@@ -13,12 +13,13 @@ import {
   orderedGlyphs,
   setNodePoint,
   updateContour,
+  glyphFileName,
 } from "@fonteditor/font-model";
 import { describe, expect, it, vi } from "vitest";
 
 import { Autosave } from "../src/autosave.js";
 import { MemoryFileStore } from "../src/file-store.js";
-import { glyphFileName } from "../src/names.js";
+
 import {
   FONT_INFO_PATH,
   JOURNAL_PATH,

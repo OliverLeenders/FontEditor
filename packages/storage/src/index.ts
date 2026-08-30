@@ -37,7 +37,11 @@ export {
   migrate,
 } from "./schema.js";
 
-export { glyphFileName } from "./names.js";
+/**
+ * Re-exported for convenience; it lives in the model now that the exporter
+ * needs the same rule for `.glif` files.
+ */
+export { glyphFileName } from "@fonteditor/font-model";
 
 export type { FileStore } from "./file-store.js";
 export { MemoryFileStore } from "./file-store.js";

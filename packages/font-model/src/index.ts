@@ -13,6 +13,8 @@
  * exist.
  */
 
+export { glyphFileName } from "./names.js";
+
 export type { ContourId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";
 

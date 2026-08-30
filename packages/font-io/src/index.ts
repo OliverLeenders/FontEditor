@@ -20,5 +20,11 @@ export { FontParseError, parseFont } from "./source.js";
 export type { ExportResult } from "./export.js";
 export { FontExportError, exportFileName, exportFont } from "./export.js";
 
+export type { UfoExport } from "./ufo.js";
+export { contourPoints, exportUfo, glif, ufoFiles } from "./ufo.js";
+
+export type { ZipEntry } from "./zip.js";
+export { crc32, zip } from "./zip.js";
+
 export type { ImportResult, ImportWarning } from "./import.js";
 export { documentFrom, importFont } from "./import.js";

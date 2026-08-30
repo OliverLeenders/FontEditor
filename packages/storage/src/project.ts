@@ -1,8 +1,13 @@
 import type { FontDocument, Glyph } from "@fonteditor/font-model";
-import { DEFAULT_FONT_INFO, fontDocument, setGlyphOrder } from "@fonteditor/font-model";
+import {
+  DEFAULT_FONT_INFO,
+  fontDocument,
+  glyphFileName,
+  setGlyphOrder,
+} from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
-import { glyphFileName } from "./names.js";
+
 import {
   type StoredGlyph,
   SCHEMA_VERSION,
