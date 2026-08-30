@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FontEditor playground</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --ink: #131922;
+        --muted: #55616F;
+        --rule: #DCE3EA;
+        --panel: rgba(255, 255, 255, 0.86);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --ink: #E5EBF2;
+          --muted: #98A6B6;
+          --rule: #232D38;
+          --panel: rgba(21, 28, 36, 0.86);
+        }
+      }
+
+      html, body { height: 100%; margin: 0; }
+      body {
+        font: 13px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: var(--ink);
+        overflow: hidden;
+      }
+
+      #surface {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+        touch-action: none;
+      }
+
+      #status {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem 1.5rem;
+        padding: 0.5rem 0.9rem;
+        background: var(--panel);
+        backdrop-filter: blur(8px);
+        border-top: 1px solid var(--rule);
+        font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+        font-size: 11.5px;
+        color: var(--muted);
+        user-select: none;
+      }
+      #status b { color: var(--ink); font-weight: 500; }
+    </style>
+  </head>
+  <body>
+    <canvas id="surface"></canvas>
+    <div id="status"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

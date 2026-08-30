@@ -1,0 +1,389 @@
+import {
+  type Cubic,
+  type Rect,
+  type TunniStatus,
+  type Vec2,
+  balance,
+  bounds,
+  lerp,
+  lineAsCubic,
+  moveTunniLine,
+  setTunniPoint,
+  split,
+  sub,
+  tunniPoint,
+  tunniStatus,
+} from "@fonteditor/geometry";
+
+import type { ContourId, IdFactory, NodeId } from "./ids.js";
+import {
+  type Node,
+  applyHvLock,
+  enforceSmooth,
+  moveNodeTo,
+  node,
+  translateNode,
+  withHandleRaw,
+} from "./node.js";
+
+/**
+ * A closed or open path, stored as its on-curve points.
+ *
+ * Segments are *derived*, never stored — see {@link segments}. That is what
+ * makes a shared on-curve point impossible to desync, because there is only ever
+ * one of it.
+ */
+export type Contour = {
+  readonly id: ContourId;
+  readonly closed: boolean;
+  readonly nodes: readonly Node[];
+};
+
+export type SegmentKind = "line" | "curve";
+
+/**
+ * A derived view of the span between two consecutive nodes.
+ *
+ * Carries the handles exactly as stored, `null` included, so callers that write
+ * files can tell a real line from a curve whose handles happen to sit on the
+ * chord. Callers that want geometry should ask for {@link segmentCubic}.
+ */
+export type Segment = {
+  readonly index: number;
+  readonly fromId: NodeId;
+  readonly toId: NodeId;
+  readonly kind: SegmentKind;
+  readonly a: Vec2;
+  readonly b: Vec2;
+  readonly out: Vec2 | null;
+  readonly in: Vec2 | null;
+};
+
+export function contour(id: ContourId, nodes: readonly Node[], closed = false): Contour {
+  return { id, closed, nodes };
+}
+
+// ---------------------------------------------------------------------------
+// derivation
+// ---------------------------------------------------------------------------
+
+/**
+ * A closed contour has as many segments as nodes, the last wrapping to the
+ * first. An open one has one fewer. Below two nodes there is nothing to span.
+ */
+export function segmentCount(c: Contour): number {
+  const n = c.nodes.length;
+  if (n < 2) return 0;
+  return c.closed ? n : n - 1;
+}
+
+export function segments(c: Contour): Segment[] {
+  const count = segmentCount(c);
+  const out: Segment[] = [];
+  for (let i = 0; i < count; i++) {
+    const segment = segmentAt(c, i);
+    if (segment !== null) out.push(segment);
+  }
+  return out;
+}
+
+export function segmentAt(c: Contour, index: number): Segment | null {
+  if (index < 0 || index >= segmentCount(c)) return null;
+  const from = c.nodes[index];
+  const to = c.nodes[(index + 1) % c.nodes.length];
+  if (from === undefined || to === undefined) return null;
+  return {
+    index,
+    fromId: from.id,
+    toId: to.id,
+    kind: from.out === null && to.in === null ? "line" : "curve",
+    a: from.pt,
+    b: to.pt,
+    out: from.out,
+    in: to.in,
+  };
+}
+
+/**
+ * The segment as a cubic, for geometric queries.
+ *
+ * A line is materialised with handles at the thirds — the exact parameterisation
+ * the prototype used for new segments. This is a *view*, and writing it back
+ * unchanged would turn the line into a curve, so treat it as read-only unless
+ * you mean to convert.
+ */
+export function segmentCubic(s: Segment): Cubic {
+  if (s.kind === "line") return lineAsCubic(s.a, s.b);
+  return { a: s.a, c1: s.out ?? s.a, c2: s.in ?? s.b, b: s.b };
+}
+
+export function nodeIndex(c: Contour, id: NodeId): number {
+  return c.nodes.findIndex((n) => n.id === id);
+}
+
+export function nodeById(c: Contour, id: NodeId): Node | null {
+  return c.nodes.find((n) => n.id === id) ?? null;
+}
+
+/** Bounding box of every segment, or `null` for a contour with no segments. */
+export function contourBounds(c: Contour): Rect | null {
+  let box: Rect | null = null;
+  for (const segment of segments(c)) {
+    box = unionRect(box, bounds(segmentCubic(segment)));
+  }
+  if (box === null && c.nodes.length === 1) {
+    const only = c.nodes[0]!;
+    return { minX: only.pt.x, minY: only.pt.y, maxX: only.pt.x, maxY: only.pt.y };
+  }
+  return box;
+}
+
+export function unionRect(a: Rect | null, b: Rect): Rect {
+  if (a === null) return b;
+  return {
+    minX: Math.min(a.minX, b.minX),
+    minY: Math.min(a.minY, b.minY),
+    maxX: Math.max(a.maxX, b.maxX),
+    maxY: Math.max(a.maxY, b.maxY),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// editing — every function is pure and returns a new contour, or null when the
+// request does not identify anything. Transactions and history live in
+// edit-core; nothing here knows about undo.
+// ---------------------------------------------------------------------------
+
+function replaceNode(c: Contour, index: number, next: Node): Contour {
+  const nodes = c.nodes.slice();
+  nodes[index] = next;
+  return { ...c, nodes };
+}
+
+export function translateNodeBy(c: Contour, id: NodeId, delta: Vec2): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+  return replaceNode(c, i, translateNode(c.nodes[i]!, delta));
+}
+
+export function setNodePoint(c: Contour, id: NodeId, pt: Vec2): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+  return replaceNode(c, i, moveNodeTo(c.nodes[i]!, pt));
+}
+
+/**
+ * Reposition one handle, honouring the node's own constraints: HV-lock first,
+ * then the smooth constraint on the opposite handle.
+ *
+ * Passing `null` retracts the handle. Retracting does not disturb the opposite
+ * side — there is no direction left to derive one from.
+ *
+ * `breakSmooth` suppresses the smooth constraint for this one move, which is
+ * what holding Alt does while dragging a handle. HV-lock still applies: the two
+ * constraints are independent, and Alt conventionally means "unlink the
+ * handles", not "ignore everything". Note that a node left with non-collinear
+ * handles is no longer smooth in fact, so the caller should also set its type to
+ * `corner` once the gesture ends — otherwise the model records something the
+ * geometry contradicts.
+ */
+export function setHandle(
+  c: Contour,
+  id: NodeId,
+  which: "in" | "out",
+  pt: Vec2 | null,
+  breakSmooth = false,
+): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+  const base = c.nodes[i]!;
+
+  if (pt === null) return replaceNode(c, i, withHandleRaw(base, which, null));
+
+  const constrained = base.hvLock ? applyHvLock(base.pt, pt) : pt;
+  const moved = withHandleRaw(base, which, constrained);
+  return replaceNode(c, i, breakSmooth ? moved : enforceSmooth(moved, which));
+}
+
+export function setNodeType(c: Contour, id: NodeId, type: Node["type"]): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+  const next: Node = { ...c.nodes[i]!, type };
+  // Adopting `smooth` should make the node smooth immediately, not merely on the
+  // next handle drag.
+  return replaceNode(c, i, type === "smooth" ? enforceSmooth(next, "out") : next);
+}
+
+export function setHvLock(c: Contour, id: NodeId, hvLock: boolean): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+  return replaceNode(c, i, { ...c.nodes[i]!, hvLock });
+}
+
+/**
+ * Write a cubic back onto the two nodes that own it.
+ *
+ * The single place where segment geometry re-enters the model, and the reason
+ * the two halves of a shared on-curve point cannot disagree: `c1` lands on one
+ * node's `out`, `c2` on the next node's `in`, and each anchor is written exactly
+ * once.
+ *
+ * Note this always produces a curve. Converting a line into one is a real edit,
+ * so make it deliberately.
+ */
+export function setSegmentCubic(c: Contour, index: number, geometry: Cubic): Contour | null {
+  if (index < 0 || index >= segmentCount(c)) return null;
+  const j = (index + 1) % c.nodes.length;
+  const from = c.nodes[index];
+  const to = c.nodes[j];
+  if (from === undefined || to === undefined) return null;
+
+  const nodes = c.nodes.slice();
+  nodes[index] = { ...from, pt: geometry.a, out: geometry.c1 };
+  nodes[j] = { ...to, pt: geometry.b, in: geometry.c2 };
+  return { ...c, nodes };
+}
+
+/** Retract both of a segment's handles, turning it into a straight line. */
+export function makeSegmentLine(c: Contour, index: number): Contour | null {
+  if (index < 0 || index >= segmentCount(c)) return null;
+  const j = (index + 1) % c.nodes.length;
+  const from = c.nodes[index];
+  const to = c.nodes[j];
+  if (from === undefined || to === undefined) return null;
+
+  const nodes = c.nodes.slice();
+  nodes[index] = { ...from, out: null };
+  nodes[j] = { ...to, in: null };
+  return { ...c, nodes };
+}
+
+/**
+ * Insert a node partway along a segment, leaving the curve's shape unchanged.
+ *
+ * For a curve this is de Casteljau: the split hands back the handles that make
+ * the two halves trace exactly what the whole did. For a line it is a plain
+ * interpolation, and the new node stays a corner with no handles, so the line
+ * stays a line.
+ */
+export function insertNodeOnSegment(
+  c: Contour,
+  index: number,
+  t: number,
+  ids: IdFactory,
+): Contour | null {
+  const segment = segmentAt(c, index);
+  if (segment === null) return null;
+  if (!(t > 0 && t < 1)) return null;
+
+  const j = (index + 1) % c.nodes.length;
+  const from = c.nodes[index];
+  const to = c.nodes[j];
+  if (from === undefined || to === undefined) return null;
+
+  const nodes = c.nodes.slice();
+  let inserted: Node;
+
+  if (segment.kind === "line") {
+    inserted = node(ids.node(), lerp(segment.a, segment.b, t));
+  } else {
+    const [left, right] = split(segmentCubic(segment), t);
+    nodes[index] = { ...from, out: left.c1 };
+    nodes[j] = { ...to, in: right.c2 };
+    inserted = node(ids.node(), left.b, { type: "smooth", in: left.c2, out: right.c1 });
+  }
+
+  nodes.splice(index + 1, 0, inserted);
+  return { ...c, nodes };
+}
+
+/**
+ * Remove a node. The neighbours keep the handles they already had, so the curve
+ * changes shape — refitting it to approximate the original is a separate,
+ * later operation.
+ */
+export function removeNode(c: Contour, id: NodeId): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+  const nodes = c.nodes.slice();
+  nodes.splice(i, 1);
+  return { ...c, nodes };
+}
+
+export function appendNode(c: Contour, n: Node): Contour {
+  return { ...c, nodes: [...c.nodes, n] };
+}
+
+export function setClosed(c: Contour, closed: boolean): Contour {
+  return { ...c, closed };
+}
+
+/**
+ * Reverse the direction of travel.
+ *
+ * Every node swaps `in` and `out`, since the segment that used to arrive now
+ * leaves. A closed contour keeps its start point where it was and reverses the
+ * rest, which is what preserves the meaning of "first node" across the
+ * operation; an open one reverses outright, because its endpoints trade places.
+ */
+export function reverseContour(c: Contour): Contour {
+  const swapped = c.nodes.map((n) => ({ ...n, in: n.out, out: n.in }));
+  if (!c.closed) return { ...c, nodes: swapped.reverse() };
+  const [first, ...rest] = swapped;
+  if (first === undefined) return c;
+  return { ...c, nodes: [first, ...rest.reverse()] };
+}
+
+// ---------------------------------------------------------------------------
+// Tunni bridge
+//
+// Each of these reads a segment, hands the cubic to the kernel, and writes the
+// result back through setSegmentCubic. The kernel stays ignorant of the model,
+// the model stays ignorant of the maths, and the null from a degenerate segment
+// propagates out untouched.
+//
+// Tunni operations preserve handle *directions* by construction, so a smooth
+// node stays smooth without any constraint being re-applied here.
+// ---------------------------------------------------------------------------
+
+export function segmentTunniStatus(c: Contour, index: number): TunniStatus | null {
+  const segment = segmentAt(c, index);
+  if (segment === null) return null;
+  if (segment.kind === "line") return "flat";
+  return tunniStatus(segmentCubic(segment));
+}
+
+export function segmentTunniPoint(c: Contour, index: number): Vec2 | null {
+  const segment = segmentAt(c, index);
+  if (segment === null || segment.kind === "line") return null;
+  return tunniPoint(segmentCubic(segment));
+}
+
+export function balanceSegment(c: Contour, index: number): Contour | null {
+  return applyToSegment(c, index, balance);
+}
+
+export function setSegmentTunniPoint(c: Contour, index: number, target: Vec2): Contour | null {
+  return applyToSegment(c, index, (geometry) => setTunniPoint(geometry, target));
+}
+
+export function moveSegmentTunniLine(c: Contour, index: number, through: Vec2): Contour | null {
+  return applyToSegment(c, index, (geometry) => moveTunniLine(geometry, through));
+}
+
+function applyToSegment(
+  c: Contour,
+  index: number,
+  operation: (geometry: Cubic) => Cubic | null,
+): Contour | null {
+  const segment = segmentAt(c, index);
+  if (segment === null || segment.kind === "line") return null;
+  const next = operation(segmentCubic(segment));
+  if (next === null) return null;
+  return setSegmentCubic(c, index, next);
+}
+
+/** The chord of a segment, useful for direction and length queries. */
+export function segmentChord(s: Segment): Vec2 {
+  return sub(s.b, s.a);
+}

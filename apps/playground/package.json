@@ -1,0 +1,23 @@
+{
+  "name": "@fonteditor/playground",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A bare harness for driving the editing surface by hand. Not the editor UI.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fonteditor/font-model": "workspace:*",
+    "@fonteditor/geometry": "workspace:*",
+    "@fonteditor/render": "workspace:*",
+    "@fonteditor/tools": "workspace:*",
+    "@fonteditor/view": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^5.4.21"
+  }
+}

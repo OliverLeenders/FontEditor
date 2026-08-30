@@ -1,0 +1,6 @@
+# Store text with LF in the repository and check it out with LF everywhere, so
+# the working copy matches .editorconfig and diffs stay clean across platforms.
+* text=auto eol=lf
+
+# Generated; keep it out of diffs and language statistics.
+pnpm-lock.yaml -diff linguist-generated=true

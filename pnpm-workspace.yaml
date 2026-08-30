@@ -1,0 +1,8 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+# pnpm blocks package install scripts by default. esbuild's postinstall links
+# its platform-specific native binary (@esbuild/win32-x64 and friends), which
+# Vitest needs in order to strip TypeScript. Without it, nothing runs.
+allowBuilds:
+  esbuild: true
