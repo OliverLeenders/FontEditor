@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { ExportFont } from "./ExportFont.js";
 import { NewFont } from "./NewFont.js";
 import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
@@ -195,6 +196,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
         <div className={styles.bar}>
           <OpenFont />
           <NewFont />
+          <ExportFont />
           <input
             type="search"
             className={styles.search}

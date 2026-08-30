@@ -17,5 +17,8 @@ export { contoursFromCommands } from "./commands.js";
 export type { SourceFont, SourceGlyph } from "./source.js";
 export { FontParseError, parseFont } from "./source.js";
 
+export type { ExportResult } from "./export.js";
+export { FontExportError, exportFileName, exportFont } from "./export.js";
+
 export type { ImportResult, ImportWarning } from "./import.js";
 export { documentFrom, importFont } from "./import.js";

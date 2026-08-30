@@ -74,13 +74,14 @@ declare module "opentype.js" {
   export interface OtGlyphInit {
     name: string;
     unicode?: number;
+    /** Several code points may map to one glyph. */
+    unicodes?: number[];
     advanceWidth: number;
     path: OtPath;
   }
 
   export interface OpenType {
     parse(buffer: ArrayBuffer): OtFont;
-    /** Used by tests to build a font to parse back; not part of the import path. */
     Font: new (init: OtFontInit) => OtFont & { toArrayBuffer(): ArrayBuffer };
     Glyph: new (init: OtGlyphInit) => OtGlyph;
     Path: new () => OtPath;
