@@ -16,6 +16,7 @@ export default defineConfig({
       "@fonteditor/font-model",
       "@fonteditor/view",
       "@fonteditor/render",
+      "@fonteditor/storage",
       "@fonteditor/tools",
     ],
   },

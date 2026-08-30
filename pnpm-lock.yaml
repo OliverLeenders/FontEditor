@@ -38,6 +38,9 @@ importers:
       '@fonteditor/render':
         specifier: workspace:*
         version: link:../../packages/render
+      '@fonteditor/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@fonteditor/tools':
         specifier: workspace:*
         version: link:../../packages/tools
@@ -83,6 +86,15 @@ importers:
       '@fonteditor/view':
         specifier: workspace:*
         version: link:../view
+
+  packages/storage:
+    dependencies:
+      '@fonteditor/font-model':
+        specifier: workspace:*
+        version: link:../font-model
+      '@fonteditor/geometry':
+        specifier: workspace:*
+        version: link:../geometry
 
   packages/tools:
     dependencies:

@@ -30,6 +30,12 @@ import {
   undo,
   undoLabelOf,
 } from "@fonteditor/edit-core";
+import {
+  Autosave,
+  type AutosaveStatus,
+  StorageClient,
+  requestPersistence,
+} from "@fonteditor/storage";
 import { fitRect, panBy, toDesign, zoomAt } from "@fonteditor/view";
 
 import { GUIDES, sampleGlyph } from "./glyph.js";
@@ -60,6 +66,33 @@ function current(): EditorState {
 
 let previewing = false;
 let panFrom: { x: number; y: number } | null = null;
+
+let storage: StorageClient | null = null;
+let storageNote = "connecting";
+let recovered = false;
+
+/**
+ * Two writes per burst of edits, and the split is the point: the journal goes
+ * down immediately so a crash inside the debounce window costs nothing, and the
+ * real save batches, then drops the journal it no longer needs.
+ */
+const autosave = new Autosave({
+  journal: async (document) => {
+    await storage?.journal(document.glyph);
+  },
+  save: async (document) => {
+    await storage?.saveGlyphs([document.glyph]);
+    await storage?.saveFontInfo([document.glyph.name]);
+  },
+  saved: () => {
+    void storage?.clearJournal();
+    render();
+  },
+  failed: (error) => {
+    storageNote = `save failed: ${error.message}`;
+    render();
+  },
+});
 
 const surface = new CanvasSurface(canvas, (ctx, size) => {
   drawScene(
@@ -100,6 +133,9 @@ function toInput(event: PointerEvent) {
 
 function apply(outcome: ToolResult): void {
   history = applyToSession(history, outcome);
+  // Cheap to call unconditionally: autosave compares by reference, so an
+  // unchanged document schedules nothing.
+  autosave.commit(current().document);
   surface.invalidate();
   render();
 }
@@ -243,6 +279,8 @@ function render(): void {
     `<b>undo</b> ${undoable ?? "—"}`,
     `<b>redo</b> ${redoable ?? "—"}`,
     `<b>steps</b> ${history.history.index}/${history.history.entries.length}`,
+    `<b>saved</b> ${savedLabel(autosave.status)}`,
+    recovered ? "<b>recovered unsaved work from the journal</b>" : "",
     "ctrl-z undoes · ctrl-shift-z redoes · esc cancels a drag",
     "shift extends · alt breaks smooth · arrows nudge",
     "space previews · wheel zooms · middle-drag pans · ctrl-0 fits",
@@ -267,6 +305,53 @@ function fitGlyph(): void {
   }
 }
 
+function savedLabel(status: AutosaveStatus): string {
+  if (storageNote !== "ok") return storageNote;
+  return status === "idle" ? "up to date" : status;
+}
+
+/**
+ * Open the store, and adopt whatever was there.
+ *
+ * Everything before this point already works without storage, and everything
+ * here is allowed to fail: a browser with no OPFS, or one that refuses a worker,
+ * should still give a usable editor that simply cannot remember anything.
+ */
+async function initStorage(): Promise<void> {
+  try {
+    const worker = new Worker(new URL("./storage.worker.ts", import.meta.url), {
+      type: "module",
+    });
+    storage = new StorageClient(worker);
+    await storage.open("project");
+
+    const loaded = await storage.load();
+    if (loaded.kind === "loaded") {
+      history = { ...history, editor: { ...current(), document: loaded.document } };
+      recovered = loaded.recovered;
+      for (const problem of loaded.problems) console.warn("[storage]", problem);
+      fitGlyph();
+    }
+
+    // A document read from the glyph files is already written; one recovered
+    // from the journal is not, and has to be flushed so disk catches up and the
+    // journal can be dropped.
+    autosave.markLoaded(current().document, recovered);
+    if (recovered) await autosave.flush();
+    storageNote = "ok";
+
+    const persisted = await requestPersistence();
+    if (!persisted) {
+      console.info("[storage] persistence not granted; the browser may evict this data");
+    }
+  } catch (error) {
+    storage = null;
+    storageNote = `unavailable (${error instanceof Error ? error.message : String(error)})`;
+  }
+  surface.invalidate();
+  render();
+}
+
 function prefersDark(): boolean {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
 }
@@ -275,6 +360,13 @@ function prefersDark(): boolean {
 // reports its intrinsic 300×150, which is smaller than the padding — `fitRect`
 // correctly refuses that, and the view silently stayed at 1:1. One frame later
 // the real size is known.
+window.addEventListener("beforeunload", () => {
+  // A best-effort last write. The journal already covers this window, so losing
+  // the race here costs nothing.
+  void autosave.flush();
+});
+
 render();
 surface.start();
 requestAnimationFrame(fitGlyph);
+void initStorage();

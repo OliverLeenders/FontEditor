@@ -9,14 +9,15 @@ derives from the reverse-engineering write-up in
 
 ## Status
 
-**Phase 2 — undo and redo.** The editing surface works and edits are undoable. Next is
-persistence (autosave to OPFS), then the pen tool as its own step.
+**Phase 2 — done.** The editing surface works, edits are undoable, and work autosaves
+to the browser's private filesystem and comes back on reload. Next is the pen tool,
+then phase 3.
 
 | Phase | | Status |
 | --- | --- | --- |
 | 0 | Foundations and the geometry kernel | done |
 | 1 | The editing surface | model, view, renderer and select tool done; pen tool pending |
-| 2 | Undo, redo, persistence | undo and redo done; persistence pending |
+| 2 | Undo, redo, persistence | done |
 | 3 | From paths to a glyph | not started |
 | 4 | From a glyph to a font | not started |
 | 5 | Binary import and export | not started |
@@ -46,6 +47,11 @@ node's handle link, arrow keys nudge, Escape cancels a drag. Ctrl-Z undoes and
 Ctrl-Shift-Z redoes. Space previews without controls, the wheel zooms, middle-drag
 pans, and Ctrl-0 refits.
 
+Edits autosave to the browser's private filesystem after a second's pause, so closing
+the tab and coming back keeps your work. Note that this store belongs to the browser,
+not to you — the files cannot be opened in a file manager. Saving a project to disk is
+a later step.
+
 ```bash
 pnpm test
 ```
@@ -67,6 +73,7 @@ packages/
   render/       Canvas drawing. Pure draw functions plus a thin surface helper.
   tools/        Pointer and keyboard tools, as pure reducers over editor state.
   edit-core/    Transactions, undo and redo over the document.
+  storage/      Autosave to OPFS, in a worker. Local-first; nothing leaves the browser.
 ```
 
 Packages are consumed directly from TypeScript source — there is no build step until

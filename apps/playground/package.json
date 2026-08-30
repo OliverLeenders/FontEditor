@@ -15,6 +15,7 @@
     "@fonteditor/font-model": "workspace:*",
     "@fonteditor/geometry": "workspace:*",
     "@fonteditor/render": "workspace:*",
+    "@fonteditor/storage": "workspace:*",
     "@fonteditor/tools": "workspace:*",
     "@fonteditor/view": "workspace:*"
   },
