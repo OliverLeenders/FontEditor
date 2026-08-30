@@ -4,8 +4,22 @@
     {
       "name": "playground",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@fonteditor/playground", "dev"],
+      "runtimeArgs": [
+        "--filter",
+        "@fonteditor/playground",
+        "dev"
+      ],
       "port": 5173
+    },
+    {
+      "name": "editor",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@fonteditor/editor",
+        "dev"
+      ],
+      "port": 5174
     }
   ]
 }

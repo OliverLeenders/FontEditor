@@ -1,0 +1,69 @@
+.strip {
+  display: flex;
+  align-items: stretch;
+  gap: .5rem;
+  padding: .35rem .5rem;
+  background: var(--surface);
+  border-top: 1px solid var(--rule);
+}
+
+.text {
+  width: 9rem;
+  flex: 0 0 auto;
+  padding: .2rem .4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: .8rem;
+}
+
+/* Wide content scrolls inside its own box; the page never scrolls sideways. */
+.cells {
+  display: flex;
+  gap: .25rem;
+  overflow-x: auto;
+  align-items: stretch;
+  flex: 1;
+  min-width: 0;
+}
+
+.cell {
+  flex: 0 0 auto;
+  width: 2.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: .1rem;
+  padding: .15rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--ground);
+  cursor: pointer;
+}
+.cell:hover { border-color: var(--rule-strong); }
+.cell[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+
+.thumb { display: block; width: 100%; height: 1.9rem; }
+
+.name {
+  font-family: var(--font-mono);
+  font-size: .58rem;
+  color: var(--ink-3);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cell[aria-pressed="true"] .name { color: var(--accent-ink); }
+
+/* A character the font has nothing for: a gap, so what you typed and what you
+   see stay in step. */
+.missing {
+  flex: 0 0 auto;
+  width: 2.6rem;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius);
+  opacity: .5;
+}

@@ -1,0 +1,22 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: .28rem .6rem;
+  background: var(--surface-2);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: .7rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.bar b { color: var(--ink-2); font-weight: 500; }
+
+.warn { color: var(--warn); }
+
+.hints {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

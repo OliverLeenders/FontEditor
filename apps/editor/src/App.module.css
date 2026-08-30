@@ -1,0 +1,27 @@
+.shell {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  height: 100%;
+}
+
+/* The canvas gets everything the bars do not, and the inspector floats over it
+   rather than taking a column of its own. */
+.stage {
+  position: relative;
+  min-height: 0;
+  background: var(--canvas);
+}
+
+.reveal {
+  position: absolute;
+  top: .6rem;
+  right: .6rem;
+  padding: .25rem .6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: .78rem;
+  color: var(--ink-2);
+}
+.reveal:hover { color: var(--ink); border-color: var(--accent); }

@@ -1,6 +1,7 @@
 import { type Vec2, handleIntersection } from "@fonteditor/geometry";
 import {
   type Contour,
+  type Glyph,
   type Node,
   type Segment,
   segmentCubic,
@@ -17,6 +18,7 @@ import {
 } from "@fonteditor/view";
 
 import type { Canvas2D } from "./context.js";
+import type { RenderPalette } from "./palette.js";
 import type { Scene } from "./scene.js";
 
 const TAU = Math.PI * 2;
@@ -356,6 +358,48 @@ function traceContour(ctx: Canvas2D, view: ViewTransform, c: Contour): void {
   }
 
   if (c.closed) ctx.closePath();
+}
+
+/**
+ * Draw a glyph small, fitted to a box, with no controls.
+ *
+ * Its own entry point rather than a `Scene` with everything switched off: a
+ * thumbnail wants a different view transform per cell and none of the scene's
+ * apparatus, and threading a whole scene through to draw one filled outline
+ * would be ceremony without benefit.
+ *
+ * Fits by the em rather than by the glyph's own bounds, so a row of thumbnails
+ * shares a baseline and a scale — an `l` and an `o` look like they belong to the
+ * same font, which is the entire point of seeing them side by side.
+ */
+export function drawGlyphThumbnail(
+  ctx: Canvas2D,
+  glyph: Glyph,
+  box: { x: number; y: number; width: number; height: number },
+  palette: RenderPalette,
+  metrics: { unitsPerEm: number; ascender: number; descender: number },
+  padding = 4,
+): void {
+  const span = metrics.ascender - metrics.descender;
+  if (span <= 0) return;
+
+  const usable = box.height - padding * 2;
+  if (usable <= 0) return;
+
+  const scale = usable / span;
+  const view: ViewTransform = {
+    scale,
+    tx: box.x + box.width / 2 - (glyph.advance / 2) * scale,
+    ty: box.y + padding + metrics.ascender * scale,
+  };
+
+  const drawable = glyph.contours.filter((c) => c.nodes.length >= 2);
+  if (drawable.length === 0) return;
+
+  ctx.beginPath();
+  for (const c of drawable) traceContour(ctx, view, c);
+  ctx.fillStyle = palette.outline;
+  ctx.fill();
 }
 
 /** True when `ref` is one of the segments showing its Tunni controls. */

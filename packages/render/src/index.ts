@@ -32,6 +32,7 @@ export { DEFAULT_METRICS, DEFAULT_OPTIONS, scene } from "./scene.js";
 export {
   clearBackground,
   drawFilledPreview,
+  drawGlyphThumbnail,
   drawGuides,
   drawHandles,
   drawMarquee,

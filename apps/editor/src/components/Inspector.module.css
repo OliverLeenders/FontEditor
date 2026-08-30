@@ -1,0 +1,93 @@
+.panel {
+  position: absolute;
+  width: 12.5rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  user-select: none;
+}
+
+.grip {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  padding: .3rem .3rem .3rem .6rem;
+  border-bottom: 1px solid var(--rule);
+  cursor: grab;
+  touch-action: none;
+}
+.grip:active { cursor: grabbing; }
+
+.title {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  color: var(--ink);
+}
+
+.dismiss {
+  width: 1.2rem;
+  height: 1.2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  color: var(--ink-3);
+  font-size: .95rem;
+  line-height: 1;
+}
+.dismiss:hover { background: var(--surface-2); color: var(--ink); }
+
+.body { display: flex; flex-direction: column; gap: .5rem; padding: .55rem .6rem .65rem; }
+
+.field { display: flex; flex-direction: column; gap: .18rem; }
+
+.label {
+  font-family: var(--font-mono);
+  font-size: .63rem;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.input {
+  width: 100%;
+  padding: .18rem .35rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.readonly {
+  font-family: var(--font-mono);
+  font-size: .76rem;
+  color: var(--ink-2);
+}
+
+.rule { height: 1px; background: var(--rule); }
+
+.segmented { display: flex; gap: .2rem; }
+.segmented button {
+  flex: 1;
+  padding: .2rem 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  cursor: pointer;
+  font-size: .74rem;
+  color: var(--ink-2);
+}
+.segmented button:hover:not(:disabled) { color: var(--ink); }
+.segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+}
+.segmented button:disabled { opacity: .38; cursor: default; }

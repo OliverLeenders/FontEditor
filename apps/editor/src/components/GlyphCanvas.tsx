@@ -1,0 +1,143 @@
+import { CanvasSurface, drawScene } from "@fonteditor/render";
+import {
+  doubleClick,
+  keyDown,
+  pointerDown,
+  pointerLeave,
+  pointerMove,
+  pointerUp,
+} from "@fonteditor/tools";
+import { panBy, toDesign, zoomAt } from "@fonteditor/view";
+import { useEffect, useRef } from "react";
+
+import { sceneFor } from "../scene.js";
+import { useEditorStore } from "../useStore.js";
+import styles from "./GlyphCanvas.module.css";
+
+/**
+ * The canvas, and the one component that deliberately never re-renders.
+ *
+ * It subscribes to the store imperatively and asks the surface to redraw. A drag
+ * therefore costs one canvas frame per animation frame and no React work at all
+ * — no reconciliation of the tabs, the toolbar, the inspector or the strip,
+ * sixty times a second, to move a single node.
+ */
+export function GlyphCanvas(): JSX.Element {
+  const store = useEditorStore();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const surfaceRef = useRef<CanvasSurface | null>(null);
+  const panFrom = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return;
+
+    const surface = new CanvasSurface(canvas, (ctx, size) => {
+      store.setViewport(size.width, size.height);
+      drawScene(ctx, sceneFor(store.getState(), size));
+    });
+    surfaceRef.current = surface;
+    surface.start();
+
+    const unsubscribe = store.subscribe(() => surface.invalidate());
+    const onScheme = (): void => surface.invalidate();
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    media?.addEventListener("change", onScheme);
+
+    return () => {
+      unsubscribe();
+      media?.removeEventListener("change", onScheme);
+      surface.destroy();
+      surfaceRef.current = null;
+    };
+  }, [store]);
+
+  /** The one place screen pixels become design units. */
+  const toInput = (event: React.PointerEvent<HTMLCanvasElement> | PointerEvent) => {
+    const surface = surfaceRef.current;
+    const view = store.editor.view;
+    const point = surface === null
+      ? { x: 0, y: 0 }
+      : toDesign(view, surface.toCanvasPoint(event));
+    return {
+      point,
+      modifiers: {
+        shift: event.shiftKey,
+        alt: event.altKey,
+        ctrl: event.ctrlKey,
+        meta: event.metaKey,
+      },
+    };
+  };
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className={styles.canvas}
+      tabIndex={0}
+      aria-label="Glyph editing canvas"
+      onPointerDown={(event) => {
+        event.currentTarget.focus();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        if (event.button === 1) {
+          panFrom.current = { x: event.clientX, y: event.clientY };
+          return;
+        }
+        if (event.button !== 0) return;
+        store.applyTool(pointerDown(store.editor, toInput(event)));
+      }}
+      onPointerMove={(event) => {
+        const from = panFrom.current;
+        if (from !== null) {
+          store.setView(panBy(store.editor.view, event.clientX - from.x, event.clientY - from.y));
+          panFrom.current = { x: event.clientX, y: event.clientY };
+          return;
+        }
+        store.applyTool(pointerMove(store.editor, toInput(event)));
+      }}
+      onPointerUp={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        if (panFrom.current !== null) {
+          panFrom.current = null;
+          return;
+        }
+        store.applyTool(pointerUp(store.editor, toInput(event)));
+      }}
+      onPointerCancel={() => {
+        panFrom.current = null;
+        store.applyTool(pointerUp(store.editor));
+      }}
+      onPointerLeave={() => {
+        if (panFrom.current === null) store.applyTool(pointerLeave(store.editor));
+      }}
+      onDoubleClick={(event) => {
+        store.applyTool(doubleClick(store.editor, toInput(event as unknown as PointerEvent)));
+      }}
+      onWheel={(event) => {
+        const surface = surfaceRef.current;
+        if (surface === null) return;
+        const anchor = surface.toCanvasPoint(event.nativeEvent);
+        store.setView(zoomAt(store.editor.view, anchor, Math.exp(-event.deltaY * 0.0015)));
+      }}
+      onKeyDown={(event) => {
+        // Tool keys and Escape belong to the tools; the application's own
+        // shortcuts are handled higher up, on the window.
+        if (event.ctrlKey || event.metaKey) return;
+        if (event.key.startsWith("Arrow") || event.key === "Backspace") event.preventDefault();
+        store.applyTool(
+          keyDown(store.editor, {
+            key: event.key,
+            modifiers: {
+              shift: event.shiftKey,
+              alt: event.altKey,
+              ctrl: event.ctrlKey,
+              meta: event.metaKey,
+            },
+          }),
+        );
+      }}
+    />
+  );
+}

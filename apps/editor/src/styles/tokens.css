@@ -1,0 +1,81 @@
+/*
+ * The design tokens, defined once and globally.
+ *
+ * Global on purpose, unlike every other stylesheet here: the canvas reads the
+ * same palette through `RenderPalette`, so a colour that only existed inside a
+ * CSS Module could not be shared with what is drawn. Light is the base and dark
+ * redefines only the tokens, so a component never needs to know which is active.
+ */
+:root {
+  --ground: #F6F8FA;
+  --surface: #FFFFFF;
+  --surface-2: #EEF2F6;
+  --canvas: #FBFCFD;
+  --ink: #131922;
+  --ink-2: #55616F;
+  --ink-3: #7C8896;
+  --rule: #DCE3EA;
+  --rule-strong: #C2CDD8;
+  --accent: #2C6DAF;
+  --accent-ink: #1F548A;
+  --accent-soft: #E4EEF8;
+  --warn: #A96F22;
+  --shadow: 0 2px 4px rgba(19, 25, 34, .06), 0 10px 28px -14px rgba(19, 25, 34, .30);
+
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+
+  --bar: 2.1rem;
+  --radius: 3px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0D1218;
+    --surface: #151C24;
+    --surface-2: #1B242E;
+    --canvas: #10171F;
+    --ink: #E5EBF2;
+    --ink-2: #98A6B6;
+    --ink-3: #74828F;
+    --rule: #232D38;
+    --rule-strong: #33404E;
+    --accent: #74AEE2;
+    --accent-ink: #A6CCEE;
+    --accent-soft: #142838;
+    --warn: #D6A05A;
+    --shadow: 0 2px 4px rgba(0, 0, 0, .35), 0 10px 28px -14px rgba(0, 0, 0, .8);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button { font: inherit; color: inherit; }
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/*
+ * The canvas is focusable so it can receive tool keys, which means it also gets
+ * a focus ring — and a ring around the entire working surface is a lot of blue
+ * for something you reach every time you click. Quieter and inset: still a clear
+ * signal to a keyboard user, not a frame around the work.
+ */
+canvas:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}

@@ -9,10 +9,10 @@ derives from the reverse-engineering write-up in
 
 ## Status
 
-**Phases 0–2 done, and the document now holds a whole font.** You can draw contours,
-edit them with Tunni lines, undo, switch between glyphs, and your work autosaves and
-comes back on reload. Next is the editor shell — tabs, toolbar, floating inspector,
-glyph strip and a glyph browser — then the per-glyph work of phase 3.
+**There is a real editor now.** Tabs, a toolbar, a floating inspector and a glyph strip
+around a canvas where you draw contours, edit them with Tunni lines, undo, and switch
+glyphs — with everything autosaving. Next is the glyph browser, then the per-glyph work
+of phase 3.
 
 | Phase | | Status |
 | --- | --- | --- |
@@ -36,10 +36,17 @@ Requires Node 20+ and pnpm.
 pnpm install
 ```
 
-Then run the playground and open http://localhost:5173:
+Then run the editor and open http://localhost:5174:
 
 ```bash
 pnpm dev
+```
+
+The playground is a bare canvas harness kept for isolating rendering and tool problems
+without the interface around them:
+
+```bash
+pnpm dev:playground
 ```
 
 Use PgUp and PgDn to move between glyphs. Press `V` for the select tool and `P` for the pen. With the pen, click for a corner
@@ -69,7 +76,8 @@ pnpm typecheck
 
 ```
 apps/
-  playground/   A bare harness for driving the surface by hand. Not the editor UI.
+  editor/       The editor: shell, panels, and the canvas.
+  playground/   A bare canvas harness, for isolating rendering and tool problems.
 
 packages/
   geometry/     Vec2, cubic Béziers, and the Tunni-line kernel. Pure; no DOM.
