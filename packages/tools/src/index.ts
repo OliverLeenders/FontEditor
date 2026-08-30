@@ -33,6 +33,7 @@ export {
 
 export {
   balanceSegmentAt,
+  centreCurrentGlyph,
   clearSelection,
   convertSegment,
   deleteSelectedPoints,

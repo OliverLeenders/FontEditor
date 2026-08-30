@@ -145,7 +145,7 @@ export function GlyphCanvas({
           glyph === undefined
             ? null
             : pick(
-                buildHitIndex(glyph, tunniSegments(editor)),
+                buildHitIndex(glyph, tunniSegments(editor), true),
                 point,
                 screenTolerance(editor.view, 11),
               );

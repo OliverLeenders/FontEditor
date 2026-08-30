@@ -8,8 +8,10 @@ import {
   segmentAt,
   segmentIndexForHandle,
   setHandle,
+  setLeftSidebearing,
   setNodeType,
   setSegmentTunniPoint,
+  sidebearings,
   translateNodeBy,
   updateContour,
   updateGlyph,
@@ -51,6 +53,15 @@ export type SelectOptions = {
   readonly nudge?: number;
   /** Arrow-key step with shift held. */
   readonly largeNudge?: number;
+  /**
+   * Whether the margin lines are grabbable.
+   *
+   * Must match whether the surface actually draws them — same contract as the
+   * Tunni controls, and for the same reason: a target you cannot see is a click
+   * on empty canvas that silently does something. Defaults to true because the
+   * renderer draws them by default.
+   */
+  readonly margins?: boolean;
 };
 
 const DEFAULT_HIT_PIXELS = 11;
@@ -82,7 +93,43 @@ export function pointerDown(
       return startTunniDrag(base, input, "dragTunniLine", target.segmentIndex, target.contourId);
     case "segment":
       return selectSegmentEnds(base, input, target);
+    case "originLine":
+    case "advanceLine":
+      return startMarginDrag(base, input, target.kind === "originLine" ? "origin" : "advance");
   }
+}
+
+/**
+ * Begin dragging a margin line.
+ *
+ * The selection is cleared first. These lines belong to the glyph as a whole, and
+ * leaving points selected would make the next arrow-key nudge move them rather
+ * than doing what the spacing gesture just implied.
+ */
+function startMarginDrag(
+  state: EditorState,
+  input: PointerInput,
+  side: "origin" | "advance",
+): ToolResult {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return result(state);
+
+  return result(
+    {
+      ...state,
+      selection: [],
+      gesture: {
+        kind: "dragMargin",
+        origin: input.point,
+        side,
+        startAdvance: glyph.advance,
+        startLeft: sidebearings(glyph)?.left ?? null,
+        before: state.document,
+        moved: false,
+      },
+    },
+    [begin(side === "origin" ? "Move glyph" : "Set advance", false)],
+  );
 }
 
 export function pointerMove(state: EditorState, input: PointerInput): ToolResult {
@@ -142,6 +189,30 @@ export function pointerMove(state: EditorState, input: PointerInput): ToolResult
         ...withCursor,
         document: next ?? state.document,
         gesture: { ...gesture, moved: gesture.moved || (next !== null && budged) },
+      });
+    }
+
+    case "dragMargin": {
+      // The origin line cannot itself move — it *is* x = 0. Dragging it means
+      // "put this much space before the glyph", so the outline follows the
+      // cursor and the advance grows with it, holding the right sidebearing.
+      // The advance line does move, and changes the advance alone.
+      const document =
+        gesture.side === "advance"
+          ? updateGlyph(gesture.before, state.currentGlyph, (g) => ({
+              ...g,
+              advance: Math.max(0, gesture.startAdvance + delta.x),
+            }))
+          : gesture.startLeft === null
+            ? null
+            : updateGlyph(gesture.before, state.currentGlyph, (g) =>
+                setLeftSidebearing(g, gesture.startLeft! + delta.x),
+              );
+
+      return result({
+        ...withCursor,
+        document: document ?? gesture.before,
+        gesture: { ...gesture, moved: gesture.moved || budged },
       });
     }
 
@@ -339,7 +410,11 @@ export function translateSelection(g: Glyph, selection: Selection, delta: Vec2):
 // ---------------------------------------------------------------------------
 
 function pickAt(state: EditorState, p: Vec2, options: SelectOptions): HitTarget | null {
-  const index = buildHitIndex(currentGlyph(state) ?? EMPTY_GLYPH, tunniSegments(state));
+  const index = buildHitIndex(
+    currentGlyph(state) ?? EMPTY_GLYPH,
+    tunniSegments(state),
+    options.margins ?? true,
+  );
   const tolerance = screenTolerance(state.view, options.hitPixels ?? DEFAULT_HIT_PIXELS);
   return pick(index, p, tolerance);
 }

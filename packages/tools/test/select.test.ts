@@ -12,6 +12,7 @@ import {
   nodeById,
   orderedGlyphs,
   segmentTunniPoint,
+  sidebearings,
 } from "@fonteditor/font-model";
 import type { Selection, ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
@@ -27,7 +28,7 @@ import {
   pointerMove,
   pointerUp,
 } from "../src/select.js";
-import { type EditorState, editorState, marqueeRect, tunniSegments } from "../src/state.js";
+import { type EditorState, currentGlyph, editorState, marqueeRect, tunniSegments } from "../src/state.js";
 
 /** The document holds many glyphs now; these tests each work with one. */
 const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
@@ -287,11 +288,12 @@ describe("selecting", () => {
 describe("marquee", () => {
   it("selects everything inside the rectangle", () => {
     const { state } = start();
-    let s = pointerDown(state, pointerInput(vec(0, 400))).state;
+    // Started clear of x = 0, which is the origin line and grabbable now.
+    let s = pointerDown(state, pointerInput(vec(-40, 400))).state;
     s = pointerMove(s, pointerInput(vec(700, 800))).state;
     // Three nodes plus four handles.
     expect(s.selection).toHaveLength(7);
-    expect(marqueeRect(s)).toEqual({ minX: 0, minY: 400, maxX: 700, maxY: 800 });
+    expect(marqueeRect(s)).toEqual({ minX: -40, minY: 400, maxX: 700, maxY: 800 });
   });
 
   it("catches handles independently of their nodes", () => {
@@ -485,7 +487,8 @@ describe("cancelling", () => {
   it("restores the selection a marquee replaced", () => {
     const { state } = start();
     const selected = pointerUp(pointerDown(state, pointerInput(vec(540, 480))).state).state;
-    let s = pointerDown(selected, pointerInput(vec(0, 400))).state;
+    // Clear of x = 0, which the origin line now occupies.
+    let s = pointerDown(selected, pointerInput(vec(-40, 400))).state;
     s = pointerMove(s, pointerInput(vec(700, 800))).state;
     expect(s.selection).toHaveLength(7);
 
@@ -565,5 +568,72 @@ describe("purity", () => {
     s = pointerMove(s, pointerInput(vec(700, 800))).state;
     const selection: Selection = s.selection;
     expect(JSON.parse(JSON.stringify(selection))).toEqual(selection);
+  });
+});
+
+describe("margin lines", () => {
+  it("starts a margin drag when pressed on, not a marquee", () => {
+    const { state } = start();
+    const s = pointerDown(state, pointerInput(vec(0, 400))).state;
+    expect(s.gesture?.kind).toBe("dragMargin");
+  });
+
+  it("dragging the advance line changes the advance and nothing else", () => {
+    const { state } = start();
+    const before = currentGlyph(state)!;
+
+    let s = pointerDown(state, pointerInput(vec(before.advance, 300))).state;
+    s = pointerMove(s, pointerInput(vec(before.advance + 120, 300))).state;
+    const after = currentGlyph(s)!;
+
+    expect(after.advance).toBe(before.advance + 120);
+    expect(after.contours).toEqual(before.contours);
+  });
+
+  it("never drives the advance negative", () => {
+    const { state } = start();
+    const before = currentGlyph(state)!;
+
+    let s = pointerDown(state, pointerInput(vec(before.advance, 300))).state;
+    s = pointerMove(s, pointerInput(vec(before.advance - 99999, 300))).state;
+    expect(currentGlyph(s)!.advance).toBe(0);
+  });
+
+  it("dragging the origin line moves the outline and holds the right sidebearing", () => {
+    const { state } = start();
+    const before = currentGlyph(state)!;
+    const rightBefore = sidebearings(before)!.right;
+
+    let s = pointerDown(state, pointerInput(vec(0, 400))).state;
+    s = pointerMove(s, pointerInput(vec(75, 400))).state;
+    const after = currentGlyph(s)!;
+
+    expect(sidebearings(after)!.left).toBeCloseTo(sidebearings(before)!.left + 75, 6);
+    expect(sidebearings(after)!.right).toBeCloseTo(rightBefore, 6);
+    expect(after.advance).toBe(before.advance + 75);
+  });
+
+  it("clears the selection, so a later nudge does not move points instead", () => {
+    const { state } = start();
+    const selected = pointerUp(pointerDown(state, pointerInput(vec(540, 480))).state).state;
+    expect(selected.selection.length).toBeGreaterThan(0);
+
+    const s = pointerDown(selected, pointerInput(vec(0, 400))).state;
+    expect(s.selection).toEqual([]);
+  });
+
+  it("commits once the drag has moved, and aborts when it has not", () => {
+    const { state } = start();
+    const pressed = pointerDown(state, pointerInput(vec(0, 400))).state;
+    expect(pointerUp(pressed).effects.map((e) => e.kind)).toContain("abortTransaction");
+
+    const moved = pointerMove(pressed, pointerInput(vec(60, 400))).state;
+    expect(pointerUp(moved).effects.map((e) => e.kind)).toContain("commitTransaction");
+  });
+
+  it("is not offered when the surface does not draw margins", () => {
+    const { state } = start();
+    const s = pointerDown(state, pointerInput(vec(0, 400)), { margins: false }).state;
+    expect(s.gesture?.kind).toBe("marquee");
   });
 });

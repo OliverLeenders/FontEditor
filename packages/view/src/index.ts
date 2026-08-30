@@ -65,6 +65,7 @@ export {
 export type { Hit, HitIndex, HitKind, HitTarget } from "./hit.js";
 export {
   PICK_PRIORITY,
+  PICK_TOLERANCE_SCALE,
   buildHitIndex,
   distanceToTarget,
   nodesInRect,

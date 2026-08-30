@@ -1,6 +1,7 @@
 import { contourById, randomIds, segmentAt } from "@fonteditor/font-model";
 import {
   balanceSegmentAt,
+  centreCurrentGlyph,
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
@@ -110,6 +111,14 @@ function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       { kind: "item", label: "Reverse contour", run: () => store.applyTool(reverseContourAt(editor, contourId)) },
     );
     return items;
+  }
+
+  if (target.kind === "originLine" || target.kind === "advanceLine") {
+    // The margin lines are about the glyph as a whole, so the menu offers the
+    // one spacing operation that is tedious to do with two number fields.
+    return [
+      { kind: "item", label: "Centre glyph", run: () => store.applyTool(centreCurrentGlyph(editor)) },
+    ];
   }
 
   const segment =

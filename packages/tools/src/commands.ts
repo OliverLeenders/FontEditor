@@ -5,6 +5,7 @@ import {
   type NodeId,
   type NodeType,
   balanceSegment,
+  centreGlyph,
   contourById,
   insertNodeOnSegment,
   makeSegmentCurve,
@@ -225,6 +226,16 @@ export function segmentForHandle(
   if (c === null) return null;
   const segmentIndex = segmentIndexForHandle(c, nodeId, part);
   return segmentIndex === null ? null : { contourId, segmentIndex };
+}
+
+// ---------------------------------------------------------------------------
+// spacing
+// ---------------------------------------------------------------------------
+
+/** Equal space either side, within the advance the glyph already has. */
+export function centreCurrentGlyph(state: EditorState): ToolResult {
+  const document = editCurrentGlyph(state, (g) => centreGlyph(g));
+  return done(state, document === null ? null : { ...state, document }, "Centre glyph");
 }
 
 // ---------------------------------------------------------------------------

@@ -58,6 +58,23 @@ export type Gesture =
       readonly moved: boolean;
     }
   | {
+      /**
+       * Dragging one of the lines that bound the advance width.
+       *
+       * `startAdvance` and `startLeft` are captured at the press so every move
+       * is computed from where the drag began. Applying each move to the *current*
+       * value instead would compound rounding across a drag and let the glyph
+       * creep away from the cursor.
+       */
+      readonly kind: "dragMargin";
+      readonly origin: Vec2;
+      readonly side: "origin" | "advance";
+      readonly startAdvance: number;
+      readonly startLeft: number | null;
+      readonly before: FontDocument;
+      readonly moved: boolean;
+    }
+  | {
       readonly kind: "marquee";
       readonly origin: Vec2;
       readonly current: Vec2;

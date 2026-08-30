@@ -24,13 +24,17 @@ export type HitKind =
   | "handleOut"
   | "tunniPoint"
   | "tunniLine"
-  | "segment";
+  | "segment"
+  | "originLine"
+  | "advanceLine";
 
 export type HitTarget =
   | { readonly kind: "node" | "handleIn" | "handleOut"; readonly contourId: ContourId; readonly nodeId: NodeId; readonly point: Vec2 }
   | { readonly kind: "tunniPoint"; readonly contourId: ContourId; readonly segmentIndex: number; readonly point: Vec2 }
   | { readonly kind: "tunniLine"; readonly contourId: ContourId; readonly segmentIndex: number; readonly from: Vec2; readonly to: Vec2 }
-  | { readonly kind: "segment"; readonly contourId: ContourId; readonly segmentIndex: number; readonly cubic: Cubic; readonly status: TunniStatus };
+  | { readonly kind: "segment"; readonly contourId: ContourId; readonly segmentIndex: number; readonly cubic: Cubic; readonly status: TunniStatus }
+  /** The vertical lines bounding the advance width. Full height, so only x matters. */
+  | { readonly kind: "originLine" | "advanceLine"; readonly x: number };
 
 /**
  * Pick order when several targets sit under the cursor at once. Lower wins.
@@ -48,6 +52,11 @@ export const PICK_PRIORITY: Readonly<Record<HitKind, number>> = {
   handleOut: 2,
   tunniLine: 3,
   segment: 4,
+  // Last, and deliberately so. They run the full height of the canvas, so they
+  // are under the cursor far more often than anything else; letting them
+  // outrank a node would make points near the origin unpickable.
+  originLine: 5,
+  advanceLine: 5,
 };
 
 export type HitIndex = {
@@ -73,8 +82,17 @@ export type HitIndex = {
 export function buildHitIndex(
   g: Glyph,
   tunniSegments: readonly SegmentRef[] = [],
+  margins = false,
 ): HitIndex {
   const targets: HitTarget[] = [];
+
+  // Off by default: the same rule as the Tunni controls, that only something
+  // drawn may be grabbed. A surface not showing margins must not have invisible
+  // ones to catch drags.
+  if (margins) {
+    targets.push({ kind: "originLine", x: 0 });
+    targets.push({ kind: "advanceLine", x: g.advance });
+  }
 
   for (const c of g.contours) {
     for (const n of c.nodes) {
@@ -145,8 +163,28 @@ export function distanceToTarget(target: HitTarget, p: Vec2): number {
       return distanceToSegment(target.from, target.to, p);
     case "segment":
       return project(target.cubic, p).distance;
+    case "originLine":
+    case "advanceLine":
+      // Vertical and unbounded, so only the horizontal gap counts.
+      return Math.abs(p.x - target.x);
   }
 }
+
+/**
+ * Per-kind adjustment to the pick radius, as a fraction of the usual tolerance.
+ *
+ * The margin lines run the full height of the canvas, which makes them vastly
+ * larger targets than anything else on it. At the ordinary radius a drag begun
+ * anywhere near the origin would grab the line instead of starting a marquee, so
+ * they ask to be aimed at rather than merely approached.
+ *
+ * Nothing else appears here: every other target is small enough that the plain
+ * tolerance is the right one.
+ */
+export const PICK_TOLERANCE_SCALE: Readonly<Partial<Record<HitKind, number>>> = {
+  originLine: 0.4,
+  advanceLine: 0.4,
+};
 
 export type Hit = {
   readonly target: HitTarget;
@@ -167,7 +205,9 @@ export function pickAll(index: HitIndex, p: Vec2, tolerance: number): Hit[] {
   const hits: Hit[] = [];
   for (const target of index.targets) {
     const d = distanceToTarget(target, p);
-    if (d <= tolerance) hits.push({ target, distance: d });
+    if (d <= tolerance * (PICK_TOLERANCE_SCALE[target.kind] ?? 1)) {
+      hits.push({ target, distance: d });
+    }
   }
   hits.sort((l, r) => {
     const byPriority = PICK_PRIORITY[l.target.kind] - PICK_PRIORITY[r.target.kind];
