@@ -52,6 +52,9 @@ export {
   segmentProximity,
 } from "./proximity.js";
 
+export type { GlyphRun, PlacedGlyph } from "./run.js";
+export { EMPTY_RUN, glyphAtX, layoutRun, occurrencesOf, placedAt } from "./run.js";
+
 export type { CellBox, GridLayout, GridOptions } from "./grid.js";
 export {
   DEFAULT_GRID,

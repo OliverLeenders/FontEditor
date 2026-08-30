@@ -51,5 +51,14 @@ export {
   isActive,
 } from "./draw.js";
 
+export type { RunScene } from "./run.js";
+export {
+  drawBaseline,
+  drawGlyphs,
+  drawRun,
+  drawRunMargins,
+  drawSelectionBands,
+} from "./run.js";
+
 export type { FrameCallback } from "./surface.js";
 export { CanvasSurface } from "./surface.js";

@@ -12,6 +12,7 @@ import {
   orderedGlyphs,
   segmentAt,
   segmentCount,
+  sidebearings,
 } from "@fonteditor/font-model";
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
@@ -22,6 +23,7 @@ import {
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
+  nudgeSidebearing,
   nodeHvLocked,
   retractHandle,
   reverseContourAt,
@@ -372,5 +374,78 @@ describe("transactions", () => {
   it("does not record a selection change", () => {
     const { s } = start();
     expect(selectAllPoints(s).effects).toEqual([]);
+  });
+});
+
+describe("nudgeSidebearing", () => {
+  const named = () => {
+    const ids = counterIds();
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(100, 0)),
+        node(ids.node(), vec(400, 0)),
+        node(ids.node(), vec(400, 700)),
+      ],
+      true,
+    );
+    const document = fontDocument([
+      glyph("n", { unicodes: [0x6e], advance: 500, contours: [c] }),
+      glyph("space", { unicodes: [0x20], advance: 250 }),
+    ]);
+    return editorState({ document, view: { scale: 1, tx: 0, ty: 0 }, currentGlyph: "space" });
+  };
+
+  const bearings = (s: EditorState, name: string) => sidebearings(s.document.glyphs[name]!)!;
+
+  it("moves the left bearing of a glyph that is not the current one", () => {
+    const state = named();
+    expect(state.currentGlyph).toBe("space");
+
+    const { state: next } = nudgeSidebearing(state, "n", "left", 12);
+    expect(bearings(next, "n").left).toBe(112);
+    // The right bearing is held, so the advance moved with it.
+    expect(bearings(next, "n").right).toBe(bearings(state, "n").right);
+    expect(next.document.glyphs["n"]!.advance).toBe(512);
+  });
+
+  it("moves the right bearing by changing the advance alone", () => {
+    const state = named();
+    const { state: next } = nudgeSidebearing(state, "n", "right", -20);
+    expect(bearings(next, "n").right).toBe(80);
+    expect(bearings(next, "n").left).toBe(100);
+    expect(next.document.glyphs["n"]!.advance).toBe(480);
+  });
+
+  it("accepts a negative bearing rather than clamping at zero", () => {
+    const state = named();
+    const { state: next } = nudgeSidebearing(state, "n", "left", -150);
+    expect(bearings(next, "n").left).toBe(-50);
+  });
+
+  it("does nothing for a step of zero, and records no transaction", () => {
+    const state = named();
+    const out = nudgeSidebearing(state, "n", "left", 0);
+    expect(out.state).toBe(state);
+    expect(out.effects).toEqual([]);
+  });
+
+  it("declines on a glyph with no outline, leaving the document alone", () => {
+    const state = named();
+    const out = nudgeSidebearing(state, "space", "left", 10);
+    expect(out.state.document).toBe(state.document);
+  });
+
+  it("declines on a glyph that is not there", () => {
+    const state = named();
+    expect(nudgeSidebearing(state, "missing", "left", 10).state.document).toBe(state.document);
+  });
+
+  it("labels the entry by side and glyph, so repeats coalesce and others do not", () => {
+    const state = named();
+    const left = nudgeSidebearing(state, "n", "left", 1).effects[0];
+    const right = nudgeSidebearing(state, "n", "right", 1).effects[0];
+    expect(left).toMatchObject({ label: "Left sidebearing of n" });
+    expect(right).toMatchObject({ label: "Right sidebearing of n" });
   });
 });

@@ -1,0 +1,89 @@
+.spacing {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 0;
+  height: 100%;
+  background: var(--canvas);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .5rem .7rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+/* The text being spaced is the subject of the view, so it gets the room. */
+.text {
+  flex: 1;
+  min-width: 0;
+  padding: .3rem .6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: .9rem;
+  letter-spacing: .04em;
+}
+.text:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.sizeLabel {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  flex: none;
+  font-size: .76rem;
+  color: var(--ink-2);
+}
+
+.size { width: 8rem; }
+
+.sizeValue {
+  min-width: 2.2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: .76rem;
+  color: var(--ink-2);
+}
+
+.stage {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+.stage:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+
+.canvas { display: block; width: 100%; height: 100%; }
+
+.readout {
+  display: flex;
+  align-items: baseline;
+  gap: 1.1rem;
+  padding: .45rem .8rem;
+  border-top: 1px solid var(--rule);
+  background: var(--surface);
+  font-size: .78rem;
+  color: var(--ink-2);
+  min-height: 1.9rem;
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: .82rem;
+  color: var(--ink);
+}
+
+.value { font-variant-numeric: tabular-nums; color: var(--ink); }
+
+.valueLabel {
+  color: var(--ink-2);
+  margin-right: .35rem;
+  font-size: .72rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.hint { color: var(--ink-3, var(--ink-2)); }

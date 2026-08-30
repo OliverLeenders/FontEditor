@@ -355,7 +355,7 @@ function haloedDisc(ctx: Canvas2D, s: Scene, p: Vec2, r: number, colour: string)
  * handles. The difference is invisible on screen and matters anyway: the path
  * the renderer traces should be the path the model describes.
  */
-function traceContour(ctx: Canvas2D, view: ViewTransform, c: Contour): void {
+export function traceContour(ctx: Canvas2D, view: ViewTransform, c: Contour): void {
   const first = c.nodes[0];
   if (first === undefined) return;
 

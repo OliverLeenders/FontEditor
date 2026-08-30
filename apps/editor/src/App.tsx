@@ -5,6 +5,7 @@ import { GlyphBrowser } from "./components/GlyphBrowser.js";
 import { GlyphCanvas } from "./components/GlyphCanvas.js";
 import { GlyphStrip } from "./components/GlyphStrip.js";
 import { Inspector } from "./components/Inspector.js";
+import { SpacingView } from "./components/SpacingView.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TabBar, type ViewId } from "./components/TabBar.js";
 import { Toolbar } from "./components/Toolbar.js";
@@ -29,7 +30,26 @@ export function App(): JSX.Element {
       const typing =
         event.target instanceof HTMLInputElement ||
         event.target instanceof HTMLSelectElement;
-      if (viewRef.current === "font") return;
+
+      // Undo is not a drawing shortcut. Every workspace that edits the document
+      // needs it, and gating it on the glyph view left spacing edits with no way
+      // back — which is worse than an unhandled key, because the edit still
+      // happened.
+      const modified = event.ctrlKey || event.metaKey;
+      if (modified && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        if (event.shiftKey) store.redo();
+        else store.undo();
+        return;
+      }
+      if (modified && event.key.toLowerCase() === "y") {
+        event.preventDefault();
+        store.redo();
+        return;
+      }
+
+      // The rest belong to the drawing canvas and mean nothing elsewhere.
+      if (viewRef.current !== "glyph") return;
 
       if (event.code === "Space" && !typing) {
         event.preventDefault();
@@ -39,17 +59,6 @@ export function App(): JSX.Element {
       if ((event.ctrlKey || event.metaKey) && event.key === "0") {
         event.preventDefault();
         store.fitGlyph();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
-        event.preventDefault();
-        if (event.shiftKey) store.redo();
-        else store.undo();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "y") {
-        event.preventDefault();
-        store.redo();
         return;
       }
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "i") {
@@ -89,7 +98,16 @@ export function App(): JSX.Element {
   return (
     <div className={styles.shell}>
       <TabBar current={view} onSelect={setView} glyphName={glyphName} />
-      {view === "font" ? (
+      {view === "spacing" ? (
+        <main className={styles.stage}>
+          <SpacingView
+            onOpenGlyph={(name) => {
+              store.setCurrentGlyph(name);
+              setView("glyph");
+            }}
+          />
+        </main>
+      ) : view === "font" ? (
         <main className={styles.stage}>
           <GlyphBrowser
             onOpen={(name) => {
@@ -121,7 +139,7 @@ export function App(): JSX.Element {
           <GlyphStrip />
         </>
       )}
-      <StatusBar workspace={view === "font" ? "font" : "glyph"} />
+      <StatusBar workspace={view === "glyph" ? "glyph" : "font"} />
     </div>
   );
 }

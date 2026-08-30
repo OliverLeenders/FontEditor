@@ -65,6 +65,15 @@ export type StoreState = {
   readonly showNeighbours: boolean;
   /** Show handles only where the work is. On by default; the canvas is calmer. */
   readonly autoHideHandles: boolean;
+  /**
+   * The spacing workspace's own text and type size.
+   *
+   * Its own, not the glyph strip's: spacing wants strings like "nonno" that
+   * would be odd sitting under the drawing canvas, and the two views want
+   * different text at the same time. Seeded from the strip so nothing is retyped.
+   */
+  readonly spacingText: string;
+  readonly spacingSize: number;
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
@@ -103,6 +112,8 @@ export class EditorStore {
       catalogQuery: DEFAULT_QUERY,
       showNeighbours: true,
       autoHideHandles: true,
+      spacingText: "nonno",
+      spacingSize: 128,
       previewing: false,
       inspector: loadInspector(),
       viewport: { width: 0, height: 0 },
@@ -350,6 +361,15 @@ export class EditorStore {
 
   toggleAutoHideHandles(): void {
     this.patch({ autoHideHandles: !this.state.autoHideHandles });
+  }
+
+  setSpacingText(spacingText: string): void {
+    this.patch({ spacingText });
+  }
+
+  setSpacingSize(spacingSize: number): void {
+    if (!Number.isFinite(spacingSize)) return;
+    this.patch({ spacingSize: Math.min(400, Math.max(8, spacingSize)) });
   }
 
   toggleNeighbours(): void {

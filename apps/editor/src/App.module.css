@@ -1,6 +1,9 @@
+/* A column rather than fixed grid rows. The workspaces have different numbers
+   of bars — the spacing view has no toolbar or glyph strip — and with named rows
+   the canvas landed in an `auto` one and stopped filling the window. */
 .shell {
-  display: grid;
-  grid-template-rows: auto auto 1fr auto auto;
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 
@@ -8,6 +11,7 @@
    rather than taking a column of its own. */
 .stage {
   position: relative;
+  flex: 1;
   min-height: 0;
   background: var(--canvas);
 }

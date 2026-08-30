@@ -1,0 +1,253 @@
+import { nudgeSidebearing } from "@fonteditor/tools";
+import { CanvasSurface, type RunScene, drawRun } from "@fonteditor/render";
+import { sidebearings } from "@fonteditor/font-model";
+import { type ViewTransform, glyphAtX, layoutRun, occurrencesOf } from "@fonteditor/view";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { palette } from "../scene.js";
+import { useEditorStore, useStoreValue } from "../useStore.js";
+import styles from "./SpacingView.module.css";
+
+/** Design units per arrow press, and with shift held. */
+const STEP = 1;
+const BIG_STEP = 10;
+
+/** Left margin when the line is too wide to centre. */
+const RUN_INSET = 40;
+
+/**
+ * Where the line sits on the canvas.
+ *
+ * One definition, used by the frame callback and by the click test alike. They
+ * have to agree exactly — a click resolved through a different transform than
+ * the one that drew selects the wrong letter, and it would do so only at certain
+ * widths, which is a miserable bug to find.
+ */
+export function runView(
+  runWidth: number,
+  size: number,
+  unitsPerEm: number,
+  viewport: { width: number; height: number },
+): ViewTransform {
+  const scale = size / unitsPerEm;
+  const drawn = runWidth * scale;
+  return {
+    scale,
+    // Centred when it fits, inset when it does not, so a long line runs off the
+    // right rather than off both sides at once.
+    tx: drawn < viewport.width - RUN_INSET * 2 ? (viewport.width - drawn) / 2 : RUN_INSET,
+    ty: viewport.height * 0.72,
+  };
+}
+
+/**
+ * The spacing workspace: a line of text, adjusted a unit at a time.
+ *
+ * Spacing is not judged on one glyph. It is judged by looking at a word and
+ * deciding which gap is wrong, which is why this view exists at all rather than
+ * the sidebearing fields in the inspector being the whole feature.
+ *
+ * The work is almost entirely keyboard: select a letter, then nudge. Arrow keys
+ * move the left bearing, alt the right, shift makes the step ten. Every press is
+ * a real edit on the glyph, so it shows on every occurrence in the line at once
+ * — which is the honest thing, and the reason all occurrences are banded rather
+ * than only the one clicked.
+ */
+export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => void }): JSX.Element {
+  const store = useEditorStore();
+  const document = useStoreValue((s) => s.session.editor.document);
+  const text = useStoreValue((s) => s.spacingText);
+  const size = useStoreValue((s) => s.spacingSize);
+  const [selected, setSelected] = useState<number | null>(null);
+
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const surfaceRef = useRef<CanvasSurface | null>(null);
+
+  const run = useMemo(() => layoutRun(document, text), [document, text]);
+
+  const selectedName = selected === null ? null : (run.glyphs[selected]?.name ?? null);
+  const bands = useMemo(
+    () => (selectedName === null ? [] : occurrencesOf(run, selectedName)),
+    [run, selectedName],
+  );
+
+  const frame = useRef({ run, document, bands, size });
+  frame.current = { run, document, bands, size };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return;
+
+    const surface = new CanvasSurface(canvas, (ctx, viewport) => {
+      const state = frame.current;
+      const { info } = state.document;
+
+      const scene: RunScene = {
+        glyphs: state.run.glyphs.map((p) => ({ glyph: p.glyph, x: p.x })),
+        view: runView(state.run.width, state.size, info.unitsPerEm, viewport),
+        viewport,
+        palette: palette(),
+        metrics: {
+          unitsPerEm: info.unitsPerEm,
+          ascender: info.ascender,
+          descender: info.descender,
+        },
+        selected: state.bands,
+        allMargins: false,
+      };
+      drawRun(ctx, scene);
+    });
+
+    surfaceRef.current = surface;
+    surface.start();
+
+    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const invalidate = (): void => surface.invalidate();
+    media?.addEventListener("change", invalidate);
+
+    return () => {
+      media?.removeEventListener("change", invalidate);
+      surface.destroy();
+      surfaceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    surfaceRef.current?.invalidate();
+  }, [run, bands, size, document]);
+
+  // A shorter line must not leave the selection pointing past its end.
+  useEffect(() => {
+    setSelected((current) =>
+      current === null || current < run.glyphs.length ? current : null,
+    );
+  }, [run.glyphs.length]);
+
+  /** Screen point to a run index, through the same transform the canvas drew with. */
+  const indexAt = (event: { clientX: number; clientY: number }): number | null => {
+    const canvas = canvasRef.current;
+    const surface = surfaceRef.current;
+    if (canvas === null || surface === null) return null;
+
+    const point = surface.toCanvasPoint(event as PointerEvent);
+    const box = canvas.getBoundingClientRect();
+    const view = runView(run.width, size, document.info.unitsPerEm, {
+      width: box.width,
+      height: box.height,
+    });
+
+    return glyphAtX(run, (point.x - view.tx) / view.scale)?.index ?? null;
+  };
+
+  const nudge = (side: "left" | "right", delta: number): void => {
+    if (selectedName === null) return;
+    store.applyTool(nudgeSidebearing(store.editor, selectedName, side, delta));
+  };
+
+  const selectedGlyph = selectedName === null ? undefined : document.glyphs[selectedName];
+  const bearings = selectedGlyph === undefined ? null : sidebearings(selectedGlyph);
+
+  return (
+    <div className={styles.spacing}>
+      <div className={styles.bar}>
+        <input
+          type="text"
+          className={styles.text}
+          value={text}
+          aria-label="Text to space"
+          spellCheck={false}
+          onChange={(event) => store.setSpacingText(event.target.value)}
+        />
+        <label className={styles.sizeLabel}>
+          Size
+          <input
+            type="range"
+            className={styles.size}
+            min={24}
+            max={320}
+            step={4}
+            value={size}
+            aria-label="Type size"
+            onChange={(event) => store.setSpacingSize(Number(event.target.value))}
+          />
+          <span className={styles.sizeValue}>{size}</span>
+        </label>
+      </div>
+
+      <div
+        className={styles.stage}
+        tabIndex={0}
+        role="application"
+        aria-label="Spacing line"
+        onKeyDown={(event) => {
+          if (event.ctrlKey || event.metaKey) return;
+          const step = event.shiftKey ? BIG_STEP : STEP;
+          const side = event.altKey ? "right" : "left";
+
+          if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+            event.preventDefault();
+            if (selectedName === null) return;
+            nudge(side, event.key === "ArrowRight" ? step : -step);
+            return;
+          }
+          // Tab would leave the stage, so stepping through letters gets its own
+          // keys rather than fighting the browser for focus order.
+          if (event.key === "]" || event.key === "[") {
+            event.preventDefault();
+            const next = (selected ?? -1) + (event.key === "]" ? 1 : -1);
+            if (next >= 0 && next < run.glyphs.length) setSelected(next);
+            return;
+          }
+          if (event.key === "Escape") setSelected(null);
+        }}
+        onPointerDown={(event) => {
+          event.currentTarget.focus();
+          setSelected(indexAt(event));
+        }}
+        onDoubleClick={(event) => {
+          const index = indexAt(event);
+          const name = index === null ? null : run.glyphs[index]?.name;
+          if (name !== null && name !== undefined) onOpenGlyph(name);
+        }}
+      >
+        <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />
+      </div>
+
+      <div className={styles.readout}>
+        {selectedName === null ? (
+          <span className={styles.hint}>
+            Click a letter to space it &middot; arrows adjust the left side, alt the right,
+            shift by ten &middot; double-click to draw it
+          </span>
+        ) : (
+          <>
+            <span className={styles.name}>{selectedName}</span>
+            {bearings === null ? (
+              <span className={styles.hint}>no outline, so no sidebearings</span>
+            ) : (
+              <>
+                <Value label="Left" value={bearings.left} />
+                <Value label="Right" value={bearings.right} />
+                <Value label="Advance" value={document.glyphs[selectedName]?.advance ?? 0} />
+              </>
+            )}
+            {bands.length > 1 ? (
+              <span className={styles.hint}>
+                {bands.length} occurrences, all moving together
+              </span>
+            ) : null}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Value({ label, value }: { label: string; value: number }): JSX.Element {
+  return (
+    <span className={styles.value}>
+      <span className={styles.valueLabel}>{label}</span>
+      {Math.round(value)}
+    </span>
+  );
+}

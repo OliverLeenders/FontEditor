@@ -38,6 +38,7 @@ export {
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
+  nudgeSidebearing,
   nodeHvLocked,
   retractHandle,
   reverseContourAt,
