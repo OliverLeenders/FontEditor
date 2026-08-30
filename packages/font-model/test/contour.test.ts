@@ -14,6 +14,7 @@ import {
   segmentAt,
   segmentCount,
   segmentCubic,
+  segmentIndexForHandle,
   segmentTunniPoint,
   segmentTunniStatus,
   segments,
@@ -74,6 +75,36 @@ describe("segment derivation", () => {
     const geometry = segmentCubic(segmentAt(c, 0)!);
     expect(geometry.c1).toEqual(vec(30, 40));
     expect(geometry.c2).toEqual(vec(100, 0));
+  });
+});
+
+describe("segmentIndexForHandle", () => {
+  // A handle names exactly one segment, which is what lets touching it say
+  // unambiguously which segment is being worked on. A node names two.
+  it("maps out to the segment leaving the node and in to the one arriving", () => {
+    const c = ringContour();
+    expect(segmentIndexForHandle(c, c.nodes[0]!.id, "out")).toBe(0);
+    expect(segmentIndexForHandle(c, c.nodes[1]!.id, "in")).toBe(0);
+    expect(segmentIndexForHandle(c, c.nodes[1]!.id, "out")).toBe(1);
+    expect(segmentIndexForHandle(c, c.nodes[3]!.id, "out")).toBe(3);
+  });
+
+  it("wraps the first node's in handle to the closing segment", () => {
+    const c = ringContour();
+    expect(segmentIndexForHandle(c, c.nodes[0]!.id, "in")).toBe(3);
+  });
+
+  it("returns null at the loose ends of an open contour", () => {
+    const c = openContour();
+    expect(segmentIndexForHandle(c, c.nodes[0]!.id, "in")).toBeNull();
+    expect(segmentIndexForHandle(c, c.nodes[2]!.id, "out")).toBeNull();
+    expect(segmentIndexForHandle(c, c.nodes[0]!.id, "out")).toBe(0);
+    expect(segmentIndexForHandle(c, c.nodes[2]!.id, "in")).toBe(1);
+  });
+
+  it("returns null for an unknown node or an empty contour", () => {
+    expect(segmentIndexForHandle(ringContour(), "nope", "out")).toBeNull();
+    expect(segmentIndexForHandle(contour("c0", []), "nope", "in")).toBeNull();
   });
 });
 

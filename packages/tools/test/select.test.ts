@@ -132,6 +132,39 @@ describe("focus", () => {
     expect(grabbed.gesture?.kind).toBe("dragTunniPoint");
   });
 
+  // Dragging a Tunni control changed focus but dragging a handle did not, which
+  // is the same class of problem: the segment you are shaping loses its controls
+  // to whatever the cursor happens to be nearest.
+  it("is taken by grabbing a handle, which shapes exactly one segment", () => {
+    const { state, contour: c } = start();
+
+    // The out handle of node 0 shapes segment 0.
+    const out = pointerDown(state, pointerInput(vec(100, 632))).state;
+    expect(out.focusedSegment).toEqual({ contourId: c.id, segmentIndex: 0 });
+
+    // The out handle of node 1 shapes segment 1.
+    const next = pointerDown(state, pointerInput(vec(432, 700))).state;
+    expect(next.focusedSegment).toEqual({ contourId: c.id, segmentIndex: 1 });
+  });
+
+  it("follows the in handle to the segment arriving at its node", () => {
+    const { state, contour: c } = start();
+    const s = pointerDown(state, pointerInput(vec(208, 700))).state;
+    expect(s.focusedSegment).toEqual({ contourId: c.id, segmentIndex: 0 });
+  });
+
+  // A node sits between two segments and names neither, so guessing one would be
+  // arbitrary. Leaving focus alone also means dragging a node never confiscates
+  // the controls you were just using.
+  it("is left alone by dragging a node", () => {
+    const { state, contour: c } = start();
+    const onHandle = pointerUp(pointerDown(state, pointerInput(vec(432, 700))).state).state;
+    expect(onHandle.focusedSegment).toEqual({ contourId: c.id, segmentIndex: 1 });
+
+    const onNode = pointerDown(onHandle, pointerInput(vec(100, 480))).state;
+    expect(onNode.focusedSegment).toEqual({ contourId: c.id, segmentIndex: 1 });
+  });
+
   it("is taken by clicking a segment", () => {
     const { state, contour: c } = start();
     const s = pointerDown(state, pointerInput(vec(168, 647))).state;

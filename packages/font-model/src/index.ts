@@ -45,6 +45,7 @@ export {
   segmentChord,
   segmentCount,
   segmentCubic,
+  segmentIndexForHandle,
   segmentTunniPoint,
   segmentTunniStatus,
   segments,

@@ -121,6 +121,34 @@ export function nodeIndex(c: Contour, id: NodeId): number {
   return c.nodes.findIndex((n) => n.id === id);
 }
 
+/**
+ * The segment a given handle shapes, or `null` if there is not one.
+ *
+ * A node's `out` handle governs the segment leaving it and its `in` handle the
+ * segment arriving — so unlike the node itself, which sits between two segments
+ * and belongs to neither in particular, a handle names exactly one. That is what
+ * lets touching a handle say unambiguously which segment is being worked on.
+ *
+ * Returns `null` at the ends of an open contour, where one side of the end node
+ * has no segment to govern.
+ */
+export function segmentIndexForHandle(
+  c: Contour,
+  id: NodeId,
+  which: "in" | "out",
+): number | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+
+  const count = segmentCount(c);
+  if (count === 0) return null;
+
+  if (which === "out") return i < count ? i : null;
+
+  const arriving = i === 0 ? (c.closed ? count - 1 : -1) : i - 1;
+  return arriving >= 0 && arriving < count ? arriving : null;
+}
+
 export function nodeById(c: Contour, id: NodeId): Node | null {
   return c.nodes.find((n) => n.id === id) ?? null;
 }

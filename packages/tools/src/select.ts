@@ -6,6 +6,7 @@ import {
   moveSegmentTunniLine,
   nodeById,
   segmentAt,
+  segmentIndexForHandle,
   setHandle,
   setNodeType,
   setSegmentTunniPoint,
@@ -15,6 +16,7 @@ import {
 } from "@fonteditor/font-model";
 import {
   type HitTarget,
+  type SegmentRef,
   type Selection,
   type SelectionItem,
   addItems,
@@ -355,6 +357,13 @@ function startItemDrag(
   const isHandle = item.part !== "point";
   const label = isHandle ? "Move handle" : "Move node";
 
+  // A handle shapes exactly one segment, so touching it says unambiguously which
+  // segment is being worked on. A node sits between two and names neither, so
+  // dragging one leaves focus where it was rather than guessing.
+  const focusedSegment = isHandle
+    ? handleSegment(state, item) ?? state.focusedSegment
+    : state.focusedSegment;
+
   const gesture: Gesture = isHandle && selection.length === 1
     ? {
         kind: "dragHandle",
@@ -374,7 +383,15 @@ function startItemDrag(
         moved: false,
       };
 
-  return result({ ...state, selection, gesture }, [begin(label)]);
+  return result({ ...state, selection, focusedSegment, gesture }, [begin(label)]);
+}
+
+function handleSegment(state: EditorState, item: SelectionItem): SegmentRef | null {
+  if (item.part === "point") return null;
+  const c = contourById(state.document.glyph, item.contourId);
+  if (c === null) return null;
+  const segmentIndex = segmentIndexForHandle(c, item.nodeId, item.part);
+  return segmentIndex === null ? null : { contourId: item.contourId, segmentIndex };
 }
 
 function startTunniDrag(
