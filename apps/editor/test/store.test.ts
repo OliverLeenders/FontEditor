@@ -1,0 +1,216 @@
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js";
+
+installBrowserGlobals();
+
+const { EditorStore } = await import("../src/store.js");
+const { setPointType, deleteSelectedPoints } = await import("@fonteditor/tools");
+const { glyphBounds, sidebearings } = await import("@fonteditor/font-model");
+
+type Store = InstanceType<typeof EditorStore>;
+
+/** A store on the starter font, with no storage worker attached. */
+function freshStore(): Store {
+  clearStoredSettings();
+  return new EditorStore();
+}
+
+/** Select every on-curve point of the current glyph. */
+function selectAllPoints(store: Store): void {
+  const glyph = store.editor.document.glyphs[store.editor.currentGlyph];
+  store.setEditor({
+    ...store.editor,
+    selection: (glyph?.contours ?? []).flatMap((c) =>
+      c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+    ),
+  });
+}
+
+describe("EditorStore", () => {
+  let store: Store;
+  beforeEach(() => {
+    store = freshStore();
+  });
+
+  it("starts on the first glyph of the starter font", () => {
+    expect(store.editor.document.glyphOrder.length).toBeGreaterThan(0);
+    expect(store.editor.currentGlyph).toBe(store.editor.document.glyphOrder[0]);
+  });
+
+  it("notifies subscribers when state changes, and not when it does not", () => {
+    let calls = 0;
+    const stop = store.subscribe(() => calls++);
+
+    store.setCurrentGlyph(store.editor.document.glyphOrder[1]!);
+    expect(calls).toBeGreaterThan(0);
+
+    const settled = calls;
+    // Selecting the glyph that is already current is not a change.
+    store.setCurrentGlyph(store.editor.currentGlyph);
+    expect(calls).toBe(settled);
+
+    stop();
+    store.setCurrentGlyph(store.editor.document.glyphOrder[0]!);
+    expect(calls).toBe(settled);
+  });
+
+  it("clears selection and focus when the glyph changes", () => {
+    selectAllPoints(store);
+    store.setEditor({
+      ...store.editor,
+      focusedSegment: { contourId: "c", segmentIndex: 0 },
+    });
+    expect(store.editor.selection.length).toBeGreaterThan(0);
+
+    store.setCurrentGlyph(store.editor.document.glyphOrder[1]!);
+    expect(store.editor.selection).toEqual([]);
+    expect(store.editor.focusedSegment).toBeNull();
+  });
+
+  describe("undo and redo", () => {
+    it("restores the document a tool edit replaced", () => {
+      selectAllPoints(store);
+      const before = store.editor.document;
+
+      store.applyTool(setPointType(store.editor, "corner"));
+      expect(store.editor.document).not.toBe(before);
+
+      store.undo();
+      // Reference equality, not deep equality: the persistent model means undo
+      // hands back the very object, which is what the whole design rests on.
+      expect(store.editor.document).toBe(before);
+    });
+
+    it("redoes what it undid", () => {
+      selectAllPoints(store);
+      store.applyTool(setPointType(store.editor, "corner"));
+      const edited = store.editor.document;
+
+      store.undo();
+      store.redo();
+      expect(store.editor.document).toBe(edited);
+    });
+
+    it("does nothing when there is nothing to undo", () => {
+      const before = store.editor.document;
+      store.undo();
+      store.undo();
+      expect(store.editor.document).toBe(before);
+    });
+
+    it("records no entry for a tool call that changed nothing", () => {
+      // Nothing selected, so setting a point type is a no-op.
+      const before = store.editor.document;
+      store.applyTool(setPointType(store.editor, "smooth"));
+      store.undo();
+      expect(store.editor.document).toBe(before);
+    });
+
+    it("names what it would undo", () => {
+      selectAllPoints(store);
+      store.applyTool(deleteSelectedPoints(store.editor));
+      expect(store.undoLabel()).toMatch(/Delete point/);
+    });
+  });
+
+  describe("newFont", () => {
+    it("replaces the document with an empty one and starts a fresh history", async () => {
+      selectAllPoints(store);
+      store.applyTool(deleteSelectedPoints(store.editor));
+
+      await store.newFont();
+
+      expect(store.editor.document.glyphOrder).toEqual([".notdef"]);
+      expect(store.editor.currentGlyph).toBe(".notdef");
+      // The previous font is gone for good; undo must not resurrect it.
+      store.undo();
+      expect(store.editor.document.glyphOrder).toEqual([".notdef"]);
+    });
+
+    it("resets the browser filter, which may have been narrowed to the old font", async () => {
+      store.setCatalogQuery({ set: "block:greek", search: "omega" });
+      await store.newFont();
+      expect(store.state.catalogQuery.set).toBe("all");
+      expect(store.state.catalogQuery.search).toBe("");
+    });
+  });
+
+  describe("catalog query", () => {
+    it("merges partial changes", () => {
+      store.setCatalogQuery({ search: "a" });
+      store.setCatalogQuery({ order: "name" });
+      expect(store.state.catalogQuery).toMatchObject({ search: "a", order: "name" });
+    });
+
+    it("does not notify when nothing actually changed", () => {
+      let calls = 0;
+      store.subscribe(() => calls++);
+      store.setCatalogQuery({ search: "" });
+      expect(calls).toBe(0);
+    });
+  });
+
+  describe("view preferences", () => {
+    it("hides handles by default, and toggles", () => {
+      expect(store.state.autoHideHandles).toBe(true);
+      store.toggleAutoHideHandles();
+      expect(store.state.autoHideHandles).toBe(false);
+    });
+
+    it("keeps the inspector on screen when the window is small", () => {
+      store.moveInspector(5000, 5000);
+      expect(store.state.inspector.x).toBeLessThanOrEqual(1200);
+      expect(store.state.inspector.y).toBeLessThanOrEqual(800);
+    });
+
+    it("never puts the inspector at a negative position", () => {
+      store.moveInspector(-500, -500);
+      expect(store.state.inspector.x).toBe(0);
+      expect(store.state.inspector.y).toBe(0);
+    });
+  });
+
+  describe("fitGlyph", () => {
+    it("does nothing before the canvas has a size", () => {
+      const before = store.editor.view;
+      store.fitGlyph();
+      expect(store.editor.view).toBe(before);
+    });
+
+    it("frames the em box once the viewport is known", () => {
+      store.setViewport(800, 600);
+      const view = store.editor.view;
+      expect(view.scale).toBeGreaterThan(0);
+      expect(Number.isFinite(view.tx)).toBe(true);
+      expect(Number.isFinite(view.ty)).toBe(true);
+    });
+
+    it("ignores a viewport that has not changed", () => {
+      store.setViewport(800, 600);
+      const view = store.editor.view;
+      store.setViewport(800, 600);
+      // The feedback loop this guards against redrew sixty times a second.
+      expect(store.editor.view).toBe(view);
+    });
+  });
+});
+
+describe("the starter font", () => {
+  it("has glyphs with real outlines and sane sidebearings", () => {
+    const store = freshStore();
+    const drawn = Object.values(store.editor.document.glyphs).filter(
+      (g) => g.contours.length > 0,
+    );
+    expect(drawn.length).toBeGreaterThan(0);
+
+    for (const g of drawn) {
+      const box = glyphBounds(g);
+      expect(box).not.toBeNull();
+      const sb = sidebearings(g);
+      expect(sb).not.toBeNull();
+      // A glyph whose outline runs past its advance is a spacing bug, not a style.
+      expect(sb!.right).toBeGreaterThan(-g.advance);
+    }
+  });
+});

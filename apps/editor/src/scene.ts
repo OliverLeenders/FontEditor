@@ -32,7 +32,7 @@ export function prefersDark(): boolean {
  * Returns nothing when the glyph is not in the strip at all — better to show no
  * context than context from a word that does not contain the letter.
  */
-function neighboursFor(
+export function neighboursFor(
   document: FontDocument,
   currentGlyph: string,
   text: string,

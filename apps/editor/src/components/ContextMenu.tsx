@@ -29,7 +29,7 @@ export type MenuRequest = {
   readonly point: { x: number; y: number };
 };
 
-type Item =
+export type Item =
   | { readonly kind: "item"; readonly label: string; readonly run: () => void; readonly checked?: boolean }
   | { readonly kind: "separator" };
 
@@ -44,7 +44,7 @@ const ids = randomIds();
  * things that apply. Each target offers what is true of it, plus the contour
  * operations that are true anywhere on a contour.
  */
-function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
+export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
   const editor = store.editor;
   const target = request.target;
 
