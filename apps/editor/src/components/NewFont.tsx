@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { useEditorStore } from "../useStore.js";
+import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
 
 /**
@@ -16,6 +16,7 @@ import styles from "./OpenFont.module.css";
  */
 export function NewFont(): JSX.Element {
   const store = useEditorStore();
+  const reading = useStoreValue((s) => s.ownership === "reading");
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
@@ -44,7 +45,8 @@ export function NewFont(): JSX.Element {
         <button
           type="button"
           className={styles.button}
-          disabled={busy}
+          disabled={busy || reading}
+          title={reading ? "Another tab is saving this project" : undefined}
           onClick={() => {
             setFailed(null);
             setAsking(true);

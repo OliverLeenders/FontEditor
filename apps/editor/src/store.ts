@@ -24,7 +24,9 @@ import {
 import {
   Autosave,
   type AutosaveStatus,
+  ProjectLock,
   StorageClient,
+  browserLocks,
   dirtyGlyphs,
   requestPersistence,
 } from "@fonteditor/storage";
@@ -43,6 +45,15 @@ import { starterFont } from "./sample.js";
 export type StorageState = "connecting" | "ready" | "unavailable";
 
 /**
+ * Whether this tab owns the project, and may therefore write to it.
+ *
+ * `reading` is a full editor over a document it will not save. That is a strange
+ * state to be in, so it is named rather than implied by a flag, and the
+ * interface says so plainly instead of quietly dropping the work.
+ */
+export type Ownership = "owner" | "reading";
+
+/**
  * Everything the interface reads, in one immutable value.
  *
  * Replaced wholesale on every change, so a selector comparing with `Object.is`
@@ -54,6 +65,8 @@ export type StoreState = {
   readonly storage: StorageState;
   readonly storageDetail: string;
   readonly recovered: boolean;
+  /** Only the owning tab writes. A second tab shows the font and saves nothing. */
+  readonly ownership: Ownership;
   /** What the glyph strip is showing, as typed. */
   readonly stripText: string;
   /** Space held: draw the shape without any controls. */
@@ -98,6 +111,7 @@ export class EditorStore {
   private readonly listeners = new Set<() => void>();
 
   private storageClient: StorageClient | null = null;
+  private readonly lock: ProjectLock;
   private lastJournalled: FontDocument | null = null;
   private readonly autosave: Autosave;
 
@@ -108,6 +122,7 @@ export class EditorStore {
       storage: "connecting",
       storageDetail: "",
       recovered: false,
+      ownership: "owner",
       stripText: "hello",
       catalogQuery: DEFAULT_QUERY,
       showNeighbours: true,
@@ -119,14 +134,23 @@ export class EditorStore {
       viewport: { width: 0, height: 0 },
     };
 
+    // Losing the lock has to stop writes at once, not at the next save: the tab
+    // that took it is now the truth, and this one still believes in the font it
+    // had.
+    this.lock = new ProjectLock(browserLocks(), () => {
+      this.patch({ ownership: "reading", saveStatus: "idle" });
+    });
+
     this.autosave = new Autosave({
       journal: async (document) => {
+        if (!this.writable) return;
         for (const g of dirtyGlyphs(this.lastJournalled, document)) {
           await this.storageClient?.journal(g);
         }
         this.lastJournalled = document;
       },
       save: async (document, previous) => {
+        if (!this.writable) return;
         await this.storageClient?.saveGlyphs(dirtyGlyphs(previous, document));
         await this.storageClient?.saveFontInfo(document);
       },
@@ -157,6 +181,46 @@ export class EditorStore {
   }
 
   // ---- reading -----------------------------------------------------------
+
+  /** Whether this tab may write. Every path to disk is gated on it. */
+  private get writable(): boolean {
+    return this.state.ownership === "owner";
+  }
+
+  /**
+   * Take the project over from whichever tab holds it.
+   *
+   * The document is reloaded afterwards rather than kept: the owning tab may
+   * have changed anything at all, including replacing the font, and writing this
+   * tab's stale copy over it is the exact bug this whole mechanism exists to
+   * stop.
+   */
+  async takeOver(): Promise<void> {
+    if (this.state.ownership === "owner") return;
+    if (!(await this.lock.steal())) return;
+
+    this.patch({ ownership: "owner" });
+    await this.reloadFromDisk();
+  }
+
+  /** Adopt whatever is on disk now, discarding what this tab was showing. */
+  private async reloadFromDisk(): Promise<void> {
+    const client = this.storageClient;
+    if (client === null) return;
+
+    const loaded = await client.load();
+    if (loaded.kind !== "loaded") return;
+
+    this.patch({
+      session: newSession(
+        editorState({ document: loaded.document, view: this.editor.view }),
+      ),
+      recovered: loaded.recovered,
+    });
+    this.setCurrentGlyph(loaded.document.glyphOrder[0] ?? "");
+    this.autosave.markLoaded(loaded.document, loaded.recovered);
+    this.patch({ saveStatus: this.autosave.status });
+  }
 
   get editor(): EditorState {
     return this.state.session.editor;
@@ -337,6 +401,9 @@ export class EditorStore {
 
     const client = this.storageClient;
     if (client === null) return;
+    // A tab that does not own the project must not replace it. The buttons that
+    // lead here are disabled, so this is the backstop rather than the message.
+    if (!this.writable) return;
 
     // Before anything is written: a save scheduled or running from the previous
     // font would otherwise land after the replacement and put its glyphs back,
@@ -421,6 +488,11 @@ export class EditorStore {
       this.storageClient = client;
       await client.open("project");
 
+      // Before anything is read: a tab that cannot write must not journal or
+      // save on the way to finding that out.
+      const owner = await this.lock.tryAcquire();
+      this.patch({ ownership: owner ? "owner" : "reading" });
+
       const loaded = await client.load();
       if (loaded.kind === "loaded") {
         const editor: EditorState = {
@@ -440,8 +512,8 @@ export class EditorStore {
       // recovered from the journal is ahead of them, and the starter font shown
       // when the store is empty has never been written at all.
       const onDisk = loaded.kind === "loaded" && !loaded.recovered;
-      this.autosave.markLoaded(this.editor.document, !onDisk);
-      if (!onDisk) await this.autosave.flush();
+      this.autosave.markLoaded(this.editor.document, !onDisk && owner);
+      if (!onDisk && owner) await this.autosave.flush();
 
       this.patch({ storage: "ready", saveStatus: this.autosave.status });
       if (!(await requestPersistence())) {

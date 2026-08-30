@@ -22,6 +22,7 @@ export function App(): JSX.Element {
   viewRef.current = view;
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const inspectorOpen = useStoreValue((s) => s.inspector.open);
+  const ownership = useStoreValue((s) => s.ownership);
 
   // Application shortcuts live on the window; the tools' own keys are handled by
   // the canvas, which only receives them while it has focus.
@@ -97,6 +98,17 @@ export function App(): JSX.Element {
 
   return (
     <div className={styles.shell}>
+      {ownership === "reading" ? (
+        <div className={styles.readOnly} role="status">
+          <span>
+            This font is open in another tab, which is the one saving. Nothing you
+            change here will be kept.
+          </span>
+          <button type="button" onClick={() => void store.takeOver()}>
+            Edit here instead
+          </button>
+        </div>
+      ) : null}
       <TabBar current={view} onSelect={setView} glyphName={glyphName} />
       {view === "spacing" ? (
         <main className={styles.stage}>

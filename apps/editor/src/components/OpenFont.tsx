@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 
-import { useEditorStore } from "../useStore.js";
+import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
 
 /** What a `.ttf`/`.otf` picker should offer, plus the web variants we can read. */
@@ -27,6 +27,7 @@ type Status =
  */
 export function OpenFont(): JSX.Element {
   const store = useEditorStore();
+  const reading = useStoreValue((s) => s.ownership === "reading");
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [dragging, setDragging] = useState(false);
@@ -81,7 +82,8 @@ export function OpenFont(): JSX.Element {
       <button
         type="button"
         className={styles.button}
-        disabled={status.kind === "reading"}
+        disabled={status.kind === "reading" || reading}
+        title={reading ? "Another tab is saving this project" : undefined}
         onClick={() => inputRef.current?.click()}
       >
         {status.kind === "reading" ? "Reading…" : "Open font…"}
