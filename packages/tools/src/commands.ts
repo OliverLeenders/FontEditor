@@ -12,7 +12,10 @@ import {
   centreGlyph,
   component,
   contourById,
+  extendHandle,
+  extendSegmentHandles,
   insertNodeOnSegment,
+  isHalfHandled,
   makeSegmentCurve,
   movedComponent,
   makeSegmentLine,
@@ -142,6 +145,64 @@ export function deleteSelectedPoints(state: EditorState): ToolResult {
     { ...editor, selection: [], focusedSegment: null, hoveredSegment: null },
     points.length === 1 ? "Delete point" : "Delete points",
   );
+}
+
+/**
+ * Pull out the handles a node has not got.
+ *
+ * The inverse of retracting. Both sides at once, because asking for them
+ * separately would mean knowing which one is missing, and the missing one is
+ * exactly the one that cannot be seen or clicked.
+ */
+export function extractHandles(
+  state: EditorState,
+  contourId: ContourId,
+  nodeId: NodeId,
+): ToolResult {
+  const document = editCurrentGlyph(state, (g) =>
+    updateContour(g, contourId, (c) => {
+      const withIn = extendHandle(c, nodeId, "in") ?? c;
+      return extendHandle(withIn, nodeId, "out") ?? withIn;
+    }),
+  );
+  if (document === null) return result(state);
+  if (document === state.document) return result(state);
+  return done(state, { ...state, document }, "Extract handles");
+}
+
+/** Complete a curve that is missing one of its two control points. */
+export function extractSegmentHandles(state: EditorState, segment: SegmentRef): ToolResult {
+  const document = editCurrentGlyph(state, (g) =>
+    updateContour(g, segment.contourId, (c) => extendSegmentHandles(c, segment.segmentIndex)),
+  );
+  if (document === null || document === state.document) return result(state);
+  return done(state, { ...state, document }, "Extract handles");
+}
+
+/** Whether a node has a handle missing that could be pulled out. */
+export function nodeHasMissingHandle(
+  state: EditorState,
+  contourId: ContourId,
+  nodeId: NodeId,
+): boolean {
+  const glyph = currentGlyph(state);
+  const c = glyph === null ? null : contourById(glyph, contourId);
+  if (c === null) return false;
+  const n = nodeById(c, nodeId);
+  if (n === null) return false;
+  // An open contour's ends genuinely have no segment on the far side, so a
+  // missing handle there is not something to offer to create.
+  if (!c.closed && (c.nodes[0]?.id === nodeId || c.nodes[c.nodes.length - 1]?.id === nodeId)) {
+    return n.in === null && n.out === null;
+  }
+  return n.in === null || n.out === null;
+}
+
+/** Whether a segment is drawn as a curve but has a control point out of reach. */
+export function segmentHasMissingHandle(state: EditorState, segment: SegmentRef): boolean {
+  const glyph = currentGlyph(state);
+  const c = glyph === null ? null : contourById(glyph, segment.contourId);
+  return c !== null && isHalfHandled(c, segment.segmentIndex);
 }
 
 /** Retract one handle, which turns its segment into a line if both are gone. */

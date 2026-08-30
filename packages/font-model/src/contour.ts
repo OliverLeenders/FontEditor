@@ -21,6 +21,7 @@ import {
   type Node,
   applyHvLock,
   enforceSmooth,
+  handleOf,
   moveNodeTo,
   node,
   snapToAxis,
@@ -314,8 +315,69 @@ export function setSegmentCubic(c: Contour, index: number, geometry: Cubic): Con
 export function makeSegmentCurve(c: Contour, index: number): Contour | null {
   const segment = segmentAt(c, index);
   if (segment === null) return null;
-  if (segment.kind === "curve") return c;
+  // A curve missing one of its handles is completed rather than left alone.
+  // Returning it untouched was what made a retracted handle unrecoverable.
+  if (segment.kind === "curve") return extendSegmentHandles(c, index);
   return setSegmentCubic(c, index, lineAsCubic(segment.a, segment.b));
+}
+
+/**
+ * Give a handle to a node that has not got one.
+ *
+ * The inverse of retracting, and the way out of a state that was otherwise a
+ * trap: a segment counts as a curve when *either* of its handles is set, with
+ * the missing control point sitting invisibly on its anchor — where nothing can
+ * be clicked, and where "make curve" sees a curve already and declines.
+ *
+ * The new handle lands a third of the way along the chord, which is where
+ * `lineAsCubic` puts one and therefore what a handle pulled from a straight
+ * segment already looks like. That does change the shape: a control point at the
+ * anchor and one a third along describe different curves, and there is no
+ * placement that would leave the outline untouched. Extracting is asked for
+ * precisely when the current shape is not the one wanted.
+ */
+export function extendHandle(c: Contour, id: NodeId, which: "in" | "out"): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+
+  const n = c.nodes[i]!;
+  if (handleOf(n, which) !== null) return c;
+
+  // `out` shapes the segment leaving this node, `in` the one arriving; an open
+  // contour's ends have no segment on the far side and so nothing to extend.
+  const facing = which === "out" ? i + 1 : i - 1;
+  const wrapped = (facing + c.nodes.length) % c.nodes.length;
+  if (!c.closed && (facing < 0 || facing >= c.nodes.length)) return null;
+
+  const other = c.nodes[wrapped];
+  if (other === undefined) return null;
+
+  const at = lerp(n.pt, other.pt, 1 / 3);
+  const placed = n.hvLock ? applyHvLock(n.pt, at) : at;
+  return replaceNode(c, i, enforceSmooth(withHandleRaw(n, which, placed), which));
+}
+
+/**
+ * Give both of a segment's handles to it, whichever are missing.
+ *
+ * What the interface offers as "extract handles": a half-handled curve has one
+ * control point you can reach and one you cannot, and asking for them one at a
+ * time would mean knowing which end is the awkward one.
+ */
+export function extendSegmentHandles(c: Contour, index: number): Contour | null {
+  const segment = segmentAt(c, index);
+  if (segment === null) return null;
+  if (segment.out !== null && segment.in !== null) return c;
+
+  const withOut = extendHandle(c, segment.fromId, "out") ?? c;
+  return extendHandle(withOut, segment.toId, "in") ?? withOut;
+}
+
+/** Whether a segment is drawn as a curve but has a control point out of reach. */
+export function isHalfHandled(c: Contour, index: number): boolean {
+  const segment = segmentAt(c, index);
+  if (segment === null || segment.kind === "line") return false;
+  return segment.out === null || segment.in === null;
 }
 
 /** Retract both of a segment's handles, turning it into a straight line. */

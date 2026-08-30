@@ -25,6 +25,15 @@ import {
   setSegmentCubic,
   setSegmentTunniPoint,
   translateNodeBy,
+  extendHandle,
+  extendSegmentHandles,
+  isHalfHandled,
+  setHvLock,
+  setNodeType,
+  makeSegmentCurve,
+  setHandle,
+  nodeById,
+  segmentAt,
 } from "../src/contour.js";
 import { counterIds } from "../src/ids.js";
 import { node } from "../src/node.js";
@@ -409,5 +418,123 @@ describe("contourBounds", () => {
 
   it("returns null for an empty contour", () => {
     expect(contourBounds(contour("c0", []))).toBeNull();
+  });
+});
+
+describe("extendHandle", () => {
+  const ids = counterIds("e");
+  /** A closed triangle with no handles at all: every segment a line. */
+  const triangle = () =>
+    contour(
+      ids.contour(),
+      [
+        node("t1", vec(0, 0)),
+        node("t2", vec(300, 0)),
+        node("t3", vec(0, 300)),
+      ],
+      true,
+    );
+
+  it("places a missing handle a third along the chord", () => {
+    const out = extendHandle(triangle(), "t1", "out")!;
+    // Segment t1 -> t2 runs 300 units; a third of it is 100.
+    expect(nodeById(out, "t1")?.out).toEqual(vec(100, 0));
+  });
+
+  it("takes the in handle from the segment arriving, not the one leaving", () => {
+    const out = extendHandle(triangle(), "t1", "in")!;
+    // t1's `in` belongs to the wrapping segment t3 -> t1.
+    expect(nodeById(out, "t1")?.in).toEqual(vec(0, 100));
+  });
+
+  it("leaves a handle that is already there alone", () => {
+    const withOne = extendHandle(triangle(), "t1", "out")!;
+    expect(extendHandle(withOne, "t1", "out")).toBe(withOne);
+  });
+
+  it("respects an axis lock", () => {
+    const locked = setHvLock(triangle(), "t1", true)!;
+    const out = extendHandle(locked, "t1", "out")!;
+    const handle = nodeById(out, "t1")?.out;
+    // On the axis, so one coordinate matches the anchor exactly.
+    expect(handle?.y).toBe(0);
+  });
+
+  it("keeps a smooth node smooth", () => {
+    let c = extendHandle(triangle(), "t1", "out")!;
+    c = setNodeType(c, "t1", "smooth")!;
+    c = extendHandle(c, "t1", "in")!;
+
+    const n = nodeById(c, "t1")!;
+    // Both handles present and opposite through the anchor.
+    expect(n.in).not.toBeNull();
+    expect(n.out).not.toBeNull();
+    const before = { x: n.pt.x - n.in!.x, y: n.pt.y - n.in!.y };
+    const after = { x: n.out!.x - n.pt.x, y: n.out!.y - n.pt.y };
+    expect(before.x * after.y - before.y * after.x).toBeCloseTo(0, 6);
+  });
+
+  it("declines at the far end of an open contour, where there is no segment", () => {
+    const open = contour(ids.contour(), triangle().nodes, false);
+    expect(extendHandle(open, "t1", "in")).toBeNull();
+    expect(extendHandle(open, "t3", "out")).toBeNull();
+  });
+
+  it("returns null for a node that is not there", () => {
+    expect(extendHandle(triangle(), "nope", "out")).toBeNull();
+  });
+});
+
+describe("a curve missing one of its handles", () => {
+  const ids = counterIds("h");
+  /** A square whose first segment is a curve with only its `out` handle. */
+  const half = () =>
+    contour(
+      ids.contour(),
+      [
+        node("h1", vec(0, 0), { out: vec(100, 0) }),
+        node("h2", vec(300, 0)),
+        node("h3", vec(300, 300)),
+      ],
+      true,
+    );
+
+  it("counts as a curve, with the missing control point on its anchor", () => {
+    expect(segmentAt(half(), 0)?.kind).toBe("curve");
+    expect(segmentAt(half(), 0)?.in).toBeNull();
+  });
+
+  it("is recognised as half-handled", () => {
+    expect(isHalfHandled(half(), 0)).toBe(true);
+    // A plain line is not: it has no control points to be missing.
+    expect(isHalfHandled(half(), 1)).toBe(false);
+  });
+
+  it("gets its missing handle back", () => {
+    const out = extendSegmentHandles(half(), 0)!;
+    expect(segmentAt(out, 0)?.out).not.toBeNull();
+    expect(segmentAt(out, 0)?.in).not.toBeNull();
+    expect(isHalfHandled(out, 0)).toBe(false);
+  });
+
+  it("is completed by makeSegmentCurve, which used to decline", () => {
+    // Declining here is what made a retracted handle unrecoverable: the menu
+    // sees a curve, offers only "make line", and nothing can reach the handle.
+    const out = makeSegmentCurve(half(), 0)!;
+    expect(isHalfHandled(out, 0)).toBe(false);
+  });
+
+  it("survives a retract and extract round trip", () => {
+    const full = extendSegmentHandles(half(), 0)!;
+    const retracted = setHandle(full, "h2", "in", null)!;
+    expect(isHalfHandled(retracted, 0)).toBe(true);
+
+    const restored = extendSegmentHandles(retracted, 0)!;
+    expect(isHalfHandled(restored, 0)).toBe(false);
+  });
+
+  it("leaves a fully handled segment alone", () => {
+    const full = extendSegmentHandles(half(), 0)!;
+    expect(extendSegmentHandles(full, 0)).toBe(full);
   });
 });

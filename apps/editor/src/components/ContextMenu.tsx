@@ -2,12 +2,16 @@ import { contourById, randomIds, segmentAt } from "@fonteditor/font-model";
 import {
   balanceSegmentAt,
   centreCurrentGlyph,
+  extractHandles,
+  extractSegmentHandles,
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
+  nodeHasMissingHandle,
   nodeHvLocked,
   retractHandle,
   reverseContourAt,
+  segmentHasMissingHandle,
   segmentParameterAt,
   selectAllPoints,
   setNodeHvLock,
@@ -71,6 +75,19 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
       { kind: "separator" },
+    );
+
+    // Only where there is something to pull out. A control point that sits on
+    // its anchor cannot be seen or clicked, so this is the only way back to it.
+    if (nodeHasMissingHandle(editor, contourId, nodeId)) {
+      items.push({
+        kind: "item",
+        label: "Extract handles",
+        run: () => store.applyTool(extractHandles(editor, contourId, nodeId)),
+      });
+    }
+
+    items.push(
       {
         kind: "item",
         label: "Lock handles to axis",
@@ -108,8 +125,19 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       },
       { kind: "separator" },
       { kind: "item", label: "Retract handle", run: () => store.applyTool(retractHandle(editor, contourId, nodeId, part)) },
-      { kind: "item", label: "Reverse contour", run: () => store.applyTool(reverseContourAt(editor, contourId)) },
     );
+    if (nodeHasMissingHandle(editor, contourId, nodeId)) {
+      items.push({
+        kind: "item",
+        label: "Extract handles",
+        run: () => store.applyTool(extractHandles(editor, contourId, nodeId)),
+      });
+    }
+    items.push({
+      kind: "item",
+      label: "Reverse contour",
+      run: () => store.applyTool(reverseContourAt(editor, contourId)),
+    });
     return items;
   }
 
@@ -158,6 +186,18 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     label: isLine ? "Make curve" : "Make line",
     run: () => store.applyTool(convertSegment(editor, segment, isLine ? "curve" : "line")),
   });
+
+  // A curve with one control point on its anchor draws as a curve, so the menu
+  // above offers only "Make line" — which is how a retracted handle became
+  // unrecoverable.
+  if (segmentHasMissingHandle(editor, segment)) {
+    items.push({
+      kind: "item",
+      label: "Extract handles",
+      run: () => store.applyTool(extractSegmentHandles(editor, segment)),
+    });
+  }
+
   items.push({ kind: "separator" });
 
   items.push(
