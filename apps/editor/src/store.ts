@@ -206,8 +206,20 @@ export class EditorStore {
 
   // ---- view --------------------------------------------------------------
 
+  /**
+   * Record the canvas size. Called from inside the render callback, which is why
+   * the early return matters more than it looks.
+   *
+   * Without it every frame patched the state with a fresh viewport object, which
+   * notified the canvas, which invalidated, which drew another frame — a loop
+   * that redrew continuously at sixty frames a second and re-ran every React
+   * selector with it. Precisely the cost the store exists to avoid.
+   */
   setViewport(width: number, height: number): void {
-    const first = this.state.viewport.width === 0;
+    const { viewport } = this.state;
+    if (viewport.width === width && viewport.height === height) return;
+
+    const first = viewport.width === 0;
     this.patch({ viewport: { width, height } });
     if (first) this.fitGlyph();
   }
