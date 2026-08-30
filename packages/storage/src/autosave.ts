@@ -42,6 +42,8 @@ export class Autosave {
   private lastSaved: FontDocument | null = null;
   private queued: FontDocument | null = null;
   private inFlight = false;
+  /** The write currently in progress, so it can be waited on. */
+  private writing: Promise<void> | null = null;
   private state: AutosaveStatus = "idle";
 
   private readonly debounceMs: number;
@@ -106,17 +108,44 @@ export class Autosave {
 
     this.inFlight = true;
     this.state = "saving";
-    try {
-      await this.hooks.save(document, this.lastSaved);
-      this.lastSaved = document;
-      this.state = this.queued === document ? "idle" : "pending";
-      this.hooks.saved?.(document);
-    } catch (error) {
-      this.state = "failed";
-      this.hooks.failed?.(error instanceof Error ? error : new Error(String(error)));
-    } finally {
-      this.inFlight = false;
+    const write = (async (): Promise<void> => {
+      try {
+        await this.hooks.save(document, this.lastSaved);
+        this.lastSaved = document;
+        this.state = this.queued === document ? "idle" : "pending";
+        this.hooks.saved?.(document);
+      } catch (error) {
+        this.state = "failed";
+        this.hooks.failed?.(error instanceof Error ? error : new Error(String(error)));
+      } finally {
+        this.inFlight = false;
+        this.writing = null;
+      }
+    })();
+
+    this.writing = write;
+    await write;
+  }
+
+  /**
+   * Give up any scheduled or running write, and wait for one already in flight.
+   *
+   * What to call before replacing the whole project — an import, or starting a
+   * new font. Without it, a save scheduled a moment earlier lands *after* the
+   * replacement has cleaned the old glyph files and writes them straight back,
+   * so the discarded font returns on the next load. The in-flight one cannot be
+   * recalled, so it is waited out instead: its writes then happen before the
+   * replacement rather than after it, and the replacement wins.
+   */
+  async abandon(): Promise<void> {
+    if (this.timer !== null) {
+      this.clearTimer(this.timer);
+      this.timer = null;
     }
+    if (this.writing !== null) await this.writing;
+
+    this.queued = null;
+    this.state = "idle";
   }
 
   /**
@@ -135,6 +164,11 @@ export class Autosave {
    * document read back from the glyph files is genuinely already on disk.
    */
   markLoaded(document: FontDocument, unwritten: boolean): void {
+    // A timer left armed from before would flush against the new baseline.
+    if (this.timer !== null) {
+      this.clearTimer(this.timer);
+      this.timer = null;
+    }
     if (!unwritten) {
       this.markSaved(document);
       return;

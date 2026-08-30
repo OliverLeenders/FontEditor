@@ -18,6 +18,7 @@ export function NewFont(): JSX.Element {
   const store = useEditorStore();
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -39,14 +40,27 @@ export function NewFont(): JSX.Element {
 
   if (!asking) {
     return (
-      <button
-        type="button"
-        className={styles.button}
-        disabled={busy}
-        onClick={() => setAsking(true)}
-      >
-        New font
-      </button>
+      <>
+        <button
+          type="button"
+          className={styles.button}
+          disabled={busy}
+          onClick={() => {
+            setFailed(null);
+            setAsking(true);
+          }}
+        >
+          {busy ? "Starting…" : "New font"}
+        </button>
+        {/* A write that failed must say so. The document on screen has already
+            been replaced, so silence would leave the editor showing an empty
+            font while the old one is still on disk, waiting to come back. */}
+        {failed !== null ? (
+          <span className={styles.error} role="alert">
+            {failed}
+          </span>
+        ) : null}
+      </>
     );
   }
 
@@ -60,7 +74,17 @@ export function NewFont(): JSX.Element {
         onClick={() => {
           setAsking(false);
           setBusy(true);
-          void store.newFont().finally(() => setBusy(false));
+          setFailed(null);
+          store
+            .newFont()
+            .catch((error: unknown) =>
+              setFailed(
+                `Could not start a new font: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+              ),
+            )
+            .finally(() => setBusy(false));
         }}
       >
         Discard

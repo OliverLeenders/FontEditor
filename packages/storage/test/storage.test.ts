@@ -513,3 +513,103 @@ describe("replaceDocument", () => {
     ]);
   });
 });
+
+describe("abandoning a save when the project is replaced", () => {
+  const doc = (names: string[]) =>
+    fontDocument(names.map((n) => glyph(n, { advance: 500 })), DEFAULT_FONT_INFO);
+
+  /** An autosave whose save blocks until released, like a slow worker call. */
+  function blockingAutosave(): {
+    autosave: Autosave;
+    written: string[][];
+    release: () => void;
+  } {
+    const written: string[][] = [];
+    let release: () => void = () => {};
+    const autosave = new Autosave(
+      {
+        journal: async () => {},
+        save: async (document) => {
+          written.push([...document.glyphOrder]);
+          await new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        },
+      },
+      { debounceMs: 0, setTimer: (fn) => { fn(); return 0; }, clearTimer: () => {} },
+    );
+    return { autosave, written, release: () => release() };
+  }
+
+  it("waits for an in-flight save, so it cannot land after the replacement", async () => {
+    const { autosave, written, release } = blockingAutosave();
+
+    autosave.markSaved(doc([]));
+    autosave.commit(doc(["A", "B", "C"])); // begins a save, then blocks
+
+    let finished = false;
+    const abandoned = autosave.abandon().then(() => {
+      finished = true;
+    });
+
+    // Still running, so abandon has not resolved: the caller must not start
+    // replacing files while a write of the old font is in the air.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(finished).toBe(false);
+
+    release();
+    await abandoned;
+    expect(finished).toBe(true);
+    expect(written).toEqual([["A", "B", "C"]]);
+  });
+
+  it("drops a scheduled save that has not started", async () => {
+    const written: string[][] = [];
+    let fire: (() => void) | null = null;
+    const autosave = new Autosave(
+      { journal: async () => {}, save: async (d) => void written.push([...d.glyphOrder]) },
+      {
+        debounceMs: 1000,
+        setTimer: (fn) => {
+          fire = fn;
+          return 1;
+        },
+        clearTimer: () => {
+          fire = null;
+        },
+      },
+    );
+
+    autosave.markSaved(doc([]));
+    autosave.commit(doc(["A", "B", "C"]));
+    expect(fire).not.toBeNull();
+
+    await autosave.abandon();
+    expect(fire).toBeNull();
+
+    // Nothing queued, so a later flush writes nothing of the old font.
+    await autosave.flush();
+    expect(written).toEqual([]);
+  });
+
+  it("adopts the replacement cleanly, and the next edit measures against it", async () => {
+    const written: string[][] = [];
+    const autosave = new Autosave(
+      { journal: async () => {}, save: async (d) => void written.push([...d.glyphOrder]) },
+      { debounceMs: 0, setTimer: (fn) => { fn(); return 0; }, clearTimer: () => {} },
+    );
+
+    autosave.markSaved(doc(["A", "B", "C"]));
+    await autosave.abandon();
+
+    const replacement = doc([".notdef"]);
+    autosave.markLoaded(replacement, false);
+    expect(autosave.dirty).toBe(false);
+
+    // An edit after the replacement writes the new font, never the old one.
+    const edited = doc([".notdef", "X"]);
+    autosave.commit(edited);
+    await autosave.flush();
+    expect(written).toEqual([[".notdef", "X"]]);
+  });
+});

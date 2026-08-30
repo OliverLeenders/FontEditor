@@ -338,6 +338,11 @@ export class EditorStore {
     const client = this.storageClient;
     if (client === null) return;
 
+    // Before anything is written: a save scheduled or running from the previous
+    // font would otherwise land after the replacement and put its glyphs back,
+    // so the font just discarded returns on the next load.
+    await this.autosave.abandon();
+
     this.patch({ saveStatus: "saving" });
     await client.replaceAll(document);
     // Disk now holds exactly this document, so autosave starts from it rather
