@@ -45,7 +45,7 @@ import {
 } from "./state.js";
 
 /** Stands in when the current glyph name does not resolve, so reads stay total. */
-const EMPTY_GLYPH: Glyph = { name: "", unicodes: [], advance: 0, contours: [] };
+const EMPTY_GLYPH: Glyph = { name: "", unicodes: [], advance: 0, contours: [], components: [] };
 
 /**
  * What the pointer may address among the handles.

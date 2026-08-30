@@ -1,5 +1,7 @@
+import { IDENTITY_AFFINE, translation } from "@fonteditor/geometry";
 import {
   type FontDocument,
+  component,
   contour,
   counterIds,
   fontDocument,
@@ -210,5 +212,57 @@ describe("exportUfo", () => {
       styleName: "",
     });
     expect(exportUfo(document).fileName).toBe("Untitled-Regular.ufo.zip");
+  });
+});
+
+describe("components", () => {
+  const ids = counterIds("k");
+  const composite = () =>
+    fontDocument(
+      [
+        glyph("a", { unicodes: [0x61], advance: 500, contours: [triangle()] }),
+        glyph("acute", { advance: 0, contours: [triangle()] }),
+        glyph("aacute", {
+          unicodes: [0xe1],
+          advance: 500,
+          components: [
+            component(ids.component(), "a"),
+            component(ids.component(), "acute", translation(120, 400)),
+          ],
+        }),
+      ],
+      INFO,
+    );
+
+  it("writes a component as a reference, not as outlines", () => {
+    const text = glif(composite().glyphs["aacute"]!);
+    expect(text).toContain('<component base="a"/>');
+    expect(text).toContain('<component base="acute" xOffset="120" yOffset="400"/>');
+    // The referenced glyph's points must not appear here.
+    expect(text).not.toContain("<point");
+  });
+
+  it("omits transform attributes that are already the default", () => {
+    // A component that merely sits somewhere writes two numbers, not six.
+    const text = glif(composite().glyphs["aacute"]!);
+    expect(text).not.toContain("xScale");
+    expect(text).not.toContain("yxScale");
+  });
+
+  it("writes a scaled or mirrored component in full", () => {
+    const mirrored = glyph("x", {
+      components: [
+        component("k9", "a", { ...IDENTITY_AFFINE, xScale: -1, xOffset: 500 }),
+      ],
+    });
+    const text = glif(mirrored);
+    expect(text).toContain('xScale="-1"');
+    expect(text).toContain('xOffset="500"');
+  });
+
+  it("gives a glyph that is only components a real outline element", () => {
+    const text = glif(composite().glyphs["aacute"]!);
+    expect(text).not.toContain("<outline/>");
+    expect(text).toContain("<outline>");
   });
 });

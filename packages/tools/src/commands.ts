@@ -1,17 +1,23 @@
 import { type Vec2, project } from "@fonteditor/geometry";
 import {
+  type ComponentId,
+  type ComponentSource,
   type ContourId,
   type GlyphName,
   type IdFactory,
   type NodeId,
   type NodeType,
+  addGlyphComponent,
   balanceSegment,
   centreGlyph,
+  component,
   contourById,
   insertNodeOnSegment,
   makeSegmentCurve,
+  movedComponent,
   makeSegmentLine,
   nodeById,
+  removeGlyphComponent,
   removeNode,
   reverseContour,
   segmentAt,
@@ -25,6 +31,8 @@ import {
   setNodeType,
   updateContour,
   updateGlyph,
+  updateGlyphComponent,
+  wouldRecurse,
 } from "@fonteditor/font-model";
 import type { SegmentRef, Selection } from "@fonteditor/view";
 
@@ -231,6 +239,53 @@ export function segmentForHandle(
   if (c === null) return null;
   const segmentIndex = segmentIndexForHandle(c, nodeId, part);
   return segmentIndex === null ? null : { contourId, segmentIndex };
+}
+
+// ---------------------------------------------------------------------------
+// components
+// ---------------------------------------------------------------------------
+
+/**
+ * Place another glyph inside the current one.
+ *
+ * Refuses a placement that would close a loop, rather than accepting it and
+ * drawing nothing: "that would make a refer to itself" is a far better answer
+ * than a glyph that silently stops appearing.
+ */
+export function addComponent(
+  state: EditorState,
+  base: GlyphName,
+  ids: IdFactory,
+): ToolResult {
+  const owner = state.currentGlyph;
+  if (base === "" || state.document.glyphs[base] === undefined) return result(state);
+
+  const source: ComponentSource = { glyphOf: (name) => state.document.glyphs[name] ?? null };
+  if (wouldRecurse(source, owner, base)) return result(state);
+
+  const document = editCurrentGlyph(state, (g) =>
+    addGlyphComponent(g, component(ids.component(), base)),
+  );
+  return done(state, document === null ? null : { ...state, document }, `Add ${base}`);
+}
+
+export function removeComponent(state: EditorState, id: ComponentId): ToolResult {
+  const document = editCurrentGlyph(state, (g) => removeGlyphComponent(g, id));
+  return done(state, document === null ? null : { ...state, document }, "Remove component");
+}
+
+/** Nudge a component's placement, which is the only part of it that is editable. */
+export function moveComponentBy(
+  state: EditorState,
+  id: ComponentId,
+  dx: number,
+  dy: number,
+): ToolResult {
+  if (dx === 0 && dy === 0) return result(state);
+  const document = editCurrentGlyph(state, (g) =>
+    updateGlyphComponent(g, id, (c) => movedComponent(c, dx, dy)),
+  );
+  return done(state, document === null ? null : { ...state, document }, "Move component");
 }
 
 // ---------------------------------------------------------------------------

@@ -53,7 +53,7 @@ import { GUIDES, sampleGlyphs } from "./glyph.js";
  */
 
 /** Stands in when no glyph resolves, so the renderer always has something. */
-const EMPTY = { name: "", unicodes: [] as number[], advance: 0, contours: [] };
+const EMPTY = { name: "", unicodes: [] as number[], advance: 0, contours: [], components: [] };
 
 const canvas = document.getElementById("surface") as HTMLCanvasElement;
 const statusBar = document.getElementById("status") as HTMLDivElement;

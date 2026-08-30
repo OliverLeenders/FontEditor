@@ -1,4 +1,10 @@
-import type { FontDocument, Glyph } from "@fonteditor/font-model";
+import {
+  type ComponentSource,
+  type FontDocument,
+  type Glyph,
+  randomIds,
+  resolveGlyphComponents,
+} from "@fonteditor/font-model";
 import type { NeighbourGlyph } from "@fonteditor/render";
 import {
   DARK_PALETTE,
@@ -11,7 +17,10 @@ import { marqueeRect, penPreview, tunniSegments } from "@fonteditor/tools";
 
 import type { StoreState } from "./store.js";
 
-const EMPTY: Glyph = { name: "", unicodes: [], advance: 0, contours: [] };
+const EMPTY: Glyph = { name: "", unicodes: [], advance: 0, contours: [], components: [] };
+
+/** Resolved component outlines are throwaway; their ids never leave the frame. */
+const outlineIds = randomIds();
 
 export function palette(): RenderPalette {
   return prefersDark() ? DARK_PALETTE : LIGHT_PALETTE;
@@ -101,8 +110,14 @@ export function sceneFor(
   const glyph = editor.document.glyphs[editor.currentGlyph] ?? EMPTY;
   const { ascender, descender, xHeight, capHeight } = editor.document.info;
 
+  const source: ComponentSource = { glyphOf: (name) => editor.document.glyphs[name] ?? null };
+
   return buildScene({
     glyph,
+    componentOutlines:
+      glyph.components.length === 0
+        ? []
+        : resolveGlyphComponents(source, glyph.name, glyph.components, outlineIds),
     view: editor.view,
     viewport: size,
     palette: palette(),

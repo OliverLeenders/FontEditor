@@ -1,4 +1,5 @@
 import {
+  type Component,
   type Contour,
   type FontDocument,
   type Glyph,
@@ -129,6 +130,29 @@ export function contourPoints(c: Contour): Point[] {
   return points;
 }
 
+/**
+ * The transform attributes a component needs, and no more.
+ *
+ * UFO defaults every one of them, so a component that merely sits somewhere
+ * writes two numbers rather than six — which is the common case by a wide
+ * margin, and makes the file far easier to read.
+ */
+function componentAttributes(c: Component): string {
+  const t = c.transform;
+  const parts: string[] = [];
+  const put = (name: string, value: number, fallback: number): void => {
+    if (value !== fallback) parts.push(` ${name}="${String(value)}"`);
+  };
+
+  put("xScale", t.xScale, 1);
+  put("xyScale", t.xyScale, 0);
+  put("yxScale", t.yxScale, 0);
+  put("yScale", t.yScale, 1);
+  put("xOffset", round(t.xOffset), 0);
+  put("yOffset", round(t.yOffset), 0);
+  return parts.join("");
+}
+
 export function glif(g: Glyph): string {
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -141,7 +165,7 @@ export function glif(g: Glyph): string {
   }
 
   const drawable = g.contours.filter((c) => c.nodes.length >= 2);
-  if (drawable.length === 0) {
+  if (drawable.length === 0 && g.components.length === 0) {
     lines.push("\t<outline/>");
   } else {
     lines.push("\t<outline>");
@@ -153,6 +177,11 @@ export function glif(g: Glyph): string {
         lines.push(`\t\t\t<point x="${String(p.x)}" y="${String(p.y)}"${type}${smooth}/>`);
       }
       lines.push("\t\t</contour>");
+    }
+    // References, not outlines. This is the whole reason to export a UFO as
+    // well as an OTF: the OTF has to flatten these, and this does not.
+    for (const c of g.components) {
+      lines.push(`\t\t<component base="${escapeXml(c.base)}"${componentAttributes(c)}/>`);
     }
     lines.push("\t</outline>");
   }

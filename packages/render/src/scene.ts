@@ -1,5 +1,5 @@
 import type { Cubic, Rect } from "@fonteditor/geometry";
-import type { Glyph } from "@fonteditor/font-model";
+import type { Contour, Glyph } from "@fonteditor/font-model";
 import type { Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
 import type { RenderPalette } from "./palette.js";
@@ -116,6 +116,15 @@ export type Scene = {
    * drawing one.
    */
   readonly neighbours: readonly NeighbourGlyph[];
+  /**
+   * Outlines the glyph's components draw, already resolved and transformed.
+   *
+   * Resolved before the frame rather than here: following references, composing
+   * transforms and refusing to loop is the model's work, and the renderer stays
+   * a pure function of what it is handed. They are drawn but never editable —
+   * the way to change one is to change the glyph it comes from.
+   */
+  readonly componentOutlines: readonly Contour[];
 };
 
 /** A glyph drawn for context, at a given offset, not for editing. */
@@ -137,6 +146,7 @@ export type SceneInit = {
   readonly marquee?: Rect | null;
   readonly penPreview?: Cubic | null;
   readonly neighbours?: readonly NeighbourGlyph[];
+  readonly componentOutlines?: readonly Contour[];
 };
 
 export function scene(init: SceneInit): Scene {
@@ -153,5 +163,6 @@ export function scene(init: SceneInit): Scene {
     marquee: init.marquee ?? null,
     penPreview: init.penPreview ?? null,
     neighbours: init.neighbours ?? [],
+    componentOutlines: init.componentOutlines ?? [],
   };
 }

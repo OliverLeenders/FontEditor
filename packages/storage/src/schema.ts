@@ -1,4 +1,5 @@
 import {
+  type Component,
   type Contour,
   type FontDocument,
   type FontInfo,
@@ -6,6 +7,7 @@ import {
   type Node,
   type NodeType,
   DEFAULT_FONT_INFO,
+  component,
   contour,
   fontDocument,
   glyph,
@@ -48,12 +50,24 @@ export type StoredContour = {
   readonly nodes: readonly StoredNode[];
 };
 
+export type StoredComponent = {
+  readonly id: string;
+  readonly base: string;
+  /** UFO's order: xScale, xyScale, yxScale, yScale, xOffset, yOffset. */
+  readonly transform: readonly [number, number, number, number, number, number];
+};
+
 export type StoredGlyph = {
   readonly schema: number;
   readonly name: string;
   readonly unicodes: readonly number[];
   readonly advance: number;
   readonly contours: readonly StoredContour[];
+  /**
+   * Optional on the way in, so a glyph written before components existed still
+   * reads. Written always, so one saved now says plainly that it has none.
+   */
+  readonly components?: readonly StoredComponent[];
 };
 
 export type StoredFontInfo = {
@@ -88,6 +102,19 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     unicodes: [...g.unicodes],
     advance: g.advance,
     contours: g.contours.map(encodeContour),
+    components: g.components.map(encodeComponent),
+  };
+}
+
+function encodeComponent(c: Component): StoredComponent {
+  const t = c.transform;
+  // An array rather than an object: it is the order every font format writes
+  // this transform in, and six keys repeated per component is a lot of file for
+  // no added clarity.
+  return {
+    id: c.id,
+    base: c.base,
+    transform: [t.xScale, t.xyScale, t.yxScale, t.yScale, t.xOffset, t.yOffset],
   };
 }
 
@@ -238,7 +265,38 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
     : [];
   const advance = typeof source["advance"] === "number" ? source["advance"] : 0;
 
-  return ok(glyph(source["name"], { unicodes, advance, contours }));
+  const components: Component[] = [];
+  if (Array.isArray(source["components"])) {
+    for (const raw of source["components"]) {
+      const decoded = decodeComponent(raw);
+      // A malformed component is dropped rather than failing the glyph: losing
+      // one placement is recoverable, losing the outline it sits on is not.
+      if (decoded !== null) components.push(decoded);
+    }
+  }
+
+  return ok(glyph(source["name"], { unicodes, advance, contours, components }));
+}
+
+function decodeComponent(raw: unknown): Component | null {
+  if (!isRecord(raw)) return null;
+  if (typeof raw["id"] !== "string" || typeof raw["base"] !== "string") return null;
+
+  const t: unknown = raw["transform"];
+  if (!Array.isArray(t) || t.length !== 6) return null;
+
+  const numbers: number[] = [];
+  for (const value of t as unknown[]) {
+    if (typeof value !== "number" || !Number.isFinite(value)) return null;
+    numbers.push(value);
+  }
+  const [xScale, xyScale, yxScale, yScale, xOffset, yOffset] = numbers as [
+    number, number, number, number, number, number,
+  ];
+
+  return component(raw["id"], raw["base"], {
+    xScale, xyScale, yxScale, yScale, xOffset, yOffset,
+  });
 }
 
 export function decodeDocument(raw: unknown): Decoded<FontDocument> {

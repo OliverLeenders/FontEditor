@@ -13,10 +13,12 @@
 
 export type NodeId = string;
 export type ContourId = string;
+export type ComponentId = string;
 
 export type IdFactory = {
   node(): NodeId;
   contour(): ContourId;
+  component(): ComponentId;
 };
 
 /**
@@ -26,9 +28,11 @@ export type IdFactory = {
 export function counterIds(prefix = ""): IdFactory {
   let nodes = 0;
   let contours = 0;
+  let components = 0;
   return {
     node: () => `${prefix}n${++nodes}`,
     contour: () => `${prefix}c${++contours}`,
+    component: () => `${prefix}k${++components}`,
   };
 }
 

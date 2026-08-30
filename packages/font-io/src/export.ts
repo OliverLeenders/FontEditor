@@ -1,7 +1,11 @@
 import {
+  type ComponentSource,
   type Contour,
   type FontDocument,
   type Glyph,
+  type IdFactory,
+  counterIds,
+  resolveGlyphComponents,
   segments,
 } from "@fonteditor/font-model";
 
@@ -62,10 +66,28 @@ function tracePath(path: OtPath, c: Contour): void {
   path.close();
 }
 
-function pathFor(g: Glyph, warnings: string[]): OtPath {
+/**
+ * Every contour a glyph draws, its components included.
+ *
+ * CFF has no notion of a component, so this is where the references become
+ * outlines. Nothing is lost in the shape — a flattened composite draws exactly
+ * what it drew — but the fact that it *was* composed does not survive, which is
+ * one of the two reasons the UFO export exists alongside this one.
+ */
+function flatten(g: Glyph, document: FontDocument, ids: IdFactory): Contour[] {
+  if (g.components.length === 0) return [...g.contours];
+
+  const source: ComponentSource = {
+    glyphOf: (name) => document.glyphs[name] ?? null,
+  };
+
+  return [...g.contours, ...resolveGlyphComponents(source, g.name, g.components, ids)];
+}
+
+function pathFor(g: Glyph, contours: readonly Contour[], warnings: string[]): OtPath {
   const path = new opentype.Path();
 
-  for (const c of g.contours) {
+  for (const c of contours) {
     if (c.nodes.length < 2) continue;
     if (!c.closed) {
       // A font has no notion of an open path; the outline is the boundary of a
@@ -100,7 +122,7 @@ function notdefFirst(document: FontDocument): { names: string[]; synthesised: bo
  * reasoning as import: refusing to produce a font over one odd contour helps
  * nobody.
  */
-export function exportFont(document: FontDocument): ExportResult {
+export function exportFont(document: FontDocument, ids: IdFactory = counterIds("x")): ExportResult {
   // Checked before the synthesised .notdef is added, or a document holding
   // nothing at all would quietly export as a font holding nothing at all.
   if (document.glyphOrder.length === 0) {
@@ -134,7 +156,7 @@ export function exportFont(document: FontDocument): ExportResult {
     } = {
       name: g.name,
       advanceWidth: Math.max(0, Math.round(g.advance)),
-      path: pathFor(g, warnings),
+      path: pathFor(g, flatten(g, document, ids), warnings),
     };
 
     // Several code points can map to one glyph, and dropping the extras would

@@ -32,12 +32,15 @@ export {
 } from "./state.js";
 
 export {
+  addComponent,
   balanceSegmentAt,
   centreCurrentGlyph,
   clearSelection,
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
+  moveComponentBy,
+  removeComponent,
   nudgeSidebearing,
   nodeHvLocked,
   retractHandle,

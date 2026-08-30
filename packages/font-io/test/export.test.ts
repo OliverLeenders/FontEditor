@@ -1,5 +1,7 @@
+import { translation } from "@fonteditor/geometry";
 import {
   type FontDocument,
+  component,
   contour,
   counterIds,
   fontDocument,
@@ -229,6 +231,73 @@ describe("exportFont", () => {
     expect(twice.glyphs["o"]?.contours[0]?.nodes.map((n) => n.pt)).toEqual(
       once.glyphs["o"]?.contours[0]?.nodes.map((n) => n.pt),
     );
+  });
+});
+
+describe("components in an OTF", () => {
+  const ids = counterIds("k");
+
+  const composite = () =>
+    fontDocument(
+      [
+        glyph(".notdef", { advance: 500 }),
+        box("n", 0x6e),
+        glyph("nn", {
+          unicodes: [0x100],
+          advance: 1000,
+          components: [
+            component(ids.component(), "n"),
+            component(ids.component(), "n", translation(500, 0)),
+          ],
+        }),
+      ],
+      INFO,
+    );
+
+  it("flattens a component into real outlines, since CFF has none", () => {
+    const back = roundTrip(composite()).glyphs["nn"]!;
+    expect(back.contours).toHaveLength(2);
+    // The second copy is where the transform put it.
+    const xs = back.contours.map((c) => Math.min(...c.nodes.map((n) => n.pt.x)));
+    expect(xs.sort((a, b) => a - b)).toEqual([80, 580]);
+  });
+
+  it("keeps the composite glyph's own advance, not the base's", () => {
+    expect(roundTrip(composite()).glyphs["nn"]?.advance).toBe(1000);
+  });
+
+  it("draws a glyph's own contours as well as its components", () => {
+    const mixed = fontDocument(
+      [
+        glyph(".notdef", { advance: 500 }),
+        box("n", 0x6e),
+        glyph("mixed", {
+          unicodes: [0x101],
+          advance: 900,
+          contours: [box("own", 0x102).contours[0]!],
+          components: [component(ids.component(), "n", translation(400, 0))],
+        }),
+      ],
+      INFO,
+    );
+    expect(roundTrip(mixed).glyphs["mixed"]?.contours).toHaveLength(2);
+  });
+
+  it("does not hang on a glyph that refers to itself", () => {
+    const looped = fontDocument(
+      [
+        glyph(".notdef", { advance: 500 }),
+        glyph("loop", {
+          unicodes: [0x103],
+          advance: 400,
+          contours: [box("b", 0x104).contours[0]!],
+          components: [component(ids.component(), "loop")],
+        }),
+      ],
+      INFO,
+    );
+    // Its own contour still draws; only the loop is cut.
+    expect(roundTrip(looped).glyphs["loop"]?.contours).toHaveLength(1);
   });
 });
 

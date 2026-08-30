@@ -1,7 +1,8 @@
 import type { Rect } from "@fonteditor/geometry";
 
+import type { Component } from "./component.js";
 import { type Contour, type Segment, contourBounds, segments, unionRect } from "./contour.js";
-import type { ContourId } from "./ids.js";
+import type { ComponentId, ContourId } from "./ids.js";
 
 /**
  * A single glyph.
@@ -21,12 +22,22 @@ export type Glyph = {
   /** Advance width in design units. */
   readonly advance: number;
   readonly contours: readonly Contour[];
+  /**
+   * Glyphs placed inside this one, by reference.
+   *
+   * Kept apart from `contours` rather than resolved into them, because the
+   * reference is the point: correcting the `a` corrects every letter built from
+   * it. Resolving happens where the outlines are needed — to draw, to measure,
+   * to compile — and never in the document.
+   */
+  readonly components: readonly Component[];
 };
 
 export type GlyphInit = {
   readonly unicodes?: readonly number[];
   readonly advance?: number;
   readonly contours?: readonly Contour[];
+  readonly components?: readonly Component[];
 };
 
 export function glyph(name: string, init: GlyphInit = {}): Glyph {
@@ -35,7 +46,38 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     unicodes: init.unicodes ?? [],
     advance: init.advance ?? 0,
     contours: init.contours ?? [],
+    components: init.components ?? [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// components
+// ---------------------------------------------------------------------------
+
+export function addGlyphComponent(g: Glyph, c: Component): Glyph {
+  return { ...g, components: [...g.components, c] };
+}
+
+export function removeGlyphComponent(g: Glyph, id: ComponentId): Glyph | null {
+  const kept = g.components.filter((c) => c.id !== id);
+  return kept.length === g.components.length ? null : { ...g, components: kept };
+}
+
+export function updateGlyphComponent(
+  g: Glyph,
+  id: ComponentId,
+  change: (c: Component) => Component,
+): Glyph | null {
+  const i = g.components.findIndex((c) => c.id === id);
+  if (i < 0) return null;
+  const components = g.components.slice();
+  components[i] = change(components[i]!);
+  return { ...g, components };
+}
+
+/** True when the glyph draws nothing of its own and is purely assembled. */
+export function isComposite(g: Glyph): boolean {
+  return g.contours.length === 0 && g.components.length > 0;
 }
 
 export function contourIndex(g: Glyph, id: ContourId): number {

@@ -1,9 +1,11 @@
 import {
+  type Component,
   type FontDocument,
   type FontInfo,
   type Glyph,
   type IdFactory,
   fontDocument,
+  component,
   glyph,
 } from "@fonteditor/font-model";
 
@@ -97,6 +99,9 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
   const taken = new Set<string>();
   const glyphs: Glyph[] = [];
 
+  // Components refer to glyphs by index, and the names are only settled here, so
+  // the naming pass runs first and the references are resolved against it.
+  const names: string[] = [];
   source.glyphs.forEach((g, index) => {
     const preferred = g.name ?? inventName(g, index);
     const name = uniqueName(preferred, taken);
@@ -107,12 +112,31 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
       });
     }
     taken.add(name);
+    names.push(name);
+  });
+
+  source.glyphs.forEach((g, index) => {
+    const name = names[index]!;
+    const components: Component[] = [];
+
+    for (const reference of g.components) {
+      const base = names[reference.glyphIndex];
+      if (base === undefined) {
+        warnings.push({
+          glyph: name,
+          message: `Dropped a component pointing at glyph ${String(reference.glyphIndex)}, which is not in this font.`,
+        });
+        continue;
+      }
+      components.push(component(ids.component(), base, reference.transform));
+    }
 
     glyphs.push(
       glyph(name, {
         unicodes: g.unicodes,
         advance: g.advance,
         contours: contoursFromCommands(g.commands, ids, epsilon),
+        components,
       }),
     );
   });

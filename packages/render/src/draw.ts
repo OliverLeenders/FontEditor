@@ -46,6 +46,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   // and context that draws over your work is a distraction rather than a help.
   drawNeighbours(ctx, s);
   if (s.options.margins) drawMargins(ctx, s);
+  drawComponents(ctx, s);
   if (s.options.showFilledPreview) drawFilledPreview(ctx, s);
   drawOutline(ctx, s);
 
@@ -559,5 +560,26 @@ export function drawNeighbours(ctx: Canvas2D, s: Scene): void {
     for (const c of drawable) traceContour(ctx, shifted, c);
     ctx.fill();
   }
+  ctx.restore();
+}
+
+
+/**
+ * The outlines this glyph's components contribute.
+ *
+ * Filled, and a little lighter than the glyph's own outline. They are part of
+ * the letter and have to read as part of it, but they belong to another glyph
+ * and cannot be edited here, so drawing them identically would invite dragging
+ * at points that are not there.
+ */
+export function drawComponents(ctx: Canvas2D, s: Scene): void {
+  const drawable = s.componentOutlines.filter((c) => c.nodes.length >= 2);
+  if (drawable.length === 0) return;
+
+  ctx.save();
+  ctx.fillStyle = s.palette.component;
+  ctx.beginPath();
+  for (const c of drawable) traceContour(ctx, s.view, c);
+  ctx.fill();
   ctx.restore();
 }

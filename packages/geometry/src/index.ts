@@ -19,6 +19,16 @@ export {
   isNegligible,
 } from "./epsilon.js";
 
+export type { Affine } from "./affine.js";
+export {
+  IDENTITY_AFFINE,
+  affineDeterminant,
+  applyAffine,
+  composeAffine,
+  isTranslation,
+  translation,
+} from "./affine.js";
+
 export type { Rect, Vec2 } from "./vec2.js";
 export {
   ORIGIN,

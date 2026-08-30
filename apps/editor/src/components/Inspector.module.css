@@ -98,3 +98,48 @@
   grid-template-columns: 1fr 1fr;
   gap: .3rem;
 }
+
+/* One row per component: what it is, where it sits, and a way to remove it. */
+.components {
+  display: flex;
+  flex-direction: column;
+  gap: .25rem;
+}
+
+.componentRow {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.componentName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  color: var(--ink);
+}
+
+.componentAt {
+  flex: none;
+  font-size: .72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+}
+
+.componentRemove {
+  flex: none;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  line-height: 1;
+}
+.componentRemove:hover { color: var(--danger, #c2453d); border-color: currentColor; }

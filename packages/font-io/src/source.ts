@@ -2,6 +2,8 @@ import type { OtCommand, OtFont, OtNames } from "opentype.js";
 
 import { opentype } from "./opentype.js";
 
+import type { Affine } from "@fonteditor/geometry";
+
 import type { PathCommand } from "./commands.js";
 
 /**
@@ -14,12 +16,24 @@ import type { PathCommand } from "./commands.js";
  * care either way.
  */
 
+/**
+ * A component as the file gives it: by glyph *index*, not name.
+ *
+ * Indices are resolved to names by the importer, which is the only place that
+ * knows what each glyph ended up called — a font may name none of them.
+ */
+export type SourceComponent = {
+  readonly glyphIndex: number;
+  readonly transform: Affine;
+};
+
 export type SourceGlyph = {
   /** May be absent in the file; the importer is what settles on a final name. */
   readonly name: string | null;
   readonly unicodes: readonly number[];
   readonly advance: number;
   readonly commands: readonly PathCommand[];
+  readonly components: readonly SourceComponent[];
 };
 
 export type SourceFont = {
@@ -85,12 +99,39 @@ function readGlyphs(font: OtFont): SourceGlyph[] {
     // `path` is lazily decoded, so a single malformed glyph throws here rather
     // than at parse time. One bad glyph should cost that glyph's outline, not
     // the whole font — a font you cannot open at all is the worse failure.
+    // A composite glyph's path is the outlines its components draw, already
+    // flattened. Taking both would draw everything twice, so a composite
+    // contributes its references and no contours of its own — which is also
+    // what the format means.
+    const composite = g.isComposite === true && (g.components?.length ?? 0) > 0;
+
     let commands: PathCommand[] = [];
-    try {
-      commands = g.path.commands.map(toCommand).filter((c): c is PathCommand => c !== null);
-    } catch {
-      commands = [];
+    if (!composite) {
+      try {
+        commands = g.path.commands.map(toCommand).filter((c): c is PathCommand => c !== null);
+      } catch {
+        commands = [];
+      }
     }
+
+    const components: SourceComponent[] = composite
+      ? (g.components ?? [])
+          // Point-matching components place themselves by aligning two points
+          // rather than by an offset. Reading one as though it were at the
+          // origin would put it in the wrong place, so it is dropped instead.
+          .filter((c) => c.matchedPoints === undefined)
+          .map((c) => ({
+            glyphIndex: c.glyphIndex,
+            transform: {
+              xScale: c.xScale,
+              xyScale: c.scale01,
+              yxScale: c.scale10,
+              yScale: c.yScale,
+              xOffset: c.dx,
+              yOffset: c.dy,
+            },
+          }))
+      : [];
 
     const unicodes = g.unicodes ?? (g.unicode === undefined ? [] : [g.unicode]);
     glyphs.push({
@@ -98,6 +139,7 @@ function readGlyphs(font: OtFont): SourceGlyph[] {
       unicodes,
       advance: g.advanceWidth ?? 0,
       commands,
+      components,
     });
   }
   return glyphs;

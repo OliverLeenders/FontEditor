@@ -33,8 +33,23 @@ declare module "opentype.js" {
     close(): void;
   }
 
+  /** A TrueType composite reference, as the `glyf` parser produces it. */
+  export interface OtComponent {
+    readonly glyphIndex: number;
+    readonly xScale: number;
+    readonly scale01: number;
+    readonly scale10: number;
+    readonly yScale: number;
+    readonly dx: number;
+    readonly dy: number;
+    /** Point-matching placement, which carries no offsets. Rare, and not read. */
+    readonly matchedPoints?: readonly number[];
+  }
+
   export interface OtGlyph {
     readonly index?: number;
+    readonly isComposite?: boolean;
+    readonly components?: readonly OtComponent[];
     readonly name?: string;
     readonly unicode?: number;
     readonly unicodes?: number[];

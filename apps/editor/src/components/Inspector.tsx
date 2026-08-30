@@ -1,4 +1,8 @@
 import {
+  isTranslation,
+} from "@fonteditor/geometry";
+import {
+  randomIds,
   setAdvance,
   setLeftSidebearing,
   setNodeType,
@@ -6,8 +10,15 @@ import {
   sidebearings,
   updateContour,
 } from "@fonteditor/font-model";
-import { begin, commit, editCurrentGlyph, result } from "@fonteditor/tools";
-import { useRef } from "react";
+import {
+  addComponent,
+  begin,
+  commit,
+  editCurrentGlyph,
+  removeComponent,
+  result,
+} from "@fonteditor/tools";
+import { useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Inspector.module.css";
@@ -44,6 +55,12 @@ export function Inspector(): JSX.Element | null {
   const rightBearing = useStoreValue(
     (s) => sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)?.right ?? null,
   );
+
+  const components = useStoreValue(
+    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.components ?? EMPTY_COMPONENTS,
+  );
+  const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
+  const [adding, setAdding] = useState("");
 
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   if (!open) return null;
@@ -174,6 +191,55 @@ export function Inspector(): JSX.Element | null {
 
         <div className={styles.rule} />
 
+        {/* Components are references, so the panel lists them and lets them be
+            placed or removed. Editing what one *looks* like means opening the
+            glyph it refers to, which is the entire point of using one. */}
+        <Field label={components.length === 0 ? "Components" : `Components · ${components.length}`}>
+          <div className={styles.components}>
+            {components.map((c) => (
+              <div key={c.id} className={styles.componentRow}>
+                <span className={styles.componentName}>{c.base}</span>
+                <span className={styles.componentAt}>
+                  {isTranslation(c.transform)
+                    ? `${String(Math.round(c.transform.xOffset))}, ${String(Math.round(c.transform.yOffset))}`
+                    : "transformed"}
+                </span>
+                <button
+                  type="button"
+                  className={styles.componentRemove}
+                  title={`Remove ${c.base}`}
+                  aria-label={`Remove ${c.base}`}
+                  onClick={() => store.applyTool(removeComponent(store.editor, c.id))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+            <div className={styles.componentRow}>
+              <input
+                className={styles.input}
+                list="fonteditor-glyph-names"
+                placeholder="glyph name"
+                aria-label="Add a component"
+                value={adding}
+                onChange={(event) => setAdding(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  store.applyTool(addComponent(store.editor, adding, componentIds));
+                  setAdding("");
+                }}
+              />
+              <datalist id="fonteditor-glyph-names">
+                {glyphNames.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+            </div>
+          </div>
+        </Field>
+
+        <div className={styles.rule} />
+
         <Field label={pointCount === 0 ? "Point" : `Point · ${pointCount} selected`}>
           <div className={styles.segmented}>
             <button
@@ -208,7 +274,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const EMPTY_GLYPH = { name: "", unicodes: [], advance: 0, contours: [] };
+/** New components need ids; the panel owns a factory, as the menu does. */
+const componentIds = randomIds();
+const EMPTY_COMPONENTS: readonly never[] = [];
+const EMPTY_GLYPH = { name: "", unicodes: [], advance: 0, contours: [], components: [] };
 const EMPTY_CODES: readonly number[] = [];
 
 /**

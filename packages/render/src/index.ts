@@ -33,6 +33,7 @@ export { DEFAULT_METRICS, DEFAULT_OPTIONS, scene } from "./scene.js";
 export type { GlyphCellState } from "./draw.js";
 export {
   clearBackground,
+  drawComponents,
   drawFilledPreview,
   drawGlyphCell,
   drawGlyphThumbnail,

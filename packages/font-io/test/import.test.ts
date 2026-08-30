@@ -96,6 +96,7 @@ describe("documentFrom", () => {
     unicodes,
     advance: 500,
     commands: [],
+    components: [],
   });
 
   it("falls back to proportions of the em for metrics the font omits", () => {

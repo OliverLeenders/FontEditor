@@ -38,6 +38,8 @@ export type RenderPalette = {
   readonly margin: string;
   /** Glyphs drawn either side for spacing context. */
   readonly neighbour: string;
+  /** Outlines a component contributes: present, but not yours to edit here. */
+  readonly component: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -64,6 +66,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   cellCurrent: "rgba(169,111,34,0.14)",
   margin: "#9AAEC4",
   neighbour: "rgba(19,25,34,0.22)",
+  component: "rgba(19,25,34,0.55)",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -90,4 +93,5 @@ export const DARK_PALETTE: RenderPalette = {
   cellCurrent: "rgba(214,160,90,0.18)",
   margin: "#4B5D70",
   neighbour: "rgba(229,235,242,0.20)",
+  component: "rgba(229,235,242,0.55)",
 };

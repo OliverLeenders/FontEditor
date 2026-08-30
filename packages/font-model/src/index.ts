@@ -15,7 +15,7 @@
 
 export { glyphFileName } from "./names.js";
 
-export type { ContourId, IdFactory, NodeId } from "./ids.js";
+export type { ComponentId, ContourId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";
 
 export type { Node, NodeInit, NodeType } from "./node.js";
@@ -30,6 +30,16 @@ export {
   translateNode,
   withHandleRaw,
 } from "./node.js";
+
+export type { Component, ComponentSource } from "./component.js";
+export {
+  MAX_COMPONENT_DEPTH,
+  component,
+  movedComponent,
+  resolveComponent,
+  resolveGlyphComponents,
+  wouldRecurse,
+} from "./component.js";
 
 export type { Contour, Segment, SegmentKind } from "./contour.js";
 export {
@@ -92,6 +102,10 @@ export {
 export type { Glyph, GlyphInit } from "./glyph.js";
 export {
   addContour,
+  addGlyphComponent,
+  isComposite,
+  removeGlyphComponent,
+  updateGlyphComponent,
   allSegments,
   contourById,
   contourIndex,
