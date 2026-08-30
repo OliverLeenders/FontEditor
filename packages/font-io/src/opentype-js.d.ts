@@ -11,8 +11,10 @@
  * anything we do start reading has to be added here first — which is the check
  * that keeps the parser's shape from spreading past `source.ts`.
  *
- * The package is a UMD bundle exposing a single default export; named imports
- * do not survive the CommonJS interop.
+ * The package ships both a CommonJS bundle and an ESM one, and they do not agree
+ * on shape: Node resolves the CommonJS build and sees only a default export,
+ * while a bundler resolves the ESM build and sees only named ones. Both are
+ * declared here, and `opentype.ts` picks whichever actually exists at runtime.
  */
 declare module "opentype.js" {
   export type OtCommand =
@@ -76,7 +78,7 @@ declare module "opentype.js" {
     path: OtPath;
   }
 
-  interface OpenType {
+  export interface OpenType {
     parse(buffer: ArrayBuffer): OtFont;
     /** Used by tests to build a font to parse back; not part of the import path. */
     Font: new (init: OtFontInit) => OtFont & { toArrayBuffer(): ArrayBuffer };
@@ -86,4 +88,9 @@ declare module "opentype.js" {
 
   const opentype: OpenType;
   export default opentype;
+
+  export const parse: OpenType["parse"];
+  export const Font: OpenType["Font"];
+  export const Glyph: OpenType["Glyph"];
+  export const Path: OpenType["Path"];
 }

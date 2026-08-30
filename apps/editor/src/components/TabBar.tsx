@@ -5,8 +5,8 @@ export type ViewId = "glyph" | "font" | "spacing" | "features" | "proof";
 type Tab = { readonly id: ViewId; readonly label: string; readonly ready: boolean };
 
 const TABS: readonly Tab[] = [
-  { id: "glyph", label: "Glyph", ready: true },
   { id: "font", label: "Font", ready: true },
+  { id: "glyph", label: "Glyph", ready: true },
   { id: "spacing", label: "Spacing", ready: false },
   { id: "features", label: "Features", ready: false },
   { id: "proof", label: "Proof", ready: false },

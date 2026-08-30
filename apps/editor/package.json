@@ -13,6 +13,7 @@
   "dependencies": {
     "@fonteditor/catalog": "workspace:*",
     "@fonteditor/edit-core": "workspace:*",
+    "@fonteditor/font-io": "workspace:*",
     "@fonteditor/font-model": "workspace:*",
     "@fonteditor/geometry": "workspace:*",
     "@fonteditor/render": "workspace:*",

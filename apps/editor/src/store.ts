@@ -1,4 +1,5 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
+import { importFont as parseFontFile } from "@fonteditor/font-io";
 import {
   type EditSession,
   apply as applyToSession,
@@ -15,6 +16,7 @@ import {
   type Glyph,
   type GlyphName,
   glyphBounds,
+  randomIds,
 } from "@fonteditor/font-model";
 import {
   Autosave,
@@ -254,6 +256,52 @@ export class EditorStore {
 
   setPreviewing(previewing: boolean): void {
     if (previewing !== this.state.previewing) this.patch({ previewing });
+  }
+
+  /**
+   * Replace the document with a font read from a file.
+   *
+   * Deliberately *not* an undoable edit. Undo is for the shape you are drawing;
+   * a single ctrl-Z that silently swapped the whole font back would be alarming
+   * rather than useful, and the history it restored would describe glyphs that
+   * are no longer open. The session starts again on the new font.
+   *
+   * The write goes through `replaceAll` rather than the autosave's per-glyph
+   * path: a few thousand glyphs is one round trip and one pass over the
+   * directory, and it is the only route that clears out the font being
+   * replaced.
+   */
+  async importFont(bytes: ArrayBuffer): Promise<{
+    family: string;
+    glyphs: number;
+    warnings: string[];
+  }> {
+    const { document, warnings } = parseFontFile(bytes, randomIds());
+
+    this.patch({
+      session: newSession(
+        editorState({ document, view: this.editor.view }),
+      ),
+      recovered: false,
+    });
+    this.setCurrentGlyph(document.glyphOrder[0] ?? "");
+    this.setCatalogQuery(DEFAULT_QUERY);
+
+    const client = this.storageClient;
+    if (client !== null) {
+      this.patch({ saveStatus: "saving" });
+      await client.replaceAll(document);
+      // The document on disk is now exactly this one, so autosave starts from
+      // it rather than believing every glyph is still unwritten.
+      this.autosave.markLoaded(document, false);
+      this.patch({ saveStatus: this.autosave.status });
+    }
+
+    return {
+      family: `${document.info.familyName} ${document.info.styleName}`.trim(),
+      glyphs: document.glyphOrder.length,
+      warnings: warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
+    };
   }
 
   setCatalogQuery(changes: Partial<CatalogQuery>): void {

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
-import { decodeGlyph, encodeFontInfo, encodeGlyph } from "./schema.js";
-import { orderedGlyphs } from "@fonteditor/font-model";
+import { decodeFontInfo, decodeGlyph, encodeFontInfo, encodeGlyph } from "./schema.js";
+import { type Glyph, fontDocument, orderedGlyphs, setGlyphOrder } from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
 import { OpfsFileStore } from "./opfs.js";
@@ -12,6 +12,7 @@ import {
   clearJournal,
   glyphPath,
   loadDocument,
+  replaceDocument,
   wipe,
 } from "./project.js";
 
@@ -98,6 +99,24 @@ async function run(request: StorageRequest): Promise<unknown> {
         written.push(path);
       }
       return written;
+    }
+
+    case "replaceAll": {
+      // Validated the same way a single save is, and *before* anything is
+      // written: a font that fails to round-trip should leave the existing
+      // project untouched rather than half-replaced.
+      const glyphs: Glyph[] = [];
+      for (const stored of request.glyphs) {
+        const decoded = decodeGlyph(stored);
+        if (!decoded.ok) throw new Error(`refusing to import ${stored.name}: ${decoded.reason}`);
+        glyphs.push(decoded.value);
+      }
+      // The stored order is authoritative: `fontDocument` would otherwise
+      // order by the array it was handed, losing the font's own arrangement.
+      const { info, glyphOrder } = decodeFontInfo(request.info);
+      const document = setGlyphOrder(fontDocument(glyphs, info), glyphOrder);
+      const report = await replaceDocument(required(), document);
+      return report;
     }
 
     case "saveFontInfo":

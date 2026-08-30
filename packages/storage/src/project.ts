@@ -106,6 +106,45 @@ export async function saveDocument(
   return report;
 }
 
+/**
+ * Write a whole document, replacing whatever the project held.
+ *
+ * What an import needs, and deliberately not `saveDocument` with a `null`
+ * previous: that would write every glyph but leave the *old* font's glyph files
+ * sitting in the directory, to be loaded back on the next launch as though they
+ * belonged to the new font.
+ *
+ * New glyphs are written before old ones are removed. The reverse order — clear
+ * then fill — leaves a window in which a crash loses the project entirely,
+ * whereas this leaves at worst a few stale files that the next import clears
+ * anyway. The journal is dropped last, once the document it described is
+ * definitively superseded.
+ */
+export async function replaceDocument(
+  store: FileStore,
+  document: FontDocument,
+): Promise<{ readonly written: number; readonly removed: number }> {
+  const keep = new Set<string>();
+  for (const name of document.glyphOrder) {
+    const g = document.glyphs[name];
+    if (g === undefined) continue;
+    const path = glyphPath(g.name);
+    await store.write(path, JSON.stringify(encodeGlyph(g)));
+    keep.add(path);
+  }
+
+  let removed = 0;
+  for (const path of await store.list(GLYPHS_PREFIX)) {
+    if (keep.has(path)) continue;
+    await store.remove(path);
+    removed++;
+  }
+
+  await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
+  await clearJournal(store);
+  return { written: keep.size, removed };
+}
+
 // ---------------------------------------------------------------------------
 // the journal
 // ---------------------------------------------------------------------------

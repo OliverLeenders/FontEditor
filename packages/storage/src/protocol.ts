@@ -16,6 +16,17 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "load" }
   | { readonly id: number; readonly kind: "saveGlyphs"; readonly glyphs: readonly StoredGlyph[] }
   | { readonly id: number; readonly kind: "saveFontInfo"; readonly info: StoredFontInfo }
+  /**
+   * Replace the whole project in one round trip. What an import sends: writing
+   * a few thousand glyphs as separate messages would serialise and post each
+   * one on its own, and would leave the project half-replaced if any failed.
+   */
+  | {
+      readonly id: number;
+      readonly kind: "replaceAll";
+      readonly glyphs: readonly StoredGlyph[];
+      readonly info: StoredFontInfo;
+    }
   | { readonly id: number; readonly kind: "journal"; readonly glyph: StoredGlyph; readonly at: number }
   | { readonly id: number; readonly kind: "clearJournal" }
   | { readonly id: number; readonly kind: "wipe" };

@@ -1,4 +1,6 @@
-import opentype, { type OtCommand, type OtFont, type OtNames } from "opentype.js";
+import type { OtCommand, OtFont, OtNames } from "opentype.js";
+
+import { opentype } from "./opentype.js";
 
 import type { PathCommand } from "./commands.js";
 

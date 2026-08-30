@@ -1,5 +1,5 @@
 import { counterIds, glyphForCharacter } from "@fonteditor/font-model";
-import opentype from "opentype.js";
+import { opentype } from "../src/opentype.js";
 import { describe, expect, it } from "vitest";
 
 import { documentFrom, importFont } from "../src/import.js";

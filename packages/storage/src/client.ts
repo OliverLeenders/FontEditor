@@ -83,6 +83,24 @@ export class StorageClient {
     return written as readonly string[];
   }
 
+  /**
+   * Replace everything on disk with this document, in one message.
+   *
+   * Returns what the worker actually did, so an import can report how many
+   * glyphs landed and how many belonged to the font being replaced.
+   */
+  async replaceAll(document: FontDocument): Promise<{ written: number; removed: number }> {
+    const glyphs = document.glyphOrder
+      .map((name) => document.glyphs[name])
+      .filter((g): g is Glyph => g !== undefined);
+    const result = await this.send({
+      kind: "replaceAll",
+      glyphs: glyphs.map(encodeGlyph),
+      info: encodeFontInfo(document),
+    });
+    return result as { written: number; removed: number };
+  }
+
   async saveFontInfo(document: FontDocument): Promise<void> {
     await this.send({ kind: "saveFontInfo", info: encodeFontInfo(document) });
   }

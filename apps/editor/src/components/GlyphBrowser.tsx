@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
 
 /** Where the Unicode blocks begin in the set list, for a divider. */
@@ -172,6 +173,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
 
       <div className={styles.main}>
         <div className={styles.bar}>
+          <OpenFont />
           <input
             type="search"
             className={styles.search}

@@ -54,6 +54,7 @@ export {
   removedGlyphs,
   loadDocument,
   readJournal,
+  replaceDocument,
   saveDocument,
   saveGlyphs,
   wipe,

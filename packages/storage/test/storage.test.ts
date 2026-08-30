@@ -5,6 +5,7 @@ import {
   type Glyph,
   addContour,
   contour,
+  DEFAULT_FONT_INFO,
   counterIds,
   fontDocument,
   glyph,
@@ -19,6 +20,7 @@ import { Autosave } from "../src/autosave.js";
 import { MemoryFileStore } from "../src/file-store.js";
 import { glyphFileName } from "../src/names.js";
 import {
+  FONT_INFO_PATH,
   JOURNAL_PATH,
   appendJournal,
   clearJournal,
@@ -26,6 +28,7 @@ import {
   glyphPath,
   loadDocument,
   readJournal,
+  replaceDocument,
   saveDocument,
 } from "../src/project.js";
 import { SCHEMA_VERSION, decodeGlyph, encodeGlyph, migrate } from "../src/schema.js";
@@ -451,5 +454,62 @@ describe("autosave", () => {
     expect(store.has(glyphPath("o"))).toBe(true);
     expect(store.has(glyphPath("l"))).toBe(true);
     expect(store.has(glyphPath("e"))).toBe(true);
+  });
+});
+
+describe("replaceDocument", () => {
+  const font = (names: string[]) =>
+    fontDocument(names.map((n) => glyph(n, { advance: 500 })), DEFAULT_FONT_INFO);
+
+  it("writes every glyph and the font info", async () => {
+    const store = new MemoryFileStore();
+    const report = await replaceDocument(store, font(["A", "B", "C"]));
+
+    expect(report.written).toBe(3);
+    expect(store.has(glyphPath("A"))).toBe(true);
+    expect(store.has(glyphPath("C"))).toBe(true);
+    expect(store.has(FONT_INFO_PATH)).toBe(true);
+  });
+
+  it("removes glyphs belonging to the font it replaced", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, font(["A", "B", "C"]));
+    const report = await replaceDocument(store, font(["A", "X"]));
+
+    expect(report.removed).toBe(2);
+    expect(store.has(glyphPath("A"))).toBe(true);
+    expect(store.has(glyphPath("X"))).toBe(true);
+    expect(store.has(glyphPath("B"))).toBe(false);
+    expect(store.has(glyphPath("C"))).toBe(false);
+  });
+
+  it("leaves nothing of the old font that a load could pick up", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, font(["A", "B"]));
+    await replaceDocument(store, font(["Z"]));
+
+    const loaded = await loadDocument(store);
+    expect(loaded.kind === "loaded" ? loaded.document.glyphOrder : null).toEqual(["Z"]);
+  });
+
+  it("drops a journal that describes the superseded document", async () => {
+    const store = new MemoryFileStore();
+    await appendJournal(store, glyph("A", { advance: 1 }), 1);
+    expect(await readJournal(store)).toHaveLength(1);
+
+    await replaceDocument(store, font(["Z"]));
+    expect(await readJournal(store)).toHaveLength(0);
+  });
+
+  it("keeps the font's own glyph order rather than sorting it", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, font(["zeta", "alpha", "mu"]));
+
+    const loaded = await loadDocument(store);
+    expect(loaded.kind === "loaded" ? loaded.document.glyphOrder : null).toEqual([
+      "zeta",
+      "alpha",
+      "mu",
+    ]);
   });
 });

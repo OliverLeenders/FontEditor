@@ -1,0 +1,50 @@
+/* The drop target is the whole control, so the button and its message both
+   accept a dragged file rather than only the button's own rectangle. */
+.zone {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  min-width: 0;
+  padding: .1rem .25rem;
+  border: 1px dashed transparent;
+  border-radius: var(--radius);
+}
+
+.dragging {
+  border-color: var(--accent);
+  background: var(--selected);
+}
+
+.input { display: none; }
+
+.button {
+  flex: none;
+  padding: .28rem .6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--canvas);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: .78rem;
+}
+.button:hover:not(:disabled) { border-color: var(--accent); }
+.button:disabled { opacity: .6; cursor: default; }
+
+.note {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: .76rem;
+  color: var(--ink-2);
+}
+
+.warn { color: var(--warn, #b4791f); }
+
+.error {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: .76rem;
+  color: var(--danger, #c2453d);
+}

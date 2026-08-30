@@ -32,6 +32,9 @@ importers:
       '@fonteditor/edit-core':
         specifier: workspace:*
         version: link:../../packages/edit-core
+      '@fonteditor/font-io':
+        specifier: workspace:*
+        version: link:../../packages/font-io
       '@fonteditor/font-model':
         specifier: workspace:*
         version: link:../../packages/font-model
