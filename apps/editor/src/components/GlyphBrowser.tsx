@@ -1,5 +1,6 @@
 import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@fonteditor/catalog";
 import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@fonteditor/render";
+import { deleteGlyph } from "@fonteditor/tools";
 import {
   type GridLayout,
   cellBox,
@@ -13,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { ExportFont } from "./ExportFont.js";
 import { NewFont } from "./NewFont.js";
+import { NewGlyph } from "./NewGlyph.js";
 import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
 
@@ -197,6 +199,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
           <OpenFont />
           <NewFont />
           <ExportFont />
+          <NewGlyph />
           <input
             type="search"
             className={styles.search}
@@ -253,6 +256,15 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
               if (event.key === "Enter") {
                 event.preventDefault();
                 openAt(focused);
+                return;
+              }
+              // Undo is the safety net, so this does not stop to ask: a
+              // confirmation on something one keystroke from reversible is
+              // friction rather than protection.
+              if (event.key === "Delete" || event.key === "Backspace") {
+                event.preventDefault();
+                const name = shown[focused]?.name;
+                if (name !== undefined) store.applyTool(deleteGlyph(store.editor, name));
               }
             }}
             onClick={(event) => {

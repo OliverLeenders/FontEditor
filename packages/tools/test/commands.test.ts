@@ -13,6 +13,7 @@ import {
   segmentAt,
   segmentCount,
   sidebearings,
+  component,
 } from "@fonteditor/font-model";
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
@@ -22,6 +23,8 @@ import {
   clearSelection,
   convertSegment,
   deleteSelectedPoints,
+  createGlyphs,
+  deleteGlyph,
   insertPointOnSegment,
   nudgeSidebearing,
   nodeHvLocked,
@@ -447,5 +450,119 @@ describe("nudgeSidebearing", () => {
     const right = nudgeSidebearing(state, "n", "right", 1).effects[0];
     expect(left).toMatchObject({ label: "Left sidebearing of n" });
     expect(right).toMatchObject({ label: "Right sidebearing of n" });
+  });
+});
+
+describe("createGlyphs", () => {
+  const start = () =>
+    editorState({
+      document: fontDocument([glyph("a", { unicodes: [0x61], advance: 500 })]),
+      view: { scale: 1, tx: 0, ty: 0 },
+      currentGlyph: "a",
+    });
+
+  it("adds a glyph and opens it", () => {
+    const { state } = createGlyphs(start(), [{ name: "b", unicodes: [0x62] }], 500);
+    expect(state.document.glyphOrder).toEqual(["a", "b"]);
+    expect(state.document.glyphs["b"]?.unicodes).toEqual([0x62]);
+    expect(state.currentGlyph).toBe("b");
+  });
+
+  it("gives a new glyph the advance it was told, and no outline", () => {
+    const { state } = createGlyphs(start(), [{ name: "b" }], 512);
+    expect(state.document.glyphs["b"]?.advance).toBe(512);
+    expect(state.document.glyphs["b"]?.contours).toEqual([]);
+  });
+
+  it("never overwrites a glyph that is already there", () => {
+    const before = start();
+    const { state } = createGlyphs(before, [{ name: "a", unicodes: [0x41] }], 500);
+    // Same document object: nothing was created, so nothing changed.
+    expect(state.document).toBe(before.document);
+    expect(state.document.glyphs["a"]?.unicodes).toEqual([0x61]);
+  });
+
+  it("skips the ones that exist and adds the rest", () => {
+    const { state } = createGlyphs(
+      start(),
+      [{ name: "a" }, { name: "b" }, { name: "c" }],
+      500,
+    );
+    expect(state.document.glyphOrder).toEqual(["a", "b", "c"]);
+  });
+
+  it("commits a whole set as one entry, so it can be taken back in one", () => {
+    const many = Array.from({ length: 95 }, (_, i) => ({
+      name: `g${String(i)}`,
+      unicodes: [0x20 + i],
+    }));
+    const out = createGlyphs(start(), many, 500);
+    expect(out.effects.map((e) => e.kind)).toEqual(["beginTransaction", "commitTransaction"]);
+    expect(out.effects[0]).toMatchObject({ label: "Add 95 glyphs" });
+  });
+
+  it("names a single addition after the glyph", () => {
+    expect(createGlyphs(start(), [{ name: "b" }], 500).effects[0]).toMatchObject({
+      label: "Add b",
+    });
+  });
+
+  it("does nothing for an empty request or a nameless glyph", () => {
+    const before = start();
+    expect(createGlyphs(before, [], 500).state).toBe(before);
+    expect(createGlyphs(before, [{ name: "" }], 500).state).toBe(before);
+  });
+});
+
+describe("deleteGlyph", () => {
+  const start = () =>
+    editorState({
+      document: fontDocument([
+        glyph("a", { unicodes: [0x61], advance: 500 }),
+        glyph("b", { unicodes: [0x62], advance: 500 }),
+      ]),
+      view: { scale: 1, tx: 0, ty: 0 },
+      currentGlyph: "b",
+    });
+
+  it("removes the glyph", () => {
+    const { state } = deleteGlyph(start(), "a");
+    expect(state.document.glyphOrder).toEqual(["b"]);
+    expect(state.document.glyphs["a"]).toBeUndefined();
+  });
+
+  it("moves off a glyph it just deleted", () => {
+    const { state } = deleteGlyph(start(), "b");
+    expect(state.currentGlyph).toBe("a");
+  });
+
+  it("leaves the open glyph alone when another is deleted", () => {
+    const { state } = deleteGlyph(start(), "a");
+    expect(state.currentGlyph).toBe("b");
+  });
+
+  it("does nothing for a glyph that is not there", () => {
+    const before = start();
+    const out = deleteGlyph(before, "nope");
+    expect(out.state).toBe(before);
+    expect(out.effects).toEqual([]);
+  });
+
+  it("leaves components pointing at it rather than rewriting other glyphs", () => {
+    const ids = counterIds("k");
+    const withComponent = editorState({
+      document: fontDocument([
+        glyph("a", { advance: 500 }),
+        glyph("b", { advance: 500, components: [component(ids.component(), "a")] }),
+      ]),
+      view: { scale: 1, tx: 0, ty: 0 },
+      currentGlyph: "b",
+    });
+
+    const { state } = deleteGlyph(withComponent, "a");
+    // The reference survives and simply draws nothing; undo brings the glyph
+    // back and the composite with it.
+    expect(state.document.glyphs["b"]?.components).toHaveLength(1);
+    expect(state.document.glyphs["b"]?.components[0]?.base).toBe("a");
   });
 });

@@ -50,6 +50,32 @@ export function glyphSet(id: string): GlyphSet | null {
   return GLYPH_SETS.find((s) => s.id === id) ?? null;
 }
 
+/**
+ * The code points a set covers, or `null` for one that is about glyph state.
+ *
+ * "Basic Latin" is a range and can be filled in; "Drawn" is a property of the
+ * glyphs already present and cannot. That distinction is what decides whether
+ * offering to create the missing ones makes any sense.
+ */
+export function codePointsOfSet(id: string): number[] | null {
+  if (id === "ascii") return range(0x20, 0x7e);
+
+  if (!id.startsWith("block:")) return null;
+  const block = UNICODE_BLOCKS.find((b) => `block:${b.id}` === id);
+  if (block === undefined) return null;
+
+  // Whole planes are legitimate blocks and nobody wants twenty thousand empty
+  // glyphs by accident, so a very large block declines rather than obliges.
+  if (block.last - block.first > 512) return null;
+  return range(block.first, block.last);
+}
+
+function range(first: number, last: number): number[] {
+  const out: number[] = [];
+  for (let c = first; c <= last; c++) out.push(c);
+  return out;
+}
+
 export type CatalogOrder = "font" | "codePoint" | "name";
 
 export type CatalogQuery = {

@@ -21,6 +21,8 @@ export { NO_MODIFIERS, keyInput, modifiers, pointerInput } from "./input.js";
 export type { Effect, ToolResult } from "./effects.js";
 export { abort, begin, commit, result } from "./effects.js";
 
+export type { NewGlyph } from "./commands.js";
+
 export type { EditorState, EditorStateInit, Gesture, PenState, ToolId } from "./state.js";
 export {
   currentGlyph,
@@ -33,6 +35,8 @@ export {
 
 export {
   addComponent,
+  createGlyphs,
+  deleteGlyph,
   balanceSegmentAt,
   centreCurrentGlyph,
   clearSelection,

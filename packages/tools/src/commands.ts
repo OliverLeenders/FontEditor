@@ -16,7 +16,10 @@ import {
   makeSegmentCurve,
   movedComponent,
   makeSegmentLine,
+  glyph,
   nodeById,
+  putGlyph,
+  removeGlyph,
   removeGlyphComponent,
   removeNode,
   reverseContour,
@@ -239,6 +242,69 @@ export function segmentForHandle(
   if (c === null) return null;
   const segmentIndex = segmentIndexForHandle(c, nodeId, part);
   return segmentIndex === null ? null : { contourId, segmentIndex };
+}
+
+// ---------------------------------------------------------------------------
+// glyphs
+// ---------------------------------------------------------------------------
+
+export type NewGlyph = {
+  readonly name: GlyphName;
+  readonly unicodes?: readonly number[];
+};
+
+/**
+ * Add glyphs that are not there yet.
+ *
+ * Takes a list and commits once, because the useful case is "give me ASCII" and
+ * ninety-five separate undo entries would make that impossible to take back.
+ * A name already in the document is skipped rather than replacing what is
+ * there: creating a glyph must never overwrite one.
+ */
+export function createGlyphs(
+  state: EditorState,
+  wanted: readonly NewGlyph[],
+  advance: number,
+): ToolResult {
+  const fresh = wanted.filter((g) => g.name !== "" && state.document.glyphs[g.name] === undefined);
+  if (fresh.length === 0) return result(state);
+
+  let document = state.document;
+  for (const g of fresh) {
+    document = putGlyph(
+      document,
+      glyph(g.name, { unicodes: g.unicodes ?? [], advance }),
+    );
+  }
+
+  const label =
+    fresh.length === 1 ? `Add ${fresh[0]!.name}` : `Add ${String(fresh.length)} glyphs`;
+  const first = fresh[0]!.name;
+  return result({ ...state, document, currentGlyph: first, selection: [] }, [
+    begin(label, false),
+    commit,
+  ]);
+}
+
+/**
+ * Remove a glyph.
+ *
+ * Components referring to it are left alone rather than hunted down. Resolution
+ * already treats a missing base as drawing nothing, so the font stays openable,
+ * and undo is one keystroke away — whereas rewriting other glyphs as a side
+ * effect of a delete is the kind of help nobody asks for.
+ */
+export function deleteGlyph(state: EditorState, name: GlyphName): ToolResult {
+  const document = removeGlyph(state.document, name);
+  if (document === null) return result(state);
+
+  const currentGlyph =
+    state.currentGlyph === name ? document.glyphOrder[0] ?? "" : state.currentGlyph;
+
+  return result(
+    { ...state, document, currentGlyph, selection: [], focusedSegment: null, hoveredSegment: null },
+    [begin(`Delete ${name}`, false), commit],
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -17,4 +17,11 @@ export type { CatalogEntry } from "./catalog.js";
 export { catalog } from "./catalog.js";
 
 export type { CatalogOrder, CatalogQuery, GlyphSet } from "./query.js";
-export { DEFAULT_QUERY, GLYPH_SETS, filterCatalog, glyphSet, setCounts } from "./query.js";
+export {
+  DEFAULT_QUERY,
+  GLYPH_SETS,
+  codePointsOfSet,
+  filterCatalog,
+  glyphSet,
+  setCounts,
+} from "./query.js";
