@@ -1,4 +1,11 @@
-import { setAdvance, setNodeType, updateContour } from "@fonteditor/font-model";
+import {
+  setAdvance,
+  setLeftSidebearing,
+  setNodeType,
+  setRightSidebearing,
+  sidebearings,
+  updateContour,
+} from "@fonteditor/font-model";
 import { begin, commit, editCurrentGlyph, result } from "@fonteditor/tools";
 import { useRef } from "react";
 
@@ -29,6 +36,14 @@ export function Inspector(): JSX.Element | null {
     (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
   );
   const pointType = useStoreValue(selectedPointType);
+  // Two selectors rather than one returning an object: a fresh object every time
+  // would compare unequal and re-render the panel on every store notification.
+  const leftBearing = useStoreValue(
+    (s) => sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)?.left ?? null,
+  );
+  const rightBearing = useStoreValue(
+    (s) => sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)?.right ?? null,
+  );
 
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   if (!open) return null;
@@ -38,6 +53,27 @@ export function Inspector(): JSX.Element | null {
     const document = editCurrentGlyph(store.editor, (g) => setAdvance(g, value));
     if (document === null) return;
     store.applyTool(result({ ...store.editor, document }, [begin("Set advance"), commit]));
+  };
+
+  /**
+   * Both sidebearings commit the same way, and each is one undo step.
+   *
+   * Sidebearings are derived, so these write through to the advance and the
+   * outline; see `setLeftSidebearing` for why the left one moves the advance
+   * with it.
+   */
+  const commitBearing = (side: "left" | "right", value: number): void => {
+    if (!Number.isFinite(value)) return;
+    const document = editCurrentGlyph(store.editor, (g) =>
+      side === "left" ? setLeftSidebearing(g, value) : setRightSidebearing(g, value),
+    );
+    if (document === null) return;
+    store.applyTool(
+      result({ ...store.editor, document }, [
+        begin(side === "left" ? "Set left sidebearing" : "Set right sidebearing"),
+        commit,
+      ]),
+    );
   };
 
   const applyPointType = (type: "corner" | "smooth"): void => {
@@ -110,6 +146,32 @@ export function Inspector(): JSX.Element | null {
           />
         </Field>
 
+        {/* Disabled rather than hidden for a glyph with no outline: a space has
+            an advance and no sidebearings, and a field that vanishes reads as a
+            bug where a greyed one reads as the fact it is. */}
+        <Field label="Sidebearings">
+          <div className={styles.pair}>
+            <input
+              className={styles.input}
+              type="number"
+              aria-label="Left sidebearing"
+              title="Left sidebearing"
+              disabled={leftBearing === null}
+              value={leftBearing === null ? "" : Math.round(leftBearing)}
+              onChange={(event) => commitBearing("left", Number(event.target.value))}
+            />
+            <input
+              className={styles.input}
+              type="number"
+              aria-label="Right sidebearing"
+              title="Right sidebearing"
+              disabled={rightBearing === null}
+              value={rightBearing === null ? "" : Math.round(rightBearing)}
+              onChange={(event) => commitBearing("right", Number(event.target.value))}
+            />
+          </div>
+        </Field>
+
         <div className={styles.rule} />
 
         <Field label={pointCount === 0 ? "Point" : `Point · ${pointCount} selected`}>
@@ -146,6 +208,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+const EMPTY_GLYPH = { name: "", unicodes: [], advance: 0, contours: [] };
 const EMPTY_CODES: readonly number[] = [];
 
 /**

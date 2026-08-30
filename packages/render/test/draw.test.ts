@@ -110,7 +110,12 @@ describe("the outline path", () => {
   });
 
   it("starts at the first node and closes a closed contour", () => {
-    const ctx = render({ ...base(ring()), options: { showFilledPreview: false } });
+    // Margins off so the outline is the only path in the recording; this is
+    // about where the outline starts, not about what else the scene draws.
+    const ctx = render({
+      ...base(ring()),
+      options: { showFilledPreview: false, margins: false },
+    });
     const start = toScreen(VIEW, vec(0, 250));
     const moves = ctx.all("moveTo");
     expect(moves[0]!.args).toEqual([start.x, start.y]);
@@ -376,8 +381,11 @@ describe("state hygiene", () => {
       tunniSegments: [{ contourId: c.id, segmentIndex: 0 }],
       options: { showHandleIntersection: true },
     });
-    expect(ctx.all("save")).toHaveLength(1);
-    expect(ctx.all("restore")).toHaveLength(1);
+    // Balance is the property that matters, not the count: each drawing pass
+    // that needs its own state saves and restores, so the number grows as the
+    // scene gains parts while the invariant stays the same.
+    expect(ctx.all("save").length).toBe(ctx.all("restore").length);
+    expect(ctx.all("save").length).toBeGreaterThan(0);
     expect(ctx.globalAlpha).toBe(1);
     expect(ctx.ops[ctx.ops.length - 1]!.op).toBe("restore");
   });

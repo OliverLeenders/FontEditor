@@ -34,6 +34,10 @@ export type RenderPalette = {
   readonly cellFocus: string;
   /** Behind the cell that is open in the editor. */
   readonly cellCurrent: string;
+  /** The origin and advance lines bounding the advance width. */
+  readonly margin: string;
+  /** Glyphs drawn either side for spacing context. */
+  readonly neighbour: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -58,6 +62,8 @@ export const LIGHT_PALETTE: RenderPalette = {
   cellLabel: "#6B7783",
   cellFocus: "rgba(44,109,175,0.12)",
   cellCurrent: "rgba(169,111,34,0.14)",
+  margin: "#9AAEC4",
+  neighbour: "rgba(19,25,34,0.22)",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -82,4 +88,6 @@ export const DARK_PALETTE: RenderPalette = {
   cellLabel: "#8B98A5",
   cellFocus: "rgba(116,174,226,0.16)",
   cellCurrent: "rgba(214,160,90,0.18)",
+  margin: "#4B5D70",
+  neighbour: "rgba(229,235,242,0.20)",
 };

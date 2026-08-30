@@ -1,4 +1,5 @@
-import type { Glyph } from "@fonteditor/font-model";
+import type { FontDocument, Glyph } from "@fonteditor/font-model";
+import type { NeighbourGlyph } from "@fonteditor/render";
 import {
   DARK_PALETTE,
   LIGHT_PALETTE,
@@ -18,6 +19,57 @@ export function palette(): RenderPalette {
 
 export function prefersDark(): boolean {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+}
+
+/**
+ * The glyphs to show either side, taken from the strip text.
+ *
+ * The strip is already the sentence you are judging the glyph in, so it is the
+ * right source: no second place to type context, and no guessing. The edited
+ * glyph is located by its *first* appearance, and the neighbours are the run
+ * around it, offset by the advances between.
+ *
+ * Returns nothing when the glyph is not in the strip at all — better to show no
+ * context than context from a word that does not contain the letter.
+ */
+function neighboursFor(
+  document: FontDocument,
+  currentGlyph: string,
+  text: string,
+  reach = 2,
+): NeighbourGlyph[] {
+  const names: string[] = [];
+  for (const character of text) {
+    const codePoint = character.codePointAt(0);
+    if (codePoint === undefined) continue;
+    const found = Object.values(document.glyphs).find((g) => g.unicodes.includes(codePoint));
+    if (found !== undefined) names.push(found.name);
+  }
+
+  const at = names.indexOf(currentGlyph);
+  if (at < 0) return [];
+
+  const out: NeighbourGlyph[] = [];
+
+  // Leftwards: each step back subtracts that glyph's own advance.
+  let x = 0;
+  for (let i = at - 1; i >= 0 && at - i <= reach; i--) {
+    const g = document.glyphs[names[i]!];
+    if (g === undefined) break;
+    x -= g.advance;
+    out.push({ glyph: g, x });
+  }
+
+  // Rightwards: each step starts after everything before it.
+  x = document.glyphs[currentGlyph]?.advance ?? 0;
+  for (let i = at + 1; i < names.length && i - at <= reach; i++) {
+    const g = document.glyphs[names[i]!];
+    if (g === undefined) break;
+    out.push({ glyph: g, x });
+    x += g.advance;
+  }
+
+  return out;
 }
 
 /**
@@ -50,6 +102,9 @@ export function sceneFor(
     selection: editor.selection,
     marquee: marqueeRect(editor),
     penPreview: penPreview(editor),
+    neighbours: state.showNeighbours
+      ? neighboursFor(editor.document, editor.currentGlyph, state.stripText)
+      : [],
     options: { showControls: !state.previewing },
   });
 }

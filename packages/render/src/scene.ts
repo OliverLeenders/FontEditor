@@ -38,6 +38,8 @@ export const DEFAULT_METRICS: RenderMetrics = {
 };
 
 export type RenderOptions = {
+  /** Draw the origin and advance lines that bound the glyph's advance width. */
+  readonly margins: boolean;
   /** The translucent glyph body. On by default; the decided design keeps it on. */
   readonly showFilledPreview: boolean;
   /**
@@ -53,6 +55,7 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   showFilledPreview: true,
   showControls: true,
   showHandleIntersection: false,
+  margins: true,
 };
 
 /**
@@ -89,6 +92,22 @@ export type Scene = {
    * where the cursor is.
    */
   readonly penPreview: Cubic | null;
+  /**
+   * Glyphs shown either side of the one being edited, dimmed and untouchable.
+   *
+   * Spacing is meaningless in isolation — a sidebearing is only right relative
+   * to whatever sits beside it — so judging one without neighbours means
+   * guessing. Each carries the x offset at which to draw it, already accumulated
+   * from the advances, because that sum is a spacing decision rather than a
+   * drawing one.
+   */
+  readonly neighbours: readonly NeighbourGlyph[];
+};
+
+/** A glyph drawn for context, at a given offset, not for editing. */
+export type NeighbourGlyph = {
+  readonly glyph: Glyph;
+  readonly x: number;
 };
 
 export type SceneInit = {
@@ -103,6 +122,7 @@ export type SceneInit = {
   readonly selection?: Selection;
   readonly marquee?: Rect | null;
   readonly penPreview?: Cubic | null;
+  readonly neighbours?: readonly NeighbourGlyph[];
 };
 
 export function scene(init: SceneInit): Scene {
@@ -118,5 +138,6 @@ export function scene(init: SceneInit): Scene {
     selection: init.selection ?? [],
     marquee: init.marquee ?? null,
     penPreview: init.penPreview ?? null,
+    neighbours: init.neighbours ?? [],
   };
 }

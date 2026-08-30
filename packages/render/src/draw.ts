@@ -40,6 +40,10 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
 
   clearBackground(ctx, s);
   drawGuides(ctx, s);
+  // Neighbours and margins sit under the glyph being edited: they are context,
+  // and context that draws over your work is a distraction rather than a help.
+  drawNeighbours(ctx, s);
+  if (s.options.margins) drawMargins(ctx, s);
   if (s.options.showFilledPreview) drawFilledPreview(ctx, s);
   drawOutline(ctx, s);
 
@@ -485,4 +489,62 @@ export function drawGlyphCell(
 /** `U+0041`, padded to at least four digits as the standard writes them. */
 export function formatCodePoint(codePoint: number): string {
   return `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
+}
+
+
+/**
+ * The origin and advance lines, which bound the glyph's advance width.
+ *
+ * Drawn full height rather than only beside the outline, because what they mark
+ * is where the *next* glyph starts — a fact about the line of text, not about
+ * this glyph's bounding box.
+ */
+export function drawMargins(ctx: Canvas2D, s: Scene): void {
+  const lines = [0, s.glyph.advance];
+
+  ctx.save();
+  ctx.strokeStyle = s.palette.margin;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+
+  for (const x of lines) {
+    // Half a pixel keeps a one-pixel line on one pixel instead of across two.
+    const screenX = Math.round(toScreen(s.view, { x, y: 0 }).x) + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(screenX, 0);
+    ctx.lineTo(screenX, s.viewport.height);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * The glyphs either side, filled flat and dimmed.
+ *
+ * Filled rather than outlined: at a glance you are judging areas of black
+ * against areas of white, and an outline reads as a shape to edit rather than as
+ * a mass to weigh against.
+ */
+export function drawNeighbours(ctx: Canvas2D, s: Scene): void {
+  if (s.neighbours.length === 0) return;
+
+  ctx.save();
+  ctx.fillStyle = s.palette.neighbour;
+
+  for (const neighbour of s.neighbours) {
+    const drawable = neighbour.glyph.contours.filter((c) => c.nodes.length >= 2);
+    if (drawable.length === 0) continue;
+
+    // Shifting the view rather than the glyph: the outline is model data and
+    // has no business being copied and moved to draw a preview of it.
+    const shifted: ViewTransform = {
+      ...s.view,
+      tx: s.view.tx + neighbour.x * s.view.scale,
+    };
+
+    ctx.beginPath();
+    for (const c of drawable) traceContour(ctx, shifted, c);
+    ctx.fill();
+  }
+  ctx.restore();
 }

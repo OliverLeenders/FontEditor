@@ -91,3 +91,10 @@
   color: var(--surface);
 }
 .segmented button:disabled { opacity: .38; cursor: default; }
+
+/* Two numbers sharing one row and one label. */
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .3rem;
+}

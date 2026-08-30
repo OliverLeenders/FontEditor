@@ -61,6 +61,8 @@ export type StoreState = {
   readonly inspector: { readonly x: number; readonly y: number; readonly open: boolean };
   /** What the glyph browser is filtered to. Not undoable, so it lives out here. */
   readonly catalogQuery: CatalogQuery;
+  /** Draw the glyphs either side, from the strip text, for judging spacing. */
+  readonly showNeighbours: boolean;
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
@@ -97,6 +99,7 @@ export class EditorStore {
       recovered: false,
       stripText: "hello",
       catalogQuery: DEFAULT_QUERY,
+      showNeighbours: true,
       previewing: false,
       inspector: loadInspector(),
       viewport: { width: 0, height: 0 },
@@ -340,6 +343,10 @@ export class EditorStore {
       return;
     }
     this.patch({ catalogQuery });
+  }
+
+  toggleNeighbours(): void {
+    this.patch({ showNeighbours: !this.state.showNeighbours });
   }
 
   setStripText(stripText: string): void {

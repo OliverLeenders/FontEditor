@@ -62,6 +62,15 @@ export {
   unionRect,
 } from "./contour.js";
 
+export type { Sidebearings } from "./metrics.js";
+export {
+  centreGlyph,
+  setLeftSidebearing,
+  setRightSidebearing,
+  sidebearings,
+  translateGlyph,
+} from "./metrics.js";
+
 export type { FontDocument, FontInfo, GlyphName } from "./document.js";
 export {
   DEFAULT_FONT_INFO,

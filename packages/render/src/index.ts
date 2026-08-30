@@ -22,6 +22,7 @@ export { DARK_PALETTE, LIGHT_PALETTE } from "./palette.js";
 
 export type {
   HorizontalGuide,
+  NeighbourGlyph,
   RenderMetrics,
   RenderOptions,
   Scene,
@@ -37,7 +38,9 @@ export {
   drawGlyphThumbnail,
   drawGuides,
   drawHandles,
+  drawMargins,
   drawMarquee,
+  drawNeighbours,
   drawNodes,
   drawOutline,
   drawPenPreview,
