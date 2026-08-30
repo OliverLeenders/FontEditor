@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fonteditor/edit-core": "workspace:*",
     "@fonteditor/font-model": "workspace:*",
     "@fonteditor/geometry": "workspace:*",
     "@fonteditor/render": "workspace:*",

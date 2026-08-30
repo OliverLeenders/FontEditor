@@ -9,15 +9,14 @@ derives from the reverse-engineering write-up in
 
 ## Status
 
-**Phase 1 — the editing surface.** Document model, view transforms, hit testing, the
-canvas renderer and the select tool are built. Edits work; nothing is remembered yet.
-Next is `edit-core` for undo and redo, then the pen tool as its own step.
+**Phase 2 — undo and redo.** The editing surface works and edits are undoable. Next is
+persistence (autosave to OPFS), then the pen tool as its own step.
 
 | Phase | | Status |
 | --- | --- | --- |
 | 0 | Foundations and the geometry kernel | done |
 | 1 | The editing surface | model, view, renderer and select tool done; pen tool pending |
-| 2 | Undo, redo, persistence | not started |
+| 2 | Undo, redo, persistence | undo and redo done; persistence pending |
 | 3 | From paths to a glyph | not started |
 | 4 | From a glyph to a font | not started |
 | 5 | Binary import and export | not started |
@@ -43,8 +42,9 @@ pnpm dev
 
 Drag nodes, handles, the blue Tunni line and the amber Tunni point. Double-click a
 Tunni point to balance the segment. Shift extends the selection, Alt breaks a smooth
-node's handle link, arrow keys nudge, Escape cancels a drag. Space previews without
-controls, the wheel zooms, middle-drag pans, and Ctrl-0 refits.
+node's handle link, arrow keys nudge, Escape cancels a drag. Ctrl-Z undoes and
+Ctrl-Shift-Z redoes. Space previews without controls, the wheel zooms, middle-drag
+pans, and Ctrl-0 refits.
 
 ```bash
 pnpm test
@@ -66,6 +66,7 @@ packages/
   view/         Design↔screen transforms, hit testing, segment activation. Pure.
   render/       Canvas drawing. Pure draw functions plus a thin surface helper.
   tools/        Pointer and keyboard tools, as pure reducers over editor state.
+  edit-core/    Transactions, undo and redo over the document.
 ```
 
 Packages are consumed directly from TypeScript source — there is no build step until
@@ -77,6 +78,13 @@ something needs to ship. Later phases add `edit-core`, `tools`, `font-io`, and a
 its handles, and segments are derived on demand. This is what makes a shared point
 impossible to desync — there is only ever one of it — and it stores smoothness once rather
 than twice.
+
+**History is snapshots, not patches.** The model is persistent — every operation returns
+a new value sharing everything it did not touch — so a history entry holds two
+references and unchanged contours exist once however deep the stack goes. Memory is
+already proportional to what changed, which is what patches would have bought, and undo
+is a reference swap. Serializable deltas, if collaboration ever needs them, can be
+derived by diffing a before/after pair.
 
 **The model holds only lines and cubics.** Quadratics from imported TrueType are converted
 at the boundary, which is exact and loses no shape. A quadratic has one control point and

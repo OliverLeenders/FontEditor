@@ -12,6 +12,7 @@ export default defineConfig({
     // silently ignored until the server restarts.
     exclude: [
       "@fonteditor/geometry",
+      "@fonteditor/edit-core",
       "@fonteditor/font-model",
       "@fonteditor/view",
       "@fonteditor/render",

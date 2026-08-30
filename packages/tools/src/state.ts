@@ -1,11 +1,11 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
-import type { ContourId, Glyph, NodeId } from "@fonteditor/font-model";
+import type { ContourId, FontDocument, NodeId } from "@fonteditor/font-model";
 import { type Selection, type SegmentRef, type ViewTransform, sameSegment } from "@fonteditor/view";
 
 /**
  * What is happening between pointer down and pointer up.
  *
- * Every gesture carries the glyph as it was when the gesture began. Each move
+ * Every gesture carries the document as it was when the gesture began. Each move
  * recomputes from that snapshot plus the *total* offset rather than nudging the
  * previous frame's result — so a drag cannot accumulate rounding error over four
  * hundred pointer events, and Escape can put things back exactly.
@@ -20,7 +20,7 @@ export type Gesture =
       readonly kind: "dragSelection";
       readonly origin: Vec2;
       readonly items: Selection;
-      readonly before: Glyph;
+      readonly before: FontDocument;
       readonly moved: boolean;
     }
   | {
@@ -30,21 +30,21 @@ export type Gesture =
       readonly nodeId: NodeId;
       readonly part: "in" | "out";
       readonly breakSmooth: boolean;
-      readonly before: Glyph;
+      readonly before: FontDocument;
       readonly moved: boolean;
     }
   | {
       readonly kind: "dragTunniPoint";
       readonly origin: Vec2;
       readonly segment: SegmentRef;
-      readonly before: Glyph;
+      readonly before: FontDocument;
       readonly moved: boolean;
     }
   | {
       readonly kind: "dragTunniLine";
       readonly origin: Vec2;
       readonly segment: SegmentRef;
-      readonly before: Glyph;
+      readonly before: FontDocument;
       readonly moved: boolean;
     }
   | {
@@ -68,7 +68,8 @@ export type Gesture =
  * job, so nothing below the view transform ever sees a pixel.
  */
 export type EditorState = {
-  readonly glyph: Glyph;
+  /** The versioned slice. Everything else here is ephemeral and never undone. */
+  readonly document: FontDocument;
   readonly view: ViewTransform;
   readonly selection: Selection;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
@@ -88,7 +89,7 @@ export type EditorState = {
 };
 
 export type EditorStateInit = {
-  readonly glyph: Glyph;
+  readonly document: FontDocument;
   readonly view: ViewTransform;
   readonly selection?: Selection;
   readonly hoveredSegment?: SegmentRef | null;
@@ -98,7 +99,7 @@ export type EditorStateInit = {
 
 export function editorState(init: EditorStateInit): EditorState {
   return {
-    glyph: init.glyph,
+    document: init.document,
     view: init.view,
     selection: init.selection ?? [],
     hoveredSegment: init.hoveredSegment ?? null,

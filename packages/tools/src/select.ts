@@ -11,6 +11,7 @@ import {
   setSegmentTunniPoint,
   translateNodeBy,
   updateContour,
+  withGlyph,
 } from "@fonteditor/font-model";
 import {
   type HitTarget,
@@ -81,7 +82,7 @@ export function pointerMove(state: EditorState, input: PointerInput): ToolResult
     return result({
       ...state,
       cursor: input.point,
-      hoveredSegment: hoveredSegment(state.glyph, input.point, state.view, state.hoveredSegment),
+      hoveredSegment: hoveredSegment(state.document.glyph, input.point, state.view, state.hoveredSegment),
     });
   }
 
@@ -91,22 +92,22 @@ export function pointerMove(state: EditorState, input: PointerInput): ToolResult
 
   switch (gesture.kind) {
     case "dragSelection": {
-      const glyph = translateSelection(gesture.before, gesture.items, delta);
+      const glyph = translateSelection(gesture.before.glyph, gesture.items, delta);
       return result({
         ...withCursor,
-        glyph,
+        document: withGlyph(gesture.before, glyph),
         gesture: { ...gesture, moved: gesture.moved || budged },
       });
     }
 
     case "dragHandle": {
       const glyph =
-        updateContour(gesture.before, gesture.contourId, (c) =>
+        updateContour(gesture.before.glyph, gesture.contourId, (c) =>
           setHandle(c, gesture.nodeId, gesture.part, input.point, gesture.breakSmooth),
-        ) ?? gesture.before;
+        ) ?? gesture.before.glyph;
       return result({
         ...withCursor,
-        glyph,
+        document: withGlyph(gesture.before, glyph),
         gesture: { ...gesture, moved: gesture.moved || budged },
       });
     }
@@ -114,7 +115,7 @@ export function pointerMove(state: EditorState, input: PointerInput): ToolResult
     case "dragTunniPoint":
     case "dragTunniLine": {
       const apply = gesture.kind === "dragTunniPoint" ? setSegmentTunniPoint : moveSegmentTunniLine;
-      const next = updateContour(gesture.before, gesture.segment.contourId, (c) =>
+      const next = updateContour(gesture.before.glyph, gesture.segment.contourId, (c) =>
         apply(c, gesture.segment.segmentIndex, input.point),
       );
       // The kernel refuses a move that would pull a handle through its anchor.
@@ -122,14 +123,14 @@ export function pointerMove(state: EditorState, input: PointerInput): ToolResult
       // and the curve simply stops following until the cursor comes back.
       return result({
         ...withCursor,
-        glyph: next ?? state.glyph,
+        document: next === null ? state.document : withGlyph(state.document, next),
         gesture: { ...gesture, moved: gesture.moved || (next !== null && budged) },
       });
     }
 
     case "marquee": {
       const next: Gesture = { ...gesture, current: input.point, moved: true };
-      const inside = itemsInRect(state.glyph, rectOf(gesture.origin, input.point));
+      const inside = itemsInRect(state.document.glyph, rectOf(gesture.origin, input.point));
       return result({
         ...withCursor,
         selection: gesture.additive ? addItems(gesture.before, inside) : inside,
@@ -155,10 +156,10 @@ export function pointerUp(state: EditorState, _input?: PointerInput): ToolResult
     // The handles are no longer collinear, so calling the node smooth would be a
     // lie the geometry contradicts. Record what is actually true.
     const glyph =
-      updateContour(settled.glyph, gesture.contourId, (c) =>
+      updateContour(settled.document.glyph, gesture.contourId, (c) =>
         setNodeType(c, gesture.nodeId, "corner"),
-      ) ?? settled.glyph;
-    return result({ ...settled, glyph }, [commit]);
+      ) ?? settled.document.glyph;
+    return result({ ...settled, document: withGlyph(settled.document, glyph) }, [commit]);
   }
 
   return result(settled, [commit]);
@@ -181,7 +182,7 @@ export function doubleClick(
   const target = pickAt(state, input.point, options);
   if (target === null || target.kind !== "tunniPoint") return result(state);
 
-  const glyph = updateContour(state.glyph, target.contourId, (c) =>
+  const glyph = updateContour(state.document.glyph, target.contourId, (c) =>
     balanceSegment(c, target.segmentIndex),
   );
   if (glyph === null) return result(state);
@@ -189,7 +190,7 @@ export function doubleClick(
   return result(
     {
       ...state,
-      glyph,
+      document: withGlyph(state.document, glyph),
       focusedSegment: { contourId: target.contourId, segmentIndex: target.segmentIndex },
     },
     [begin("Balance segment"), commit],
@@ -216,12 +217,12 @@ export function keyDown(
     ? options.largeNudge ?? DEFAULT_LARGE_NUDGE
     : options.nudge ?? DEFAULT_NUDGE;
 
-  const glyph = translateSelection(state.glyph, state.selection, {
+  const glyph = translateSelection(state.document.glyph, state.selection, {
     x: step.x * size,
     y: step.y * size,
   });
 
-  return result({ ...state, glyph }, [begin("Nudge"), commit]);
+  return result({ ...state, document: withGlyph(state.document, glyph) }, [begin("Nudge"), commit]);
 }
 
 /** Abandon whatever is in progress, restoring what it started from. */
@@ -232,7 +233,7 @@ export function cancel(state: EditorState): ToolResult {
   if (gesture.kind === "marquee") {
     return result({ ...state, selection: gesture.before, gesture: null }, [abort]);
   }
-  return result({ ...state, glyph: gesture.before, gesture: null }, [abort]);
+  return result({ ...state, document: gesture.before, gesture: null }, [abort]);
 }
 
 // design y is up, so ArrowUp is +y
@@ -311,7 +312,7 @@ export function translateSelection(g: Glyph, selection: Selection, delta: Vec2):
 // ---------------------------------------------------------------------------
 
 function pickAt(state: EditorState, p: Vec2, options: SelectOptions): HitTarget | null {
-  const index = buildHitIndex(state.glyph, tunniSegments(state));
+  const index = buildHitIndex(state.document.glyph, tunniSegments(state));
   const tolerance = screenTolerance(state.view, options.hitPixels ?? DEFAULT_HIT_PIXELS);
   return pick(index, p, tolerance);
 }
@@ -362,14 +363,14 @@ function startItemDrag(
         nodeId: item.nodeId,
         part: item.part === "in" ? "in" : "out",
         breakSmooth: input.modifiers.alt,
-        before: state.glyph,
+        before: state.document,
         moved: false,
       }
     : {
         kind: "dragSelection",
         origin: input.point,
         items: selection,
-        before: state.glyph,
+        before: state.document,
         moved: false,
       };
 
@@ -393,7 +394,7 @@ function startTunniDrag(
         kind,
         origin: input.point,
         segment,
-        before: state.glyph,
+        before: state.document,
         moved: false,
       },
     },
@@ -410,7 +411,7 @@ function selectSegmentEnds(
   input: PointerInput,
   target: Extract<HitTarget, { kind: "segment" }>,
 ): ToolResult {
-  const c = contourById(state.glyph, target.contourId);
+  const c = contourById(state.document.glyph, target.contourId);
   const segment = c === null ? null : segmentAt(c, target.segmentIndex);
   if (segment === null) return result(state);
 
@@ -428,7 +429,7 @@ function selectSegmentEnds(
       kind: "dragSelection",
       origin: input.point,
       items: selection,
-      before: state.glyph,
+      before: state.document,
       moved: false,
     },
   }, [begin("Move segment")]);

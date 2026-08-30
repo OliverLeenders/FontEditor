@@ -4,6 +4,7 @@ import {
   addContour,
   contour,
   counterIds,
+  fontDocument,
   glyph,
   node,
   nodeById,
@@ -42,7 +43,10 @@ function arch(): Contour {
 
 function start(c: Contour = arch()): { state: EditorState; contour: Contour } {
   return {
-    state: editorState({ glyph: addContour(glyph("n", { advance: 640 }), c), view: VIEW }),
+    state: editorState({
+      document: fontDocument(addContour(glyph("n", { advance: 640 }), c)),
+      view: VIEW,
+    }),
     contour: c,
   };
 }
@@ -60,7 +64,7 @@ function drag(
 }
 
 const pointOf = (s: EditorState, c: Contour, i: number) =>
-  nodeById(s.glyph.contours[0]!, c.nodes[i]!.id)!;
+  nodeById(s.document.glyph.contours[0]!, c.nodes[i]!.id)!;
 
 describe("hover", () => {
   it("wakes the segment under the cursor without changing anything else", () => {
@@ -68,7 +72,7 @@ describe("hover", () => {
     const next = pointerMove(state, pointerInput(vec(150, 520))).state;
     expect(next.hoveredSegment).not.toBeNull();
     expect(next.hoveredSegment!.segmentIndex).toBe(0);
-    expect(next.glyph).toBe(state.glyph);
+    expect(next.document).toBe(state.document);
     expect(next.selection).toEqual([]);
   });
 
@@ -123,7 +127,7 @@ describe("focus", () => {
     expect(tunniSegments(s).map((ref) => ref.segmentIndex).sort()).toEqual([0, 1]);
 
     // …and, crucially, still grabbable.
-    const stillThere = segmentTunniPoint(s.glyph.contours[0]!, 0)!;
+    const stillThere = segmentTunniPoint(s.document.glyph.contours[0]!, 0)!;
     const grabbed = pointerDown(s, pointerInput(stillThere)).state;
     expect(grabbed.gesture?.kind).toBe("dragTunniPoint");
   });
@@ -341,7 +345,7 @@ describe("Tunni gestures", () => {
     const target = vec(tunni.x - 10, tunni.y - 30);
 
     const moved = drag(awake, tunni, [target]);
-    const landed = segmentTunniPoint(moved.glyph.contours[0]!, 0)!;
+    const landed = segmentTunniPoint(moved.document.glyph.contours[0]!, 0)!;
     expect(distance(landed, target)).toBeLessThan(1e-6);
   });
 
@@ -368,7 +372,7 @@ describe("Tunni gestures", () => {
     const awake = wake(state, tunni);
     const balanced = doubleClick(awake, pointerInput(tunni)).state;
 
-    const seg = balanced.glyph.contours[0]!;
+    const seg = balanced.document.glyph.contours[0]!;
     const a = seg.nodes[0]!.pt;
     const b = seg.nodes[1]!.pt;
     const chord = { x: b.x - a.x, y: b.y - a.y };
@@ -385,7 +389,7 @@ describe("Tunni gestures", () => {
     const good = pointerMove(s, pointerInput(vec(tunni.x, tunni.y - 20))).state;
     // Far below the chord would pull both handles through their anchors.
     s = pointerMove(good, pointerInput(vec(tunni.x, tunni.y - 40000))).state;
-    expect(s.glyph).toBe(good.glyph);
+    expect(s.document).toBe(good.document);
   });
 });
 
@@ -416,7 +420,7 @@ describe("keyboard", () => {
 
   it("does nothing with an empty selection", () => {
     const { state } = start();
-    expect(keyDown(state, keyInput("ArrowRight")).state.glyph).toBe(state.glyph);
+    expect(keyDown(state, keyInput("ArrowRight")).state.document).toBe(state.document);
   });
 
   it("ignores keys it does not handle", () => {
@@ -431,10 +435,10 @@ describe("cancelling", () => {
     const { state } = start();
     let s = pointerDown(state, pointerInput(vec(100, 480))).state;
     s = pointerMove(s, pointerInput(vec(300, 300))).state;
-    expect(s.glyph).not.toBe(state.glyph);
+    expect(s.document).not.toBe(state.document);
 
     const cancelled = keyDown(s, keyInput("Escape")).state;
-    expect(cancelled.glyph).toBe(state.glyph);
+    expect(cancelled.document).toBe(state.document);
     expect(cancelled.gesture).toBeNull();
   });
 

@@ -59,6 +59,9 @@ export {
   unionRect,
 } from "./contour.js";
 
+export type { FontDocument } from "./document.js";
+export { fontDocument, withGlyph } from "./document.js";
+
 export type { Glyph, GlyphInit } from "./glyph.js";
 export {
   addContour,

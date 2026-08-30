@@ -26,6 +26,9 @@ importers:
 
   apps/playground:
     dependencies:
+      '@fonteditor/edit-core':
+        specifier: workspace:*
+        version: link:../../packages/edit-core
       '@fonteditor/font-model':
         specifier: workspace:*
         version: link:../../packages/font-model
@@ -45,6 +48,21 @@ importers:
       vite:
         specifier: ^5.4.21
         version: 5.4.21(@types/node@22.20.1)
+
+  packages/edit-core:
+    dependencies:
+      '@fonteditor/font-model':
+        specifier: workspace:*
+        version: link:../font-model
+      '@fonteditor/geometry':
+        specifier: workspace:*
+        version: link:../geometry
+      '@fonteditor/tools':
+        specifier: workspace:*
+        version: link:../tools
+      '@fonteditor/view':
+        specifier: workspace:*
+        version: link:../view
 
   packages/font-model:
     dependencies:
