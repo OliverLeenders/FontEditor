@@ -1,3 +1,10 @@
+import { randomIds } from "@fonteditor/font-model";
+import {
+  clipboardText,
+  deleteSelectedContours,
+  pasteContours,
+  selectAllPoints,
+} from "@fonteditor/tools";
 import { useEffect, useRef, useState } from "react";
 
 import { ContextMenu, type MenuRequest } from "./components/ContextMenu.js";
@@ -11,6 +18,9 @@ import { TabBar, type ViewId } from "./components/TabBar.js";
 import { Toolbar } from "./components/Toolbar.js";
 import styles from "./App.module.css";
 import { useEditorStore, useStoreValue } from "./useStore.js";
+
+/** Pasted contours need ids; the application owns the factory. */
+const pasteIds = randomIds();
 
 export function App(): JSX.Element {
   const store = useEditorStore();
@@ -52,6 +62,12 @@ export function App(): JSX.Element {
       // The rest belong to the drawing canvas and mean nothing elsewhere.
       if (viewRef.current !== "glyph") return;
 
+      if (modified && !typing && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        store.applyTool(selectAllPoints(store.editor));
+        return;
+      }
+
       if (event.code === "Space" && !typing) {
         event.preventDefault();
         store.setPreviewing(true);
@@ -87,6 +103,62 @@ export function App(): JSX.Element {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("beforeunload", onUnload);
       window.removeEventListener("resize", onResize);
+    };
+  }, [store]);
+
+  /**
+   * Cut, copy and paste through the browser's own clipboard events.
+   *
+   * Listening for `copy`/`cut`/`paste` rather than reading the clipboard
+   * directly: the events carry the data with them, so nothing has to ask for
+   * clipboard permission, and Ctrl-C, Cmd-X and the Edit menu all arrive here
+   * without shortcuts of our own to keep in step with the platform.
+   *
+   * A text field gets to keep its own clipboard. Someone editing the glyph name
+   * or the spacing string means the text, not the outline.
+   */
+  useEffect(() => {
+    const typingIn = (target: EventTarget | null): boolean =>
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement;
+
+    const onCopy = (event: ClipboardEvent): void => {
+      if (typingIn(event.target) || viewRef.current !== "glyph") return;
+      const text = clipboardText(store.editor);
+      if (text === null) return;
+      event.preventDefault();
+      event.clipboardData?.setData("text/plain", text);
+    };
+
+    const onCut = (event: ClipboardEvent): void => {
+      if (typingIn(event.target) || viewRef.current !== "glyph") return;
+      const text = clipboardText(store.editor);
+      if (text === null) return;
+      event.preventDefault();
+      event.clipboardData?.setData("text/plain", text);
+      store.applyTool(deleteSelectedContours(store.editor));
+    };
+
+    const onPaste = (event: ClipboardEvent): void => {
+      if (typingIn(event.target) || viewRef.current !== "glyph") return;
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+      if (text === "") return;
+      // Not prevented unless it is ours, so pasting something else into the
+      // canvas does nothing rather than swallowing the event.
+      const result = pasteContours(store.editor, text, pasteIds);
+      if (result.state === store.editor) return;
+      event.preventDefault();
+      store.applyTool(result);
+    };
+
+    window.addEventListener("copy", onCopy);
+    window.addEventListener("cut", onCut);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("copy", onCopy);
+      window.removeEventListener("cut", onCut);
+      window.removeEventListener("paste", onPaste);
     };
   }, [store]);
 

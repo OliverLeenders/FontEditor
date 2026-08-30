@@ -50,6 +50,14 @@ export {
   setPointType,
 } from "./commands.js";
 
+export {
+  clipboardText,
+  deleteSelectedContours,
+  parseClipboard,
+  pasteContours,
+  selectedContours,
+} from "./clipboard.js";
+
 export type { SelectOptions } from "./select.js";
 export { cancel, handleVisibility, translateSelection } from "./select.js";
 
