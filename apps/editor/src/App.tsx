@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ContextMenu, type MenuRequest } from "./components/ContextMenu.js";
 import { GlyphCanvas } from "./components/GlyphCanvas.js";
 import { GlyphStrip } from "./components/GlyphStrip.js";
 import { Inspector } from "./components/Inspector.js";
@@ -12,6 +13,7 @@ import { useEditorStore, useStoreValue } from "./useStore.js";
 export function App(): JSX.Element {
   const store = useEditorStore();
   const [view, setView] = useState<ViewId>("glyph");
+  const [menu, setMenu] = useState<MenuRequest | null>(null);
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const inspectorOpen = useStoreValue((s) => s.inspector.open);
 
@@ -75,8 +77,11 @@ export function App(): JSX.Element {
       <TabBar current={view} onSelect={setView} glyphName={glyphName} />
       <Toolbar />
       <main className={styles.stage}>
-        <GlyphCanvas />
+        <GlyphCanvas onContextMenu={setMenu} />
         <Inspector />
+        {menu !== null ? (
+          <ContextMenu store={store} request={menu} onClose={() => setMenu(null)} />
+        ) : null}
         {!inspectorOpen ? (
           <button
             type="button"

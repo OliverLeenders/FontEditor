@@ -6,12 +6,23 @@ import {
   pointerLeave,
   pointerMove,
   pointerUp,
+  tunniSegments,
 } from "@fonteditor/tools";
-import { panBy, toDesign, zoomAt } from "@fonteditor/view";
+import {
+  buildHitIndex,
+  itemForTarget,
+  hasItem,
+  panBy,
+  pick,
+  screenTolerance,
+  toDesign,
+  zoomAt,
+} from "@fonteditor/view";
 import { useEffect, useRef } from "react";
 
 import { sceneFor } from "../scene.js";
 import { useEditorStore } from "../useStore.js";
+import type { MenuRequest } from "./ContextMenu.js";
 import styles from "./GlyphCanvas.module.css";
 
 /**
@@ -22,7 +33,11 @@ import styles from "./GlyphCanvas.module.css";
  * — no reconciliation of the tabs, the toolbar, the inspector or the strip,
  * sixty times a second, to move a single node.
  */
-export function GlyphCanvas(): JSX.Element {
+export function GlyphCanvas({
+  onContextMenu,
+}: {
+  onContextMenu: (request: MenuRequest) => void;
+}): JSX.Element {
   const store = useEditorStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const surfaceRef = useRef<CanvasSurface | null>(null);
@@ -114,6 +129,36 @@ export function GlyphCanvas(): JSX.Element {
       }}
       onDoubleClick={(event) => {
         store.applyTool(doubleClick(store.editor, toInput(event as unknown as PointerEvent)));
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        const surface = surfaceRef.current;
+        if (surface === null) return;
+
+        // What the menu offers is decided by what is under the pointer, using
+        // the same hit index the tools use — so the menu can never offer an
+        // action for something the canvas is not actually showing.
+        const editor = store.editor;
+        const glyph = editor.document.glyphs[editor.currentGlyph];
+        const { point } = toInput(event as unknown as PointerEvent);
+        const target =
+          glyph === undefined
+            ? null
+            : pick(
+                buildHitIndex(glyph, tunniSegments(editor)),
+                point,
+                screenTolerance(editor.view, 11),
+              );
+        // Right-clicking selects what it lands on, the way every editor does —
+        // and it is what makes the menu's selection-based actions ("Delete
+        // point") act on the thing you actually clicked. An existing multi
+        // selection is left alone, so a right-click cannot silently shrink it.
+        const item = target === null ? null : itemForTarget(target);
+        if (item !== null && !hasItem(editor.selection, item)) {
+          store.setEditor({ ...editor, selection: [item] });
+        }
+
+        onContextMenu({ x: event.clientX, y: event.clientY, target, point });
       }}
       onWheel={(event) => {
         const surface = surfaceRef.current;

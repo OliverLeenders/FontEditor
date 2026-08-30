@@ -23,7 +23,11 @@ export function Inspector(): JSX.Element | null {
   const unicodes = useStoreValue(
     (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.unicodes ?? EMPTY_CODES,
   );
-  const selectionCount = useStoreValue((s) => s.session.editor.selection.length);
+  // Points only. A handle in the selection is not something these buttons can
+  // act on, so counting it would enable them to do nothing.
+  const pointCount = useStoreValue(
+    (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
+  );
   const pointType = useStoreValue(selectedPointType);
 
   const drag = useRef<{ dx: number; dy: number } | null>(null);
@@ -108,12 +112,12 @@ export function Inspector(): JSX.Element | null {
 
         <div className={styles.rule} />
 
-        <Field label={selectionCount === 0 ? "Point" : `Point · ${selectionCount} selected`}>
+        <Field label={pointCount === 0 ? "Point" : `Point · ${pointCount} selected`}>
           <div className={styles.segmented}>
             <button
               type="button"
               aria-pressed={pointType === "corner"}
-              disabled={selectionCount === 0}
+              disabled={pointCount === 0}
               onClick={() => applyPointType("corner")}
             >
               Corner
@@ -121,7 +125,7 @@ export function Inspector(): JSX.Element | null {
             <button
               type="button"
               aria-pressed={pointType === "smooth"}
-              disabled={selectionCount === 0}
+              disabled={pointCount === 0}
               onClick={() => applyPointType("smooth")}
             >
               Smooth

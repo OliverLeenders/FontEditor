@@ -31,6 +31,23 @@ export {
   tunniSegments,
 } from "./state.js";
 
+export {
+  balanceSegmentAt,
+  clearSelection,
+  convertSegment,
+  deleteSelectedPoints,
+  insertPointOnSegment,
+  nodeHvLocked,
+  retractHandle,
+  reverseContourAt,
+  reverseSelectedContour,
+  segmentForHandle,
+  segmentParameterAt,
+  selectAllPoints,
+  setNodeHvLock,
+  setPointType,
+} from "./commands.js";
+
 export type { SelectOptions } from "./select.js";
 export { cancel, translateSelection } from "./select.js";
 

@@ -128,6 +128,27 @@ export function applyHvLock(anchor: Vec2, pt: Vec2): Vec2 {
   return dy <= dx ? { x: pt.x, y: anchor.y } : { x: anchor.x, y: pt.y };
 }
 
+/**
+ * Rotate `p` onto the nearer axis through `anchor`, keeping its distance.
+ *
+ * Distinct from {@link applyHvLock}, and the difference matters. Dragging a
+ * locked handle *projects* the cursor onto the axis — the pointer is saying
+ * where, and how far along the axis you dragged is the length you asked for.
+ * Turning the lock on has no cursor to follow, so the least destructive thing is
+ * to correct the direction and leave the length alone, which is what "snap the
+ * direction to north, east, south or west" actually asks for.
+ */
+export function snapToAxis(anchor: Vec2, p: Vec2): Vec2 {
+  const dx = p.x - anchor.x;
+  const dy = p.y - anchor.y;
+  const reach = Math.hypot(dx, dy);
+  if (reach === 0) return p;
+
+  return Math.abs(dx) >= Math.abs(dy)
+    ? { x: anchor.x + Math.sign(dx) * reach, y: anchor.y }
+    : { x: anchor.x, y: anchor.y + Math.sign(dy) * reach };
+}
+
 export function hasHandles(n: Node): boolean {
   return n.in !== null || n.out !== null;
 }

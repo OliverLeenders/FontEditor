@@ -5,6 +5,7 @@ import {
   type Vec2,
   balance,
   bounds,
+  distance,
   lerp,
   lineAsCubic,
   moveTunniLine,
@@ -22,6 +23,7 @@ import {
   enforceSmooth,
   moveNodeTo,
   node,
+  snapToAxis,
   translateNode,
   withHandleRaw,
 } from "./node.js";
@@ -242,10 +244,40 @@ export function setNodeType(c: Contour, id: NodeId, type: Node["type"]): Contour
   return replaceNode(c, i, type === "smooth" ? enforceSmooth(next, "out") : next);
 }
 
+/**
+ * Turn the node's axis constraint on or off.
+ *
+ * Switching it on snaps the handles onto an axis immediately rather than waiting
+ * for the next drag: a lock that visibly changed nothing would read as broken.
+ * The snap rotates rather than projects, so a handle keeps its length and only
+ * its direction is corrected — see `snapToAxis` for why those differ.
+ *
+ * A smooth node needs more care than snapping each handle to its own nearer
+ * axis, which would leave one pointing north and the other east and quietly make
+ * "smooth" a lie. Instead the longer handle picks the axis and the other is
+ * swung to face it, so the node stays smooth and both sides end up on the same
+ * line. A corner node has no such obligation, so each handle snaps on its own.
+ */
 export function setHvLock(c: Contour, id: NodeId, hvLock: boolean): Contour | null {
   const i = nodeIndex(c, id);
   if (i < 0) return null;
-  return replaceNode(c, i, { ...c.nodes[i]!, hvLock });
+
+  const base = c.nodes[i]!;
+  if (!hvLock) return replaceNode(c, i, { ...base, hvLock: false });
+
+  let next: Node = { ...base, hvLock: true };
+
+  if (base.type === "smooth" && base.in !== null && base.out !== null) {
+    const leading = distance(base.pt, base.out) >= distance(base.pt, base.in) ? "out" : "in";
+    const handle = leading === "out" ? base.out : base.in;
+    next = withHandleRaw(next, leading, snapToAxis(base.pt, handle));
+    next = enforceSmooth(next, leading);
+  } else {
+    if (next.in !== null) next = withHandleRaw(next, "in", snapToAxis(base.pt, next.in));
+    if (next.out !== null) next = withHandleRaw(next, "out", snapToAxis(base.pt, next.out));
+  }
+
+  return replaceNode(c, i, next);
 }
 
 /**
@@ -270,6 +302,20 @@ export function setSegmentCubic(c: Contour, index: number, geometry: Cubic): Con
   nodes[index] = { ...from, pt: geometry.a, out: geometry.c1 };
   nodes[j] = { ...to, pt: geometry.b, in: geometry.c2 };
   return { ...c, nodes };
+}
+
+/**
+ * Give a straight segment handles at the thirds, turning it into a curve.
+ *
+ * The inverse of {@link makeSegmentLine}, and the same parameterisation the pen
+ * uses for a new segment — so converting a line and then converting it back
+ * leaves the shape exactly where it started.
+ */
+export function makeSegmentCurve(c: Contour, index: number): Contour | null {
+  const segment = segmentAt(c, index);
+  if (segment === null) return null;
+  if (segment.kind === "curve") return c;
+  return setSegmentCubic(c, index, lineAsCubic(segment.a, segment.b));
 }
 
 /** Retract both of a segment's handles, turning it into a straight line. */

@@ -53,10 +53,18 @@ Use PgUp and PgDn to move between glyphs. Press `V` for the select tool and `P` 
 point and drag for a smooth one, Alt while dragging to leave only one handle, click the
 first point to close, Enter or Escape to finish open, Backspace to take a point back.
 
-With the select tool: drag nodes, handles, the blue Tunni line and the amber Tunni point. Double-click a
-Tunni point to balance the segment. Shift extends the selection, Alt breaks a smooth
-node's handle link, arrow keys nudge, Escape cancels a drag. Ctrl-Z undoes and
-Ctrl-Shift-Z redoes. Space previews without controls, the wheel zooms, middle-drag
+With the select tool: drag nodes, handles, the blue Tunni line and the amber Tunni
+point. Double-click a Tunni point to balance the segment. Shift extends the selection,
+Alt breaks a smooth node's handle link, arrow keys nudge, Backspace deletes selected
+points, `R` reverses the contour, and Escape cancels a drag. Ctrl-Z undoes and
+Ctrl-Shift-Z redoes.
+
+**Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,
+reverse contour and delete. A handle offers the axis lock, its node's type, retract,
+and reverse. A segment offers insert-point-here, line/curve conversion, balance and
+reverse. Which items appear depends on what is under the pointer, using the same hit
+index the tools use — the menu can never offer an action for something the canvas is
+not showing. Space previews without controls, the wheel zooms, middle-drag
 pans, and Ctrl-0 refits.
 
 Edits autosave to the browser's private filesystem after a second's pause, so closing

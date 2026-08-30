@@ -31,6 +31,7 @@ import {
 } from "@fonteditor/view";
 
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
+import { deleteSelectedPoints, reverseSelectedContour } from "./commands.js";
 import type { KeyInput, PointerInput } from "./input.js";
 import {
   type EditorState,
@@ -222,6 +223,17 @@ export function keyDown(
   options: SelectOptions = {},
 ): ToolResult {
   if (input.key === "Escape") return cancel(state);
+
+  // Only while nothing is being dragged: a gesture owns the keyboard until it
+  // ends, and Escape is how it ends.
+  if (state.gesture === null && !input.modifiers.ctrl && !input.modifiers.meta) {
+    if (input.key === "Backspace" || input.key === "Delete") {
+      return deleteSelectedPoints(state);
+    }
+    if (input.key.toLowerCase() === "r") {
+      return reverseSelectedContour(state);
+    }
+  }
 
   const step = NUDGES[input.key];
   if (step === undefined) return result(state);

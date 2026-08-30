@@ -24,6 +24,7 @@ export {
   hasHandles,
   moveNodeTo,
   node,
+  snapToAxis,
   translateNode,
   withHandleRaw,
 } from "./node.js";
@@ -35,6 +36,7 @@ export {
   contour,
   contourBounds,
   insertNodeOnSegment,
+  makeSegmentCurve,
   makeSegmentLine,
   moveSegmentTunniLine,
   nodeById,
