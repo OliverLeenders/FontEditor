@@ -118,27 +118,38 @@ function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       : null;
   if (segment === null) return items;
 
+  // The segment actions are offered for all three segment-bearing targets, not
+  // just the curve itself. A Tunni point and its line sit directly on top of the
+  // curve they control and win the hit test, so gating these on `kind ===
+  // "segment"` meant the likeliest place to right-click a curve was the one
+  // place that offered no way to convert it.
+  //
+  // `status === "flat"` is not the same question: a curve whose handles happen
+  // to lie on its chord is also flat. Ask the model what kind of segment it is.
+  const glyph = editor.document.glyphs[editor.currentGlyph];
+  const c = glyph === undefined ? null : contourById(glyph, segment.contourId);
+  const isLine = (c === null ? null : segmentAt(c, segment.segmentIndex))?.kind === "line";
+
+  // Only from the curve. `segmentParameterAt` projects onto the curve, so a
+  // click on a Tunni control would yield a valid `t` and insert a point some
+  // distance from the cursor — an item named "here" must mean here.
   if (target.kind === "segment") {
     const t = segmentParameterAt(editor, segment, request.point);
-    items.push({
-      kind: "item",
-      label: "Insert point here",
-      run: () => {
-        if (t !== null) store.applyTool(insertPointOnSegment(editor, segment, t, ids));
-      },
-    });
-    // `status === "flat"` is not the same question: a curve whose handles happen
-    // to lie on its chord is also flat. Ask the model what kind of segment it is.
-    const glyph = editor.document.glyphs[editor.currentGlyph];
-    const c = glyph === undefined ? null : contourById(glyph, segment.contourId);
-    const isLine = (c === null ? null : segmentAt(c, segment.segmentIndex))?.kind === "line";
-    items.push({
-      kind: "item",
-      label: isLine ? "Make curve" : "Make line",
-      run: () => store.applyTool(convertSegment(editor, segment, isLine ? "curve" : "line")),
-    });
-    items.push({ kind: "separator" });
+    if (t !== null) {
+      items.push({
+        kind: "item",
+        label: "Insert point here",
+        run: () => store.applyTool(insertPointOnSegment(editor, segment, t, ids)),
+      });
+    }
   }
+
+  items.push({
+    kind: "item",
+    label: isLine ? "Make curve" : "Make line",
+    run: () => store.applyTool(convertSegment(editor, segment, isLine ? "curve" : "line")),
+  });
+  items.push({ kind: "separator" });
 
   items.push(
     { kind: "item", label: "Balance handles", run: () => store.applyTool(balanceSegmentAt(editor, segment)) },
