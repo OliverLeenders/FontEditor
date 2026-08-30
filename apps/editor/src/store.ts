@@ -63,6 +63,8 @@ export type StoreState = {
   readonly catalogQuery: CatalogQuery;
   /** Draw the glyphs either side, from the strip text, for judging spacing. */
   readonly showNeighbours: boolean;
+  /** Show handles only where the work is. On by default; the canvas is calmer. */
+  readonly autoHideHandles: boolean;
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
@@ -100,6 +102,7 @@ export class EditorStore {
       stripText: "hello",
       catalogQuery: DEFAULT_QUERY,
       showNeighbours: true,
+      autoHideHandles: true,
       previewing: false,
       inspector: loadInspector(),
       viewport: { width: 0, height: 0 },
@@ -343,6 +346,10 @@ export class EditorStore {
       return;
     }
     this.patch({ catalogQuery });
+  }
+
+  toggleAutoHideHandles(): void {
+    this.patch({ autoHideHandles: !this.state.autoHideHandles });
   }
 
   toggleNeighbours(): void {

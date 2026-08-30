@@ -7,9 +7,11 @@ import {
   project,
 } from "@fonteditor/geometry";
 import {
+  type Contour,
   type ContourId,
   type Glyph,
   type NodeId,
+  segmentCount,
   segmentCubic,
   segmentTunniStatus,
   segments,
@@ -17,6 +19,7 @@ import {
 } from "@fonteditor/font-model";
 
 import { type SegmentRef, sameSegment } from "./proximity.js";
+import type { Selection } from "./selection.js";
 
 export type HitKind =
   | "node"
@@ -79,28 +82,83 @@ export type HitIndex = {
  * enforces, and getting either half wrong makes the control disappear exactly
  * when it is reached for.
  */
+/**
+ * When a handle is on screen, and therefore when it may be grabbed.
+ *
+ * The rule lives here rather than in the renderer because this package owns the
+ * question "what can the pointer address", and the renderer asks it too. One
+ * definition means the drawn handles and the grabbable ones cannot drift apart —
+ * the same reason `tunniSegments` is shared rather than recomputed.
+ */
+export type HandleVisibility = {
+  readonly autoHide: boolean;
+  /** Hovered and focused segments; handles of these are shown. */
+  readonly awake: readonly SegmentRef[];
+  readonly selection: Selection;
+};
+
+export const ALL_HANDLES: HandleVisibility = { autoHide: false, awake: [], selection: [] };
+
+/**
+ * Whether one handle is visible.
+ *
+ * A handle shapes exactly one segment — a node's `out` shapes the segment
+ * leaving it, its `in` the one arriving, which on a closed contour wraps round.
+ * So "is this handle relevant" is really "is that segment awake".
+ *
+ * Selection overrides it: picking a point says you mean to work on it, and
+ * having its handles disappear because the cursor drifted would be perverse.
+ */
+export function handleIsVisible(
+  c: Contour,
+  nodeIndex: number,
+  part: "in" | "out",
+  v: HandleVisibility,
+): boolean {
+  if (!v.autoHide) return true;
+
+  const n = c.nodes[nodeIndex];
+  if (n === undefined) return false;
+
+  if (v.selection.some((item) => item.contourId === c.id && item.nodeId === n.id)) return true;
+
+  const count = segmentCount(c);
+  if (count === 0) return false;
+  const index = part === "out" ? nodeIndex : (nodeIndex - 1 + c.nodes.length) % c.nodes.length;
+  if (index < 0 || index >= count) return false;
+
+  return v.awake.some((ref) => ref.contourId === c.id && ref.segmentIndex === index);
+}
+
+export type HitOptions = {
+  /** Whether the margin lines are drawn, and so grabbable. */
+  readonly margins?: boolean;
+  readonly handles?: HandleVisibility;
+};
+
 export function buildHitIndex(
   g: Glyph,
   tunniSegments: readonly SegmentRef[] = [],
-  margins = false,
+  options: HitOptions = {},
 ): HitIndex {
   const targets: HitTarget[] = [];
+  const handles = options.handles ?? ALL_HANDLES;
 
   // Off by default: the same rule as the Tunni controls, that only something
   // drawn may be grabbed. A surface not showing margins must not have invisible
   // ones to catch drags.
-  if (margins) {
+  if (options.margins === true) {
     targets.push({ kind: "originLine", x: 0 });
     targets.push({ kind: "advanceLine", x: g.advance });
   }
 
   for (const c of g.contours) {
-    for (const n of c.nodes) {
+    for (const [nodeIndex, n] of c.nodes.entries()) {
       targets.push({ kind: "node", contourId: c.id, nodeId: n.id, point: n.pt });
-      if (n.in !== null) {
+      if (n.in !== null && handleIsVisible(c, nodeIndex, "in", handles)) {
         targets.push({ kind: "handleIn", contourId: c.id, nodeId: n.id, point: n.in });
       }
-      if (n.out !== null) {
+      if (n.out !== null && handleIsVisible(c, nodeIndex, "out", handles)) {
         targets.push({ kind: "handleOut", contourId: c.id, nodeId: n.id, point: n.out });
       }
     }

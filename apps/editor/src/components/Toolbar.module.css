@@ -54,3 +54,11 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* A toggled action reads as pressed but stays quieter than an active tool: it
+   is a view preference, not the mode the pointer is in. */
+.action[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: var(--selected);
+}

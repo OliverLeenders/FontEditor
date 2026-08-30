@@ -62,12 +62,14 @@ export {
   visibleCells,
 } from "./grid.js";
 
-export type { Hit, HitIndex, HitKind, HitTarget } from "./hit.js";
+export type { HandleVisibility, Hit, HitIndex, HitKind, HitOptions, HitTarget } from "./hit.js";
 export {
+  ALL_HANDLES,
   PICK_PRIORITY,
   PICK_TOLERANCE_SCALE,
   buildHitIndex,
   distanceToTarget,
+  handleIsVisible,
   nodesInRect,
   pick,
   pickAll,

@@ -30,6 +30,7 @@ export function Toolbar(): JSX.Element {
   const store = useEditorStore();
   const activeTool = useStoreValue((s) => s.session.editor.activeTool);
   const scale = useStoreValue((s) => s.session.editor.view.scale);
+  const autoHide = useStoreValue((s) => s.autoHideHandles);
   const undoLabel = useStoreValue((s) => (canUndo(s) ? store.undoLabel() : null));
   const redoLabel = useStoreValue((s) => (canRedo(s) ? store.redoLabel() : null));
 
@@ -74,6 +75,22 @@ export function Toolbar(): JSX.Element {
           Redo
         </button>
       </div>
+
+      <div className={styles.divider} />
+
+      <button
+        type="button"
+        className={styles.action}
+        aria-pressed={autoHide}
+        title={
+          autoHide
+            ? "Handles show near the work  (H)"
+            : "All handles always shown  (H)"
+        }
+        onClick={() => store.toggleAutoHideHandles()}
+      >
+        Handles
+      </button>
 
       <div className={styles.spacer} />
 

@@ -105,6 +105,13 @@ export function sceneFor(
     neighbours: state.showNeighbours
       ? neighboursFor(editor.document, editor.currentGlyph, state.stripText)
       : [],
-    options: { showControls: !state.previewing },
+    options: {
+      showControls: !state.previewing,
+      // Not while the pen is out. The pen keeps no hovered or focused segment,
+      // so auto-hiding would take the handles away exactly while they are being
+      // placed.
+      autoHideHandles:
+        state.autoHideHandles && state.session.editor.activeTool === "select",
+    },
   });
 }

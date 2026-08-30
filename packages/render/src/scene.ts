@@ -40,6 +40,19 @@ export const DEFAULT_METRICS: RenderMetrics = {
 export type RenderOptions = {
   /** Draw the origin and advance lines that bound the glyph's advance width. */
   readonly margins: boolean;
+  /**
+   * Show handles only where they are being worked on.
+   *
+   * A glyph's on-curve points are its skeleton and are always drawn; it is the
+   * handles and their lines that turn a shape into a thicket. With this on they
+   * appear for the segment under the cursor or being worked on, and for any
+   * point that is selected, and stay out of the way otherwise.
+   *
+   * The host decides when it applies — the pen tool, for one, does not maintain
+   * the awake set, so hiding handles mid-draw would blind you exactly while
+   * drawing.
+   */
+  readonly autoHideHandles: boolean;
   /** The translucent glyph body. On by default; the decided design keeps it on. */
   readonly showFilledPreview: boolean;
   /**
@@ -56,6 +69,7 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   showControls: true,
   showHandleIntersection: false,
   margins: true,
+  autoHideHandles: false,
 };
 
 /**

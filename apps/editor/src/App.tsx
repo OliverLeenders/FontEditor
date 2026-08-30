@@ -54,6 +54,12 @@ export function App(): JSX.Element {
       }
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "i") {
         store.toggleInspector();
+        return;
+      }
+      // Lower case only, and not while a tool key could mean something else —
+      // "H" is free, where the tool letters are not.
+      if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "h") {
+        store.toggleAutoHideHandles();
       }
     };
     const onKeyUp = (event: KeyboardEvent): void => {

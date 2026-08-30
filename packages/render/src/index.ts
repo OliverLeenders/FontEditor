@@ -46,6 +46,7 @@ export {
   drawPenPreview,
   drawScene,
   drawTunniControls,
+  handleVisibility,
   formatCodePoint,
   isActive,
 } from "./draw.js";

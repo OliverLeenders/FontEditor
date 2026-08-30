@@ -50,7 +50,7 @@ export {
 } from "./commands.js";
 
 export type { SelectOptions } from "./select.js";
-export { cancel, translateSelection } from "./select.js";
+export { cancel, handleVisibility, translateSelection } from "./select.js";
 
 export type { PenOptions } from "./pen.js";
 export { penPreview } from "./pen.js";

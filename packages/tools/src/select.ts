@@ -17,6 +17,7 @@ import {
   updateGlyph,
 } from "@fonteditor/font-model";
 import {
+  type HandleVisibility,
   type HitTarget,
   type SegmentRef,
   type Selection,
@@ -46,6 +47,23 @@ import {
 /** Stands in when the current glyph name does not resolve, so reads stay total. */
 const EMPTY_GLYPH: Glyph = { name: "", unicodes: [], advance: 0, contours: [] };
 
+/**
+ * What the pointer may address among the handles.
+ *
+ * Built here rather than passed in so every caller of the select tool gets the
+ * same answer the renderer draws — the two read one rule, in `view`.
+ */
+export function handleVisibility(
+  state: EditorState,
+  options: SelectOptions = {},
+): HandleVisibility {
+  return {
+    autoHide: options.autoHideHandles ?? false,
+    awake: tunniSegments(state),
+    selection: state.selection,
+  };
+}
+
 export type SelectOptions = {
   /** Pick radius in screen pixels. */
   readonly hitPixels?: number;
@@ -62,6 +80,13 @@ export type SelectOptions = {
    * renderer draws them by default.
    */
   readonly margins?: boolean;
+  /**
+   * Hide handles away from the work, matching `autoHideHandles` in the renderer.
+   *
+   * Off here by default so a caller that has not thought about it keeps every
+   * handle grabbable; the editor turns it on together with the drawing option.
+   */
+  readonly autoHideHandles?: boolean;
 };
 
 const DEFAULT_HIT_PIXELS = 11;
@@ -410,11 +435,10 @@ export function translateSelection(g: Glyph, selection: Selection, delta: Vec2):
 // ---------------------------------------------------------------------------
 
 function pickAt(state: EditorState, p: Vec2, options: SelectOptions): HitTarget | null {
-  const index = buildHitIndex(
-    currentGlyph(state) ?? EMPTY_GLYPH,
-    tunniSegments(state),
-    options.margins ?? true,
-  );
+  const index = buildHitIndex(currentGlyph(state) ?? EMPTY_GLYPH, tunniSegments(state), {
+    margins: options.margins ?? true,
+    handles: handleVisibility(state, options),
+  });
   const tolerance = screenTolerance(state.view, options.hitPixels ?? DEFAULT_HIT_PIXELS);
   return pick(index, p, tolerance);
 }

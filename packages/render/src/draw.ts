@@ -10,8 +10,10 @@ import {
   segments,
 } from "@fonteditor/font-model";
 import {
+  type HandleVisibility,
   type SegmentRef,
   type ViewTransform,
+  handleIsVisible,
   sameSegment,
   selectionKey,
   toScreen,
@@ -201,15 +203,26 @@ function drawHandleIntersection(ctx: Canvas2D, s: Scene, segment: Segment): void
  * shape a curve directly, and hiding them behind a hover would make ordinary
  * drawing feel furtive. Only the Tunni controls come and go.
  */
+/** What the scene's options and awake set mean for handle visibility. */
+export function handleVisibility(s: Scene): HandleVisibility {
+  return {
+    autoHide: s.options.autoHideHandles,
+    awake: s.tunniSegments,
+    selection: s.selection,
+  };
+}
+
 export function drawHandles(ctx: Canvas2D, s: Scene): void {
   const chosen = new Set(s.selection.map(selectionKey));
+  const visibility = handleVisibility(s);
 
   for (const c of s.glyph.contours) {
-    for (const n of c.nodes) {
+    for (const [nodeIndex, n] of c.nodes.entries()) {
       const anchor = toScreen(s.view, n.pt);
       for (const part of ["in", "out"] as const) {
         const handle = part === "in" ? n.in : n.out;
         if (handle === null) continue;
+        if (!handleIsVisible(c, nodeIndex, part, visibility)) continue;
         const p = toScreen(s.view, handle);
         const isChosen = chosen.has(
           selectionKey({ contourId: c.id, nodeId: n.id, part }),
