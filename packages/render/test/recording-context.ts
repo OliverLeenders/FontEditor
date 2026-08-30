@@ -17,6 +17,9 @@ export type Op = {
   readonly lineWidth: number;
   readonly globalAlpha: number;
   readonly lineDash: readonly number[];
+  /** Set only by `fillText`, whose payload is not numbers. */
+  readonly text?: string;
+  readonly font?: string;
 };
 
 /**
@@ -35,6 +38,9 @@ export class RecordingContext implements Canvas2D {
   globalAlpha = 1;
   lineJoin: "round" | "bevel" | "miter" = "miter";
   lineCap: "butt" | "round" | "square" = "butt";
+  font = "10px sans-serif";
+  textAlign: "left" | "center" | "right" = "left";
+  textBaseline: "top" | "middle" | "alphabetic" | "bottom" = "alphabetic";
 
   readonly ops: Op[] = [];
   private dash: readonly number[] = [];
@@ -104,6 +110,14 @@ export class RecordingContext implements Canvas2D {
     this.record("setLineDash", segments);
   }
 
+  fillText(text: string, x: number, y: number, maxWidth?: number): void {
+    this.record("fillText", maxWidth === undefined ? [x, y] : [x, y, maxWidth]);
+    const last = this.ops[this.ops.length - 1];
+    if (last !== undefined) {
+      this.ops[this.ops.length - 1] = { ...last, text, font: this.font };
+    }
+  }
+
   // ---- queries used by the tests -----------------------------------------
 
   /** Every recorded call of the given kind, in order. */
@@ -138,6 +152,11 @@ export class RecordingContext implements Canvas2D {
    */
   filledIn(colour: string): Op[] {
     return this.ops.filter((o) => o.op === "fill" && o.fillStyle === colour);
+  }
+
+  /** The text of every `fillText`, in order. */
+  texts(): string[] {
+    return this.all("fillText").map((o) => o.text ?? "");
   }
 
   /** Every `stroke` in the given colour. */

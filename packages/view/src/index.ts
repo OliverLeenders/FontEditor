@@ -52,6 +52,16 @@ export {
   segmentProximity,
 } from "./proximity.js";
 
+export type { CellBox, GridLayout, GridOptions } from "./grid.js";
+export {
+  DEFAULT_GRID,
+  cellBox,
+  cellIndexAt,
+  gridLayout,
+  scrollToCell,
+  visibleCells,
+} from "./grid.js";
+
 export type { Hit, HitIndex, HitKind, HitTarget } from "./hit.js";
 export {
   PICK_PRIORITY,

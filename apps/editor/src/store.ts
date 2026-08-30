@@ -1,3 +1,4 @@
+import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import {
   type EditSession,
   apply as applyToSession,
@@ -53,6 +54,8 @@ export type StoreState = {
   /** Space held: draw the shape without any controls. */
   readonly previewing: boolean;
   readonly inspector: { readonly x: number; readonly y: number; readonly open: boolean };
+  /** What the glyph browser is filtered to. Not undoable, so it lives out here. */
+  readonly catalogQuery: CatalogQuery;
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
@@ -88,6 +91,7 @@ export class EditorStore {
       storageDetail: "",
       recovered: false,
       stripText: "hello",
+      catalogQuery: DEFAULT_QUERY,
       previewing: false,
       inspector: loadInspector(),
       viewport: { width: 0, height: 0 },
@@ -250,6 +254,19 @@ export class EditorStore {
 
   setPreviewing(previewing: boolean): void {
     if (previewing !== this.state.previewing) this.patch({ previewing });
+  }
+
+  setCatalogQuery(changes: Partial<CatalogQuery>): void {
+    const catalogQuery = { ...this.state.catalogQuery, ...changes };
+    const current = this.state.catalogQuery;
+    if (
+      catalogQuery.set === current.set &&
+      catalogQuery.search === current.search &&
+      catalogQuery.order === current.order
+    ) {
+      return;
+    }
+    this.patch({ catalogQuery });
   }
 
   setStripText(stripText: string): void {

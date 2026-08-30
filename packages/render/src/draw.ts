@@ -406,3 +406,83 @@ export function drawGlyphThumbnail(
 export function isActive(s: Scene, ref: SegmentRef): boolean {
   return s.tunniSegments.some((candidate) => sameSegment(candidate, ref));
 }
+
+/**
+ * What a browser cell needs to know beyond the glyph itself.
+ *
+ * Named rather than passed as loose booleans because the two states read
+ * differently and are easy to transpose: `current` is the glyph open in the
+ * editor, `focused` is the one the keyboard is on. They are frequently not the
+ * same cell.
+ */
+export type GlyphCellState = {
+  readonly name: string;
+  readonly codePoint: number | null;
+  readonly focused: boolean;
+  readonly current: boolean;
+};
+
+/** Room reserved under the artwork for the name and code point. */
+const CELL_LABEL_HEIGHT = 26;
+
+/**
+ * One cell of the glyph browser: the glyph, its name, and its code point.
+ *
+ * A glyph with no outline still gets a cell, drawn empty. Most of a font in
+ * progress is glyphs you have not made yet, and showing where the gaps are is
+ * most of what the browser is for — so an undrawn glyph is a labelled empty box
+ * rather than something omitted.
+ */
+export function drawGlyphCell(
+  ctx: Canvas2D,
+  glyph: Glyph | null,
+  box: { x: number; y: number; width: number; height: number },
+  palette: RenderPalette,
+  metrics: { unitsPerEm: number; ascender: number; descender: number },
+  state: GlyphCellState,
+): void {
+  if (state.current || state.focused) {
+    ctx.fillStyle = state.current ? palette.cellCurrent : palette.cellFocus;
+    ctx.beginPath();
+    ctx.rect(box.x, box.y, box.width, box.height);
+    ctx.fill();
+  }
+
+  // Half-pixel inset so a one-pixel border lands on a pixel rather than
+  // straddling two and rendering as a soft two-pixel line.
+  ctx.strokeStyle = state.focused ? palette.marqueeStroke : palette.cellRule;
+  ctx.lineWidth = state.focused ? 2 : 1;
+  ctx.beginPath();
+  ctx.rect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
+  ctx.stroke();
+
+  if (glyph !== null) {
+    drawGlyphThumbnail(
+      ctx,
+      glyph,
+      { x: box.x, y: box.y, width: box.width, height: box.height - CELL_LABEL_HEIGHT },
+      palette,
+      metrics,
+      6,
+    );
+  }
+
+  ctx.fillStyle = palette.cellLabel;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  const centre = box.x + box.width / 2;
+  const inset = box.width - 8;
+
+  ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+  ctx.fillText(state.name, centre, box.y + box.height - 14, inset);
+
+  if (state.codePoint !== null) {
+    ctx.font = "9px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.fillText(formatCodePoint(state.codePoint), centre, box.y + box.height - 4, inset);
+  }
+}
+
+/** `U+0041`, padded to at least four digits as the standard writes them. */
+export function formatCodePoint(codePoint: number): string {
+  return `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
+}

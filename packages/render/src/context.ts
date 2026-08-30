@@ -17,6 +17,9 @@ export interface Canvas2D {
   globalAlpha: number;
   lineJoin: "round" | "bevel" | "miter";
   lineCap: "butt" | "round" | "square";
+  font: string;
+  textAlign: "left" | "center" | "right";
+  textBaseline: "top" | "middle" | "alphabetic" | "bottom";
 
   save(): void;
   restore(): void;
@@ -33,4 +36,6 @@ export interface Canvas2D {
   stroke(): void;
   clearRect(x: number, y: number, width: number, height: number): void;
   setLineDash(segments: number[]): void;
+  /** `maxWidth` squeezes over-long glyph names rather than letting them spill. */
+  fillText(text: string, x: number, y: number, maxWidth?: number): void;
 }

@@ -26,6 +26,9 @@ importers:
 
   apps/editor:
     dependencies:
+      '@fonteditor/catalog':
+        specifier: workspace:*
+        version: link:../../packages/catalog
       '@fonteditor/edit-core':
         specifier: workspace:*
         version: link:../../packages/edit-core

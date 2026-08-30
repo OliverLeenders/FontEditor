@@ -29,9 +29,11 @@ export type {
 } from "./scene.js";
 export { DEFAULT_METRICS, DEFAULT_OPTIONS, scene } from "./scene.js";
 
+export type { GlyphCellState } from "./draw.js";
 export {
   clearBackground,
   drawFilledPreview,
+  drawGlyphCell,
   drawGlyphThumbnail,
   drawGuides,
   drawHandles,
@@ -41,6 +43,7 @@ export {
   drawPenPreview,
   drawScene,
   drawTunniControls,
+  formatCodePoint,
   isActive,
 } from "./draw.js";
 

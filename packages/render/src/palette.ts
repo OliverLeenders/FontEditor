@@ -26,6 +26,14 @@ export type RenderPalette = {
   readonly marqueeFill: string;
   readonly marqueeStroke: string;
   readonly preview: string;
+  /** Border around a glyph browser cell. */
+  readonly cellRule: string;
+  /** The glyph name and code point beneath a cell. */
+  readonly cellLabel: string;
+  /** Behind the cell the keyboard is on. */
+  readonly cellFocus: string;
+  /** Behind the cell that is open in the editor. */
+  readonly cellCurrent: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -46,6 +54,10 @@ export const LIGHT_PALETTE: RenderPalette = {
   marqueeFill: "rgba(44,109,175,0.08)",
   marqueeStroke: "#2C6DAF",
   preview: "#7C8896",
+  cellRule: "#E3E9EF",
+  cellLabel: "#6B7783",
+  cellFocus: "rgba(44,109,175,0.12)",
+  cellCurrent: "rgba(169,111,34,0.14)",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -66,4 +78,8 @@ export const DARK_PALETTE: RenderPalette = {
   marqueeFill: "rgba(116,174,226,0.10)",
   marqueeStroke: "#74AEE2",
   preview: "#74828F",
+  cellRule: "#232F3C",
+  cellLabel: "#8B98A5",
+  cellFocus: "rgba(116,174,226,0.16)",
+  cellCurrent: "rgba(214,160,90,0.18)",
 };
