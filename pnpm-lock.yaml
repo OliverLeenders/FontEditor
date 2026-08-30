@@ -110,6 +110,18 @@ importers:
         specifier: workspace:*
         version: link:../view
 
+  packages/font-io:
+    dependencies:
+      '@fonteditor/font-model':
+        specifier: workspace:*
+        version: link:../font-model
+      '@fonteditor/geometry':
+        specifier: workspace:*
+        version: link:../geometry
+      opentype.js:
+        specifier: ^2.0.0
+        version: 2.0.0
+
   packages/font-model:
     dependencies:
       '@fonteditor/geometry':
@@ -731,6 +743,10 @@ packages:
   node-releases@2.0.54:
     resolution: {integrity: sha512-YHs7BmmcsdAI5Ozuf8JZo6PT0mv2GIWC9vMfvUC3dp65M8hn7Ux8CPL+2oBI7juNuj9d0ndhTcznq2ODBps9cQ==}
     engines: {node: '>=18'}
+
+  opentype.js@2.0.0:
+    resolution: {integrity: sha512-kCyjv6xdDY1W/jLWZ/L3QhhTlKUqDZMQ5+Jdlw12b3dXkKNpYBqqlMMj0YDQPShWFTMwgZI1hG14kN3XUDSg/A==}
+    hasBin: true
 
   pathe@1.1.2:
     resolution: {integrity: sha512-whLdWMYL2TwI08hn8/ZqAbrVemu0LNaNNJZX73O6qaIdCTfXutsLhMkjdENX0qhsQ9uIimo4/aQOmXkoon2nDQ==}
@@ -1368,6 +1384,8 @@ snapshots:
   nanoid@3.3.18: {}
 
   node-releases@2.0.54: {}
+
+  opentype.js@2.0.0: {}
 
   pathe@1.1.2: {}
 
