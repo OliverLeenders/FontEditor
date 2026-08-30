@@ -9,9 +9,10 @@ derives from the reverse-engineering write-up in
 
 ## Status
 
-**Phases 0–2 done.** You can draw contours, edit them with Tunni lines, undo, and your
-work autosaves and comes back on reload. Next is phase 3: sidebearings, components,
-anchors — turning a set of paths into a glyph.
+**Phases 0–2 done, and the document now holds a whole font.** You can draw contours,
+edit them with Tunni lines, undo, switch between glyphs, and your work autosaves and
+comes back on reload. Next is the editor shell — tabs, toolbar, floating inspector,
+glyph strip and a glyph browser — then the per-glyph work of phase 3.
 
 | Phase | | Status |
 | --- | --- | --- |
@@ -19,7 +20,7 @@ anchors — turning a set of paths into a glyph.
 | 1 | The editing surface | done |
 | 2 | Undo, redo, persistence | done |
 | 3 | From paths to a glyph | not started |
-| 4 | From a glyph to a font | not started |
+| 4 | From a glyph to a font | multi-glyph document done; browser and font info panel pending |
 | 5 | Binary import and export | not started |
 | 6 | Proofing and shaping | not started |
 | 7 | Spacing and kerning | not started |
@@ -41,7 +42,7 @@ Then run the playground and open http://localhost:5173:
 pnpm dev
 ```
 
-Press `V` for the select tool and `P` for the pen. With the pen, click for a corner
+Use PgUp and PgDn to move between glyphs. Press `V` for the select tool and `P` for the pen. With the pen, click for a corner
 point and drag for a smooth one, Alt while dragging to leave only one handle, click the
 first point to close, Enter or Escape to finish open, Backspace to take a point back.
 
@@ -84,6 +85,11 @@ Packages are consumed directly from TypeScript source — there is no build step
 something needs to ship. Later phases add `edit-core`, `tools`, `font-io`, and an `apps/editor` shell.
 
 ### Two decisions worth knowing before reading the code
+
+**The document is a font, not a glyph.** `FontDocument` holds many glyphs keyed by name
+with a separate ordering — UFO's arrangement, which pays off twice: lookup by name is
+what components and the glyph strip need, and ordering belongs to the font rather than
+to the glyphs, so renaming one does not disturb where it sits.
 
 **A contour is a list of nodes, not a list of segments.** Each on-curve point owns both of
 its handles, and segments are derived on demand. This is what makes a shared point

@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import { decodeGlyph, encodeFontInfo, encodeGlyph } from "./schema.js";
-import { fontDocument } from "@fonteditor/font-model";
+import { orderedGlyphs } from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
 import { OpfsFileStore } from "./opfs.js";
@@ -67,11 +67,17 @@ async function run(request: StorageRequest): Promise<unknown> {
     case "load": {
       const result = await loadDocument(required());
       if (result.kind === "empty") {
-        const payload: LoadedPayload = { glyph: null, recovered: false, problems: [] };
+        const payload: LoadedPayload = {
+          glyphs: [],
+          info: null,
+          recovered: false,
+          problems: [],
+        };
         return payload;
       }
       const payload: LoadedPayload = {
-        glyph: encodeGlyph(result.document.glyph),
+        glyphs: orderedGlyphs(result.document).map(encodeGlyph),
+        info: encodeFontInfo(result.document),
         recovered: result.recovered,
         problems: result.problems,
       };
@@ -94,12 +100,9 @@ async function run(request: StorageRequest): Promise<unknown> {
       return written;
     }
 
-    case "saveFontInfo": {
-      const first = request.glyphOrder[0] ?? "";
-      const info = encodeFontInfo(fontDocument({ name: first, unicodes: [], advance: 0, contours: [] }));
-      await required().write(FONT_INFO_PATH, JSON.stringify(info));
+    case "saveFontInfo":
+      await required().write(FONT_INFO_PATH, JSON.stringify(request.info));
       return null;
-    }
 
     case "journal": {
       const decoded = decodeGlyph(request.glyph);

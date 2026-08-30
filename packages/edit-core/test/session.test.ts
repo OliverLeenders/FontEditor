@@ -1,6 +1,8 @@
 import { vec } from "@fonteditor/geometry";
 import {
   type Contour,
+  type FontDocument,
+  type Glyph,
   addContour,
   contour,
   counterIds,
@@ -8,6 +10,7 @@ import {
   glyph,
   node,
   nodeById,
+  orderedGlyphs,
   segmentTunniPoint,
 } from "@fonteditor/font-model";
 import {
@@ -24,6 +27,7 @@ import {
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
+
 import { history, push } from "../src/history.js";
 import {
   type EditSession,
@@ -36,6 +40,9 @@ import {
   undo,
   undoLabelOf,
 } from "../src/session.js";
+
+/** The document holds many glyphs now; these tests each work with one. */
+const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
 
 const VIEW: ViewTransform = { scale: 1, tx: 0, ty: 0 };
 
@@ -55,14 +62,14 @@ function arch(): Contour {
 function start(): { s: EditSession; c: Contour } {
   const c = arch();
   const editor = editorState({
-    document: fontDocument(addContour(glyph("n", { advance: 640 }), c)),
+    document: fontDocument([addContour(glyph("n", { advance: 640 }), c)]),
     view: VIEW,
   });
   return { s: session(editor), c };
 }
 
 const nodeAt = (s: EditSession, c: Contour, i: number) =>
-  nodeById(s.editor.document.glyph.contours[0]!, c.nodes[i]!.id)!;
+  nodeById(firstGlyph(s.editor.document).contours[0]!, c.nodes[i]!.id)!;
 
 /** Drive a whole drag through the session, the way the host does. */
 function drag(
@@ -235,7 +242,7 @@ describe("Tunni edits", () => {
     expect(dragged.history.entries[0]!.label).toBe("Move Tunni point");
 
     const back = undo(dragged);
-    const restored = segmentTunniPoint(back.editor.document.glyph.contours[0]!, 0)!;
+    const restored = segmentTunniPoint(firstGlyph(back.editor.document).contours[0]!, 0)!;
     expect(Math.hypot(restored.x - tunni.x, restored.y - tunni.y)).toBeLessThan(1e-9);
   });
 
@@ -246,7 +253,7 @@ describe("Tunni edits", () => {
 
     // Skew it first, so balancing has something to undo.
     const lopsided = drag(awake, tunni, [vec(tunni.x - 25, tunni.y - 45)], 1000);
-    const skewed = segmentTunniPoint(lopsided.editor.document.glyph.contours[0]!, 0)!;
+    const skewed = segmentTunniPoint(firstGlyph(lopsided.editor.document).contours[0]!, 0)!;
 
     const balanced = apply(
       lopsided,
@@ -257,7 +264,7 @@ describe("Tunni edits", () => {
     expect(balanced.history.entries[1]!.label).toBe("Balance segment");
 
     const back = undo(balanced);
-    const restored = segmentTunniPoint(back.editor.document.glyph.contours[0]!, 0)!;
+    const restored = segmentTunniPoint(firstGlyph(back.editor.document).contours[0]!, 0)!;
     expect(Math.hypot(restored.x - skewed.x, restored.y - skewed.y)).toBeLessThan(1e-9);
   });
 });
@@ -302,7 +309,7 @@ describe("the stack limit", () => {
   // The prototype shifted its array without moving the cursor with it, so undo
   // skipped a state once the stack passed a hundred entries.
   it("drops the oldest entries and keeps the cursor in step", () => {
-    const doc = fontDocument(addContour(glyph("x"), arch()));
+    const doc = fontDocument([addContour(glyph("x"), arch())]);
     let h = history(3);
     for (let i = 0; i < 5; i++) {
       h = push(

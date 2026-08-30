@@ -1,5 +1,13 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
-import type { ContourId, FontDocument, NodeId } from "@fonteditor/font-model";
+import {
+  type ContourId,
+  type FontDocument,
+  type Glyph,
+  type GlyphName,
+  type NodeId,
+  glyphNamed,
+  updateGlyph,
+} from "@fonteditor/font-model";
 
 export type ToolId = "select" | "pen";
 import { type Selection, type SegmentRef, type ViewTransform, sameSegment } from "@fonteditor/view";
@@ -90,6 +98,8 @@ export type EditorState = {
   /** The versioned slice. Everything else here is ephemeral and never undone. */
   readonly document: FontDocument;
   readonly activeTool: ToolId;
+  /** Which glyph the canvas is editing. */
+  readonly currentGlyph: GlyphName;
   /** The contour the pen is partway through, if any. */
   readonly pen: PenState | null;
   readonly view: ViewTransform;
@@ -114,6 +124,7 @@ export type EditorStateInit = {
   readonly document: FontDocument;
   readonly view: ViewTransform;
   readonly activeTool?: ToolId;
+  readonly currentGlyph?: GlyphName;
   readonly selection?: Selection;
   readonly hoveredSegment?: SegmentRef | null;
   readonly focusedSegment?: SegmentRef | null;
@@ -124,6 +135,7 @@ export function editorState(init: EditorStateInit): EditorState {
   return {
     document: init.document,
     activeTool: init.activeTool ?? "select",
+    currentGlyph: init.currentGlyph ?? init.document.glyphOrder[0] ?? "",
     pen: null,
     view: init.view,
     selection: init.selection ?? [],
@@ -149,6 +161,28 @@ export function tunniSegments(state: EditorState): SegmentRef[] {
     refs.push(ref);
   }
   return refs;
+}
+
+/**
+ * The glyph being edited, or `null` if the name does not resolve.
+ *
+ * Every tool reads through this rather than reaching into the document, so
+ * "which glyph" lives in exactly one place and switching glyphs is a change to
+ * one field.
+ */
+export function currentGlyph(state: EditorState): Glyph | null {
+  return glyphNamed(state.document, state.currentGlyph);
+}
+
+/**
+ * Apply a pure edit to the glyph being edited, returning the new document or
+ * `null` when the glyph is missing or the operation declined.
+ */
+export function editCurrentGlyph(
+  state: EditorState,
+  operation: (glyph: Glyph) => Glyph | null,
+): FontDocument | null {
+  return updateGlyph(state.document, state.currentGlyph, operation);
 }
 
 /** The marquee rectangle for the renderer, or `null` when none is in progress. */

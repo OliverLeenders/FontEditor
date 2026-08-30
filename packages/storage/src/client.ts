@@ -1,8 +1,8 @@
 import type { FontDocument, Glyph } from "@fonteditor/font-model";
-import { fontDocument } from "@fonteditor/font-model";
+import { fontDocument, setGlyphOrder } from "@fonteditor/font-model";
 
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
-import { decodeGlyph, encodeGlyph } from "./schema.js";
+import { decodeFontInfo, decodeGlyph, encodeFontInfo, encodeGlyph } from "./schema.js";
 
 /**
  * `Omit<StorageRequest, "id">` looks right and is not: applied to a union, Omit
@@ -60,17 +60,21 @@ export class StorageClient {
 
   async load(): Promise<LoadedProject> {
     const payload = (await this.send({ kind: "load" })) as LoadedPayload;
-    if (payload.glyph === null) return { kind: "empty" };
+    if (payload.glyphs.length === 0) return { kind: "empty" };
 
-    const decoded = decodeGlyph(payload.glyph);
-    if (!decoded.ok) return { kind: "empty" };
+    const glyphs = [];
+    const problems = [...payload.problems];
+    for (const stored of payload.glyphs) {
+      const decoded = decodeGlyph(stored);
+      if (decoded.ok) glyphs.push(decoded.value);
+      else problems.push(`${stored.name}: ${decoded.reason}`);
+    }
+    if (glyphs.length === 0) return { kind: "empty" };
 
-    return {
-      kind: "loaded",
-      document: fontDocument(decoded.value),
-      recovered: payload.recovered,
-      problems: payload.problems,
-    };
+    const { info } = decodeFontInfo(payload.info);
+    const document = setGlyphOrder(fontDocument(glyphs, info), glyphs.map((g) => g.name));
+
+    return { kind: "loaded", document, recovered: payload.recovered, problems };
   }
 
   async saveGlyphs(glyphs: readonly Glyph[]): Promise<readonly string[]> {
@@ -79,8 +83,8 @@ export class StorageClient {
     return written as readonly string[];
   }
 
-  async saveFontInfo(glyphOrder: readonly string[]): Promise<void> {
-    await this.send({ kind: "saveFontInfo", glyphOrder });
+  async saveFontInfo(document: FontDocument): Promise<void> {
+    await this.send({ kind: "saveFontInfo", info: encodeFontInfo(document) });
   }
 
   async journal(glyph: Glyph, at: number = Date.now()): Promise<void> {

@@ -1,18 +1,31 @@
 import { distance, vec } from "@fonteditor/geometry";
-import { counterIds, fontDocument, glyph, segmentAt, segmentCount } from "@fonteditor/font-model";
+import {
+  type FontDocument,
+  type Glyph,
+  counterIds,
+  fontDocument,
+  glyph,
+  orderedGlyphs,
+  segmentAt,
+  segmentCount,
+} from "@fonteditor/font-model";
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
+
 
 import { doubleClick, keyDown, pointerDown, pointerMove, pointerUp, setActiveTool } from "../src/dispatch.js";
 import { keyInput, pointerInput } from "../src/input.js";
 import { penPreview } from "../src/pen.js";
 import { type EditorState, editorState } from "../src/state.js";
 
+/** The document holds many glyphs now; these tests each work with one. */
+const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
+
 const VIEW: ViewTransform = { scale: 1, tx: 0, ty: 0 };
 
 function blank(): EditorState {
   return editorState({
-    document: fontDocument(glyph("a", { advance: 600 })),
+    document: fontDocument([glyph("a", { advance: 600 })]),
     view: VIEW,
     activeTool: "pen",
   });
@@ -38,12 +51,12 @@ function pull(
   return pointerUp(s).state;
 }
 
-const only = (s: EditorState) => s.document.glyph.contours[0]!;
+const only = (s: EditorState) => firstGlyph(s.document).contours[0]!;
 
 describe("drawing", () => {
   it("starts a contour on the first click", () => {
     const s = click(blank(), vec(100, 100));
-    expect(s.document.glyph.contours).toHaveLength(1);
+    expect(firstGlyph(s.document).contours).toHaveLength(1);
     expect(only(s).nodes).toHaveLength(1);
     expect(only(s).closed).toBe(false);
     expect(s.pen).not.toBeNull();
@@ -169,7 +182,7 @@ describe("finishing and taking back", () => {
   // invisible node in the glyph.
   it("discards a contour of one point", () => {
     const s = keyDown(click(blank(), vec(100, 100)), keyInput("Escape")).state;
-    expect(s.document.glyph.contours).toHaveLength(0);
+    expect(firstGlyph(s.document).contours).toHaveLength(0);
   });
 
   it("takes back the last point on Backspace", () => {
@@ -185,7 +198,7 @@ describe("finishing and taking back", () => {
 
   it("removes the contour when the last point is taken back", () => {
     const s = keyDown(click(blank(), vec(100, 100)), keyInput("Backspace")).state;
-    expect(s.document.glyph.contours).toHaveLength(0);
+    expect(firstGlyph(s.document).contours).toHaveLength(0);
     expect(s.pen).toBeNull();
   });
 
@@ -236,7 +249,7 @@ describe("the rubber band", () => {
 
 describe("tool switching", () => {
   it("swaps tools on p and v", () => {
-    const s = editorState({ document: fontDocument(glyph("a")), view: VIEW });
+    const s = editorState({ document: fontDocument([glyph("a")]), view: VIEW });
     expect(s.activeTool).toBe("select");
     const withPen = keyDown(s, keyInput("p")).state;
     expect(withPen.activeTool).toBe("pen");
@@ -245,7 +258,7 @@ describe("tool switching", () => {
 
   // A shortcut with a modifier belongs to the application, not the toolbox.
   it("ignores p and v when a modifier is held", () => {
-    const s = editorState({ document: fontDocument(glyph("a")), view: VIEW });
+    const s = editorState({ document: fontDocument([glyph("a")]), view: VIEW });
     expect(keyDown(s, keyInput("p", { ctrl: true })).state.activeTool).toBe("select");
     expect(keyDown(s, keyInput("p", { meta: true })).state.activeTool).toBe("select");
   });

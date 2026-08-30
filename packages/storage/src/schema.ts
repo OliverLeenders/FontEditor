@@ -1,9 +1,11 @@
 import {
   type Contour,
   type FontDocument,
+  type FontInfo,
   type Glyph,
   type Node,
   type NodeType,
+  DEFAULT_FONT_INFO,
   contour,
   fontDocument,
   glyph,
@@ -56,8 +58,15 @@ export type StoredGlyph = {
 
 export type StoredFontInfo = {
   readonly schema: number;
-  /** Glyph names in order, so a project knows what to load. */
+  /** Glyph names in order. Ordering belongs to the font, not to the glyphs. */
   readonly glyphOrder: readonly string[];
+  readonly familyName: string;
+  readonly styleName: string;
+  readonly unitsPerEm: number;
+  readonly ascender: number;
+  readonly descender: number;
+  readonly xHeight: number;
+  readonly capHeight: number;
 };
 
 /** Success, or a reason a file could not be understood. */
@@ -98,7 +107,49 @@ function encodeNode(n: Node): StoredNode {
 }
 
 export function encodeFontInfo(document: FontDocument): StoredFontInfo {
-  return { schema: SCHEMA_VERSION, glyphOrder: [document.glyph.name] };
+  return {
+    schema: SCHEMA_VERSION,
+    glyphOrder: [...document.glyphOrder],
+    ...document.info,
+  };
+}
+
+/**
+ * Read the font's own measurements back, falling back field by field.
+ *
+ * A missing or nonsensical value takes the default rather than failing the load:
+ * losing a project because someone hand-edited the x-height to a string would be
+ * a poor trade.
+ */
+export function decodeFontInfo(raw: unknown): {
+  info: FontInfo;
+  glyphOrder: readonly string[];
+} {
+  if (!isRecord(raw)) return { info: DEFAULT_FONT_INFO, glyphOrder: [] };
+
+  const number = (key: keyof FontInfo, fallback: number): number => {
+    const value = raw[key];
+    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  };
+  const text = (key: keyof FontInfo, fallback: string): string => {
+    const value = raw[key];
+    return typeof value === "string" ? value : fallback;
+  };
+
+  return {
+    info: {
+      familyName: text("familyName", DEFAULT_FONT_INFO.familyName),
+      styleName: text("styleName", DEFAULT_FONT_INFO.styleName),
+      unitsPerEm: number("unitsPerEm", DEFAULT_FONT_INFO.unitsPerEm),
+      ascender: number("ascender", DEFAULT_FONT_INFO.ascender),
+      descender: number("descender", DEFAULT_FONT_INFO.descender),
+      xHeight: number("xHeight", DEFAULT_FONT_INFO.xHeight),
+      capHeight: number("capHeight", DEFAULT_FONT_INFO.capHeight),
+    },
+    glyphOrder: Array.isArray(raw["glyphOrder"])
+      ? raw["glyphOrder"].filter((n): n is string => typeof n === "string")
+      : [],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +243,7 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
 
 export function decodeDocument(raw: unknown): Decoded<FontDocument> {
   const decoded = decodeGlyph(raw);
-  return decoded.ok ? ok(fontDocument(decoded.value)) : fail(decoded.reason);
+  return decoded.ok ? ok(fontDocument([decoded.value])) : fail(decoded.reason);
 }
 
 // ---------------------------------------------------------------------------

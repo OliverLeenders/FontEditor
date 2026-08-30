@@ -120,16 +120,22 @@ export class Autosave {
   }
 
   /**
-   * Adopt a freshly loaded document, saying whether it came out of the journal.
+   * Adopt a document at startup, saying whether any of it is actually on disk.
    *
-   * The distinction matters and is easy to get wrong. A document read from the
-   * glyph files is already on disk, so adopting it as saved is right. A document
-   * *recovered from the journal* is newer than the files — it was committed but
-   * never written — so calling it saved leaves disk permanently behind and the
-   * journal permanently uncleared. It has to be adopted as unwritten and flushed.
+   * The distinction is easy to get wrong and there are two ways to get it wrong,
+   * both of which leave disk permanently behind the truth:
+   *
+   *  - A document **recovered from the journal** is newer than the files. It was
+   *    committed but never written.
+   *  - A document that is **there because the store was empty** — a new project,
+   *    or a starter font — has never been written at all.
+   *
+   * In both cases calling it saved means nothing is ever flushed until the user
+   * happens to touch something, and then only the part they touched. Only a
+   * document read back from the glyph files is genuinely already on disk.
    */
-  markLoaded(document: FontDocument, recovered: boolean): void {
-    if (!recovered) {
+  markLoaded(document: FontDocument, unwritten: boolean): void {
+    if (!unwritten) {
       this.markSaved(document);
       return;
     }

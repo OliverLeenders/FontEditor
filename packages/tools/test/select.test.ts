@@ -1,6 +1,8 @@
 import { distance, vec } from "@fonteditor/geometry";
 import {
   type Contour,
+  type FontDocument,
+  type Glyph,
   addContour,
   contour,
   counterIds,
@@ -8,10 +10,12 @@ import {
   glyph,
   node,
   nodeById,
+  orderedGlyphs,
   segmentTunniPoint,
 } from "@fonteditor/font-model";
 import type { Selection, ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
+
 
 import { pointerInput, keyInput } from "../src/input.js";
 import {
@@ -24,6 +28,9 @@ import {
   pointerUp,
 } from "../src/select.js";
 import { type EditorState, editorState, marqueeRect, tunniSegments } from "../src/state.js";
+
+/** The document holds many glyphs now; these tests each work with one. */
+const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
 
 const VIEW: ViewTransform = { scale: 1, tx: 0, ty: 0 };
 
@@ -44,7 +51,7 @@ function arch(): Contour {
 function start(c: Contour = arch()): { state: EditorState; contour: Contour } {
   return {
     state: editorState({
-      document: fontDocument(addContour(glyph("n", { advance: 640 }), c)),
+      document: fontDocument([addContour(glyph("n", { advance: 640 }), c)]),
       view: VIEW,
     }),
     contour: c,
@@ -64,7 +71,7 @@ function drag(
 }
 
 const pointOf = (s: EditorState, c: Contour, i: number) =>
-  nodeById(s.document.glyph.contours[0]!, c.nodes[i]!.id)!;
+  nodeById(firstGlyph(s.document).contours[0]!, c.nodes[i]!.id)!;
 
 describe("hover", () => {
   it("wakes the segment under the cursor without changing anything else", () => {
@@ -127,7 +134,7 @@ describe("focus", () => {
     expect(tunniSegments(s).map((ref) => ref.segmentIndex).sort()).toEqual([0, 1]);
 
     // …and, crucially, still grabbable.
-    const stillThere = segmentTunniPoint(s.document.glyph.contours[0]!, 0)!;
+    const stillThere = segmentTunniPoint(firstGlyph(s.document).contours[0]!, 0)!;
     const grabbed = pointerDown(s, pointerInput(stillThere)).state;
     expect(grabbed.gesture?.kind).toBe("dragTunniPoint");
   });
@@ -378,7 +385,7 @@ describe("Tunni gestures", () => {
     const target = vec(tunni.x - 10, tunni.y - 30);
 
     const moved = drag(awake, tunni, [target]);
-    const landed = segmentTunniPoint(moved.document.glyph.contours[0]!, 0)!;
+    const landed = segmentTunniPoint(firstGlyph(moved.document).contours[0]!, 0)!;
     expect(distance(landed, target)).toBeLessThan(1e-6);
   });
 
@@ -405,7 +412,7 @@ describe("Tunni gestures", () => {
     const awake = wake(state, tunni);
     const balanced = doubleClick(awake, pointerInput(tunni)).state;
 
-    const seg = balanced.document.glyph.contours[0]!;
+    const seg = firstGlyph(balanced.document).contours[0]!;
     const a = seg.nodes[0]!.pt;
     const b = seg.nodes[1]!.pt;
     const chord = { x: b.x - a.x, y: b.y - a.y };

@@ -60,8 +60,21 @@ export {
   unionRect,
 } from "./contour.js";
 
-export type { FontDocument } from "./document.js";
-export { fontDocument, withGlyph } from "./document.js";
+export type { FontDocument, FontInfo, GlyphName } from "./document.js";
+export {
+  DEFAULT_FONT_INFO,
+  fontDocument,
+  glyphCount,
+  glyphForCharacter,
+  glyphNamed,
+  glyphsForString,
+  orderedGlyphs,
+  putGlyph,
+  removeGlyph,
+  setFontInfo,
+  setGlyphOrder,
+  updateGlyph,
+} from "./document.js";
 
 export type { Glyph, GlyphInit } from "./glyph.js";
 export {

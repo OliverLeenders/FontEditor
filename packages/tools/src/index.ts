@@ -22,7 +22,14 @@ export type { Effect, ToolResult } from "./effects.js";
 export { abort, begin, commit, result } from "./effects.js";
 
 export type { EditorState, EditorStateInit, Gesture, PenState, ToolId } from "./state.js";
-export { editorState, isDragging, marqueeRect, tunniSegments } from "./state.js";
+export {
+  currentGlyph,
+  editCurrentGlyph,
+  editorState,
+  isDragging,
+  marqueeRect,
+  tunniSegments,
+} from "./state.js";
 
 export type { SelectOptions } from "./select.js";
 export { cancel, translateSelection } from "./select.js";

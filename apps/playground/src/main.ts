@@ -16,6 +16,7 @@ import {
   pointerLeave,
   pointerMove,
   pointerUp,
+  currentGlyph,
   penPreview,
   type ToolResult,
   tunniSegments,
@@ -35,11 +36,12 @@ import {
   Autosave,
   type AutosaveStatus,
   StorageClient,
+  dirtyGlyphs,
   requestPersistence,
 } from "@fonteditor/storage";
 import { fitRect, panBy, toDesign, zoomAt } from "@fonteditor/view";
 
-import { GUIDES, sampleGlyph } from "./glyph.js";
+import { GUIDES, sampleGlyphs } from "./glyph.js";
 
 /**
  * A harness, not the editor.
@@ -50,12 +52,15 @@ import { GUIDES, sampleGlyph } from "./glyph.js";
  * the parts that *are* built can be driven by hand.
  */
 
+/** Stands in when no glyph resolves, so the renderer always has something. */
+const EMPTY = { name: "", unicodes: [] as number[], advance: 0, contours: [] };
+
 const canvas = document.getElementById("surface") as HTMLCanvasElement;
 const statusBar = document.getElementById("status") as HTMLDivElement;
 
 let history: EditSession = newSession(
   editorState({
-    document: fontDocument(sampleGlyph()),
+    document: fontDocument(sampleGlyphs()),
     view: { scale: 1, tx: 0, ty: 0 },
   }),
 );
@@ -69,6 +74,8 @@ let previewing = false;
 let panFrom: { x: number; y: number } | null = null;
 
 let storage: StorageClient | null = null;
+/** What the journal has already seen, so a burst only appends what moved. */
+let lastJournalled: import("@fonteditor/font-model").FontDocument | null = null;
 let storageNote = "connecting";
 let recovered = false;
 
@@ -79,11 +86,12 @@ let recovered = false;
  */
 const autosave = new Autosave({
   journal: async (document) => {
-    await storage?.journal(document.glyph);
+    for (const g of dirtyGlyphs(lastJournalled, document)) await storage?.journal(g);
+    lastJournalled = document;
   },
-  save: async (document) => {
-    await storage?.saveGlyphs([document.glyph]);
-    await storage?.saveFontInfo([document.glyph.name]);
+  save: async (document, previous) => {
+    await storage?.saveGlyphs(dirtyGlyphs(previous, document));
+    await storage?.saveFontInfo(document);
   },
   saved: () => {
     void storage?.clearJournal();
@@ -99,7 +107,7 @@ const surface = new CanvasSurface(canvas, (ctx, size) => {
   drawScene(
     ctx,
     scene({
-      glyph: current().document.glyph,
+      glyph: currentGlyph(current()) ?? EMPTY,
       view: current().view,
       viewport: size,
       palette: prefersDark() ? DARK_PALETTE : LIGHT_PALETTE,
@@ -221,6 +229,18 @@ window.addEventListener("keydown", (event) => {
     fitGlyph();
     return;
   }
+  // Page through glyphs until the real glyph strip exists.
+  if (!event.ctrlKey && !event.metaKey && (event.key === "PageDown" || event.key === "PageUp")) {
+    event.preventDefault();
+    const order = current().document.glyphOrder;
+    const at = order.indexOf(current().currentGlyph);
+    const next = order[(at + (event.key === "PageDown" ? 1 : order.length - 1)) % order.length];
+    if (next !== undefined) {
+      setEditor({ ...current(), currentGlyph: next, selection: [], pen: null, focusedSegment: null });
+      fitGlyph();
+    }
+    return;
+  }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z") {
     event.preventDefault();
     history = event.shiftKey ? redo(history) : undo(history);
@@ -283,6 +303,7 @@ function render(): void {
     `<b>undo</b> ${undoable ?? "—"}`,
     `<b>redo</b> ${redoable ?? "—"}`,
     `<b>steps</b> ${history.history.index}/${history.history.entries.length}`,
+    `<b>glyph</b> ${editor.currentGlyph} ${current().document.glyphOrder.indexOf(editor.currentGlyph) + 1}/${current().document.glyphOrder.length}`,
     `<b>tool</b> ${editor.activeTool}`,
     `<b>saved</b> ${savedLabel(autosave.status)}`,
     recovered ? "<b>recovered unsaved work from the journal</b>" : "",
@@ -290,7 +311,7 @@ function render(): void {
     "pen: click the first point to close · enter or esc to finish · backspace takes one back",
     "ctrl-z undoes · ctrl-shift-z redoes",
     "shift extends · alt breaks smooth · arrows nudge",
-    "space previews · wheel zooms · middle-drag pans · ctrl-0 fits",
+    "pgup/pgdn switches glyph · space previews · wheel zooms · middle-drag pans · ctrl-0 fits",
   ].join("<span></span>");
 }
 
@@ -301,7 +322,7 @@ function render(): void {
  * narrow window, and a hardcoded guess put a third of the glyph behind it.
  */
 function fitGlyph(): void {
-  const box = glyphBounds(current().document.glyph);
+  const box = glyphBounds(currentGlyph(current()) ?? EMPTY);
   if (box === null) return;
   const chrome = statusBar.getBoundingClientRect().height;
   const fitted = fitRect(box, surface.size.width, surface.size.height - chrome, 70);
@@ -340,11 +361,13 @@ async function initStorage(): Promise<void> {
       fitGlyph();
     }
 
-    // A document read from the glyph files is already written; one recovered
-    // from the journal is not, and has to be flushed so disk catches up and the
-    // journal can be dropped.
-    autosave.markLoaded(current().document, recovered);
-    if (recovered) await autosave.flush();
+    // Only a document read back from the glyph files is genuinely on disk. One
+    // recovered from the journal is newer than the files, and the starter font
+    // shown when the store is empty has never been written at all — both have to
+    // be flushed, or nothing is saved until the user happens to touch something.
+    const onDisk = loaded.kind === "loaded" && !loaded.recovered;
+    autosave.markLoaded(current().document, !onDisk);
+    if (!onDisk) await autosave.flush();
     storageNote = "ok";
 
     const persisted = await requestPersistence();

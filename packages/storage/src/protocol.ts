@@ -1,4 +1,4 @@
-import type { StoredGlyph } from "./schema.js";
+import type { StoredFontInfo, StoredGlyph } from "./schema.js";
 
 /**
  * What the main thread and the storage worker say to each other.
@@ -15,13 +15,14 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "open"; readonly directory: string }
   | { readonly id: number; readonly kind: "load" }
   | { readonly id: number; readonly kind: "saveGlyphs"; readonly glyphs: readonly StoredGlyph[] }
-  | { readonly id: number; readonly kind: "saveFontInfo"; readonly glyphOrder: readonly string[] }
+  | { readonly id: number; readonly kind: "saveFontInfo"; readonly info: StoredFontInfo }
   | { readonly id: number; readonly kind: "journal"; readonly glyph: StoredGlyph; readonly at: number }
   | { readonly id: number; readonly kind: "clearJournal" }
   | { readonly id: number; readonly kind: "wipe" };
 
 export type LoadedPayload = {
-  readonly glyph: StoredGlyph | null;
+  readonly glyphs: readonly StoredGlyph[];
+  readonly info: StoredFontInfo | null;
   readonly recovered: boolean;
   readonly problems: readonly string[];
 };

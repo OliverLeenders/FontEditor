@@ -2,12 +2,14 @@ import { vec } from "@fonteditor/geometry";
 import {
   type Contour,
   type FontDocument,
+  type Glyph,
   addContour,
   contour,
   counterIds,
   fontDocument,
   glyph,
   node,
+  orderedGlyphs,
   setNodePoint,
   updateContour,
 } from "@fonteditor/font-model";
@@ -28,6 +30,9 @@ import {
 } from "../src/project.js";
 import { SCHEMA_VERSION, decodeGlyph, encodeGlyph, migrate } from "../src/schema.js";
 
+/** The document holds many glyphs now; these tests each work with one. */
+const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
+
 function ring(): Contour {
   const ids = counterIds();
   const k = 140;
@@ -44,14 +49,14 @@ function ring(): Contour {
 }
 
 function document(): FontDocument {
-  return fontDocument(
+  return fontDocument([
     addContour(glyph("o", { unicodes: [0x6f], advance: 600 }), ring()),
-  );
+  ]);
 }
 
 describe("serialization", () => {
   it("round-trips a glyph exactly", () => {
-    const g = document().glyph;
+    const g = firstGlyph(document());
     const decoded = decodeGlyph(JSON.parse(JSON.stringify(encodeGlyph(g))) as unknown);
     expect(decoded.ok).toBe(true);
     if (decoded.ok) expect(decoded.value).toEqual(g);
@@ -72,17 +77,17 @@ describe("serialization", () => {
   // Points are pairs, not objects — most of a glyph file is coordinates, and a
   // font has thousands of glyphs.
   it("writes points as pairs", () => {
-    const encoded = encodeGlyph(document().glyph);
+    const encoded = encodeGlyph(firstGlyph(document()));
     expect(encoded.contours[0]!.nodes[0]!.pt).toEqual([0, 250]);
   });
 
   it("omits hvLock when it is false", () => {
-    const encoded = encodeGlyph(document().glyph);
+    const encoded = encodeGlyph(firstGlyph(document()));
     expect("hvLock" in encoded.contours[0]!.nodes[0]!).toBe(false);
   });
 
   it("stamps every file with a schema version", () => {
-    expect(encodeGlyph(document().glyph).schema).toBe(SCHEMA_VERSION);
+    expect(encodeGlyph(firstGlyph(document())).schema).toBe(SCHEMA_VERSION);
   });
 });
 
@@ -97,33 +102,33 @@ describe("decoding untrusted files", () => {
   });
 
   it("refuses a file with no schema stamp", () => {
-    const { schema: _schema, ...unstamped } = encodeGlyph(document().glyph);
+    const { schema: _schema, ...unstamped } = encodeGlyph(firstGlyph(document()));
     const decoded = decodeGlyph(unstamped);
     expect(decoded.ok).toBe(false);
     if (!decoded.ok) expect(decoded.reason).toContain("schema");
   });
 
   it("refuses a file from a newer build, and says so", () => {
-    const future = { ...encodeGlyph(document().glyph), schema: SCHEMA_VERSION + 5 };
+    const future = { ...encodeGlyph(firstGlyph(document())), schema: SCHEMA_VERSION + 5 };
     const decoded = decodeGlyph(future);
     expect(decoded.ok).toBe(false);
     if (!decoded.ok) expect(decoded.reason).toContain("newer version");
   });
 
   it("rejects a node with a broken point", () => {
-    const encoded = JSON.parse(JSON.stringify(encodeGlyph(document().glyph)));
+    const encoded = JSON.parse(JSON.stringify(encodeGlyph(firstGlyph(document()))));
     encoded.contours[0].nodes[0].pt = [0, "up"];
     expect(decodeGlyph(encoded).ok).toBe(false);
   });
 
   it("rejects non-finite coordinates", () => {
-    const encoded = JSON.parse(JSON.stringify(encodeGlyph(document().glyph)));
+    const encoded = JSON.parse(JSON.stringify(encodeGlyph(firstGlyph(document()))));
     encoded.contours[0].nodes[0].pt = [0, null];
     expect(decodeGlyph(encoded).ok).toBe(false);
   });
 
   it("passes a current-version file through migration untouched", () => {
-    const encoded = encodeGlyph(document().glyph);
+    const encoded = encodeGlyph(firstGlyph(document()));
     const migrated = migrate(encoded);
     expect(migrated.ok).toBe(true);
   });
@@ -204,7 +209,7 @@ describe("saving and loading", () => {
     const result = await loadDocument(store);
     expect(result.kind).toBe("loaded");
     if (result.kind === "loaded") {
-      expect(result.document.glyph.name).toBe("o");
+      expect(firstGlyph(result.document).name).toBe("o");
       expect(result.problems).toHaveLength(1);
       expect(result.problems[0]).toContain("broken.json");
     }
@@ -226,10 +231,10 @@ describe("saving and loading", () => {
     await saveDocument(store, before);
     store.clearWrites();
 
-    const moved = updateContour(before.glyph, before.glyph.contours[0]!.id, (c) =>
+    const moved = updateContour(firstGlyph(before), firstGlyph(before).contours[0]!.id, (c) =>
       setNodePoint(c, c.nodes[0]!.id, vec(0, 300)),
     )!;
-    await saveDocument(store, fontDocument(moved), before);
+    await saveDocument(store, fontDocument([moved]), before);
     expect(store.writes).toContain(glyphPath("o"));
   });
 });
@@ -244,11 +249,11 @@ describe("dirtyGlyphs", () => {
 
   it("finds the glyph after an edit", () => {
     const before = document();
-    const moved = fontDocument(
-      updateContour(before.glyph, before.glyph.contours[0]!.id, (c) =>
+    const moved = fontDocument([
+      updateContour(firstGlyph(before), firstGlyph(before).contours[0]!.id, (c) =>
         setNodePoint(c, c.nodes[0]!.id, vec(0, 300)),
       )!,
-    );
+    ]);
     expect(dirtyGlyphs(before, moved)).toHaveLength(1);
   });
 
@@ -260,8 +265,8 @@ describe("dirtyGlyphs", () => {
 describe("the journal", () => {
   it("appends records and reads them back in order", async () => {
     const store = new MemoryFileStore();
-    await appendJournal(store, document().glyph, 100);
-    await appendJournal(store, document().glyph, 200);
+    await appendJournal(store, firstGlyph(document()), 100);
+    await appendJournal(store, firstGlyph(document()), 200);
 
     const records = await readJournal(store);
     expect(records).toHaveLength(2);
@@ -274,7 +279,7 @@ describe("the journal", () => {
   // for.
   it("keeps every whole record when the last line is truncated", async () => {
     const store = new MemoryFileStore();
-    await appendJournal(store, document().glyph, 100);
+    await appendJournal(store, firstGlyph(document()), 100);
     await store.append(JOURNAL_PATH, '{"at":200,"glyph":{"sche');
 
     expect(await readJournal(store)).toHaveLength(1);
@@ -285,7 +290,7 @@ describe("the journal", () => {
     const saved = document();
     await saveDocument(store, saved);
 
-    const newer = updateContour(saved.glyph, saved.glyph.contours[0]!.id, (c) =>
+    const newer = updateContour(firstGlyph(saved), firstGlyph(saved).contours[0]!.id, (c) =>
       setNodePoint(c, c.nodes[0]!.id, vec(0, 999)),
     )!;
     await appendJournal(store, newer, 5000);
@@ -294,13 +299,13 @@ describe("the journal", () => {
     expect(result.kind).toBe("loaded");
     if (result.kind === "loaded") {
       expect(result.recovered).toBe(true);
-      expect(result.document.glyph.contours[0]!.nodes[0]!.pt).toEqual(vec(0, 999));
+      expect(firstGlyph(result.document).contours[0]!.nodes[0]!.pt).toEqual(vec(0, 999));
     }
   });
 
   it("is empty once cleared", async () => {
     const store = new MemoryFileStore();
-    await appendJournal(store, document().glyph, 100);
+    await appendJournal(store, firstGlyph(document()), 100);
     await clearJournal(store);
     expect(await readJournal(store)).toEqual([]);
   });
@@ -353,11 +358,11 @@ describe("autosave", () => {
     const { autosave, journal, save, tick } = harness();
     let doc = document();
     for (let i = 0; i < 4; i++) {
-      doc = fontDocument(
-        updateContour(doc.glyph, doc.glyph.contours[0]!.id, (c) =>
+      doc = fontDocument([
+        updateContour(firstGlyph(doc), firstGlyph(doc).contours[0]!.id, (c) =>
           setNodePoint(c, c.nodes[0]!.id, vec(0, 250 + i)),
         )!,
-      );
+      ]);
       autosave.commit(doc);
     }
 
@@ -416,14 +421,12 @@ describe("autosave", () => {
     expect(autosave.dirty).toBe(false);
   });
 
-  // A document recovered from the journal is newer than the files: it was
-  // committed but never written. Adopting it as saved would leave disk behind
-  // for good, and leave the journal uncleared so every later launch would claim
-  // to be recovering again.
-  it("treats a journal-recovered document as unwritten", async () => {
+  // Two ways to be unwritten, both of which leave disk behind for good if
+  // adopted as saved: recovered from the journal, and a starter document shown
+  // because the store was empty.
+  it("treats an unwritten document as needing a save", async () => {
     const { autosave, save } = harness();
-    const recoveredDoc = document();
-    autosave.markLoaded(recoveredDoc, true);
+    autosave.markLoaded(document(), true);
 
     expect(autosave.dirty).toBe(true);
     expect(autosave.status).toBe("pending");
@@ -431,5 +434,22 @@ describe("autosave", () => {
     await autosave.flush();
     expect(save).toHaveBeenCalledTimes(1);
     expect(autosave.dirty).toBe(false);
+  });
+
+  it("writes every glyph of a starter font, not just one that gets touched", async () => {
+    const store = new MemoryFileStore();
+    const starter = fontDocument([
+      addContour(glyph("o", { unicodes: [0x6f] }), ring()),
+      glyph("l", { unicodes: [0x6c] }),
+      glyph("e", { unicodes: [0x65] }),
+    ]);
+
+    // Nothing is on disk, so everything is dirty.
+    expect(dirtyGlyphs(null, starter)).toHaveLength(3);
+    await saveDocument(store, starter, null);
+
+    expect(store.has(glyphPath("o"))).toBe(true);
+    expect(store.has(glyphPath("l"))).toBe(true);
+    expect(store.has(glyphPath("e"))).toBe(true);
   });
 });

@@ -1,11 +1,12 @@
 import type { FontDocument, Glyph } from "@fonteditor/font-model";
-import { fontDocument } from "@fonteditor/font-model";
+import { DEFAULT_FONT_INFO, fontDocument, setGlyphOrder } from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
 import { glyphFileName } from "./names.js";
 import {
   type StoredGlyph,
   SCHEMA_VERSION,
+  decodeFontInfo,
   decodeGlyph,
   encodeFontInfo,
   encodeGlyph,
@@ -46,8 +47,23 @@ export function glyphPath(name: string): string {
  * bookkeeping to get out of step.
  */
 export function dirtyGlyphs(previous: FontDocument | null, next: FontDocument): Glyph[] {
-  if (previous === null) return [next.glyph];
-  return previous.glyph === next.glyph ? [] : [next.glyph];
+  const changed: Glyph[] = [];
+  for (const name of next.glyphOrder) {
+    const glyph = next.glyphs[name];
+    if (glyph === undefined) continue;
+    if (previous === null || previous.glyphs[name] !== glyph) changed.push(glyph);
+  }
+  return changed;
+}
+
+function sameOrder(a: readonly string[], b: readonly string[]): boolean {
+  return a.length === b.length && a.every((name, i) => name === b[i]);
+}
+
+/** Glyph files that should no longer exist, because the glyph was removed. */
+export function removedGlyphs(previous: FontDocument | null, next: FontDocument): string[] {
+  if (previous === null) return [];
+  return previous.glyphOrder.filter((name) => !(name in next.glyphs));
 }
 
 // ---------------------------------------------------------------------------
@@ -76,9 +92,15 @@ export async function saveDocument(
   const changed = dirtyGlyphs(previous, document);
   const report = await saveGlyphs(store, changed);
 
-  // The index is small and cheap; rewriting it on any change keeps it honest
-  // about which glyphs exist.
-  if (changed.length > 0 || previous === null) {
+  for (const name of removedGlyphs(previous, document)) {
+    await store.remove(glyphPath(name));
+  }
+
+  // The index is small and cheap; rewriting it whenever anything moved keeps it
+  // honest about which glyphs exist and in what order.
+  const orderChanged = previous === null || !sameOrder(previous.glyphOrder, document.glyphOrder);
+  const infoChanged = previous === null || previous.info !== document.info;
+  if (changed.length > 0 || orderChanged || infoChanged) {
     await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   }
   return report;
@@ -191,10 +213,41 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
     }
   }
 
-  const first = [...glyphs.values()][0];
-  if (first === undefined) return { kind: "empty" };
+  if (glyphs.size === 0) return { kind: "empty" };
 
-  return { kind: "loaded", document: fontDocument(first), recovered, problems };
+  // The saved order wins where it is known; anything the index does not mention
+  // is appended, so a glyph file that appeared without the index being rewritten
+  // still shows up rather than vanishing.
+  const rawInfo = await store.read(FONT_INFO_PATH);
+  const { info, glyphOrder } = decodeFontInfo(parseOrNull(rawInfo));
+
+  const ordered: Glyph[] = [];
+  const seen = new Set<string>();
+  for (const name of glyphOrder) {
+    const g = glyphs.get(name);
+    if (g !== undefined && !seen.has(name)) {
+      ordered.push(g);
+      seen.add(name);
+    }
+  }
+  for (const [name, g] of glyphs) {
+    if (!seen.has(name)) ordered.push(g);
+  }
+
+  const document = setGlyphOrder(
+    fontDocument(ordered, info),
+    ordered.map((g) => g.name),
+  );
+  return { kind: "loaded", document, recovered, problems };
+}
+
+function parseOrNull(raw: string | null): unknown {
+  if (raw === null) return null;
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function decodeFile(raw: string): ReturnType<typeof decodeGlyph> {
@@ -210,4 +263,4 @@ export async function wipe(store: FileStore): Promise<void> {
   for (const path of await store.list("")) await store.remove(path);
 }
 
-export { SCHEMA_VERSION };
+export { DEFAULT_FONT_INFO, SCHEMA_VERSION };

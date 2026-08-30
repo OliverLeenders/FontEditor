@@ -59,14 +59,44 @@ function ellipse(
   );
 }
 
-export function sampleGlyph(): Glyph {
-  const ids = counterIds();
+function ringGlyph(name: string, codePoint: number): Glyph {
+  const ids = counterIds(`${name}-`);
   const outer = ellipse(ids, 300, 250, 240, 260, false);
   const counter = ellipse(ids, 300, 250, 130, 150, true);
   return addContour(
-    addContour(glyph("o", { unicodes: [0x6f], advance: 600 }), outer),
+    addContour(glyph(name, { unicodes: [codePoint], advance: 600 }), outer),
     counter,
   );
+}
+
+function barGlyph(name: string, codePoint: number): Glyph {
+  const ids = counterIds(`${name}-`);
+  const stem = contour(
+    ids.contour(),
+    [
+      node(ids.node(), vec(100, 0)),
+      node(ids.node(), vec(200, 0)),
+      node(ids.node(), vec(200, 700)),
+      node(ids.node(), vec(100, 700)),
+    ],
+    true,
+  );
+  return addContour(glyph(name, { unicodes: [codePoint], advance: 300 }), stem);
+}
+
+/**
+ * A few glyphs rather than one, so the glyph strip and the browser have
+ * something to show. Deliberately crude — this is a harness, and the shapes only
+ * have to be distinguishable from each other.
+ */
+export function sampleGlyphs(): Glyph[] {
+  return [
+    ringGlyph("o", 0x6f),
+    barGlyph("l", 0x6c),
+    ringGlyph("e", 0x65),
+    barGlyph("i", 0x69),
+    ringGlyph("c", 0x63),
+  ];
 }
 
 /** Vertical metrics for the guides, in design units. */
