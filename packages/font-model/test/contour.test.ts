@@ -28,12 +28,7 @@ import {
   extendHandle,
   extendSegmentHandles,
   isHalfHandled,
-  setHvLock,
-  setNodeType,
   makeSegmentCurve,
-  setHandle,
-  nodeById,
-  segmentAt,
 } from "../src/contour.js";
 import { counterIds } from "../src/ids.js";
 import { node } from "../src/node.js";
