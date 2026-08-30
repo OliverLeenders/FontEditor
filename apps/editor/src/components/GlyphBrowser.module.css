@@ -130,8 +130,12 @@
 .scroller {
   position: absolute;
   inset: 0;
-  overflow-y: auto;
+  overflow-y: scroll;
   overflow-x: hidden;
+  /* Always reserved, so clientWidth does not change when the grid starts
+     overflowing. Without it the measured width feeds back into the height that
+     decides whether a scrollbar exists at all, and the layout can oscillate. */
+  scrollbar-gutter: stable;
 }
 .scroller:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 

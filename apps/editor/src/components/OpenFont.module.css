@@ -48,3 +48,18 @@
   font-size: .76rem;
   color: var(--danger, #c2453d);
 }
+
+/* Shared with NewFont: the two live side by side in the browser's bar and must
+   not drift apart visually. */
+.confirm {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  flex: none;
+}
+
+.danger {
+  border-color: var(--danger, #c2453d);
+  color: var(--danger, #c2453d);
+}
+.danger:hover:not(:disabled) { border-color: var(--danger, #c2453d); }

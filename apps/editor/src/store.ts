@@ -15,6 +15,9 @@ import {
   type FontDocument,
   type Glyph,
   type GlyphName,
+  DEFAULT_FONT_INFO,
+  fontDocument,
+  glyph,
   glyphBounds,
   randomIds,
 } from "@fonteditor/font-model";
@@ -259,6 +262,19 @@ export class EditorStore {
   }
 
   /**
+   * Start a new, empty font, discarding whatever is open.
+   *
+   * Empty means genuinely empty apart from `.notdef`, which every font needs and
+   * which no one wants to remember to make. Destructive, so the caller is
+   * expected to have asked first; the store's job is to do it cleanly rather
+   * than to second-guess it.
+   */
+  async newFont(): Promise<void> {
+    const document = fontDocument([glyph(".notdef", { advance: 500 })], DEFAULT_FONT_INFO);
+    await this.adoptDocument(document);
+  }
+
+  /**
    * Replace the document with a font read from a file.
    *
    * Deliberately *not* an undoable edit. Undo is for the shape you are drawing;
@@ -277,31 +293,40 @@ export class EditorStore {
     warnings: string[];
   }> {
     const { document, warnings } = parseFontFile(bytes, randomIds());
-
-    this.patch({
-      session: newSession(
-        editorState({ document, view: this.editor.view }),
-      ),
-      recovered: false,
-    });
-    this.setCurrentGlyph(document.glyphOrder[0] ?? "");
-    this.setCatalogQuery(DEFAULT_QUERY);
-
-    const client = this.storageClient;
-    if (client !== null) {
-      this.patch({ saveStatus: "saving" });
-      await client.replaceAll(document);
-      // The document on disk is now exactly this one, so autosave starts from
-      // it rather than believing every glyph is still unwritten.
-      this.autosave.markLoaded(document, false);
-      this.patch({ saveStatus: this.autosave.status });
-    }
+    await this.adoptDocument(document);
 
     return {
       family: `${document.info.familyName} ${document.info.styleName}`.trim(),
       glyphs: document.glyphOrder.length,
       warnings: warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
     };
+  }
+
+  /**
+   * Make a document the one being edited, on screen and on disk.
+   *
+   * Shared by opening a font and by starting a new one, because they differ only
+   * in where the document came from. The history is replaced rather than
+   * appended to: undo is for the shape you are drawing, and a single ctrl-Z that
+   * silently swapped the whole font back would be alarming rather than useful.
+   */
+  private async adoptDocument(document: FontDocument): Promise<void> {
+    this.patch({
+      session: newSession(editorState({ document, view: this.editor.view })),
+      recovered: false,
+    });
+    this.setCurrentGlyph(document.glyphOrder[0] ?? "");
+    this.setCatalogQuery(DEFAULT_QUERY);
+
+    const client = this.storageClient;
+    if (client === null) return;
+
+    this.patch({ saveStatus: "saving" });
+    await client.replaceAll(document);
+    // Disk now holds exactly this document, so autosave starts from it rather
+    // than believing every glyph is still unwritten.
+    this.autosave.markLoaded(document, false);
+    this.patch({ saveStatus: this.autosave.status });
   }
 
   setCatalogQuery(changes: Partial<CatalogQuery>): void {

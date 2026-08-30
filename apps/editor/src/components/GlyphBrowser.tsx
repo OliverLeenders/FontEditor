@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { NewFont } from "./NewFont.js";
 import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
 
@@ -39,22 +40,45 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const surfaceRef = useRef<CanvasSurface | null>(null);
-  const layoutRef = useRef<GridLayout | null>(null);
   const [focused, setFocused] = useState(0);
-  const [columns, setColumns] = useState(1);
+  const [width, setWidth] = useState(0);
 
   // Rebuilt only when the font changes, not on every keystroke: walking every
   // glyph's contours to ask "is this drawn?" is what would make typing in the
   // search box feel heavy on a large font.
+  // The scroller's width is state rather than a ref because the grid's height
+  // is derived from it, and a ref changing does not re-render — which is exactly
+  // how the spacer came to be stuck at zero and the grid refused to scroll.
+  //
+  // `clientWidth` excludes the scrollbar, and the stylesheet reserves the gutter
+  // permanently, so this cannot oscillate between "tall enough to overflow" and
+  // "narrow enough not to".
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller === null) return;
+
+    const measure = (): void => setWidth(scroller.clientWidth);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, []);
+
   const entries = useMemo(() => catalog(document), [document]);
   const counts = useMemo(() => setCounts(entries), [entries]);
   const shown = useMemo(() => filterCatalog(entries, query), [entries, query]);
 
+  // One layout, computed in render, used by the spacer, the keyboard and the
+  // canvas alike. Deriving it separately in the frame callback is what let the
+  // two disagree.
+  const layout: GridLayout = useMemo(() => gridLayout(shown.length, width), [shown.length, width]);
+  const columns = layout.columns;
+
   // What the frame callback reads. Held in a ref so that installing the surface
   // does not depend on it — otherwise the canvas would be torn down and rebuilt
   // on every keystroke.
-  const frame = useRef({ shown, document, focused, currentGlyph });
-  frame.current = { shown, document, focused, currentGlyph };
+  const frame = useRef({ shown, document, focused, currentGlyph, layout });
+  frame.current = { shown, document, focused, currentGlyph, layout };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -66,10 +90,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
       const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
       const palette = dark ? DARK_PALETTE : LIGHT_PALETTE;
 
-      const layout = gridLayout(state.shown.length, size.width);
-      layoutRef.current = layout;
-      setColumns((previous) => (previous === layout.columns ? previous : layout.columns));
-
+      const layout = state.layout;
       ctx.clearRect(0, 0, size.width, size.height);
       const scrollTop = scroller.scrollTop;
       const range = visibleCells(layout, scrollTop, size.height);
@@ -125,7 +146,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
   // Redraw when what is shown changes. The canvas itself never re-renders.
   useEffect(() => {
     surfaceRef.current?.invalidate();
-  }, [shown, focused, currentGlyph, document]);
+  }, [shown, focused, currentGlyph, document, layout]);
 
   // A filter that shortens the list must not strand focus past its end.
   useEffect(() => {
@@ -142,8 +163,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
     setFocused(clamped);
 
     const scroller = scrollRef.current;
-    const layout = layoutRef.current;
-    if (scroller === null || layout === null) return;
+    if (scroller === null) return;
     const target = scrollToCell(layout, clamped, scroller.scrollTop, scroller.clientHeight);
     if (target !== null) scroller.scrollTop = target;
   };
@@ -174,6 +194,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
       <div className={styles.main}>
         <div className={styles.bar}>
           <OpenFont />
+          <NewFont />
           <input
             type="search"
             className={styles.search}
@@ -233,11 +254,11 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
               }
             }}
             onClick={(event) => {
-              const index = cellFromEvent(event, scrollRef.current, layoutRef.current);
+              const index = cellFromEvent(event, scrollRef.current, layout);
               if (index !== null) setFocused(index);
             }}
             onDoubleClick={(event) => {
-              const index = cellFromEvent(event, scrollRef.current, layoutRef.current);
+              const index = cellFromEvent(event, scrollRef.current, layout);
               if (index !== null) openAt(index);
             }}
           >
@@ -245,7 +266,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
                 viewport-sized and repaints as this moves beneath it. */}
             <div
               className={styles.content}
-              style={{ height: `${String(layoutRef.current?.contentHeight ?? 0)}px` }}
+              style={{ height: `${String(layout.contentHeight)}px` }}
             />
           </div>
           <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />
@@ -265,9 +286,9 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
 function cellFromEvent(
   event: { clientX: number; clientY: number },
   scroller: HTMLDivElement | null,
-  layout: GridLayout | null,
+  layout: GridLayout,
 ): number | null {
-  if (scroller === null || layout === null) return null;
+  if (scroller === null) return null;
   const box = scroller.getBoundingClientRect();
   return cellIndexAt(
     layout,
