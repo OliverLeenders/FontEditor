@@ -21,7 +21,7 @@ import {
 } from "@fonteditor/view";
 import { useEffect, useRef } from "react";
 
-import { sceneFor } from "../scene.js";
+import { handlesAutoHidden, sceneFor } from "../scene.js";
 import type { EditorStore } from "../store.js";
 import { useEditorStore } from "../useStore.js";
 import type { MenuRequest } from "./ContextMenu.js";
@@ -35,19 +35,9 @@ import styles from "./GlyphCanvas.module.css";
  * — no reconciliation of the tabs, the toolbar, the inspector or the strip,
  * sixty times a second, to move a single node.
  */
-/**
- * The picking options, which must match what the renderer is drawing.
- *
- * Auto-hide is off while the pen is out, exactly as in `sceneFor` — the two have
- * to agree or a handle would be drawn and not grabbable, or worse, grabbable and
- * not drawn.
- */
+/** The picking options, from the same rule the renderer draws by. */
 function selectOptions(store: EditorStore): { autoHideHandles: boolean } {
-  const state = store.getState();
-  return {
-    autoHideHandles:
-      state.autoHideHandles && state.session.editor.activeTool === "select",
-  };
+  return { autoHideHandles: handlesAutoHidden(store.getState()) };
 }
 
 export function GlyphCanvas({

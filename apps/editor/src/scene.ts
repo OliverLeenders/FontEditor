@@ -73,6 +73,21 @@ function neighboursFor(
 }
 
 /**
+ * Whether handles are being hidden right now.
+ *
+ * One definition, read by both the renderer and the hit test. They must agree:
+ * a handle drawn but not grabbable is maddening, and one grabbable but not
+ * drawn means clicking empty canvas silently does something. Having written
+ * this condition out twice once already, it lives here.
+ *
+ * Never while the pen is out — the pen keeps no hovered or focused segment, so
+ * auto-hiding would take the handles away exactly while they are being placed.
+ */
+export function handlesAutoHidden(state: StoreState): boolean {
+  return state.autoHideHandles && state.session.editor.activeTool === "select";
+}
+
+/**
  * Turn the store's state into a frame.
  *
  * A pure function of the state and the canvas size, which is what lets the
@@ -107,11 +122,7 @@ export function sceneFor(
       : [],
     options: {
       showControls: !state.previewing,
-      // Not while the pen is out. The pen keeps no hovered or focused segment,
-      // so auto-hiding would take the handles away exactly while they are being
-      // placed.
-      autoHideHandles:
-        state.autoHideHandles && state.session.editor.activeTool === "select",
+      autoHideHandles: handlesAutoHidden(state),
     },
   });
 }
