@@ -9,14 +9,14 @@ derives from the reverse-engineering write-up in
 
 ## Status
 
-**Phase 2 — done.** The editing surface works, edits are undoable, and work autosaves
-to the browser's private filesystem and comes back on reload. Next is the pen tool,
-then phase 3.
+**Phases 0–2 done.** You can draw contours, edit them with Tunni lines, undo, and your
+work autosaves and comes back on reload. Next is phase 3: sidebearings, components,
+anchors — turning a set of paths into a glyph.
 
 | Phase | | Status |
 | --- | --- | --- |
 | 0 | Foundations and the geometry kernel | done |
-| 1 | The editing surface | model, view, renderer and select tool done; pen tool pending |
+| 1 | The editing surface | done |
 | 2 | Undo, redo, persistence | done |
 | 3 | From paths to a glyph | not started |
 | 4 | From a glyph to a font | not started |
@@ -41,7 +41,11 @@ Then run the playground and open http://localhost:5173:
 pnpm dev
 ```
 
-Drag nodes, handles, the blue Tunni line and the amber Tunni point. Double-click a
+Press `V` for the select tool and `P` for the pen. With the pen, click for a corner
+point and drag for a smooth one, Alt while dragging to leave only one handle, click the
+first point to close, Enter or Escape to finish open, Backspace to take a point back.
+
+With the select tool: drag nodes, handles, the blue Tunni line and the amber Tunni point. Double-click a
 Tunni point to balance the segment. Shift extends the selection, Alt breaks a smooth
 node's handle link, arrow keys nudge, Escape cancels a drag. Ctrl-Z undoes and
 Ctrl-Shift-Z redoes. Space previews without controls, the wheel zooms, middle-drag
@@ -71,7 +75,7 @@ packages/
   font-model/   Nodes, contours, glyphs. Plain serializable data.
   view/         Design↔screen transforms, hit testing, segment activation. Pure.
   render/       Canvas drawing. Pure draw functions plus a thin surface helper.
-  tools/        Pointer and keyboard tools, as pure reducers over editor state.
+  tools/        Select and pen, as pure reducers over editor state.
   edit-core/    Transactions, undo and redo over the document.
   storage/      Autosave to OPFS, in a worker. Local-first; nothing leaves the browser.
 ```

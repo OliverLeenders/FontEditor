@@ -29,6 +29,8 @@ export type Pending = {
   readonly label: string;
   readonly document: FontDocument;
   readonly selection: Selection;
+  /** Whether this step may merge with the one before it. */
+  readonly coalesce: boolean;
 };
 
 /**
@@ -75,6 +77,7 @@ export function apply(
           label: effect.label,
           document: before.document,
           selection: before.selection,
+          coalesce: effect.coalesce ?? true,
         };
         break;
 
@@ -94,7 +97,9 @@ export function apply(
               selectionAfter: outcome.state.selection,
               at: now,
             },
-            options,
+            // A step that asked not to coalesce gets a zero window, so it
+            // stands alone however fast it followed the last one.
+            pending.coalesce ? options : { ...options, coalesceMs: 0 },
           );
         }
         pending = null;

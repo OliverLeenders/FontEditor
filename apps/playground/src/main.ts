@@ -16,6 +16,7 @@ import {
   pointerLeave,
   pointerMove,
   pointerUp,
+  penPreview,
   type ToolResult,
   tunniSegments,
 } from "@fonteditor/tools";
@@ -106,6 +107,7 @@ const surface = new CanvasSurface(canvas, (ctx, size) => {
       tunniSegments: tunniSegments(current()),
       selection: current().selection,
       marquee: marqueeRect(current()),
+      penPreview: penPreview(current()),
       options: { showControls: !previewing },
     }),
   );
@@ -233,7 +235,9 @@ window.addEventListener("keydown", (event) => {
     render();
     return;
   }
-  if (event.key.startsWith("Arrow") || event.key === "Escape") event.preventDefault();
+  if (event.key.startsWith("Arrow") || event.key === "Escape" || event.key === "Backspace") {
+    event.preventDefault();
+  }
   apply(
     keyDown(current(), {
       key: event.key,
@@ -279,9 +283,12 @@ function render(): void {
     `<b>undo</b> ${undoable ?? "—"}`,
     `<b>redo</b> ${redoable ?? "—"}`,
     `<b>steps</b> ${history.history.index}/${history.history.entries.length}`,
+    `<b>tool</b> ${editor.activeTool}`,
     `<b>saved</b> ${savedLabel(autosave.status)}`,
     recovered ? "<b>recovered unsaved work from the journal</b>" : "",
-    "ctrl-z undoes · ctrl-shift-z redoes · esc cancels a drag",
+    "p pen · v select · click for a corner, drag for a smooth point",
+    "pen: click the first point to close · enter or esc to finish · backspace takes one back",
+    "ctrl-z undoes · ctrl-shift-z redoes",
     "shift extends · alt breaks smooth · arrows nudge",
     "space previews · wheel zooms · middle-drag pans · ctrl-0 fits",
   ].join("<span></span>");

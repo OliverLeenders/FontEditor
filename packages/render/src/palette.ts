@@ -25,6 +25,7 @@ export type RenderPalette = {
   readonly intersection: string;
   readonly marqueeFill: string;
   readonly marqueeStroke: string;
+  readonly preview: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -44,6 +45,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   intersection: "#B4BFCA",
   marqueeFill: "rgba(44,109,175,0.08)",
   marqueeStroke: "#2C6DAF",
+  preview: "#7C8896",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -63,4 +65,5 @@ export const DARK_PALETTE: RenderPalette = {
   intersection: "#3A4655",
   marqueeFill: "rgba(116,174,226,0.10)",
   marqueeStroke: "#74AEE2",
+  preview: "#74828F",
 };

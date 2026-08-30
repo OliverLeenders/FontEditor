@@ -45,6 +45,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
     drawNodes(ctx, s);
+    drawPenPreview(ctx, s);
     drawMarquee(ctx, s);
   }
 
@@ -230,6 +231,29 @@ export function drawHandles(ctx: Canvas2D, s: Scene): void {
       }
     }
   }
+}
+
+/**
+ * The pen's rubber band, dashed so it never reads as part of the outline —
+ * it is a proposal, not geometry that exists yet.
+ */
+export function drawPenPreview(ctx: Canvas2D, s: Scene): void {
+  const preview = s.penPreview;
+  if (preview === null) return;
+
+  const a = toScreen(s.view, preview.a);
+  const c1 = toScreen(s.view, preview.c1);
+  const c2 = toScreen(s.view, preview.c2);
+  const b = toScreen(s.view, preview.b);
+
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = s.palette.preview;
+  ctx.lineWidth = s.metrics.outlineWidth - 0.5;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, b.x, b.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
 }
 
 /**

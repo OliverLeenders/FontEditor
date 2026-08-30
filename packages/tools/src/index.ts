@@ -21,17 +21,28 @@ export { NO_MODIFIERS, keyInput, modifiers, pointerInput } from "./input.js";
 export type { Effect, ToolResult } from "./effects.js";
 export { abort, begin, commit, result } from "./effects.js";
 
-export type { EditorState, EditorStateInit, Gesture } from "./state.js";
+export type { EditorState, EditorStateInit, Gesture, PenState, ToolId } from "./state.js";
 export { editorState, isDragging, marqueeRect, tunniSegments } from "./state.js";
 
 export type { SelectOptions } from "./select.js";
+export { cancel, translateSelection } from "./select.js";
+
+export type { PenOptions } from "./pen.js";
+export { penPreview } from "./pen.js";
+
+/**
+ * The entry points route to whichever tool is active. Individual tools remain
+ * reachable as `select` and `pen` for tests that want to drive one directly.
+ */
+export type { ToolOptions } from "./dispatch.js";
 export {
-  cancel,
   doubleClick,
   keyDown,
+  pen,
   pointerDown,
   pointerLeave,
   pointerMove,
   pointerUp,
-  translateSelection,
-} from "./select.js";
+  select,
+  setActiveTool,
+} from "./dispatch.js";

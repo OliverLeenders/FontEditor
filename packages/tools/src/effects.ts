@@ -14,7 +14,18 @@ import type { EditorState } from "./state.js";
  * nothing, which is precisely what the prototype did on every mouse-up.
  */
 export type Effect =
-  | { readonly kind: "beginTransaction"; readonly label: string }
+  | {
+      readonly kind: "beginTransaction";
+      readonly label: string;
+      /**
+       * Whether this step may merge with an identical one just before it.
+       *
+       * On by default, which is what makes twelve arrow nudges one undo. The pen
+       * turns it off: each point placed is its own step, and two quick clicks
+       * collapsing into one would take back a point the user never asked to lose.
+       */
+      readonly coalesce?: boolean;
+    }
   | { readonly kind: "commitTransaction" }
   | { readonly kind: "abortTransaction" };
 
@@ -27,6 +38,9 @@ export function result(state: EditorState, effects: readonly Effect[] = []): Too
   return { state, effects };
 }
 
-export const begin = (label: string): Effect => ({ kind: "beginTransaction", label });
+export const begin = (label: string, coalesce = true): Effect =>
+  coalesce
+    ? { kind: "beginTransaction", label }
+    : { kind: "beginTransaction", label, coalesce: false };
 export const commit: Effect = { kind: "commitTransaction" };
 export const abort: Effect = { kind: "abortTransaction" };

@@ -1,4 +1,4 @@
-import type { Rect } from "@fonteditor/geometry";
+import type { Cubic, Rect } from "@fonteditor/geometry";
 import type { Glyph } from "@fonteditor/font-model";
 import type { Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
@@ -84,6 +84,11 @@ export type Scene = {
   readonly selection: Selection;
   /** The marquee rectangle in design units, while one is being dragged. */
   readonly marquee: Rect | null;
+  /**
+   * The pen's rubber band: the segment that would exist if the next click landed
+   * where the cursor is.
+   */
+  readonly penPreview: Cubic | null;
 };
 
 export type SceneInit = {
@@ -97,6 +102,7 @@ export type SceneInit = {
   readonly tunniSegments?: readonly SegmentRef[];
   readonly selection?: Selection;
   readonly marquee?: Rect | null;
+  readonly penPreview?: Cubic | null;
 };
 
 export function scene(init: SceneInit): Scene {
@@ -111,5 +117,6 @@ export function scene(init: SceneInit): Scene {
     tunniSegments: init.tunniSegments ?? [],
     selection: init.selection ?? [],
     marquee: init.marquee ?? null,
+    penPreview: init.penPreview ?? null,
   };
 }

@@ -1,5 +1,7 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
 import type { ContourId, FontDocument, NodeId } from "@fonteditor/font-model";
+
+export type ToolId = "select" | "pen";
 import { type Selection, type SegmentRef, type ViewTransform, sameSegment } from "@fonteditor/view";
 
 /**
@@ -67,9 +69,29 @@ export type Gesture =
  * `cursor` is in design units. Converting from screen coordinates is the host's
  * job, so nothing below the view transform ever sees a pixel.
  */
+/**
+ * A contour being drawn.
+ *
+ * Unlike a gesture, this outlives a single press: drawing a contour is a
+ * sequence of clicks with the tool waiting in between, so the pen's place in the
+ * work has to survive pointer-up.
+ */
+export type PenState = {
+  readonly contourId: ContourId;
+  /** The point most recently placed; a drag shapes its handles. */
+  readonly lastNodeId: NodeId;
+  /** True between pointer-down and pointer-up, while handles are being pulled out. */
+  readonly pullingHandles: boolean;
+  /** True when the placing drag moved far enough to count as a drag at all. */
+  readonly pulled: boolean;
+};
+
 export type EditorState = {
   /** The versioned slice. Everything else here is ephemeral and never undone. */
   readonly document: FontDocument;
+  readonly activeTool: ToolId;
+  /** The contour the pen is partway through, if any. */
+  readonly pen: PenState | null;
   readonly view: ViewTransform;
   readonly selection: Selection;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
@@ -91,6 +113,7 @@ export type EditorState = {
 export type EditorStateInit = {
   readonly document: FontDocument;
   readonly view: ViewTransform;
+  readonly activeTool?: ToolId;
   readonly selection?: Selection;
   readonly hoveredSegment?: SegmentRef | null;
   readonly focusedSegment?: SegmentRef | null;
@@ -100,6 +123,8 @@ export type EditorStateInit = {
 export function editorState(init: EditorStateInit): EditorState {
   return {
     document: init.document,
+    activeTool: init.activeTool ?? "select",
+    pen: null,
     view: init.view,
     selection: init.selection ?? [],
     hoveredSegment: init.hoveredSegment ?? null,

@@ -37,6 +37,7 @@ export {
   drawMarquee,
   drawNodes,
   drawOutline,
+  drawPenPreview,
   drawScene,
   drawTunniControls,
   isActive,
