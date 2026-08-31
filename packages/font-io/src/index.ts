@@ -17,6 +17,16 @@ export { contoursFromCommands } from "./commands.js";
 export type { SourceFont, SourceGlyph } from "./source.js";
 export { FontParseError, parseFont } from "./source.js";
 
+export {
+  buildKerningGpos,
+  classDef,
+  coverage,
+  gposTable,
+  pairPosClasses,
+  pairPosGlyphs,
+} from "./gpos.js";
+export { tableChecksum, withTable } from "./sfnt.js";
+
 export type { ExportResult } from "./export.js";
 export { FontExportError, exportFileName, exportFont } from "./export.js";
 

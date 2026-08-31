@@ -51,6 +51,7 @@ export {
   FONT_INFO_PATH,
   GLYPHS_PREFIX,
   JOURNAL_PATH,
+  KERNING_PATH,
   appendJournal,
   clearJournal,
   dirtyGlyphs,

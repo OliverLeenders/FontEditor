@@ -65,7 +65,16 @@ declare module "opentype.js" {
   /** Localised name records, keyed by platform then by name then by language. */
   export type OtNames = Record<string, Record<string, Record<string, string>> | undefined>;
 
+  export interface OtPosition {
+    init(): void;
+    readonly defaultKerningTables?: unknown;
+  }
+
   export interface OtFont {
+    /** Reading GPOS is supported even though writing it is not. */
+    getKerningValue(left: number | OtGlyph, right: number | OtGlyph): number;
+    charToGlyph(character: string): OtGlyph;
+    readonly position: OtPosition;
     readonly unitsPerEm: number;
     readonly ascender: number;
     readonly descender: number;
@@ -74,6 +83,7 @@ declare module "opentype.js" {
     readonly outlinesFormat: string;
     readonly tables: {
       readonly os2?: { readonly sxHeight?: number; readonly sCapHeight?: number };
+      readonly gpos?: unknown;
     };
   }
 

@@ -1,5 +1,7 @@
 import {
   type Component,
+  type Kerning,
+  EMPTY_KERNING,
   type Contour,
   type FontDocument,
   type FontInfo,
@@ -345,4 +347,65 @@ export function migrate(raw: unknown): Decoded<Record<string, unknown>> {
     current = step(current);
   }
   return ok(current);
+}
+
+
+// ---------------------------------------------------------------------------
+// kerning
+// ---------------------------------------------------------------------------
+
+export type StoredKerning = {
+  readonly schema: number;
+  readonly firstGroups: Readonly<Record<string, readonly string[]>>;
+  readonly secondGroups: Readonly<Record<string, readonly string[]>>;
+  readonly pairs: Readonly<Record<string, Readonly<Record<string, number>>>>;
+};
+
+export function encodeKerning(kerning: Kerning): StoredKerning {
+  return {
+    schema: SCHEMA_VERSION,
+    firstGroups: kerning.firstGroups,
+    secondGroups: kerning.secondGroups,
+    pairs: kerning.pairs,
+  };
+}
+
+/**
+ * Read kerning back, discarding anything malformed.
+ *
+ * Never fails. Kerning is a refinement on top of outlines that are already
+ * correct without it, so a damaged pair costs that pair; refusing to open the
+ * font over one would trade something serious for something trivial.
+ */
+export function decodeKerning(raw: unknown): Kerning {
+  if (!isRecord(raw)) return EMPTY_KERNING;
+
+  const groups = (value: unknown): Record<string, string[]> => {
+    if (!isRecord(value)) return {};
+    const out: Record<string, string[]> = {};
+    for (const [name, members] of Object.entries(value)) {
+      if (!Array.isArray(members)) continue;
+      const glyphs = members.filter((m): m is string => typeof m === "string");
+      if (glyphs.length > 0) out[name] = glyphs;
+    }
+    return out;
+  };
+
+  const pairs: Record<string, Record<string, number>> = {};
+  if (isRecord(raw["pairs"])) {
+    for (const [first, row] of Object.entries(raw["pairs"])) {
+      if (!isRecord(row)) continue;
+      const kept: Record<string, number> = {};
+      for (const [second, value] of Object.entries(row)) {
+        if (typeof value === "number" && Number.isFinite(value)) kept[second] = value;
+      }
+      if (Object.keys(kept).length > 0) pairs[first] = kept;
+    }
+  }
+
+  return {
+    firstGroups: groups(raw["firstGroups"]),
+    secondGroups: groups(raw["secondGroups"]),
+    pairs,
+  };
 }

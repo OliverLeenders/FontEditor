@@ -14,6 +14,14 @@ import {
   setNodePoint,
   updateContour,
   glyphFileName,
+  EMPTY_KERNING,
+  groupKey,
+  kernIndex,
+  kernValue,
+  putGlyph,
+  setKern,
+  setKernGroup,
+  setKerning,
 } from "@fonteditor/font-model";
 import { describe, expect, it, vi } from "vitest";
 
@@ -23,6 +31,7 @@ import { MemoryFileStore } from "../src/file-store.js";
 import {
   FONT_INFO_PATH,
   JOURNAL_PATH,
+  KERNING_PATH,
   appendJournal,
   clearJournal,
   dirtyGlyphs,
@@ -612,5 +621,72 @@ describe("abandoning a save when the project is replaced", () => {
     autosave.commit(edited);
     await autosave.flush();
     expect(written).toEqual([[".notdef", "X"]]);
+  });
+});
+
+describe("kerning on disk", () => {
+  const kerned = () => {
+    let k = setKernGroup(EMPTY_KERNING, "first", "O", ["O", "Q"]);
+    k = setKernGroup(k, "second", "A", ["A"]);
+    k = setKern(k, groupKey("O"), groupKey("A"), -40);
+    k = setKern(k, "T", "A", -95);
+    return setKerning(fontDocument([glyph("O", { advance: 500 })], DEFAULT_FONT_INFO), k);
+  };
+
+  it("survives a save and load", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, kerned());
+
+    const loaded = await loadDocument(store);
+    const back = loaded.kind === "loaded" ? loaded.document.kerning : null;
+    expect(back).not.toBeNull();
+    expect(kernValue(kernIndex(back!), "Q", "A")).toBe(-40);
+    expect(kernValue(kernIndex(back!), "T", "A")).toBe(-95);
+  });
+
+  it("goes in its own file, as it does in a UFO", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, kerned());
+    expect(store.has(KERNING_PATH)).toBe(true);
+  });
+
+  it("is written by an incremental save only when it changed", async () => {
+    const store = new MemoryFileStore();
+    const document = kerned();
+    await saveDocument(store, document, null);
+
+    const before = store.snapshot()[KERNING_PATH];
+    // An edit that leaves kerning alone must not rewrite the table.
+    const moved = putGlyph(document, glyph("O", { advance: 600 }));
+    await saveDocument(store, moved, document);
+    expect(store.snapshot()[KERNING_PATH]).toBe(before);
+
+    const rekerned = setKerning(moved, setKern(moved.kerning, "T", "A", -50));
+    await saveDocument(store, rekerned, moved);
+    expect(store.snapshot()[KERNING_PATH]).not.toBe(before);
+  });
+
+  it("loads a project written before kerning existed", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, fontDocument([glyph("A", { advance: 500 })], DEFAULT_FONT_INFO));
+    await store.remove(KERNING_PATH);
+
+    const loaded = await loadDocument(store);
+    expect(loaded.kind).toBe("loaded");
+    expect(loaded.kind === "loaded" ? loaded.document.kerning : null).toEqual(EMPTY_KERNING);
+  });
+
+  it("drops a malformed pair rather than failing the load", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, kerned());
+    await store.write(
+      KERNING_PATH,
+      JSON.stringify({ pairs: { T: { A: "not a number", V: -20 } }, firstGroups: 7 }),
+    );
+
+    const loaded = await loadDocument(store);
+    const back = loaded.kind === "loaded" ? loaded.document.kerning : null;
+    expect(kernValue(kernIndex(back!), "T", "V")).toBe(-20);
+    expect(kernValue(kernIndex(back!), "T", "A")).toBe(0);
   });
 });

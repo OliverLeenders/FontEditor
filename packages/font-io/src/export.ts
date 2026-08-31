@@ -5,11 +5,14 @@ import {
   type Glyph,
   type IdFactory,
   counterIds,
+  kernIndex,
   resolveGlyphComponents,
   segments,
 } from "@fonteditor/font-model";
 
+import { buildKerningGpos } from "./gpos.js";
 import { opentype } from "./opentype.js";
+import { withTable } from "./sfnt.js";
 import type { OtGlyph, OtPath } from "opentype.js";
 
 /**
@@ -180,7 +183,20 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
     glyphs,
   });
 
-  return { bytes: font.toArrayBuffer(), warnings };
+  const bytes = font.toArrayBuffer();
+
+  // opentype.js writes no GPOS, so the kerning goes in afterwards. Glyph ids
+  // are positions in the list just built, which is the order they were added.
+  const order = new Map<string, number>();
+  glyphs.forEach((g, i) => {
+    if (g.name !== undefined) order.set(g.name, i);
+  });
+
+  const gpos = buildKerningGpos(kernIndex(document.kerning), (name) => order.get(name));
+  if (gpos.length === 0) return { bytes, warnings };
+
+  const spliced = withTable(new Uint8Array(bytes), "GPOS", gpos);
+  return { bytes: spliced.buffer.slice(0) as ArrayBuffer, warnings };
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   fontDocument,
   glyphFileName,
   setGlyphOrder,
+  setKerning,
 } from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
@@ -15,6 +16,8 @@ import {
   decodeGlyph,
   encodeFontInfo,
   encodeGlyph,
+  encodeKerning,
+  decodeKerning,
 } from "./schema.js";
 
 /**
@@ -33,6 +36,15 @@ import {
 export const FONT_INFO_PATH = "fontinfo.json";
 export const GLYPHS_PREFIX = "glyphs/";
 export const JOURNAL_PATH = "journal.ndjson";
+/**
+ * Kerning gets its own file, as it does in a UFO.
+ *
+ * It is font-level data like the index, but it grows with the square of the
+ * alphabet where the index grows with the alphabet — so folding it into
+ * fontinfo would mean rewriting every pair each time a glyph is renamed or
+ * reordered.
+ */
+export const KERNING_PATH = "kerning.json";
 
 export function glyphPath(name: string): string {
   return GLYPHS_PREFIX + glyphFileName(name);
@@ -108,6 +120,12 @@ export async function saveDocument(
   if (changed.length > 0 || orderChanged || infoChanged) {
     await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   }
+
+  // Reference equality again: kerning is persistent, so an untouched table is
+  // the same object and costs nothing to skip.
+  if (previous === null || previous.kerning !== document.kerning) {
+    await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
+  }
   return report;
 }
 
@@ -146,6 +164,7 @@ export async function replaceDocument(
   }
 
   await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
+  await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
   await clearJournal(store);
   return { written: keep.size, removed };
 }
@@ -264,6 +283,7 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
   // still shows up rather than vanishing.
   const rawInfo = await store.read(FONT_INFO_PATH);
   const { info, glyphOrder } = decodeFontInfo(parseOrNull(rawInfo));
+  const kerning = decodeKerning(parseOrNull(await store.read(KERNING_PATH)));
 
   const ordered: Glyph[] = [];
   const seen = new Set<string>();
@@ -278,9 +298,9 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
     if (!seen.has(name)) ordered.push(g);
   }
 
-  const document = setGlyphOrder(
-    fontDocument(ordered, info),
-    ordered.map((g) => g.name),
+  const document = setKerning(
+    setGlyphOrder(fontDocument(ordered, info), ordered.map((g) => g.name)),
+    kerning,
   );
   return { kind: "loaded", document, recovered, problems };
 }
