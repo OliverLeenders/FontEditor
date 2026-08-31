@@ -1,5 +1,5 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
-import { importFont as parseFontFile } from "@fonteditor/font-io";
+import { importFont as parseFontFile, importUfo, looksLikeUfo } from "@fonteditor/font-io";
 import {
   type EditSession,
   apply as applyToSession,
@@ -298,23 +298,57 @@ export class EditorStore {
   /**
    * Replace the document with a font read from a file.
    *
+   * Which reader is used comes from the file's name rather than from sniffing
+   * its bytes: a UFO is a zip and a zip could be anything, so the only honest
+   * way to know one is that it was offered as one. Being wrong is cheap — the
+   * UFO reader says what it could not find.
+   *
    * Deliberately *not* an undoable edit. Undo is for the shape you are drawing;
    * a single ctrl-Z that silently swapped the whole font back would be alarming
    * rather than useful, and the history it restored would describe glyphs that
    * are no longer open. The session starts again on the new font.
    */
-  async importFont(bytes: ArrayBuffer): Promise<{
+  async importFont(
+    bytes: ArrayBuffer,
+    fileName = "",
+  ): Promise<{
     family: string;
     glyphs: number;
     warnings: string[];
   }> {
-    const { document, warnings } = parseFontFile(bytes, randomIds());
-    await this.adoptDocument(document);
+    const read = looksLikeUfo(fileName)
+      ? await this.readUfo(bytes)
+      : (() => {
+          const parsed = parseFontFile(bytes, randomIds());
+          return {
+            document: parsed.document,
+            warnings: parsed.warnings.map((w) =>
+              w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
+            ),
+          };
+        })();
+
+    await this.adoptDocument(read.document);
+
+    const { info, glyphOrder } = read.document;
+    return {
+      family: `${info.familyName} ${info.styleName}`.trim(),
+      glyphs: glyphOrder.length,
+      warnings: read.warnings,
+    };
+  }
+
+  private async readUfo(
+    bytes: ArrayBuffer,
+  ): Promise<{ document: FontDocument; warnings: string[] }> {
+    const out = await importUfo(bytes, randomIds());
+    // A UFO that cannot be read is reported rather than half-adopted: there is
+    // no partial font to fall back on the way a damaged glyph has one.
+    if ("reason" in out) throw new Error(out.reason);
 
     return {
-      family: `${document.info.familyName} ${document.info.styleName}`.trim(),
-      glyphs: document.glyphOrder.length,
-      warnings: warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
+      document: out.document,
+      warnings: out.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
     };
   }
 

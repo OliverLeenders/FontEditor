@@ -487,10 +487,9 @@ describe("the mark on a locked handle", () => {
     expect(strokesNear(ctx, p.x, p.y).length).toBeGreaterThan(0);
   });
 
-  it("draws the bar square to the tether, not along it", () => {
-    // Along it is exactly where the tether already is, so a mark drawn there
-    // would be invisible. The out handle runs vertically, so its bar is level:
-    // its two ends share a y and differ in x.
+  it("draws the bar along the axis the handle is locked to", () => {
+    // The line the handle may slide on, drawn as a line. The out handle runs
+    // vertically, so its bar is upright: the two ends share an x.
     const ctx = render(base(withLock({ out: true })));
     const p = toScreen(VIEW, { x: 0, y: 120 });
     const at = ctx.indexWhere(
@@ -499,8 +498,12 @@ describe("the mark on a locked handle", () => {
         Math.abs((o.args[0] ?? NaN) - p.x) < 12 &&
         Math.abs((o.args[1] ?? NaN) - p.y) < 12,
     );
-    const from = ctx.all("moveTo").find((o) => Math.abs((o.args[1] ?? NaN) - p.y) < 12);
     expect(at).toBeGreaterThan(-1);
-    expect(from).toBeDefined();
+
+    const from = ctx.ops[at];
+    const to = ctx.ops[at + 1];
+    expect(to?.op).toBe("lineTo");
+    expect(Math.abs((to?.args[0] ?? NaN) - (from?.args[0] ?? NaN))).toBeLessThan(0.01);
+    expect(Math.abs((to?.args[1] ?? NaN) - (from?.args[1] ?? NaN))).toBeGreaterThan(1);
   });
 });

@@ -3,8 +3,15 @@ import { useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
 
-/** What a `.ttf`/`.otf` picker should offer, plus the web variants we can read. */
-const ACCEPT = ".ttf,.otf,.woff,font/ttf,font/otf,font/woff";
+/**
+ * What the picker offers: the binary formats, and a zipped UFO.
+ *
+ * `.zip` has to be in the list for a UFO to be selectable at all, which does
+ * mean the picker will show archives that are not fonts. The alternative is a
+ * second button for one format, and a wrong file is answered immediately by the
+ * reader rather than being a state anyone gets stuck in.
+ */
+const ACCEPT = ".ttf,.otf,.woff,.ufoz,.zip,font/ttf,font/otf,font/woff";
 
 type Status =
   | { readonly kind: "idle" }
@@ -35,7 +42,7 @@ export function OpenFont(): JSX.Element {
   const open = async (file: File): Promise<void> => {
     setStatus({ kind: "reading", name: file.name });
     try {
-      const result = await store.importFont(await file.arrayBuffer());
+      const result = await store.importFont(await file.arrayBuffer(), file.name);
       setStatus({
         kind: "done",
         family: result.family,

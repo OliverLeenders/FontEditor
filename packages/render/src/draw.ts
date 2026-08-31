@@ -307,28 +307,28 @@ export function drawHandles(ctx: Canvas2D, s: Scene): void {
 /**
  * The mark on a handle that is held to an axis.
  *
- * A short bar across the handle, square to the tether it is locked along — the
- * end-stop a dimension line wears, and it reads the same way here: this may
- * slide along the line it is on and nowhere else.
+ * A short bar through the handle, running along the axis it is locked to: the
+ * line the handle may slide on, drawn as a line. The half towards the anchor
+ * lies over the tether and adds nothing; the half beyond the handle is the mark,
+ * and reads as the axis carrying on past where the handle happens to sit.
  *
- * Across rather than along, because along is exactly where the tether already
- * is and a mark drawn there would be invisible. Drawn in the handle's own
- * colour, so a locked handle that is also selected still reads as selected.
+ * Drawn in the handle's own colour, so a locked handle that is also selected
+ * still reads as selected.
  */
 function drawLockBar(ctx: Canvas2D, s: Scene, anchor: Vec2, handle: Vec2): void {
   const dx = handle.x - anchor.x;
   const dy = handle.y - anchor.y;
   const reach = Math.hypot(dx, dy);
-  // A handle sitting on its anchor has no direction to be square to.
+  // A handle sitting on its anchor has no direction to run along.
   if (reach < 0.001) return;
 
-  const arm = s.metrics.handleRadius * 1.5;
-  const nx = (-dy / reach) * arm;
-  const ny = (dx / reach) * arm;
+  const arm = s.metrics.handleRadius * 1.8;
+  const ax = (dx / reach) * arm;
+  const ay = (dy / reach) * arm;
 
   ctx.beginPath();
-  ctx.moveTo(handle.x - nx, handle.y - ny);
-  ctx.lineTo(handle.x + nx, handle.y + ny);
+  ctx.moveTo(handle.x - ax, handle.y - ay);
+  ctx.lineTo(handle.x + ax, handle.y + ay);
   ctx.stroke();
 }
 

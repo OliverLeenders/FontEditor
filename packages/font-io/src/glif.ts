@@ -1,0 +1,280 @@
+import {
+  type Component,
+  type Contour,
+  type Glyph,
+  type IdFactory,
+  type Node,
+  component,
+  contour,
+  glyph,
+  node,
+} from "@fonteditor/font-model";
+import { IDENTITY_AFFINE, type Vec2 } from "@fonteditor/geometry";
+
+import { type XmlElement, childNamed, childrenNamed, parseXml } from "./xml.js";
+
+/**
+ * Reading a `.glif`: UFO's outline format, and the mirror of `glif()` beside it.
+ *
+ * The whole subtlety is the point list. UFO stores a contour as one flat cyclic
+ * list in which an on-curve point carries the type of the segment *arriving* at
+ * it, and that segment's control points sit immediately before it. So a control
+ * point belongs to the node after it or the node before it depending on which of
+ * the pair it is, and the list wraps — the closing segment's controls are at the
+ * end and pair with the first point.
+ *
+ * Going the other way means walking the list, gathering the run of off-curve
+ * points before each on-curve one, and handing the first of that run to the
+ * previous node's `out` and the last to this node's `in`.
+ */
+
+export type GlifWarning = {
+  readonly glyph: string | null;
+  readonly message: string;
+};
+
+type RawPoint = {
+  readonly pt: Vec2;
+  /** Absent for an off-curve control point. */
+  readonly type: string | null;
+  readonly smooth: boolean;
+};
+
+const number = (raw: string | undefined): number | null => {
+  if (raw === undefined) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * Parse one glif into a glyph.
+ *
+ * `null` only when the file is not a glif at all. Everything short of that is a
+ * warning and a glyph: a contour with a bad point is dropped and reported, and
+ * the rest of the glyph still opens. A font is worth more with one contour
+ * missing than not at all, and silence is what would make that a bad trade.
+ */
+export function parseGlif(
+  source: string,
+  ids: IdFactory,
+  warn: (message: string) => void,
+): Glyph | null {
+  const root = parseXml(source);
+  if (root === null || root.name !== "glyph") return null;
+
+  const name = root.attributes["name"] ?? "";
+  const advanceElement = childNamed(root, "advance");
+  const advance = advanceElement === null ? 0 : number(advanceElement.attributes["width"]) ?? 0;
+
+  const unicodes: number[] = [];
+  for (const u of childrenNamed(root, "unicode")) {
+    const hex = u.attributes["hex"];
+    if (hex === undefined) continue;
+    const code = Number.parseInt(hex, 16);
+    if (Number.isNaN(code)) warn(`ignored an unreadable unicode value "${hex}"`);
+    else unicodes.push(code);
+  }
+
+  const outline = childNamed(root, "outline");
+  const contours: Contour[] = [];
+  const components: Component[] = [];
+
+  if (outline !== null) {
+    for (const element of outline.children) {
+      if (!("name" in element)) continue;
+      if (element.name === "contour") {
+        const c = parseContour(element, ids, warn);
+        if (c !== null) contours.push(c);
+      } else if (element.name === "component") {
+        const placed = parseComponent(element, ids, warn);
+        if (placed !== null) components.push(placed);
+      }
+    }
+  }
+
+  return glyph(name, { unicodes, advance, contours, components });
+}
+
+function parseComponent(
+  element: XmlElement,
+  ids: IdFactory,
+  warn: (message: string) => void,
+): Component | null {
+  const base = element.attributes["base"];
+  if (base === undefined || base === "") {
+    warn("dropped a component that names no glyph");
+    return null;
+  }
+
+  return component(ids.component(), base, {
+    xScale: number(element.attributes["xScale"]) ?? IDENTITY_AFFINE.xScale,
+    xyScale: number(element.attributes["xyScale"]) ?? IDENTITY_AFFINE.xyScale,
+    yxScale: number(element.attributes["yxScale"]) ?? IDENTITY_AFFINE.yxScale,
+    yScale: number(element.attributes["yScale"]) ?? IDENTITY_AFFINE.yScale,
+    xOffset: number(element.attributes["xOffset"]) ?? IDENTITY_AFFINE.xOffset,
+    yOffset: number(element.attributes["yOffset"]) ?? IDENTITY_AFFINE.yOffset,
+  });
+}
+
+function parseContour(
+  element: XmlElement,
+  ids: IdFactory,
+  warn: (message: string) => void,
+): Contour | null {
+  const raw: RawPoint[] = [];
+  for (const p of childrenNamed(element, "point")) {
+    const x = number(p.attributes["x"]);
+    const y = number(p.attributes["y"]);
+    if (x === null || y === null) {
+      warn("dropped a contour with a point that has no position");
+      return null;
+    }
+    raw.push({
+      pt: { x, y },
+      type: p.attributes["type"] ?? null,
+      smooth: p.attributes["smooth"] === "yes",
+    });
+  }
+
+  if (raw.length === 0) return null;
+
+  // An outline of nothing but control points describes no curve at all.
+  if (!raw.some((p) => p.type !== null)) {
+    warn("dropped a contour with no on-curve points");
+    return null;
+  }
+
+  // A contour is open exactly when it begins with a move. Everything else wraps.
+  const closed = raw[0]?.type !== "move";
+  const points = expandQuadratics(raw, closed, warn);
+
+  return buildContour(points, closed, ids);
+}
+
+/**
+ * Turn quadratic segments into the cubics the model holds.
+ *
+ * The conversion itself is exact — a quadratic is a cubic whose controls sit two
+ * thirds of the way from each anchor toward the quadratic's own control — so
+ * nothing is approximated here. What has to be handled first is TrueType's habit
+ * of leaving on-curve points out: a run of several controls in a row implies an
+ * on-curve point midway between each neighbouring pair, and those are put back
+ * before the conversion.
+ */
+function expandQuadratics(
+  raw: readonly RawPoint[],
+  closed: boolean,
+  warn: (message: string) => void,
+): RawPoint[] {
+  if (!raw.some((p) => p.type === "qcurve")) return [...raw];
+  warn("converted quadratic curves to cubics");
+
+  const out: RawPoint[] = [];
+  const n = raw.length;
+
+  for (let i = 0; i < n; i++) {
+    const point = raw[i]!;
+    if (point.type !== "qcurve") {
+      out.push(point);
+      continue;
+    }
+
+    // Gather the controls of this segment: the run of off-curves before it.
+    const controls: Vec2[] = [];
+    for (let back = 1; back <= n; back++) {
+      const at = (i - back + n) % n;
+      const candidate = raw[at]!;
+      if (candidate.type !== null) break;
+      controls.unshift(candidate.pt);
+    }
+
+    // Those controls were already pushed as themselves; take them back off, the
+    // implied midpoints and the cubic controls go in their place.
+    out.length -= Math.min(controls.length, out.length);
+
+    const startIndex = (i - controls.length - 1 + n) % n;
+    let start = raw[startIndex]!.pt;
+
+    for (let k = 0; k < controls.length; k++) {
+      const q = controls[k]!;
+      const last = k === controls.length - 1;
+      const end = last ? point.pt : midpoint(q, controls[k + 1]!);
+
+      out.push({ pt: cubicControl(start, q), type: null, smooth: false });
+      out.push({ pt: cubicControl(end, q), type: null, smooth: false });
+      out.push(
+        last
+          ? { ...point, type: "curve" }
+          : { pt: end, type: "curve", smooth: true },
+      );
+      start = end;
+    }
+
+    if (controls.length === 0) out.push({ ...point, type: "line" });
+  }
+
+  // A closed quadratic contour can begin on an implied point; leaving the flag
+  // alone is right either way, and is why it is passed in but not changed.
+  void closed;
+  return out;
+}
+
+const midpoint = (a: Vec2, b: Vec2): Vec2 => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+
+/** The cubic control that reproduces a quadratic's, seen from one anchor. */
+const cubicControl = (anchor: Vec2, q: Vec2): Vec2 => ({
+  x: anchor.x + (2 / 3) * (q.x - anchor.x),
+  y: anchor.y + (2 / 3) * (q.y - anchor.y),
+});
+
+/**
+ * Walk the point list into nodes.
+ *
+ * Each on-curve point becomes a node. The off-curve run immediately before it
+ * belongs to the segment arriving there: its last member is this node's `in`,
+ * and its first is the previous node's `out`. A run of one is a half-handled
+ * curve, which the model represents natively — the missing control sits on its
+ * anchor, and that is a real shape rather than an error.
+ */
+function buildContour(points: readonly RawPoint[], closed: boolean, ids: IdFactory): Contour | null {
+  const onCurve = points.map((p, i) => ({ p, i })).filter(({ p }) => p.type !== null);
+  if (onCurve.length === 0) return null;
+
+  const handles = new Map<number, { in: Vec2 | null; out: Vec2 | null }>();
+  for (const { i } of onCurve) handles.set(i, { in: null, out: null });
+
+  const n = points.length;
+  for (let k = 0; k < onCurve.length; k++) {
+    const here = onCurve[k]!;
+    // An open contour's first point has no segment arriving at it.
+    if (!closed && k === 0) continue;
+
+    const controls: number[] = [];
+    for (let back = 1; back <= n; back++) {
+      const at = (here.i - back + n) % n;
+      if (points[at]!.type !== null) break;
+      controls.unshift(at);
+    }
+    if (controls.length === 0) continue;
+
+    const previous = onCurve[(k - 1 + onCurve.length) % onCurve.length]!;
+    const first = controls[0]!;
+    const last = controls[controls.length - 1]!;
+
+    // With one control the two ends would otherwise both claim it. It belongs to
+    // the arriving side, which is where UFO puts a lone control.
+    if (controls.length > 1) handles.get(previous.i)!.out = points[first]!.pt;
+    handles.get(here.i)!.in = points[last]!.pt;
+  }
+
+  const nodes: Node[] = onCurve.map(({ p, i }) => {
+    const h = handles.get(i)!;
+    return node(ids.node(), p.pt, {
+      type: p.smooth ? "smooth" : "corner",
+      in: h.in,
+      out: h.out,
+    });
+  });
+
+  return contour(ids.contour(), nodes, closed);
+}
