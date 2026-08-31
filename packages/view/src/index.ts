@@ -77,5 +77,19 @@ export {
   pickOf,
 } from "./hit.js";
 
-export type { Snapping } from "./snap.js";
-export { NO_SNAPPING, SNAP_PIXELS, snapDelta, snapPoint, toGrid } from "./snap.js";
+export type { SnapHold, SnapLine, SnapSource, Snapping } from "./snap.js";
+export {
+  NO_HOLD,
+  NO_SNAPPING,
+  SNAP_PIXELS,
+  SNAP_STAY_PIXELS,
+  SNAP_STICKINESS,
+  metricLine,
+  sameLine,
+  snapDelta,
+  snapPoint,
+  toGrid,
+} from "./snap.js";
+
+export type { AlignmentLines, AlignmentOptions } from "./alignment.js";
+export { alignmentLines } from "./alignment.js";

@@ -10,7 +10,13 @@ import {
 } from "@fonteditor/font-model";
 
 export type ToolId = "select" | "pen";
-import { type Selection, type SegmentRef, type ViewTransform, sameSegment } from "@fonteditor/view";
+import {
+  type Selection,
+  type SegmentRef,
+  type SnapHold,
+  type ViewTransform,
+  sameSegment,
+} from "@fonteditor/view";
 
 /**
  * What is happening between pointer down and pointer up.
@@ -32,6 +38,14 @@ export type Gesture =
       readonly items: Selection;
       readonly before: FontDocument;
       readonly moved: boolean;
+      /**
+       * The lines this drag is currently caught on.
+       *
+       * Carried on the gesture rather than beside it so its lifetime is the
+       * gesture's: there is no way to leave a stale hold behind, because when
+       * the gesture goes the hold goes with it.
+       */
+      readonly snapped: SnapHold;
     }
   | {
       readonly kind: "dragHandle";
@@ -42,6 +56,7 @@ export type Gesture =
       readonly breakSmooth: boolean;
       readonly before: FontDocument;
       readonly moved: boolean;
+      readonly snapped: SnapHold;
     }
   | {
       readonly kind: "dragTunniPoint";

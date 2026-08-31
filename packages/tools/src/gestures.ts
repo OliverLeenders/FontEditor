@@ -21,12 +21,17 @@ import {
   type Selection,
   type SelectionItem,
   type Snapping,
+  NO_HOLD,
   NO_SNAPPING,
   SNAP_PIXELS,
+  SNAP_STAY_PIXELS,
+  SNAP_STICKINESS,
   addItems,
+  alignmentLines,
   hasItem,
   itemForTarget,
   itemsInRect,
+  metricLine,
   screenTolerance,
   selectionPoints,
   snapDelta,
@@ -135,6 +140,7 @@ export function startItemDrag(
           breakSmooth: input.modifiers.alt,
           before: state.document,
           moved: false,
+          snapped: NO_HOLD,
         }
       : {
           kind: "dragSelection",
@@ -142,6 +148,7 @@ export function startItemDrag(
           items: selection,
           before: state.document,
           moved: false,
+          snapped: NO_HOLD,
         };
 
   return result({ ...state, selection, focusedSegment, gesture }, [begin(label)]);
@@ -229,6 +236,7 @@ export function selectSegmentEnds(
         items: selection,
         before: state.document,
         moved: false,
+        snapped: NO_HOLD,
       },
     },
     [begin("Move segment")],
@@ -310,28 +318,49 @@ function rectOf(a: Vec2, b: Vec2) {
 /**
  * Where drags are allowed to land, for the glyph being edited.
  *
- * The lines are exactly the ones the canvas already draws — the five metric
- * lines, the origin and the advance. That is the rule this follows and expects
- * to keep following as more lines arrive: a drag may only catch on something
- * visible. A pull towards an invisible line is indistinguishable from a bug.
+ * The metric lines are exactly the ones the canvas already draws — the five of
+ * them, the origin and the advance — and that is the rule this follows: a drag
+ * may only catch on something visible. A pull towards an invisible line is
+ * indistinguishable from a bug.
  *
- * The tolerance is converted from screen pixels, so the catch feels the same at
- * every zoom instead of covering half the em at a distance. Holding ctrl turns
- * the whole thing off, including the rounding, for the times when a coordinate
- * has to be exactly what the cursor says.
+ * Which is why the alignment lines are off unless a caller asks for them. They
+ * are not drawn yet, and until they are, turning them on would be adding exactly
+ * that bug.
+ *
+ * The tolerances are converted from screen pixels, so the catch feels the same
+ * at every zoom instead of covering half the em at a distance. Holding ctrl
+ * turns the whole thing off, including the rounding, for the times when a
+ * coordinate has to be exactly what the cursor says.
  */
 function snappingFor(
   state: EditorState,
   input: PointerInput,
   options: GestureOptions,
+  started: Glyph,
+  moving: Selection,
 ): Snapping {
   if (options.snap === false || input.modifiers.ctrl) return NO_SNAPPING;
 
   const glyph = currentGlyph(state);
+  const alignment = alignmentLines(started, moving, {
+    extremes: options.snapExtremes ?? false,
+    neighbours: options.snapNeighbours ?? false,
+  });
+
+  const pixels = options.snapPixels ?? SNAP_PIXELS;
   return {
-    xs: glyph === null ? [0] : [0, glyph.advance],
-    ys: metricLines(state.document.info).map((line) => line.y),
-    tolerance: screenTolerance(state.view, options.snapPixels ?? SNAP_PIXELS),
+    // Font lines first: where a stem edge happens to sit exactly on the cap
+    // height, catching "the cap height" is the more useful account of what
+    // happened, and `catchLine` breaks a tie by the order it was given.
+    xs: [
+      metricLine(0, "origin"),
+      ...(glyph === null ? [] : [metricLine(glyph.advance, "advance")]),
+      ...alignment.xs,
+    ],
+    ys: [...metricLines(state.document.info).map((line) => metricLine(line.y)), ...alignment.ys],
+    enter: screenTolerance(state.view, pixels),
+    stay: screenTolerance(state.view, options.snapStayPixels ?? SNAP_STAY_PIXELS),
+    stickiness: options.snapStickiness ?? SNAP_STICKINESS,
     grid: 1,
   };
 }
@@ -345,6 +374,24 @@ export type GestureOptions = {
   readonly snap?: boolean;
   /** Catch radius in screen pixels. */
   readonly snapPixels?: number;
+  /** How far a caught line may stray before it lets go, in screen pixels. */
+  readonly snapStayPixels?: number;
+  /** How much nearer a rival line must be to take a caught one's place. */
+  readonly snapStickiness?: number;
+  /**
+   * Also catch on the points where the outline turns — stem edges, overshoot
+   * tops, the point across a counter.
+   *
+   * Off until these lines are drawn. See {@link snappingFor}.
+   */
+  readonly snapExtremes?: boolean;
+  /**
+   * Also catch on the nodes either side of what is being dragged, which is how a
+   * segment is made exactly upright or exactly level.
+   *
+   * Off until these lines are drawn, for the same reason.
+   */
+  readonly snapNeighbours?: boolean;
 };
 
 /**
@@ -360,7 +407,7 @@ type Continuations = {
     gesture: Extract<Gesture, { kind: K }>,
     input: PointerInput,
     delta: Vec2,
-    snapping: Snapping,
+    options: GestureOptions,
   ) => EditorState;
 };
 
@@ -368,37 +415,50 @@ type Continuations = {
 const budged = (delta: Vec2): boolean => delta.x !== 0 || delta.y !== 0;
 
 const CONTINUE: Continuations = {
-  dragSelection: (state, gesture, _input, delta, snapping) => {
+  dragSelection: (state, gesture, input, delta, options) => {
     // Measured against the glyph as it was when the drag began: the offsets are
     // from those positions, so snapping has to ask where they started rather
-    // than where the last frame left them.
+    // than where the last frame left them — and the lines to catch on have to be
+    // where they started too, or the drag would tow its own candidates along.
     const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
-    const offset = snapDelta(selectionPoints(started, gesture.items), delta, snapping);
+    const snapping = snappingFor(state, input, options, started, gesture.items);
+    const snapped = snapDelta(
+      selectionPoints(started, gesture.items),
+      delta,
+      snapping,
+      gesture.snapped,
+    );
 
     const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
-      translateSelection(g, gesture.items, offset),
+      translateSelection(g, gesture.items, snapped.delta),
     );
     return {
       ...state,
       document: document ?? gesture.before,
-      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+      gesture: { ...gesture, moved: gesture.moved || budged(delta), snapped: snapped.hold },
     };
   },
 
-  dragHandle: (state, gesture, input, delta, snapping) => {
+  dragHandle: (state, gesture, input, delta, options) => {
+    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const moving: Selection = [
+      { contourId: gesture.contourId, nodeId: gesture.nodeId, part: gesture.part },
+    ];
+    const snapping = snappingFor(state, input, options, started, moving);
+
     // A handle is placed at the cursor rather than offset from where it was, so
     // it is the position that snaps. A smooth node then swings its other handle
     // to match, which is the point: the snapped side is the one being aimed.
-    const at = snapPoint(input.point, snapping);
+    const snapped = snapPoint(input.point, snapping, gesture.snapped);
     const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
       updateContour(g, gesture.contourId, (c) =>
-        setHandle(c, gesture.nodeId, gesture.part, at, gesture.breakSmooth),
+        setHandle(c, gesture.nodeId, gesture.part, snapped.point, gesture.breakSmooth),
       ),
     );
     return {
       ...state,
       document: document ?? gesture.before,
-      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+      gesture: { ...gesture, moved: gesture.moved || budged(delta), snapped: snapped.hold },
     };
   },
 
@@ -408,7 +468,11 @@ const CONTINUE: Continuations = {
   dragTunniLine: (state, gesture, input, delta) =>
     continueTunni(state, gesture, input, delta, moveSegmentTunniLine),
 
-  dragMargin: (state, gesture, _input, delta, snapping) => {
+  dragMargin: (state, gesture, input, delta, options) => {
+    // Only the grid applies: an advance is a measurement, not a position, and
+    // there is nothing on that axis for it to line up with yet.
+    const snapping = snappingFor(state, input, options, EMPTY_GLYPH, []);
+
     // The origin line cannot itself move — it *is* x = 0. Dragging it means
     // "put this much space before the glyph", so the outline follows the cursor
     // and the advance grows with it, holding the right sidebearing. The advance
@@ -489,13 +553,7 @@ export function continueGesture(
     g: Gesture,
     i: PointerInput,
     d: Vec2,
-    snapping: Snapping,
+    o: GestureOptions,
   ) => EditorState;
-  return carry(
-    { ...state, cursor: input.point },
-    gesture,
-    input,
-    delta,
-    snappingFor(state, input, options),
-  );
+  return carry({ ...state, cursor: input.point }, gesture, input, delta, options);
 }
