@@ -1,6 +1,12 @@
 /// <reference lib="webworker" />
 
-import { decodeFontInfo, decodeGlyph, encodeFontInfo, encodeGlyph } from "./schema.js";
+import {
+  decodeFontInfo,
+  decodeGlyph,
+  encodeFontInfo,
+  encodeGlyph,
+  encodeKerning,
+} from "./schema.js";
 import { type Glyph, fontDocument, orderedGlyphs, setGlyphOrder } from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
@@ -8,6 +14,7 @@ import { OpfsFileStore } from "./opfs.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import {
   FONT_INFO_PATH,
+  KERNING_PATH,
   appendJournal,
   clearJournal,
   glyphPath,
@@ -71,6 +78,7 @@ async function run(request: StorageRequest): Promise<unknown> {
         const payload: LoadedPayload = {
           glyphs: [],
           info: null,
+          kerning: null,
           recovered: false,
           problems: [],
         };
@@ -79,6 +87,7 @@ async function run(request: StorageRequest): Promise<unknown> {
       const payload: LoadedPayload = {
         glyphs: orderedGlyphs(result.document).map(encodeGlyph),
         info: encodeFontInfo(result.document),
+        kerning: encodeKerning(result.document.kerning),
         recovered: result.recovered,
         problems: result.problems,
       };
@@ -118,6 +127,10 @@ async function run(request: StorageRequest): Promise<unknown> {
       const report = await replaceDocument(required(), document);
       return report;
     }
+
+    case "saveKerning":
+      await required().write(KERNING_PATH, JSON.stringify(request.kerning));
+      return null;
 
     case "saveFontInfo":
       await required().write(FONT_INFO_PATH, JSON.stringify(request.info));

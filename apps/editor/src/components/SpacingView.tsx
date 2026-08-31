@@ -1,4 +1,4 @@
-import { nudgeSidebearing } from "@fonteditor/tools";
+import { breakOutKern, kerningFor, nudgeKern, nudgeSidebearing } from "@fonteditor/tools";
 import { CanvasSurface, type RunScene, drawRun } from "@fonteditor/render";
 import { sidebearings } from "@fonteditor/font-model";
 import { type ViewTransform, glyphAtX, layoutRun, occurrencesOf } from "@fonteditor/view";
@@ -58,6 +58,7 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
   const document = useStoreValue((s) => s.session.editor.document);
   const text = useStoreValue((s) => s.spacingText);
   const size = useStoreValue((s) => s.spacingSize);
+  const mode = useStoreValue((s) => s.spacingMode);
   const [selected, setSelected] = useState<number | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -144,6 +145,19 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
     store.applyTool(nudgeSidebearing(store.editor, selectedName, side, delta));
   };
 
+  // In kern mode the selection means the gap *before* the selected letter, so
+  // the pair is it and the one preceding it.
+  const previousName = selected === null || selected === 0 ? null : (run.glyphs[selected - 1]?.name ?? null);
+  const pair =
+    previousName === null || selectedName === null
+      ? null
+      : kerningFor(store.editor, previousName, selectedName);
+
+  const kern = (delta: number): void => {
+    if (previousName === null || selectedName === null) return;
+    store.applyTool(nudgeKern(store.editor, previousName, selectedName, delta));
+  };
+
   const selectedGlyph = selectedName === null ? undefined : document.glyphs[selectedName];
   const bearings = selectedGlyph === undefined ? null : sidebearings(selectedGlyph);
 
@@ -158,6 +172,25 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
           spellCheck={false}
           onChange={(event) => store.setSpacingText(event.target.value)}
         />
+        {/* Two exclusive modes rather than a modifier key: adjusting a letter's
+            own space and adjusting the gap before it are different jobs, and
+            which one the arrows are doing should be visible, not remembered. */}
+        <div className={styles.modes} role="group" aria-label="What the arrows adjust">
+          <button
+            type="button"
+            aria-pressed={mode === "space"}
+            onClick={() => store.setSpacingMode("space")}
+          >
+            Space
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "kern"}
+            onClick={() => store.setSpacingMode("kern")}
+          >
+            Kern
+          </button>
+        </div>
         <label className={styles.sizeLabel}>
           Size
           <input
@@ -187,7 +220,9 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
           if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
             event.preventDefault();
             if (selectedName === null) return;
-            nudge(side, event.key === "ArrowRight" ? step : -step);
+            const amount = event.key === "ArrowRight" ? step : -step;
+            if (mode === "kern") kern(amount);
+            else nudge(side, amount);
             return;
           }
           // Tab would leave the stage, so stepping through letters gets its own
@@ -216,9 +251,47 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
       <div className={styles.readout}>
         {selectedName === null ? (
           <span className={styles.hint}>
-            Click a letter to space it &middot; arrows adjust the left side, alt the right,
-            shift by ten &middot; double-click to draw it
+            Click a letter &middot; arrows adjust, shift by ten &middot; alt for the right side
+            &middot; double-click to draw it
           </span>
+        ) : mode === "kern" ? (
+          <>
+            {previousName === null ? (
+              <span className={styles.hint}>
+                Nothing precedes this letter, so there is no pair to kern.
+              </span>
+            ) : (
+              <>
+                <span className={styles.name}>
+                  {previousName} {selectedName}
+                </span>
+                <Value label="Kern" value={pair?.value ?? 0} />
+                {/* Which rule applied, because adjusting a class moves far more
+                    than the two letters in front of you. */}
+                {pair === null ? (
+                  <span className={styles.hint}>no pair yet</span>
+                ) : pair.grouped ? (
+                  <>
+                    <span className={styles.hint}>
+                      from {pair.first} {pair.second}
+                    </span>
+                    <button
+                      type="button"
+                      className={styles.breakOut}
+                      title="Kern these two on their own, leaving the group alone"
+                      onClick={() =>
+                        store.applyTool(breakOutKern(store.editor, previousName, selectedName))
+                      }
+                    >
+                      Kern separately
+                    </button>
+                  </>
+                ) : (
+                  <span className={styles.hint}>this pair only</span>
+                )}
+              </>
+            )}
+          </>
         ) : (
           <>
             <span className={styles.name}>{selectedName}</span>

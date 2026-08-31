@@ -5,6 +5,11 @@ import { opentype } from "./opentype.js";
 import type { Affine } from "@fonteditor/geometry";
 
 import type { PathCommand } from "./commands.js";
+import {
+  type SourceKerning,
+  kerningFromGpos,
+  kerningFromKernTable,
+} from "./readkern.js";
 
 /**
  * The only file that knows which parser we use.
@@ -47,6 +52,7 @@ export type SourceFont = {
   /** `truetype` or `cff` — recorded for diagnostics, not acted on. */
   readonly outlines: string;
   readonly glyphs: readonly SourceGlyph[];
+  readonly kerning: SourceKerning;
 };
 
 export class FontParseError extends Error {
@@ -89,6 +95,19 @@ function toCommand(c: OtCommand): PathCommand | null {
     default:
       return null;
   }
+}
+
+/**
+ * Kerning, from whichever table has it.
+ *
+ * GPOS first and the legacy table only as a fallback, because a font carrying
+ * both means the GPOS one — that is what shapers do, and disagreeing would
+ * import kerning the font does not actually apply.
+ */
+function readKerning(font: OtFont): SourceKerning {
+  const fromGpos = kerningFromGpos(font.tables.gpos);
+  if (fromGpos.pairs.length > 0) return fromGpos;
+  return kerningFromKernTable(font.kerningPairs);
 }
 
 function readGlyphs(font: OtFont): SourceGlyph[] {
@@ -174,5 +193,6 @@ export function parseFont(bytes: ArrayBuffer): SourceFont {
     capHeight: os2?.sCapHeight ?? null,
     outlines: font.outlinesFormat,
     glyphs: readGlyphs(font),
+    kerning: readKerning(font),
   };
 }

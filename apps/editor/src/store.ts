@@ -87,6 +87,8 @@ export type StoreState = {
    */
   readonly spacingText: string;
   readonly spacingSize: number;
+  /** Whether the spacing view's arrows adjust a glyph or the gap before it. */
+  readonly spacingMode: "space" | "kern";
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
@@ -129,6 +131,7 @@ export class EditorStore {
       autoHideHandles: true,
       spacingText: "nonno",
       spacingSize: 128,
+      spacingMode: "space",
       previewing: false,
       inspector: loadInspector(),
       viewport: { width: 0, height: 0 },
@@ -153,6 +156,11 @@ export class EditorStore {
         if (!this.writable) return;
         await this.storageClient?.saveGlyphs(dirtyGlyphs(previous, document));
         await this.storageClient?.saveFontInfo(document);
+        // Only when it moved: the table is persistent, so this is exact, and it
+        // can be large enough that rewriting it on every stroke would show.
+        if (previous === null || previous.kerning !== document.kerning) {
+          await this.storageClient?.saveKerning(document);
+        }
       },
       saved: () => {
         void this.storageClient?.clearJournal();
@@ -437,6 +445,10 @@ export class EditorStore {
 
   setSpacingText(spacingText: string): void {
     this.patch({ spacingText });
+  }
+
+  setSpacingMode(spacingMode: "space" | "kern"): void {
+    if (spacingMode !== this.state.spacingMode) this.patch({ spacingMode });
   }
 
   setSpacingSize(spacingSize: number): void {

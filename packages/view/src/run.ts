@@ -1,5 +1,5 @@
 import type { FontDocument, Glyph, GlyphName } from "@fonteditor/font-model";
-import { glyphsForString } from "@fonteditor/font-model";
+import { glyphsForString, kernIndex, kernValue } from "@fonteditor/font-model";
 
 /**
  * One glyph placed in a line of text.
@@ -15,6 +15,8 @@ export type PlacedGlyph = {
   /** Position in the run, which is not the position in the text: see below. */
   readonly index: number;
   readonly x: number;
+  /** The kern applied before this glyph. Zero for the first, and for no pair. */
+  readonly kern: number;
 };
 
 export type GlyphRun = {
@@ -26,11 +28,11 @@ export type GlyphRun = {
 export const EMPTY_RUN: GlyphRun = { glyphs: [], width: 0 };
 
 /**
- * Lay a string out as a run of glyphs, advance by advance.
+ * Lay a string out as a run of glyphs, advance by advance, kerning included.
  *
- * No kerning, because there is none in the model yet. When there is, it applies
- * here and nowhere else — which is the reason this is a function over a document
- * rather than something the spacing view works out as it draws.
+ * Kerning applies here and nowhere else, which is why this takes a document
+ * rather than a list of glyphs: a pair is a fact about the font, and the view
+ * that draws the line has no business working it out.
  *
  * Characters the font has no glyph for are skipped rather than substituted.
  * Reserving a notdef box would be the typographically correct thing for a proof,
@@ -41,12 +43,21 @@ export const EMPTY_RUN: GlyphRun = { glyphs: [], width: 0 };
  */
 export function layoutRun(document: FontDocument, text: string): GlyphRun {
   const glyphs: PlacedGlyph[] = [];
+  const index = kernIndex(document.kerning);
   let x = 0;
+  let previous: string | null = null;
 
   for (const glyph of glyphsForString(document, text)) {
     if (glyph === null) continue;
-    glyphs.push({ glyph, name: glyph.name, index: glyphs.length, x });
+
+    // The kern goes before the glyph it precedes, so a pair moves the second
+    // letter rather than stretching the first one's advance.
+    const kern = previous === null ? 0 : kernValue(index, previous, glyph.name);
+    x += kern;
+
+    glyphs.push({ glyph, name: glyph.name, index: glyphs.length, x, kern });
     x += glyph.advance;
+    previous = glyph.name;
   }
 
   return { glyphs, width: x };

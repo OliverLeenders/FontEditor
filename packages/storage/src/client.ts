@@ -1,8 +1,15 @@
 import type { FontDocument, Glyph } from "@fonteditor/font-model";
-import { fontDocument, setGlyphOrder } from "@fonteditor/font-model";
+import { fontDocument, setGlyphOrder, setKerning } from "@fonteditor/font-model";
 
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
-import { decodeFontInfo, decodeGlyph, encodeFontInfo, encodeGlyph } from "./schema.js";
+import {
+  decodeFontInfo,
+  decodeGlyph,
+  decodeKerning,
+  encodeFontInfo,
+  encodeGlyph,
+  encodeKerning,
+} from "./schema.js";
 
 /**
  * `Omit<StorageRequest, "id">` looks right and is not: applied to a union, Omit
@@ -72,7 +79,10 @@ export class StorageClient {
     if (glyphs.length === 0) return { kind: "empty" };
 
     const { info } = decodeFontInfo(payload.info);
-    const document = setGlyphOrder(fontDocument(glyphs, info), glyphs.map((g) => g.name));
+    const document = setKerning(
+      setGlyphOrder(fontDocument(glyphs, info), glyphs.map((g) => g.name)),
+      decodeKerning(payload.kerning),
+    );
 
     return { kind: "loaded", document, recovered: payload.recovered, problems };
   }
@@ -99,6 +109,10 @@ export class StorageClient {
       info: encodeFontInfo(document),
     });
     return result as { written: number; removed: number };
+  }
+
+  async saveKerning(document: FontDocument): Promise<void> {
+    await this.send({ kind: "saveKerning", kerning: encodeKerning(document.kerning) });
   }
 
   async saveFontInfo(document: FontDocument): Promise<void> {

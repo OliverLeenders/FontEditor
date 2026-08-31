@@ -2,6 +2,7 @@ import { type Vec2, project } from "@fonteditor/geometry";
 import {
   type ComponentId,
   type ComponentSource,
+  type KernMatch,
   type ContourId,
   type GlyphName,
   type IdFactory,
@@ -16,6 +17,8 @@ import {
   extendSegmentHandles,
   insertNodeOnSegment,
   isHalfHandled,
+  kernIndex,
+  kernMatch,
   makeSegmentCurve,
   movedComponent,
   makeSegmentLine,
@@ -29,6 +32,8 @@ import {
   segmentAt,
   segmentCubic,
   segmentIndexForHandle,
+  setKern,
+  setKerning,
   setLeftSidebearing,
   setRightSidebearing,
   sidebearings,
@@ -413,6 +418,74 @@ export function moveComponentBy(
     updateGlyphComponent(g, id, (c) => movedComponent(c, dx, dy)),
   );
   return done(state, document === null ? null : { ...state, document }, "Move component");
+}
+
+// ---------------------------------------------------------------------------
+// kerning
+// ---------------------------------------------------------------------------
+
+/**
+ * Change the kerning between two glyphs by a step.
+ *
+ * Written to whichever pair already governs them, so nudging a pair that is
+ * kerned by a class adjusts the class — which is what a designer means by
+ * "these are too far apart" when the two letters are examples of a category.
+ * Making it an exception instead is a deliberate act, and a separate one.
+ */
+export function nudgeKern(
+  state: EditorState,
+  left: GlyphName,
+  right: GlyphName,
+  delta: number,
+): ToolResult {
+  if (delta === 0) return result(state);
+
+  const index = kernIndex(state.document.kerning);
+  const existing = kernMatch(index, left, right);
+  const first = existing?.first ?? left;
+  const second = existing?.second ?? right;
+  const value = (existing?.value ?? 0) + delta;
+
+  const kerning = setKern(state.document.kerning, first, second, value);
+  if (kerning === state.document.kerning) return result(state);
+
+  return result({ ...state, document: setKerning(state.document, kerning) }, [
+    begin(`Kern ${first} ${second}`),
+    commit,
+  ]);
+}
+
+/**
+ * Pin a pair at its current value, breaking it out of the class governing it.
+ *
+ * The way to correct one pair without disturbing the category it belongs to.
+ * Does nothing when the pair is already its own, since there is nothing to
+ * break out of.
+ */
+export function breakOutKern(
+  state: EditorState,
+  left: GlyphName,
+  right: GlyphName,
+): ToolResult {
+  const index = kernIndex(state.document.kerning);
+  const existing = kernMatch(index, left, right);
+  if (existing === null || !existing.grouped) return result(state);
+
+  const kerning = setKern(state.document.kerning, left, right, existing.value);
+  return done(
+    state,
+    { ...state, document: setKerning(state.document, kerning) },
+    `Kern ${left} ${right} separately`,
+  );
+}
+
+/** What governs a pair right now, for an interface that has to explain itself. */
+export function kerningFor(
+  state: EditorState,
+  left: GlyphName,
+  right: GlyphName,
+): KernMatch | null {
+  return kernMatch(kernIndex(state.document.kerning), left, right);
 }
 
 // ---------------------------------------------------------------------------

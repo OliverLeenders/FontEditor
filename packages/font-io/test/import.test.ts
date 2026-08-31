@@ -3,6 +3,7 @@ import { opentype } from "../src/opentype.js";
 import { describe, expect, it } from "vitest";
 
 import { documentFrom, importFont } from "../src/import.js";
+import { NO_KERNING } from "../src/readkern.js";
 import { type SourceFont, FontParseError } from "../src/source.js";
 
 /**
@@ -89,6 +90,7 @@ describe("documentFrom", () => {
     capHeight: null,
     outlines: "truetype",
     glyphs: [],
+    kerning: NO_KERNING,
   };
 
   const plain = (name: string | null, unicodes: number[] = []) => ({

@@ -1,4 +1,5 @@
-import type { StoredFontInfo, StoredGlyph } from "./schema.js";
+import type {
+  StoredKerning, StoredFontInfo, StoredGlyph } from "./schema.js";
 
 /**
  * What the main thread and the storage worker say to each other.
@@ -16,6 +17,7 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "load" }
   | { readonly id: number; readonly kind: "saveGlyphs"; readonly glyphs: readonly StoredGlyph[] }
   | { readonly id: number; readonly kind: "saveFontInfo"; readonly info: StoredFontInfo }
+  | { readonly id: number; readonly kind: "saveKerning"; readonly kerning: StoredKerning }
   /**
    * Replace the whole project in one round trip. What an import sends: writing
    * a few thousand glyphs as separate messages would serialise and post each
@@ -34,6 +36,14 @@ export type StorageRequest =
 export type LoadedPayload = {
   readonly glyphs: readonly StoredGlyph[];
   readonly info: StoredFontInfo | null;
+  /**
+   * Carried across explicitly, like everything else.
+   *
+   * The worker reads it from disk, but a document does not survive being posted
+   * between threads — only plain data does — so anything left out here is
+   * silently dropped on the way back.
+   */
+  readonly kerning: StoredKerning | null;
   readonly recovered: boolean;
   readonly problems: readonly string[];
 };

@@ -1,6 +1,5 @@
 import type { FontDocument } from "@fonteditor/font-model";
 
-import { dirtyGlyphs } from "./project.js";
 
 /**
  * Decides *when* to write, having been told *what* changed.
@@ -65,7 +64,7 @@ export class Autosave {
 
   /** True when there are committed edits not yet written. */
   get dirty(): boolean {
-    return this.queued !== null && dirtyGlyphs(this.lastSaved, this.queued).length > 0;
+    return this.queued !== null && this.queued !== this.lastSaved;
   }
 
   /**
@@ -76,7 +75,11 @@ export class Autosave {
    * actually happened.
    */
   commit(document: FontDocument): void {
-    if (dirtyGlyphs(this.lastSaved, document).length === 0) return;
+    // Reference equality, not a glyph diff. The document is persistent, so any
+    // change at all — a glyph, the metrics, the order, the kerning — produces a
+    // new object, and asking only about glyphs meant a kerning edit scheduled
+    // no save whatsoever.
+    if (this.lastSaved === document) return;
 
     this.queued = document;
     this.state = "pending";
@@ -101,7 +104,7 @@ export class Autosave {
 
     const document = this.queued;
     if (document === null || this.inFlight) return;
-    if (dirtyGlyphs(this.lastSaved, document).length === 0) {
+    if (this.lastSaved === document) {
       this.state = "idle";
       return;
     }

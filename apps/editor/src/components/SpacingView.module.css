@@ -87,3 +87,40 @@
 }
 
 .hint { color: var(--ink-3, var(--ink-2)); }
+
+/* Two exclusive modes, so they read as one control rather than two buttons. */
+.modes {
+  display: flex;
+  flex: none;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.modes button {
+  padding: .25rem .6rem;
+  border: 0;
+  background: var(--canvas);
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: .76rem;
+}
+.modes button + button { border-left: 1px solid var(--rule-strong); }
+.modes button:hover { color: var(--ink); }
+.modes button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.breakOut {
+  padding: .1rem .45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: .72rem;
+}
+.breakOut:hover { color: var(--ink); border-color: var(--accent); }

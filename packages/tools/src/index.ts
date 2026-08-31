@@ -35,6 +35,7 @@ export {
 
 export {
   addComponent,
+  breakOutKern,
   createGlyphs,
   deleteGlyph,
   extractHandles,
@@ -45,6 +46,8 @@ export {
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
+  kerningFor,
+  nudgeKern,
   moveComponentBy,
   removeComponent,
   nudgeSidebearing,

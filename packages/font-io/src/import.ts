@@ -1,15 +1,22 @@
 import {
   type Component,
   type FontDocument,
+  type Kerning,
   type FontInfo,
   type Glyph,
   type IdFactory,
   fontDocument,
+  EMPTY_KERNING,
   component,
   glyph,
+  groupKey,
+  setKern,
+  setKernGroup,
+  setKerning,
 } from "@fonteditor/font-model";
 
 import { contoursFromCommands } from "./commands.js";
+import { type SourceKernSide, type SourceKerning } from "./readkern.js";
 import { type SourceFont, type SourceGlyph, parseFont } from "./source.js";
 
 /**
@@ -145,8 +152,58 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
     warnings.push({ glyph: null, message: "This font contains no glyphs." });
   }
 
-  return { document: fontDocument(glyphs, info), warnings };
+  return {
+    document: setKerning(fontDocument(glyphs, info), kerningFrom(source.kerning, names)),
+    warnings,
+  };
 }
+
+/**
+ * Turn the file's kerning, which is in glyph indices, into the model's, which is
+ * in names.
+ *
+ * Groups arrive as anonymous classes and are given numbered names. A font
+ * usually names its kerning classes something meaningful, but that naming lives
+ * in the source the font was built from and not in the font itself, so there is
+ * nothing to recover.
+ */
+function kerningFrom(source: SourceKerning, names: readonly string[]): Kerning {
+  if (source.pairs.length === 0) return EMPTY_KERNING;
+
+  const glyphOf = (index: number): string | undefined => names[index];
+  const named = (glyphs: readonly number[]): string[] =>
+    glyphs.map(glyphOf).filter((n): n is string => n !== undefined);
+
+  let kerning = EMPTY_KERNING;
+  const firstNames: string[] = [];
+  const secondNames: string[] = [];
+
+  source.firstGroups.forEach((glyphs, i) => {
+    const name = `kern1.${String(i + 1)}`;
+    firstNames.push(name);
+    kerning = setKernGroup(kerning, "first", name, named(glyphs));
+  });
+  source.secondGroups.forEach((glyphs, i) => {
+    const name = `kern2.${String(i + 1)}`;
+    secondNames.push(name);
+    kerning = setKernGroup(kerning, "second", name, named(glyphs));
+  });
+
+  const key = (side: SourceKernSide, group: readonly string[]): string | undefined =>
+    side.kind === "glyph" ? glyphOf(side.glyph) : groupKeyOf(group[side.group]);
+
+  for (const pair of source.pairs) {
+    const first = key(pair.first, firstNames);
+    const second = key(pair.second, secondNames);
+    if (first === undefined || second === undefined) continue;
+    kerning = setKern(kerning, first, second, pair.value);
+  }
+
+  return kerning;
+}
+
+const groupKeyOf = (name: string | undefined): string | undefined =>
+  name === undefined ? undefined : groupKey(name);
 
 /**
  * Read a font binary into an editable document.

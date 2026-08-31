@@ -4,6 +4,8 @@ import {
   type FontDocument,
   type Glyph,
   glyphFileName,
+  groupNameOf,
+  isGroupKey,
   segments,
 } from "@fonteditor/font-model";
 
@@ -57,6 +59,23 @@ function dict(pairs: ReadonlyArray<readonly [string, string]>): string {
 }
 
 const str = (value: string): string => `<string>${escapeXml(value)}</string>`;
+
+function array(items: readonly string[]): string {
+  return ["<array>", ...items.map((i) => `\t${i}`), "</array>"].join("\n");
+}
+
+/**
+ * A pair's side, in the name UFO uses.
+ *
+ * Groups are marked by a prefix in the model and by a *namespaced name* in the
+ * file, and the namespace carries the side — so the conversion is not just a
+ * different sigil, it is where the side stops being structural and becomes part
+ * of the name.
+ */
+function ufoSide(key: string, side: "first" | "second"): string {
+  if (!isGroupKey(key)) return key;
+  return `public.kern${side === "first" ? "1" : "2"}.${groupNameOf(key)}`;
+}
 const int = (value: number): string => `<integer>${String(round(value))}</integer>`;
 
 // ---------------------------------------------------------------------------
@@ -252,6 +271,31 @@ export function ufoFiles(document: FontDocument): ZipEntry[] {
 
     contents.push([g.name, file]);
     entries.push({ path: `glyphs/${file}`, text: glif(g) });
+  }
+
+  // Kerning, in UFO's own arrangement: groups in one file with the side written
+  // into the name, values in another that refers to them by that name.
+  const { kerning } = document;
+  const groupEntries: Array<readonly [string, string]> = [];
+  for (const [name, glyphs] of Object.entries(kerning.firstGroups)) {
+    groupEntries.push([`public.kern1.${name}`, array(glyphs.map(str))]);
+  }
+  for (const [name, glyphs] of Object.entries(kerning.secondGroups)) {
+    groupEntries.push([`public.kern2.${name}`, array(glyphs.map(str))]);
+  }
+  if (groupEntries.length > 0) {
+    entries.push({ path: "groups.plist", text: plist(dict(groupEntries)) });
+  }
+
+  const kernRows: Array<readonly [string, string]> = [];
+  for (const [first, row] of Object.entries(kerning.pairs)) {
+    const seconds = Object.entries(row).map(
+      ([second, value]) => [ufoSide(second, "second"), int(value)] as const,
+    );
+    if (seconds.length > 0) kernRows.push([ufoSide(first, "first"), dict(seconds)]);
+  }
+  if (kernRows.length > 0) {
+    entries.push({ path: "kerning.plist", text: plist(dict(kernRows)) });
   }
 
   entries.push({

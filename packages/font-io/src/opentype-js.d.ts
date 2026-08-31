@@ -75,6 +75,7 @@ declare module "opentype.js" {
     getKerningValue(left: number | OtGlyph, right: number | OtGlyph): number;
     charToGlyph(character: string): OtGlyph;
     readonly position: OtPosition;
+    readonly kerningPairs?: Readonly<Record<string, number>>;
     readonly unitsPerEm: number;
     readonly ascender: number;
     readonly descender: number;

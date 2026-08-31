@@ -7,6 +7,7 @@ import {
   glyph,
   groupKey,
   kernIndex,
+  kernValue,
   node,
   setKern,
   setKernGroup,
@@ -15,6 +16,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";
+import { importFont } from "../src/import.js";
 import { buildKerningGpos, classDef, coverage } from "../src/gpos.js";
 import { opentype } from "../src/opentype.js";
 import { tableChecksum, withTable } from "../src/sfnt.js";
@@ -250,5 +252,48 @@ describe("withTable", () => {
     const removed = withTable(added, "TEST", new Uint8Array(0));
     const before = new DataView(font().buffer).getUint16(4);
     expect(new DataView(removed.buffer).getUint16(4)).toBe(before);
+  });
+});
+
+describe("kerning survives a round trip", () => {
+  const back = () => importFont(exportFont(document()).bytes, counterIds("r")).document;
+
+  it("comes back with the same values for the same pairs", () => {
+    const index = kernIndex(back().kerning);
+    // The group rule reaches every member on both sides.
+    expect(kernValue(index, "O", "A")).toBe(-40);
+    expect(kernValue(index, "Q", "B")).toBe(-40);
+    // The exception still beats it.
+    expect(kernValue(index, "T", "A")).toBe(-95);
+  });
+
+  it("recovers the classes as groups rather than as loose pairs", () => {
+    const kerning = back().kerning;
+    const groups = Object.values(kerning.firstGroups);
+    expect(groups.length).toBeGreaterThan(0);
+    // O and Q were one class in the file and must be one group again, or the
+    // next edit would move only the letter that was touched.
+    expect(groups.some((g) => g.includes("O") && g.includes("Q"))).toBe(true);
+  });
+
+  it("names recovered groups, since a font carries no names for them", () => {
+    const kerning = back().kerning;
+    expect(Object.keys(kerning.firstGroups)[0]).toMatch(/^kern1\./);
+    expect(Object.keys(kerning.secondGroups)[0]).toMatch(/^kern2\./);
+  });
+
+  it("brings back nothing for a font that kerns nothing", () => {
+    const plain = fontDocument([glyph(".notdef", { advance: 500 }), box("A", 0x41)], INFO);
+    const kerning = importFont(exportFont(plain).bytes, counterIds("p")).document.kerning;
+    expect(kerning).toEqual(EMPTY_KERNING);
+  });
+
+  it("survives a second trip without multiplying groups", () => {
+    const once = back();
+    const twice = importFont(exportFont(once).bytes, counterIds("s")).document;
+    expect(Object.keys(twice.kerning.firstGroups).length).toBe(
+      Object.keys(once.kerning.firstGroups).length,
+    );
+    expect(kernValue(kernIndex(twice.kerning), "O", "A")).toBe(-40);
   });
 });
