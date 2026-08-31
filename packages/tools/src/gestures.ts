@@ -2,6 +2,7 @@ import { type Vec2, add, sub } from "@fonteditor/geometry";
 import {
   type Glyph,
   contourById,
+  metricLines,
   moveSegmentTunniLine,
   nodeById,
   segmentAt,
@@ -19,10 +20,18 @@ import {
   type SegmentRef,
   type Selection,
   type SelectionItem,
+  type Snapping,
+  NO_SNAPPING,
+  SNAP_PIXELS,
   addItems,
   hasItem,
   itemForTarget,
   itemsInRect,
+  screenTolerance,
+  selectionPoints,
+  snapDelta,
+  snapPoint,
+  toGrid,
   toggleItem,
 } from "@fonteditor/view";
 
@@ -299,6 +308,46 @@ function rectOf(a: Vec2, b: Vec2) {
 }
 
 /**
+ * Where drags are allowed to land, for the glyph being edited.
+ *
+ * The lines are exactly the ones the canvas already draws — the five metric
+ * lines, the origin and the advance. That is the rule this follows and expects
+ * to keep following as more lines arrive: a drag may only catch on something
+ * visible. A pull towards an invisible line is indistinguishable from a bug.
+ *
+ * The tolerance is converted from screen pixels, so the catch feels the same at
+ * every zoom instead of covering half the em at a distance. Holding ctrl turns
+ * the whole thing off, including the rounding, for the times when a coordinate
+ * has to be exactly what the cursor says.
+ */
+function snappingFor(
+  state: EditorState,
+  input: PointerInput,
+  options: GestureOptions,
+): Snapping {
+  if (options.snap === false || input.modifiers.ctrl) return NO_SNAPPING;
+
+  const glyph = currentGlyph(state);
+  return {
+    xs: glyph === null ? [0] : [0, glyph.advance],
+    ys: metricLines(state.document.info).map((line) => line.y),
+    tolerance: screenTolerance(state.view, options.snapPixels ?? SNAP_PIXELS),
+    grid: 1,
+  };
+}
+
+export type GestureOptions = {
+  /**
+   * Land drags on the drawn lines, and on whole units otherwise. On by default:
+   * a font is written in whole units, and an editor that quietly produced
+   * fractional ones would be lying about what it is making.
+   */
+  readonly snap?: boolean;
+  /** Catch radius in screen pixels. */
+  readonly snapPixels?: number;
+};
+
+/**
  * How each gesture follows the pointer.
  *
  * A mapped type over the gesture union, so a new kind cannot be added without
@@ -311,6 +360,7 @@ type Continuations = {
     gesture: Extract<Gesture, { kind: K }>,
     input: PointerInput,
     delta: Vec2,
+    snapping: Snapping,
   ) => EditorState;
 };
 
@@ -318,9 +368,15 @@ type Continuations = {
 const budged = (delta: Vec2): boolean => delta.x !== 0 || delta.y !== 0;
 
 const CONTINUE: Continuations = {
-  dragSelection: (state, gesture, _input, delta) => {
+  dragSelection: (state, gesture, _input, delta, snapping) => {
+    // Measured against the glyph as it was when the drag began: the offsets are
+    // from those positions, so snapping has to ask where they started rather
+    // than where the last frame left them.
+    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const offset = snapDelta(selectionPoints(started, gesture.items), delta, snapping);
+
     const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
-      translateSelection(g, gesture.items, delta),
+      translateSelection(g, gesture.items, offset),
     );
     return {
       ...state,
@@ -329,10 +385,14 @@ const CONTINUE: Continuations = {
     };
   },
 
-  dragHandle: (state, gesture, input, delta) => {
+  dragHandle: (state, gesture, input, delta, snapping) => {
+    // A handle is placed at the cursor rather than offset from where it was, so
+    // it is the position that snaps. A smooth node then swings its other handle
+    // to match, which is the point: the snapped side is the one being aimed.
+    const at = snapPoint(input.point, snapping);
     const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
       updateContour(g, gesture.contourId, (c) =>
-        setHandle(c, gesture.nodeId, gesture.part, input.point, gesture.breakSmooth),
+        setHandle(c, gesture.nodeId, gesture.part, at, gesture.breakSmooth),
       ),
     );
     return {
@@ -348,7 +408,7 @@ const CONTINUE: Continuations = {
   dragTunniLine: (state, gesture, input, delta) =>
     continueTunni(state, gesture, input, delta, moveSegmentTunniLine),
 
-  dragMargin: (state, gesture, _input, delta) => {
+  dragMargin: (state, gesture, _input, delta, snapping) => {
     // The origin line cannot itself move — it *is* x = 0. Dragging it means
     // "put this much space before the glyph", so the outline follows the cursor
     // and the advance grows with it, holding the right sidebearing. The advance
@@ -357,12 +417,15 @@ const CONTINUE: Continuations = {
       gesture.side === "advance"
         ? updateGlyph(gesture.before, state.currentGlyph, (g) => ({
             ...g,
-            advance: Math.max(0, gesture.startAdvance + delta.x),
+            // The measurement itself is rounded, not the offset: an advance is a
+            // number someone will read in a field, and it should be whole even
+            // when the one it started from was not.
+            advance: Math.max(0, toGrid(gesture.startAdvance + delta.x, snapping)),
           }))
         : gesture.startLeft === null
           ? null
           : updateGlyph(gesture.before, state.currentGlyph, (g) =>
-              setLeftSidebearing(g, (gesture.startLeft ?? 0) + delta.x),
+              setLeftSidebearing(g, toGrid((gesture.startLeft ?? 0) + delta.x, snapping)),
             );
 
     return {
@@ -416,6 +479,7 @@ export function continueGesture(
   state: EditorState,
   gesture: Gesture,
   input: PointerInput,
+  options: GestureOptions = {},
 ): EditorState {
   const delta = sub(input.point, gesture.origin);
   // One cast, in one place: TypeScript cannot see that the key and the gesture
@@ -425,6 +489,13 @@ export function continueGesture(
     g: Gesture,
     i: PointerInput,
     d: Vec2,
+    snapping: Snapping,
   ) => EditorState;
-  return carry({ ...state, cursor: input.point }, gesture, input, delta);
+  return carry(
+    { ...state, cursor: input.point },
+    gesture,
+    input,
+    delta,
+    snappingFor(state, input, options),
+  );
 }

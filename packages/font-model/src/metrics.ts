@@ -1,6 +1,7 @@
 import type { Vec2 } from "@fonteditor/geometry";
 
 import { type Contour } from "./contour.js";
+import type { FontInfo } from "./document.js";
 import { type Glyph, glyphBounds } from "./glyph.js";
 import { translateNode } from "./node.js";
 
@@ -95,4 +96,37 @@ export function centreGlyph(g: Glyph): Glyph | null {
 
   const margin = (g.advance - (box.maxX - box.minX)) / 2;
   return translateGlyph(g, { x: margin - box.minX, y: 0 });
+}
+
+/**
+ * One of the horizontal lines a font's metrics define.
+ *
+ * `emphasis` marks the baseline, which is the line everything else is measured
+ * from and so is drawn heavier than the rest.
+ */
+export type MetricLine = {
+  readonly name: string;
+  readonly y: number;
+  readonly emphasis?: boolean;
+};
+
+/**
+ * The horizontal lines of a font, in one place.
+ *
+ * One definition because two things read it and they must agree exactly: the
+ * renderer draws these lines, and a drag snaps to them. A line drawn but not
+ * snapped to looks broken, and a line snapped to but not drawn is a drag
+ * catching on nothing the user can see.
+ *
+ * The baseline is always present even when it coincides with another line —
+ * duplicates are the font's business, not ours.
+ */
+export function metricLines(info: FontInfo): readonly MetricLine[] {
+  return [
+    { name: "baseline", y: 0, emphasis: true },
+    { name: "x-height", y: info.xHeight },
+    { name: "cap height", y: info.capHeight },
+    { name: "ascender", y: info.ascender },
+    { name: "descender", y: info.descender },
+  ];
 }

@@ -13,6 +13,7 @@ import { deleteSelectedPoints, reverseSelectedContour } from "./commands.js";
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import {
   EMPTY_GLYPH,
+  type GestureOptions,
   continueGesture,
   selectSegmentEnds,
   startItemDrag,
@@ -49,7 +50,7 @@ export function handleVisibility(
   };
 }
 
-export type SelectOptions = {
+export type SelectOptions = GestureOptions & {
   /** Pick radius in screen pixels. */
   readonly hitPixels?: number;
   /** Arrow-key step in design units. */
@@ -111,7 +112,11 @@ export function pointerDown(
   }
 }
 
-export function pointerMove(state: EditorState, input: PointerInput): ToolResult {
+export function pointerMove(
+  state: EditorState,
+  input: PointerInput,
+  options: SelectOptions = {},
+): ToolResult {
   const gesture = state.gesture;
 
   if (gesture === null) {
@@ -129,7 +134,7 @@ export function pointerMove(state: EditorState, input: PointerInput): ToolResult
     });
   }
 
-  return result(continueGesture(state, gesture, input));
+  return result(continueGesture(state, gesture, input, options));
 }
 
 export function pointerUp(state: EditorState, _input?: PointerInput): ToolResult {

@@ -2,6 +2,7 @@ import {
   type ComponentSource,
   type FontDocument,
   type Glyph,
+  metricLines,
   randomIds,
   resolveGlyphComponents,
 } from "@fonteditor/font-model";
@@ -108,7 +109,6 @@ export function sceneFor(
 ): Scene {
   const editor = state.session.editor;
   const glyph = editor.document.glyphs[editor.currentGlyph] ?? EMPTY;
-  const { ascender, descender, xHeight, capHeight } = editor.document.info;
 
   const source: ComponentSource = { glyphOf: (name) => editor.document.glyphs[name] ?? null };
 
@@ -121,13 +121,9 @@ export function sceneFor(
     view: editor.view,
     viewport: size,
     palette: palette(),
-    guides: [
-      { y: 0, emphasis: true },
-      { y: xHeight },
-      { y: capHeight },
-      { y: ascender },
-      { y: descender },
-    ],
+    // The same list a drag snaps to. Drawn and snapped must not part company:
+    // a line you can catch on but cannot see is indistinguishable from a bug.
+    guides: metricLines(editor.document.info),
     tunniSegments: tunniSegments(editor),
     selection: editor.selection,
     marquee: marqueeRect(editor),

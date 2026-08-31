@@ -31,10 +31,12 @@ export {
   addItems,
   hasItem,
   itemForTarget,
+  itemPoint,
   itemsInRect,
   removeItems,
   sameItem,
   selectionKey,
+  selectionPoints,
   toggleItem,
 } from "./selection.js";
 
@@ -74,3 +76,6 @@ export {
   pickAll,
   pickOf,
 } from "./hit.js";
+
+export type { Snapping } from "./snap.js";
+export { NO_SNAPPING, SNAP_PIXELS, snapDelta, snapPoint, toGrid } from "./snap.js";

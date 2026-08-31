@@ -36,7 +36,7 @@ export function pointerMove(
 ): ToolResult {
   switch (state.activeTool) {
     case "select":
-      return select.pointerMove(state, input);
+      return select.pointerMove(state, input, options);
     case "pen":
       return pen.pointerMove(state, input, options);
   }

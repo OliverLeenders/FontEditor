@@ -637,3 +637,99 @@ describe("margin lines", () => {
     expect(s.gesture?.kind).toBe("marquee");
   });
 });
+
+describe("snapping", () => {
+  /** A single free-standing node, so a drag has nothing else to interfere with. */
+  function loneNode(): { state: EditorState; contour: Contour } {
+    const ids = counterIds("snap");
+    const c = contour(ids.contour(), [node(ids.node(), vec(100, 300))], false);
+    return start(c);
+  }
+
+  /** Select that node and drag it by the given offset, ending the gesture. */
+  function dragBy(state: EditorState, from: { x: number; y: number }, by: { x: number; y: number }) {
+    let s = pointerDown(state, pointerInput(vec(from.x, from.y))).state;
+    s = pointerMove(s, pointerInput(vec(from.x + by.x, from.y + by.y))).state;
+    return pointerUp(s).state;
+  }
+
+  it("rounds a drag to whole units", () => {
+    const { state, contour: c } = loneNode();
+    const moved = dragBy(state, { x: 100, y: 300 }, { x: 40.7, y: -20.4 });
+
+    const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[0]!.id)!;
+    expect(n.pt).toEqual({ x: 141, y: 280 });
+  });
+
+  it("catches the x-height rather than the whole unit beside it", () => {
+    const { state, contour: c } = loneNode();
+    // Landing at y = 497, three units under the 500 x-height and inside the
+    // six-pixel catch radius at scale 1.
+    const moved = dragBy(state, { x: 100, y: 300 }, { x: 0, y: 197 });
+
+    const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[0]!.id)!;
+    expect(n.pt.y).toBe(500);
+  });
+
+  it("catches the origin, which is a line the canvas draws", () => {
+    const { state, contour: c } = loneNode();
+    const moved = dragBy(state, { x: 100, y: 300 }, { x: -96, y: 0 });
+
+    const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[0]!.id)!;
+    expect(n.pt.x).toBe(0);
+  });
+
+  it("leaves the coordinate exactly where the cursor is when ctrl is held", () => {
+    const { state, contour: c } = loneNode();
+    let s = pointerDown(state, pointerInput(vec(100, 300))).state;
+    s = pointerMove(s, pointerInput(vec(140.7, 279.6), { ctrl: true })).state;
+    s = pointerUp(s).state;
+
+    const n = nodeById(firstGlyph(s.document).contours[0]!, c.nodes[0]!.id)!;
+    expect(n.pt).toEqual({ x: 140.7, y: 279.6 });
+  });
+
+  it("obeys a caller that turns snapping off", () => {
+    const { state, contour: c } = loneNode();
+    let s = pointerDown(state, pointerInput(vec(100, 300))).state;
+    s = pointerMove(s, pointerInput(vec(140.7, 279.6)), { snap: false }).state;
+
+    const n = nodeById(firstGlyph(s.document).contours[0]!, c.nodes[0]!.id)!;
+    expect(n.pt).toEqual({ x: 140.7, y: 279.6 });
+  });
+
+  it("moves a multi-point selection as one body", () => {
+    const ids = counterIds("body");
+    const c = contour(
+      ids.contour(),
+      [node(ids.node(), vec(100, 300)), node(ids.node(), vec(200, 495))],
+      false,
+    );
+    const { state } = start(c);
+
+    const selection: Selection = c.nodes.map((n) => ({
+      contourId: c.id,
+      nodeId: n.id,
+      part: "point" as const,
+    }));
+    let s: EditorState = { ...state, selection };
+
+    // Grab the lower node and nudge upward. The *upper* node is the one that
+    // finds the x-height, and both must move by its correction.
+    s = pointerDown(s, pointerInput(vec(100, 300))).state;
+    s = pointerMove(s, pointerInput(vec(100, 302.3))).state;
+
+    const nodes = firstGlyph(s.document).contours[0]!.nodes;
+    expect(nodes[1]!.pt.y).toBe(500);
+    expect(nodes[0]!.pt.y).toBe(305);
+  });
+
+  it("keeps a dragged advance whole", () => {
+    const { state } = loneNode();
+    // The advance line is grabbable, and lands the advance on a whole number.
+    let s = pointerDown(state, pointerInput(vec(640, 200))).state;
+    s = pointerMove(s, pointerInput(vec(700.4, 200))).state;
+
+    expect(firstGlyph(s.document).advance).toBe(700);
+  });
+});

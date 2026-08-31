@@ -1,5 +1,5 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
-import type { ContourId, Glyph, NodeId } from "@fonteditor/font-model";
+import { type ContourId, type Glyph, type NodeId, contourById, nodeById } from "@fonteditor/font-model";
 
 import type { HitTarget } from "./hit.js";
 
@@ -106,4 +106,30 @@ export function itemsInRect(g: Glyph, rect: Rect): SelectionItem[] {
     }
   }
   return found;
+}
+
+/**
+ * Where a selected item currently sits, or `null` when it no longer exists.
+ *
+ * `null` rather than a zero vector: a selection can outlive the thing it names —
+ * a handle retracted, a node deleted by an undo — and a point at the origin is a
+ * real position that a caller would have no way to tell apart from an absence.
+ */
+export function itemPoint(g: Glyph, item: SelectionItem): Vec2 | null {
+  const c = contourById(g, item.contourId);
+  const n = c === null ? null : nodeById(c, item.nodeId);
+  if (n === null) return null;
+
+  if (item.part === "point") return n.pt;
+  return (item.part === "in" ? n.in : n.out) ?? null;
+}
+
+/** Where every item of a selection sits, skipping any that have gone. */
+export function selectionPoints(g: Glyph, selection: Selection): Vec2[] {
+  const points: Vec2[] = [];
+  for (const item of selection) {
+    const p = itemPoint(g, item);
+    if (p !== null) points.push(p);
+  }
+  return points;
 }

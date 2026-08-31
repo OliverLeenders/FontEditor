@@ -75,9 +75,10 @@ export {
   unionRect,
 } from "./contour.js";
 
-export type { Sidebearings } from "./metrics.js";
+export type { MetricLine, Sidebearings } from "./metrics.js";
 export {
   centreGlyph,
+  metricLines,
   setLeftSidebearing,
   setRightSidebearing,
   sidebearings,
