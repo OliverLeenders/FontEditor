@@ -15,7 +15,6 @@ export {
   COLLINEAR_EPS,
   FLATTEN_TOLERANCE,
   PARALLEL_EPS,
-  approxEqual,
   isNegligible,
 } from "./epsilon.js";
 
@@ -31,7 +30,6 @@ export {
 
 export type { Rect, Vec2 } from "./vec2.js";
 export {
-  ORIGIN,
   add,
   addScaled,
   angleBetween,
@@ -44,10 +42,8 @@ export {
   equals,
   isFinitePoint,
   length,
-  lengthSq,
   lerp,
   midpoint,
-  negate,
   normalize,
   perpendicular,
   rotate,
@@ -71,7 +67,6 @@ export type { Cubic, Projection, Quadratic } from "./cubic.js";
 export {
   arcLength,
   bounds,
-  controlPoints,
   cubic,
   derivative,
   evaluate,

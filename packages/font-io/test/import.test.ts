@@ -1,4 +1,4 @@
-import { counterIds, glyphForCharacter } from "@fonteditor/font-model";
+import { counterIds, glyphForCodePoint } from "@fonteditor/font-model";
 import { opentype } from "../src/opentype.js";
 import { describe, expect, it } from "vitest";
 
@@ -48,7 +48,7 @@ describe("importFont", () => {
     expect(document.info.ascender).toBe(800);
     expect(document.info.descender).toBe(-200);
 
-    const a = glyphForCharacter(document, 0x41);
+    const a = glyphForCodePoint(document, 0x41);
     expect(a?.name).toBe("A");
     expect(a?.advance).toBe(600);
     expect(a?.unicodes).toContain(65);
@@ -59,7 +59,7 @@ describe("importFont", () => {
 
   it("keeps coordinates in font units, y up", () => {
     const { document } = importFont(buildFont(), counterIds());
-    const points = glyphForCharacter(document, 0x41)?.contours[0]?.nodes.map((n) => n.pt) ?? [];
+    const points = glyphForCodePoint(document, 0x41)?.contours[0]?.nodes.map((n) => n.pt) ?? [];
 
     // The same numbers that went in, not scaled to a point size and not flipped.
     expect(points).toContainEqual({ x: 100, y: 0 });

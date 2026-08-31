@@ -11,7 +11,6 @@ import {
   moveTunniLine,
   setTunniPoint,
   split,
-  sub,
   tunniPoint,
   tunniStatus,
 } from "@fonteditor/geometry";
@@ -517,9 +516,4 @@ function applyToSegment(
   const next = operation(segmentCubic(segment));
   if (next === null) return null;
   return setSegmentCubic(c, index, next);
-}
-
-/** The chord of a segment, useful for direction and length queries. */
-export function segmentChord(s: Segment): Vec2 {
-  return sub(s.b, s.a);
 }

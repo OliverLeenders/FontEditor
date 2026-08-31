@@ -35,11 +35,3 @@ export function isNegligible(value: number, reference: number, eps: number): boo
   if (!Number.isFinite(value) || !Number.isFinite(reference)) return false;
   return Math.abs(value) <= eps * Math.abs(reference);
 }
-
-/** True when `a` and `b` agree to within `eps`, relative to their own magnitudes. */
-export function approxEqual(a: number, b: number, eps = 1e-9): boolean {
-  if (a === b) return true;
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-  const scale = Math.max(1, Math.abs(a), Math.abs(b));
-  return Math.abs(a - b) <= eps * scale;
-}

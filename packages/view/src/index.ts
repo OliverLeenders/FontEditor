@@ -28,14 +28,10 @@ export {
 
 export type { Selection, SelectionItem, SelectionPart } from "./selection.js";
 export {
-  EMPTY_SELECTION,
   addItems,
   hasItem,
-  hasPoint,
   itemForTarget,
-  itemPosition,
   itemsInRect,
-  rectBetween,
   removeItems,
   sameItem,
   selectionKey,

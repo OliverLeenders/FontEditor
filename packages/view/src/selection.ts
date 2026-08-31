@@ -26,8 +26,6 @@ export type SelectionItem = {
  */
 export type Selection = readonly SelectionItem[];
 
-export const EMPTY_SELECTION: Selection = [];
-
 export function selectionKey(item: SelectionItem): string {
   // Built rather than written literally: a raw NUL byte in the source makes the
   // file binary to grep, diff and review tools, which is a poor price for a
@@ -43,11 +41,6 @@ export function sameItem(a: SelectionItem, b: SelectionItem): boolean {
 
 export function hasItem(selection: Selection, item: SelectionItem): boolean {
   return selection.some((candidate) => sameItem(candidate, item));
-}
-
-/** True when this node's on-curve point is selected, whatever its handles are. */
-export function hasPoint(selection: Selection, contourId: ContourId, nodeId: NodeId): boolean {
-  return hasItem(selection, { contourId, nodeId, part: "point" });
 }
 
 export function addItems(selection: Selection, items: Selection): Selection {
@@ -89,16 +82,6 @@ export function itemForTarget(target: HitTarget): SelectionItem | null {
   }
 }
 
-/** Position of a selection item in design units, or `null` if it is not there. */
-export function itemPosition(g: Glyph, item: SelectionItem): Vec2 | null {
-  const c = g.contours.find((candidate) => candidate.id === item.contourId);
-  if (c === undefined) return null;
-  const n = c.nodes.find((candidate) => candidate.id === item.nodeId);
-  if (n === undefined) return null;
-  if (item.part === "point") return n.pt;
-  return item.part === "in" ? n.in : n.out;
-}
-
 /**
  * Everything inside a marquee: on-curve points and handles alike.
  *
@@ -123,14 +106,4 @@ export function itemsInRect(g: Glyph, rect: Rect): SelectionItem[] {
     }
   }
   return found;
-}
-
-/** Normalised rectangle between two points, for a marquee in progress. */
-export function rectBetween(a: Vec2, b: Vec2): Rect {
-  return {
-    minX: Math.min(a.x, b.x),
-    minY: Math.min(a.y, b.y),
-    maxX: Math.max(a.x, b.x),
-    maxY: Math.max(a.y, b.y),
-  };
 }

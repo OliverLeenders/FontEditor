@@ -10,6 +10,12 @@
  * asserted on in a test. `CanvasSurface` is the thin shell that owns the element,
  * the device-pixel ratio and the frame loop.
  *
+ * What it exports is what something outside actually draws with: a whole scene,
+ * a browser cell, a thumbnail, a line of text. The individual passes are how
+ * those are built and stay inside — the package's own tests reach them through
+ * their module, which is the right amount of access for something that is not
+ * an entry point.
+ *
  * The renderer reads the document and never writes it. Which segment is awake,
  * what is selected, where the view sits — all of it arrives in the scene, so a
  * frame is reproducible from its inputs alone.
@@ -32,33 +38,14 @@ export { DEFAULT_METRICS, DEFAULT_OPTIONS, scene } from "./scene.js";
 
 export type { GlyphCellState } from "./draw.js";
 export {
-  clearBackground,
-  drawComponents,
-  drawFilledPreview,
   drawGlyphCell,
   drawGlyphThumbnail,
-  drawGuides,
-  drawHandles,
-  drawMargins,
-  drawMarquee,
-  drawNeighbours,
-  drawNodes,
-  drawOutline,
-  drawPenPreview,
   drawScene,
-  drawTunniControls,
-  handleVisibility,
-  formatCodePoint,
-  isActive,
 } from "./draw.js";
 
 export type { RunScene } from "./run.js";
 export {
-  drawBaseline,
-  drawGlyphs,
   drawRun,
-  drawRunMargins,
-  drawSelectionBands,
 } from "./run.js";
 
 export type { FrameCallback } from "./surface.js";

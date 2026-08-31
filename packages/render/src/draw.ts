@@ -420,11 +420,6 @@ export function drawGlyphThumbnail(
   ctx.fill();
 }
 
-/** True when `ref` is one of the segments showing its Tunni controls. */
-export function isActive(s: Scene, ref: SegmentRef): boolean {
-  return s.tunniSegments.some((candidate) => sameSegment(candidate, ref));
-}
-
 /**
  * What a browser cell needs to know beyond the glyph itself.
  *

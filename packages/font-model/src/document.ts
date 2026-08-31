@@ -151,12 +151,15 @@ export function setGlyphOrder(
 /**
  * The glyph carrying a given code point, or `null`.
  *
+ * Named for what it takes. It was `glyphForCharacter`, which reads as though a
+ * string would do and cost one failing test before anyone noticed.
+ *
  * Built by scanning rather than kept as an index, because the map is small and a
  * cached index is one more thing that can fall out of step with the document.
  * Revisit if a real font makes it slow — which would mean thousands of glyphs
  * and a hot loop, neither of which exists yet.
  */
-export function glyphForCharacter(document: FontDocument, codePoint: number): Glyph | null {
+export function glyphForCodePoint(document: FontDocument, codePoint: number): Glyph | null {
   for (const name of document.glyphOrder) {
     const g = document.glyphs[name];
     if (g !== undefined && g.unicodes.includes(codePoint)) return g;
@@ -176,7 +179,7 @@ export function glyphsForString(document: FontDocument, text: string): Array<Gly
   const out: Array<Glyph | null> = [];
   for (const character of text) {
     const codePoint = character.codePointAt(0);
-    out.push(codePoint === undefined ? null : glyphForCharacter(document, codePoint));
+    out.push(codePoint === undefined ? null : glyphForCodePoint(document, codePoint));
   }
   return out;
 }

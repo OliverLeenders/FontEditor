@@ -6,7 +6,7 @@ import {
   DEFAULT_FONT_INFO,
   fontDocument,
   glyphCount,
-  glyphForCharacter,
+  glyphForCodePoint,
   glyphNamed,
   glyphsForString,
   orderedGlyphs,
@@ -115,8 +115,8 @@ describe("updateGlyph", () => {
 
 describe("character lookup", () => {
   it("finds the glyph carrying a code point", () => {
-    expect(glyphForCharacter(sample(), 0x62)?.name).toBe("b");
-    expect(glyphForCharacter(sample(), 0x7a)).toBeNull();
+    expect(glyphForCodePoint(sample(), 0x62)?.name).toBe("b");
+    expect(glyphForCodePoint(sample(), 0x7a)).toBeNull();
   });
 
   it("resolves a string to one entry per character", () => {

@@ -11,7 +11,6 @@ import {
   DEFAULT_FONT_INFO,
   component,
   contour,
-  fontDocument,
   glyph,
   node,
 } from "@fonteditor/font-model";
@@ -299,11 +298,6 @@ function decodeComponent(raw: unknown): Component | null {
   return component(raw["id"], raw["base"], {
     xScale, xyScale, yxScale, yScale, xOffset, yOffset,
   });
-}
-
-export function decodeDocument(raw: unknown): Decoded<FontDocument> {
-  const decoded = decodeGlyph(raw);
-  return decoded.ok ? ok(fontDocument([decoded.value])) : fail(decoded.reason);
 }
 
 // ---------------------------------------------------------------------------

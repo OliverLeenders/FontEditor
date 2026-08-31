@@ -5,6 +5,22 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  /*
+   * Dragging on the canvas would otherwise start a native text selection and
+   * sweep it across every label and button it passed, which then swallows the
+   * pointer and leaves the interface apparently frozen until you click to
+   * dismiss it. The application chrome is not prose and there is nothing in it
+   * worth selecting; the fields below are, and keep their own behaviour.
+   */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.shell input,
+.shell textarea,
+.shell [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 /* The canvas gets everything the bars do not, and the inspector floats over it

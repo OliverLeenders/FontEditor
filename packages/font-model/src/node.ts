@@ -148,7 +148,3 @@ export function snapToAxis(anchor: Vec2, p: Vec2): Vec2 {
     ? { x: anchor.x + Math.sign(dx) * reach, y: anchor.y }
     : { x: anchor.x, y: anchor.y + Math.sign(dy) * reach };
 }
-
-export function hasHandles(n: Node): boolean {
-  return n.in !== null || n.out !== null;
-}

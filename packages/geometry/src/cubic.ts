@@ -32,11 +32,6 @@ export function cubic(a: Vec2, c1: Vec2, c2: Vec2, b: Vec2): Cubic {
   return { a, c1, c2, b };
 }
 
-/** The four control points in order, for the cases where iteration is clearer. */
-export function controlPoints(s: Cubic): readonly [Vec2, Vec2, Vec2, Vec2] {
-  return [s.a, s.c1, s.c2, s.b];
-}
-
 /** Point on the curve at parameter `t`, by the Bernstein form. */
 export function evaluate(s: Cubic, t: number): Vec2 {
   const mt = 1 - t;

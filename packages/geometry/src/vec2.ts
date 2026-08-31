@@ -22,8 +22,6 @@ export type Rect = {
   readonly maxY: number;
 };
 
-export const ORIGIN: Vec2 = { x: 0, y: 0 };
-
 export function vec(x: number, y: number): Vec2 {
   return { x, y };
 }
@@ -38,10 +36,6 @@ export function sub(p: Vec2, q: Vec2): Vec2 {
 
 export function scale(p: Vec2, k: number): Vec2 {
   return { x: p.x * k, y: p.y * k };
-}
-
-export function negate(p: Vec2): Vec2 {
-  return { x: -p.x, y: -p.y };
 }
 
 /**
@@ -68,11 +62,6 @@ export function cross(p: Vec2, q: Vec2): number {
 
 export function length(p: Vec2): number {
   return Math.hypot(p.x, p.y);
-}
-
-/** Squared length. Prefer this in comparisons — it avoids the square root. */
-export function lengthSq(p: Vec2): number {
-  return p.x * p.x + p.y * p.y;
 }
 
 export function distance(p: Vec2, q: Vec2): number {

@@ -20,7 +20,6 @@ import {
   kernIndex,
   kernMatch,
   makeSegmentCurve,
-  movedComponent,
   makeSegmentLine,
   glyph,
   nodeById,
@@ -31,7 +30,6 @@ import {
   reverseContour,
   segmentAt,
   segmentCubic,
-  segmentIndexForHandle,
   setKern,
   setKerning,
   setLeftSidebearing,
@@ -42,7 +40,6 @@ import {
   setNodeType,
   updateContour,
   updateGlyph,
-  updateGlyphComponent,
   wouldRecurse,
 } from "@fonteditor/font-model";
 import type { SegmentRef, Selection } from "@fonteditor/view";
@@ -296,20 +293,6 @@ export function balanceSegmentAt(state: EditorState, segment: SegmentRef): ToolR
   return done(state, document === null ? null : { ...state, document }, "Balance handles");
 }
 
-/** The segment a handle shapes, for menus opened on a handle. */
-export function segmentForHandle(
-  state: EditorState,
-  contourId: ContourId,
-  nodeId: NodeId,
-  part: "in" | "out",
-): SegmentRef | null {
-  const glyph = currentGlyph(state);
-  const c = glyph === null ? null : contourById(glyph, contourId);
-  if (c === null) return null;
-  const segmentIndex = segmentIndexForHandle(c, nodeId, part);
-  return segmentIndex === null ? null : { contourId, segmentIndex };
-}
-
 // ---------------------------------------------------------------------------
 // glyphs
 // ---------------------------------------------------------------------------
@@ -404,20 +387,6 @@ export function addComponent(
 export function removeComponent(state: EditorState, id: ComponentId): ToolResult {
   const document = editCurrentGlyph(state, (g) => removeGlyphComponent(g, id));
   return done(state, document === null ? null : { ...state, document }, "Remove component");
-}
-
-/** Nudge a component's placement, which is the only part of it that is editable. */
-export function moveComponentBy(
-  state: EditorState,
-  id: ComponentId,
-  dx: number,
-  dy: number,
-): ToolResult {
-  if (dx === 0 && dy === 0) return result(state);
-  const document = editCurrentGlyph(state, (g) =>
-    updateGlyphComponent(g, id, (c) => movedComponent(c, dx, dy)),
-  );
-  return done(state, document === null ? null : { ...state, document }, "Move component");
 }
 
 // ---------------------------------------------------------------------------

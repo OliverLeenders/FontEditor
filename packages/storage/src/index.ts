@@ -29,7 +29,6 @@ export type {
 export {
   MIGRATIONS,
   SCHEMA_VERSION,
-  decodeDocument,
   decodeFontInfo,
   decodeGlyph,
   encodeFontInfo,

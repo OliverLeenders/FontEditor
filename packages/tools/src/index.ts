@@ -28,7 +28,6 @@ export {
   currentGlyph,
   editCurrentGlyph,
   editorState,
-  isDragging,
   marqueeRect,
   tunniSegments,
 } from "./state.js";
@@ -48,7 +47,6 @@ export {
   insertPointOnSegment,
   kerningFor,
   nudgeKern,
-  moveComponentBy,
   removeComponent,
   nudgeSidebearing,
   nodeHasMissingHandle,
@@ -57,7 +55,6 @@ export {
   retractHandle,
   reverseContourAt,
   reverseSelectedContour,
-  segmentForHandle,
   segmentParameterAt,
   selectAllPoints,
   setNodeHvLock,

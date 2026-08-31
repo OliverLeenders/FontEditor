@@ -236,6 +236,7 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
           if (event.key === "Escape") setSelected(null);
         }}
         onPointerDown={(event) => {
+          event.preventDefault();
           event.currentTarget.focus();
           setSelected(indexAt(event));
         }}

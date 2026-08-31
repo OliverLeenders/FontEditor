@@ -99,6 +99,10 @@ export function GlyphCanvas({
       tabIndex={0}
       aria-label="Glyph editing canvas"
       onPointerDown={(event) => {
+        // Belt as well as braces. The stylesheet stops a selection being
+        // *painted*, and this stops one being *started* — which also keeps the
+        // browser from deciding a drag is a text drag partway through.
+        event.preventDefault();
         event.currentTarget.focus();
         event.currentTarget.setPointerCapture(event.pointerId);
         if (event.button === 1) {

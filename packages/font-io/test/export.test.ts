@@ -6,7 +6,7 @@ import {
   counterIds,
   fontDocument,
   glyph,
-  glyphForCharacter,
+  glyphForCodePoint,
   node,
   segmentAt,
   segmentCount,
@@ -103,9 +103,9 @@ describe("exportFont", () => {
 
   it("keeps the character map", () => {
     const back = roundTrip(sample());
-    expect(glyphForCharacter(back, 0x6f)?.name).toBe("o");
-    expect(glyphForCharacter(back, 0x6e)?.name).toBe("n");
-    expect(glyphForCharacter(back, 0x20)?.name).toBe("space");
+    expect(glyphForCodePoint(back, 0x6f)?.name).toBe("o");
+    expect(glyphForCodePoint(back, 0x6e)?.name).toBe("n");
+    expect(glyphForCodePoint(back, 0x20)?.name).toBe("space");
   });
 
   it("preserves a curved outline point for point", () => {

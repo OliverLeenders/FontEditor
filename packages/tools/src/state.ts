@@ -213,7 +213,3 @@ export function marqueeRect(state: EditorState): Rect | null {
     maxY: Math.max(gesture.origin.y, gesture.current.y),
   };
 }
-
-export function isDragging(state: EditorState): boolean {
-  return state.gesture !== null;
-}
