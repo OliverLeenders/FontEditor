@@ -43,6 +43,31 @@ export type AlignmentLines = {
 const NONE: AlignmentLines = { xs: [], ys: [] };
 
 /**
+ * How far off level a direction may be and still count as level.
+ *
+ * The sine of about five degrees. Needed because the sign test below is a
+ * knife-edge on a smooth node: its two handles are collinear through it, so they
+ * land on opposite sides of any axis unless the tangent is *exactly* level, and
+ * a drawn outline is never exactly anything. The bottom of a real stem was found
+ * one unit and 1.4 degrees off, which was enough to stop it being offered at all
+ * while the counter beside it — level to the unit — was offered. Dragging one
+ * onto the other worked in one direction and not the other.
+ *
+ * Five degrees is wide enough for that and far short of anything anyone would
+ * call a slope: over a 40-unit handle it is three and a half units.
+ */
+const LEVEL = 0.09;
+
+/** Whether a direction is close enough to level to be treated as level, per axis. */
+function level(d: Vec2, axis: "x" | "y"): boolean {
+  const length = Math.hypot(d.x, d.y);
+  if (length === 0) return true;
+  // A y-extreme wants a near-horizontal tangent, which is a small y component;
+  // an x-extreme wants a near-vertical one, which is a small x component.
+  return Math.abs(axis === "y" ? d.y : d.x) <= length * LEVEL;
+}
+
+/**
  * Whether a node is where the outline turns back on itself, per axis.
  *
  * A local test rather than the calculus: the outline reverses at a node exactly
@@ -50,26 +75,23 @@ const NONE: AlignmentLines = { xs: [], ys: [] };
  * where there is one, and where there is not — a straight segment — the on-curve
  * point at the far end of that segment gives it instead.
  *
- * That second half is the whole of the difference between this being useful and
- * being noise. Calling every node with a straight side a landmark, which is the
- * obvious reading of "it has no handle to judge by", turned 21 nodes of a real
- * drawn `a` into 14 candidates on one axis — several of them within a single
- * catch radius of each other, so no drag could aim between them. Judging the
- * straight side by where it goes gives 6, every one distinguishable.
+ * That second half is the difference between this being useful and being noise.
+ * Calling every node with a straight side a landmark, which is the obvious
+ * reading of "it has no handle to judge by", turned 21 nodes of a real drawn `a`
+ * into 14 candidates on one axis — several within a single catch radius of each
+ * other, so no drag could aim between them. Judging the straight side by where
+ * it goes gives 6.
+ *
+ * The other half is {@link LEVEL}: a turn that is nearly flat is a turn.
  */
 function extremeAxes(n: Node, previous: Vec2, next: Vec2): { readonly x: boolean; readonly y: boolean } {
-  const from = n.in ?? previous;
-  const to = n.out ?? next;
+  const from = { x: (n.in ?? previous).x - n.pt.x, y: (n.in ?? previous).y - n.pt.y };
+  const to = { x: (n.out ?? next).x - n.pt.x, y: (n.out ?? next).y - n.pt.y };
 
-  const inX = from.x - n.pt.x;
-  const outX = to.x - n.pt.x;
-  const inY = from.y - n.pt.y;
-  const outY = to.y - n.pt.y;
-
-  // Same side, or one of them exactly level: a node the outline arrives at
-  // horizontally and leaves horizontally is a landmark in y even though it is
-  // running straight through in x.
-  return { x: inX * outX >= 0, y: inY * outY >= 0 };
+  return {
+    x: from.x * to.x >= 0 || level(from, "x") || level(to, "x"),
+    y: from.y * to.y >= 0 || level(from, "y") || level(to, "y"),
+  };
 }
 
 /** The point one step around a contour, or `null` at the end of an open one. */

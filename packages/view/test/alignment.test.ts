@@ -117,6 +117,42 @@ describe("extremes", () => {
     expect(values(lines.xs)).toEqual([10, 110]);
   });
 
+  it("offers a turn that is very nearly, but not exactly, level", () => {
+    // Taken from a real drawn `a`. Its counter's lowest node had handles exactly
+    // level and was offered; the stem's lowest node, one unit and 1.4 degrees
+    // off, was not — so a drag snapped the stem onto the counter but never the
+    // counter onto the stem. On a smooth node the sign test alone is a
+    // knife-edge: the two handles are collinear through it, so they straddle the
+    // axis unless the tangent is exactly level, and a drawn outline never is.
+    const bottoms = contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(175, -13), { type: "smooth", in: at(241, -13), out: at(86, -13) }),
+        node(ids.node(), at(390, -12), { type: "smooth", in: at(430, -13), out: at(349, -11) }),
+        node(ids.node(), at(300, 500), { type: "smooth", in: at(240, 500), out: at(360, 500) }),
+      ],
+      true,
+    );
+    const lines = alignmentLines(glyph("a", { contours: [bottoms] }), [], { extremes: true });
+    expect(values(lines.ys)).toContain(-13);
+    expect(values(lines.ys)).toContain(-12);
+  });
+
+  it("still refuses a turn that is genuinely a slope", () => {
+    // The tolerance is five degrees, not a licence for anything vaguely flat.
+    const sloped = contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(0, 0), { type: "smooth", in: at(-50, -30), out: at(50, 30) }),
+        node(ids.node(), at(200, 400)),
+      ],
+      true,
+    );
+    const lines = alignmentLines(glyph("k", { contours: [sloped] }), [], { extremes: true });
+    // Thirty degrees off level, so the first node is no landmark in y.
+    expect(values(lines.ys)).not.toContain(0);
+  });
+
   it("leaves out whatever is being dragged", () => {
     const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" }];
     expect(values(alignmentLines(g, moving, { extremes: true }).xs)).toEqual([60]);
