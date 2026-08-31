@@ -86,6 +86,25 @@ export {
   translateGlyph,
 } from "./metrics.js";
 
+export type { KernIndex, KernMatch, Kerning } from "./kerning.js";
+export {
+  EMPTY_KERNING,
+  GROUP_PREFIX,
+  clearKern,
+  groupKey,
+  groupNameOf,
+  isGroupKey,
+  kernIndex,
+  kernMatch,
+  kernPairCount,
+  kernPairs,
+  kernValue,
+  removeKernGroup,
+  setKern,
+  setKernException,
+  setKernGroup,
+} from "./kerning.js";
+
 export type { FontDocument, FontInfo, GlyphName } from "./document.js";
 export {
   DEFAULT_FONT_INFO,
@@ -99,6 +118,7 @@ export {
   removeGlyph,
   setFontInfo,
   setGlyphOrder,
+  setKerning,
   updateGlyph,
 } from "./document.js";
 

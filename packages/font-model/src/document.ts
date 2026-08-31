@@ -1,4 +1,5 @@
 import type { Glyph } from "./glyph.js";
+import { type Kerning, EMPTY_KERNING } from "./kerning.js";
 
 export type GlyphName = string;
 
@@ -45,6 +46,14 @@ export type FontDocument = {
   readonly info: FontInfo;
   readonly glyphOrder: readonly GlyphName[];
   readonly glyphs: Readonly<Record<GlyphName, Glyph>>;
+  /**
+   * Kerning belongs to the font, not to a glyph.
+   *
+   * A pair is a relationship between two of them, so storing it on either would
+   * make one glyph's file the owner of a fact about another — and moving or
+   * deleting that glyph would take the pair with it.
+   */
+  readonly kerning: Kerning;
 };
 
 export function fontDocument(
@@ -57,7 +66,7 @@ export function fontDocument(
     if (!(g.name in map)) order.push(g.name);
     map[g.name] = g;
   }
-  return { info, glyphOrder: order, glyphs: map };
+  return { info, glyphOrder: order, glyphs: map, kerning: EMPTY_KERNING };
 }
 
 export function glyphNamed(document: FontDocument, name: GlyphName): Glyph | null {
@@ -170,4 +179,10 @@ export function glyphsForString(document: FontDocument, text: string): Array<Gly
     out.push(codePoint === undefined ? null : glyphForCharacter(document, codePoint));
   }
   return out;
+}
+
+
+/** Replace the font's kerning, leaving the glyphs alone. */
+export function setKerning(document: FontDocument, kerning: Kerning): FontDocument {
+  return kerning === document.kerning ? document : { ...document, kerning };
 }
