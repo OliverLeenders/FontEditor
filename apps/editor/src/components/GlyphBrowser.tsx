@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { ExportFont } from "./ExportFont.js";
 import { NewFont } from "./NewFont.js";
+import { RoundCoordinates } from "./RoundCoordinates.js";
 import { NewGlyph } from "./NewGlyph.js";
 import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
@@ -200,6 +201,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
           <NewFont />
           <ExportFont />
           <NewGlyph />
+          <RoundCoordinates />
           <input
             type="search"
             className={styles.search}

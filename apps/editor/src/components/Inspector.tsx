@@ -15,8 +15,10 @@ import {
   begin,
   commit,
   editCurrentGlyph,
+  moveCoordinateTo,
   removeComponent,
   result,
+  selectedCoordinate,
 } from "@fonteditor/tools";
 import { useRef, useState } from "react";
 
@@ -56,6 +58,13 @@ export function Inspector(): JSX.Element | null {
     (s) => sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)?.right ?? null,
   );
 
+  // Three scalar selectors rather than one returning the position: an object
+  // built in a selector is a new object every time and would re-render the panel
+  // on every store notification, drags included.
+  const coordX = useStoreValue((s) => selectedCoordinate(s.session.editor)?.point.x ?? null);
+  const coordY = useStoreValue((s) => selectedCoordinate(s.session.editor)?.point.y ?? null);
+  const coordPart = useStoreValue((s) => selectedCoordinate(s.session.editor)?.item.part ?? null);
+
   const components = useStoreValue(
     (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.components ?? EMPTY_COMPONENTS,
   );
@@ -90,6 +99,26 @@ export function Inspector(): JSX.Element | null {
         begin(side === "left" ? "Set left sidebearing" : "Set right sidebearing"),
         commit,
       ]),
+    );
+  };
+
+  /**
+   * Move the one selected point or handle to an exact coordinate.
+   *
+   * The other axis is read at the moment of the commit rather than from the
+   * field beside it: typing in one box should not write back whatever the other
+   * happened to be showing.
+   */
+  const commitCoordinate = (axis: "x" | "y", value: number): void => {
+    if (!Number.isFinite(value)) return;
+    const current = selectedCoordinate(store.editor);
+    if (current === null) return;
+
+    store.applyTool(
+      moveCoordinateTo(store.editor, current.item, {
+        x: axis === "x" ? value : current.point.x,
+        y: axis === "y" ? value : current.point.y,
+      }),
     );
   };
 
@@ -260,9 +289,48 @@ export function Inspector(): JSX.Element | null {
             </button>
           </div>
         </Field>
+
+        {/* Only for a single selection. A coordinate shown for six selected
+            points would be one arbitrary point's, and typing into it would move
+            that one alone — neither of which is what a number in a box promises.
+            Disabled rather than hidden, for the reason the sidebearings are. */}
+        <Field label={coordPart === "in" || coordPart === "out" ? "Handle position" : "Position"}>
+          <div className={styles.pair}>
+            <input
+              className={styles.input}
+              type="number"
+              aria-label="X position"
+              title="X position"
+              disabled={coordX === null}
+              value={coordX === null ? "" : shown(coordX)}
+              onChange={(event) => commitCoordinate("x", Number(event.target.value))}
+            />
+            <input
+              className={styles.input}
+              type="number"
+              aria-label="Y position"
+              title="Y position"
+              disabled={coordY === null}
+              value={coordY === null ? "" : shown(coordY)}
+              onChange={(event) => commitCoordinate("y", Number(event.target.value))}
+            />
+          </div>
+        </Field>
       </div>
     </aside>
   );
+}
+
+/**
+ * A coordinate as a field should show it.
+ *
+ * Not rounded, unlike the advance and the sidebearings: this field exists to set
+ * an exact position, and a display that rounded 106.402 to 106 would write 106
+ * back the moment anything else in the panel was touched. Two decimals is enough
+ * to see that a number is not whole without showing the floating-point tail.
+ */
+function shown(v: number): number {
+  return Math.round(v * 100) / 100;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {

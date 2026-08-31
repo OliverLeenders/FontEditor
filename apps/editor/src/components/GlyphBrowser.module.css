@@ -81,7 +81,9 @@
 
 .search {
   flex: 1;
-  min-width: 0;
+  /* A floor rather than zero: the bar's transient notes would otherwise squeeze
+     the field down to a few characters while one is showing. */
+  min-width: 11rem;
   padding: .3rem .55rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);

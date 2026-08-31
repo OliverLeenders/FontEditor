@@ -26,15 +26,19 @@ import {
   createGlyphs,
   deleteGlyph,
   insertPointOnSegment,
+  moveCoordinateTo,
   nudgeSidebearing,
   nodeHvLocked,
   retractHandle,
   reverseContourAt,
+  roundCoordinates,
   reverseSelectedContour,
   segmentParameterAt,
   selectAllPoints,
+  selectedCoordinate,
   setNodeHvLock,
   setPointType,
+  unroundedCount,
 } from "../src/commands.js";
 import { keyInput } from "../src/input.js";
 import { keyDown } from "../src/select.js";
@@ -564,5 +568,133 @@ describe("deleteGlyph", () => {
     // back and the composite with it.
     expect(state.document.glyphs["b"]?.components).toHaveLength(1);
     expect(state.document.glyphs["b"]?.components[0]?.base).toBe("a");
+  });
+});
+
+describe("roundCoordinates", () => {
+  it("puts the whole font on whole units in one undo step", () => {
+    const ids = counterIds("round");
+    const c = contour(
+      ids.contour(),
+      [node(ids.node(), vec(100.4, 200.6)), node(ids.node(), vec(300.5, 0))],
+      false,
+    );
+    const state = editorState({
+      document: fontDocument([addContour(glyph("a", { advance: 500.4 }), c)]),
+      view: VIEW,
+    });
+
+    const out = roundCoordinates(state);
+    const g = firstGlyph(out.state.document);
+
+    expect(g.contours[0]!.nodes[0]!.pt).toEqual({ x: 100, y: 201 });
+    expect(g.advance).toBe(500);
+    // One begin and one commit: a partial undo of this would be worse than none.
+    expect(out.effects.filter((e) => e.kind === "beginTransaction")).toHaveLength(1);
+  });
+
+  it("does nothing, and records nothing, when everything is already whole", () => {
+    const ids = counterIds("done");
+    const c = contour(ids.contour(), [node(ids.node(), vec(100, 200))], false);
+    const state = editorState({
+      document: fontDocument([addContour(glyph("a", { advance: 500 }), c)]),
+      view: VIEW,
+    });
+
+    const out = roundCoordinates(state);
+    expect(out.state).toBe(state);
+    expect(out.effects).toHaveLength(0);
+  });
+
+  it("counts the glyphs it would change before changing them", () => {
+    const ids = counterIds("count");
+    const c = contour(ids.contour(), [node(ids.node(), vec(100.4, 200))], false);
+    const state = editorState({
+      document: fontDocument([addContour(glyph("a"), c), glyph("b", { advance: 500 })]),
+      view: VIEW,
+    });
+    expect(unroundedCount(state)).toBe(1);
+  });
+});
+
+describe("setting a coordinate", () => {
+  /** A smooth node with both handles, and one loose point to select instead. */
+  function withNode() {
+    const ids = counterIds("coord");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(100, 200), {
+          type: "smooth",
+          in: vec(60, 200),
+          out: vec(140, 200),
+        }),
+        node(ids.node(), vec(400, 200), { type: "corner", in: vec(360, 200) }),
+      ],
+      false,
+    );
+    const state = editorState({
+      document: fontDocument([addContour(glyph("a", { advance: 500 }), c)]),
+      view: VIEW,
+    });
+    return { state, contour: c };
+  }
+
+  it("reports the one selected item and where it is", () => {
+    const { state, contour: c } = withNode();
+    const item = { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" as const };
+
+    const found = selectedCoordinate({ ...state, selection: [item] });
+    expect(found?.point).toEqual({ x: 100, y: 200 });
+    expect(found?.item.part).toBe("point");
+  });
+
+  it("reports nothing for an empty or a multiple selection", () => {
+    const { state, contour: c } = withNode();
+    const items = c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const }));
+
+    expect(selectedCoordinate(state)).toBeNull();
+    expect(selectedCoordinate({ ...state, selection: items })).toBeNull();
+  });
+
+  it("moves a point, carrying its handles with it", () => {
+    const { state, contour: c } = withNode();
+    const item = { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" as const };
+
+    const out = moveCoordinateTo({ ...state, selection: [item] }, item, { x: 120, y: 260 });
+    const n = firstGlyph(out.state.document).contours[0]!.nodes[0]!;
+
+    expect(n.pt).toEqual({ x: 120, y: 260 });
+    expect(n.in).toEqual({ x: 80, y: 260 });
+    expect(n.out).toEqual({ x: 160, y: 260 });
+  });
+
+  it("keeps a smooth node smooth when a handle is typed in", () => {
+    const { state, contour: c } = withNode();
+    const item = { contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" as const };
+
+    const out = moveCoordinateTo({ ...state, selection: [item] }, item, { x: 140, y: 240 });
+    const n = firstGlyph(out.state.document).contours[0]!.nodes[0]!;
+
+    expect(n.out).toEqual({ x: 140, y: 240 });
+    // The other side swings to stay opposite, exactly as a drag would leave it.
+    const across = { x: n.pt.x - (n.out!.x - n.pt.x), y: n.pt.y - (n.out!.y - n.pt.y) };
+    const alongX = (n.in!.x - n.pt.x) * (across.y - n.pt.y);
+    const alongY = (n.in!.y - n.pt.y) * (across.x - n.pt.x);
+    expect(alongX - alongY).toBeCloseTo(0, 6);
+  });
+
+  it("does nothing when the point is already there", () => {
+    const { state, contour: c } = withNode();
+    const item = { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" as const };
+    const selected = { ...state, selection: [item] };
+
+    expect(moveCoordinateTo(selected, item, { x: 100, y: 200 }).state).toBe(selected);
+  });
+
+  it("does nothing for an item that is no longer there", () => {
+    const { state, contour: c } = withNode();
+    const gone = { contourId: c.id, nodeId: "vanished", part: "point" as const };
+    expect(moveCoordinateTo(state, gone, { x: 0, y: 0 }).state).toBe(state);
   });
 });

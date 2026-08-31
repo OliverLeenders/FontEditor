@@ -139,3 +139,5 @@ export {
   setAdvance,
   updateContour,
 } from "./glyph.js";
+
+export { UNIT_GRID, roundFont, roundGlyph, unroundedGlyphs } from "./round.js";
