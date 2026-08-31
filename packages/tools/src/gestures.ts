@@ -1,0 +1,430 @@
+import { type Vec2, add, sub } from "@fonteditor/geometry";
+import {
+  type Glyph,
+  contourById,
+  moveSegmentTunniLine,
+  nodeById,
+  segmentAt,
+  segmentIndexForHandle,
+  setHandle,
+  setLeftSidebearing,
+  setSegmentTunniPoint,
+  sidebearings,
+  translateNodeBy,
+  updateContour,
+  updateGlyph,
+} from "@fonteditor/font-model";
+import {
+  type HitTarget,
+  type SegmentRef,
+  type Selection,
+  type SelectionItem,
+  addItems,
+  hasItem,
+  itemForTarget,
+  itemsInRect,
+  toggleItem,
+} from "@fonteditor/view";
+
+import { type ToolResult, begin, result } from "./effects.js";
+import type { PointerInput } from "./input.js";
+import { type EditorState, type Gesture, currentGlyph } from "./state.js";
+
+/**
+ * Beginning and continuing a drag.
+ *
+ * Split from the tool's entry points because a gesture used to be described in
+ * two places — where it started, and a branch of a switch far below that carried
+ * it on — and the two drifted. Here each kind is one entry in one table, and the
+ * table's type makes a missing half a compile error rather than a gesture that
+ * begins and then does nothing.
+ */
+
+/** Stands in when the current glyph name does not resolve, so reads stay total. */
+export const EMPTY_GLYPH: Glyph = {
+  name: "",
+  unicodes: [],
+  advance: 0,
+  contours: [],
+  components: [],
+};
+
+// ---------------------------------------------------------------------------
+// starting
+// ---------------------------------------------------------------------------
+
+/**
+ * Shift extends or removes; a plain click replaces — unless the thing clicked is
+ * already selected, in which case the selection is left alone so a multi-item
+ * drag is not destroyed by grabbing one of its members.
+ */
+function nextSelection(selection: Selection, item: SelectionItem, extend: boolean): Selection {
+  if (extend) return toggleItem(selection, item);
+  if (hasItem(selection, item)) return selection;
+  return [item];
+}
+
+function handleSegment(state: EditorState, item: SelectionItem): SegmentRef | null {
+  if (item.part === "point") return null;
+  const c = contourById(currentGlyph(state) ?? EMPTY_GLYPH, item.contourId);
+  if (c === null) return null;
+  const segmentIndex = segmentIndexForHandle(c, item.nodeId, item.part);
+  return segmentIndex === null ? null : { contourId: item.contourId, segmentIndex };
+}
+
+export function startMarquee(state: EditorState, input: PointerInput): ToolResult {
+  const additive = input.modifiers.shift;
+  // Clicking empty canvas means "nothing in particular", so it drops focus as
+  // well as selection — otherwise a focused segment's controls would linger with
+  // no way to dismiss them.
+  return result({
+    ...state,
+    selection: additive ? state.selection : [],
+    focusedSegment: additive ? state.focusedSegment : null,
+    gesture: {
+      kind: "marquee",
+      origin: input.point,
+      current: input.point,
+      additive,
+      before: state.selection,
+      moved: false,
+    },
+  });
+}
+
+export function startItemDrag(
+  state: EditorState,
+  input: PointerInput,
+  target: HitTarget,
+): ToolResult {
+  const item = itemForTarget(target);
+  if (item === null) return result(state);
+
+  const selection = nextSelection(state.selection, item, input.modifiers.shift);
+
+  // Shift-clicking to deselect should not then drag the thing just removed.
+  if (!hasItem(selection, item)) return result({ ...state, selection });
+
+  const isHandle = item.part !== "point";
+  const label = isHandle ? "Move handle" : "Move node";
+
+  // A handle shapes exactly one segment, so touching it says unambiguously which
+  // segment is being worked on. A node sits between two and names neither, so
+  // dragging one leaves focus where it was rather than guessing.
+  const focusedSegment = isHandle
+    ? handleSegment(state, item) ?? state.focusedSegment
+    : state.focusedSegment;
+
+  const gesture: Gesture =
+    isHandle && selection.length === 1
+      ? {
+          kind: "dragHandle",
+          origin: input.point,
+          contourId: item.contourId,
+          nodeId: item.nodeId,
+          part: item.part === "in" ? "in" : "out",
+          breakSmooth: input.modifiers.alt,
+          before: state.document,
+          moved: false,
+        }
+      : {
+          kind: "dragSelection",
+          origin: input.point,
+          items: selection,
+          before: state.document,
+          moved: false,
+        };
+
+  return result({ ...state, selection, focusedSegment, gesture }, [begin(label)]);
+}
+
+export function startTunniDrag(
+  state: EditorState,
+  input: PointerInput,
+  kind: "dragTunniPoint" | "dragTunniLine",
+  segmentIndex: number,
+  contourId: string,
+): ToolResult {
+  const label = kind === "dragTunniPoint" ? "Move Tunni point" : "Move Tunni line";
+  const segment = { contourId, segmentIndex };
+  return result(
+    {
+      ...state,
+      focusedSegment: segment,
+      gesture: { kind, origin: input.point, segment, before: state.document, moved: false },
+    },
+    [begin(label)],
+  );
+}
+
+/**
+ * Begin dragging a margin line.
+ *
+ * The selection is cleared first. These lines belong to the glyph as a whole, and
+ * leaving points selected would make the next arrow-key nudge move them rather
+ * than doing what the spacing gesture just implied.
+ */
+export function startMarginDrag(
+  state: EditorState,
+  input: PointerInput,
+  side: "origin" | "advance",
+): ToolResult {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return result(state);
+
+  return result(
+    {
+      ...state,
+      selection: [],
+      gesture: {
+        kind: "dragMargin",
+        origin: input.point,
+        side,
+        startAdvance: glyph.advance,
+        startLeft: sidebearings(glyph)?.left ?? null,
+        before: state.document,
+        moved: false,
+      },
+    },
+    [begin(side === "origin" ? "Move glyph" : "Set advance", false)],
+  );
+}
+
+/**
+ * Clicking a segment selects the on-curve points at each end, so the whole span
+ * can then be nudged or dragged as a unit.
+ */
+export function selectSegmentEnds(
+  state: EditorState,
+  input: PointerInput,
+  target: Extract<HitTarget, { kind: "segment" }>,
+): ToolResult {
+  const c = contourById(currentGlyph(state) ?? EMPTY_GLYPH, target.contourId);
+  const segment = c === null ? null : segmentAt(c, target.segmentIndex);
+  if (segment === null) return result(state);
+
+  const ends: Selection = [
+    { contourId: target.contourId, nodeId: segment.fromId, part: "point" },
+    { contourId: target.contourId, nodeId: segment.toId, part: "point" },
+  ];
+  const selection = input.modifiers.shift ? addItems(state.selection, ends) : ends;
+
+  return result(
+    {
+      ...state,
+      selection,
+      focusedSegment: { contourId: target.contourId, segmentIndex: target.segmentIndex },
+      gesture: {
+        kind: "dragSelection",
+        origin: input.point,
+        items: selection,
+        before: state.document,
+        moved: false,
+      },
+    },
+    [begin("Move segment")],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// continuing
+// ---------------------------------------------------------------------------
+
+/**
+ * Offset every selected item, resolving the overlaps a mixed selection creates.
+ *
+ * Three cases, and the order matters:
+ *
+ *  - A selected on-curve point moves with both its handles, so any handle of
+ *    that node is skipped — moving it again would double its offset.
+ *  - Exactly one handle of a node selected: move it through `setHandle`, which
+ *    keeps a smooth node smooth by swinging the other side.
+ *  - Both handles selected and not the point: move each without enforcing
+ *    smoothness, because enforcing it twice makes each handle fight the other
+ *    and the result depends on which was processed first.
+ */
+export function translateSelection(g: Glyph, selection: Selection, delta: Vec2): Glyph {
+  if (delta.x === 0 && delta.y === 0) return g;
+
+  const pointsMoved = new Set<string>();
+  const handleCount = new Map<string, number>();
+  for (const item of selection) {
+    const key = `${item.contourId} ${item.nodeId}`;
+    if (item.part === "point") pointsMoved.add(key);
+    else handleCount.set(key, (handleCount.get(key) ?? 0) + 1);
+  }
+
+  let next = g;
+
+  for (const item of selection) {
+    if (item.part !== "point") continue;
+    next = updateContour(next, item.contourId, (c) => translateNodeBy(c, item.nodeId, delta)) ?? next;
+  }
+
+  for (const item of selection) {
+    // Bound to a const so the narrowing survives into the closure below —
+    // TypeScript discards a narrowing on `item.part` there, since the object
+    // could in principle be mutated in between.
+    const part = item.part;
+    if (part === "point") continue;
+
+    const key = `${item.contourId} ${item.nodeId}`;
+    if (pointsMoved.has(key)) continue;
+
+    // Read from the original glyph: a sibling handle's move must not shift the
+    // origin this one is offset from.
+    const source = contourById(g, item.contourId);
+    const original = source === null ? null : nodeById(source, item.nodeId);
+    if (original === null) continue;
+    const handle = part === "in" ? original.in : original.out;
+    if (handle === null) continue;
+
+    const breakSmooth = (handleCount.get(key) ?? 0) > 1;
+    next =
+      updateContour(next, item.contourId, (c) =>
+        setHandle(c, item.nodeId, part, add(handle, delta), breakSmooth),
+      ) ?? next;
+  }
+
+  return next;
+}
+
+function rectOf(a: Vec2, b: Vec2) {
+  return {
+    minX: Math.min(a.x, b.x),
+    minY: Math.min(a.y, b.y),
+    maxX: Math.max(a.x, b.x),
+    maxY: Math.max(a.y, b.y),
+  };
+}
+
+/**
+ * How each gesture follows the pointer.
+ *
+ * A mapped type over the gesture union, so a new kind cannot be added without
+ * one — which is exactly the drift this replaces. Each is handed the state with
+ * the cursor already updated and the offset from where the drag began.
+ */
+type Continuations = {
+  [K in Gesture["kind"]]: (
+    state: EditorState,
+    gesture: Extract<Gesture, { kind: K }>,
+    input: PointerInput,
+    delta: Vec2,
+  ) => EditorState;
+};
+
+/** Whether the pointer has actually gone anywhere since the press. */
+const budged = (delta: Vec2): boolean => delta.x !== 0 || delta.y !== 0;
+
+const CONTINUE: Continuations = {
+  dragSelection: (state, gesture, _input, delta) => {
+    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+      translateSelection(g, gesture.items, delta),
+    );
+    return {
+      ...state,
+      document: document ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+    };
+  },
+
+  dragHandle: (state, gesture, input, delta) => {
+    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+      updateContour(g, gesture.contourId, (c) =>
+        setHandle(c, gesture.nodeId, gesture.part, input.point, gesture.breakSmooth),
+      ),
+    );
+    return {
+      ...state,
+      document: document ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+    };
+  },
+
+  dragTunniPoint: (state, gesture, input, delta) =>
+    continueTunni(state, gesture, input, delta, setSegmentTunniPoint),
+
+  dragTunniLine: (state, gesture, input, delta) =>
+    continueTunni(state, gesture, input, delta, moveSegmentTunniLine),
+
+  dragMargin: (state, gesture, _input, delta) => {
+    // The origin line cannot itself move — it *is* x = 0. Dragging it means
+    // "put this much space before the glyph", so the outline follows the cursor
+    // and the advance grows with it, holding the right sidebearing. The advance
+    // line does move, and changes the advance alone.
+    const document =
+      gesture.side === "advance"
+        ? updateGlyph(gesture.before, state.currentGlyph, (g) => ({
+            ...g,
+            advance: Math.max(0, gesture.startAdvance + delta.x),
+          }))
+        : gesture.startLeft === null
+          ? null
+          : updateGlyph(gesture.before, state.currentGlyph, (g) =>
+              setLeftSidebearing(g, (gesture.startLeft ?? 0) + delta.x),
+            );
+
+    return {
+      ...state,
+      document: document ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+    };
+  },
+
+  marquee: (state, gesture, input) => {
+    const inside = itemsInRect(
+      currentGlyph(state) ?? EMPTY_GLYPH,
+      rectOf(gesture.origin, input.point),
+    );
+    return {
+      ...state,
+      selection: gesture.additive ? addItems(gesture.before, inside) : inside,
+      gesture: { ...gesture, current: input.point, moved: true },
+    };
+  },
+};
+
+/**
+ * The two Tunni drags, which differ only in which kernel function they call.
+ *
+ * The kernel refuses a move that would pull a handle through its anchor. Holding
+ * the last good geometry is the right answer: the drag continues, and the curve
+ * simply stops following until the cursor comes back.
+ */
+function continueTunni(
+  state: EditorState,
+  gesture: Extract<Gesture, { kind: "dragTunniPoint" | "dragTunniLine" }>,
+  input: PointerInput,
+  delta: Vec2,
+  apply: (c: Parameters<typeof setSegmentTunniPoint>[0], index: number, p: Vec2) => unknown,
+): EditorState {
+  const next = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+    updateContour(g, gesture.segment.contourId, (c) =>
+      apply(c, gesture.segment.segmentIndex, input.point) as ReturnType<typeof setSegmentTunniPoint>,
+    ),
+  );
+  return {
+    ...state,
+    document: next ?? state.document,
+    gesture: { ...gesture, moved: gesture.moved || (next !== null && budged(delta)) },
+  };
+}
+
+/** Carry a gesture on, whichever it is. */
+export function continueGesture(
+  state: EditorState,
+  gesture: Gesture,
+  input: PointerInput,
+): EditorState {
+  const delta = sub(input.point, gesture.origin);
+  // One cast, in one place: TypeScript cannot see that the key and the gesture
+  // narrow together, though the table's type guarantees they do.
+  const carry = CONTINUE[gesture.kind] as (
+    s: EditorState,
+    g: Gesture,
+    i: PointerInput,
+    d: Vec2,
+  ) => EditorState;
+  return carry({ ...state, cursor: input.point }, gesture, input, delta);
+}
