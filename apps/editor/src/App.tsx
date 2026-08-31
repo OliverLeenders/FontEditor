@@ -86,6 +86,12 @@ export function App(): JSX.Element {
       // "H" is free, where the tool letters are not.
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "h") {
         store.toggleAutoHideHandles();
+        return;
+      }
+      // "S" is free too. The tool letters are V P K R E M, and "R" also reverses
+      // a contour inside the select tool.
+      if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "s") {
+        store.toggleSnapPoints();
       }
     };
     const onKeyUp = (event: KeyboardEvent): void => {

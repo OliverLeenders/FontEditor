@@ -1,5 +1,6 @@
 import { CanvasSurface, drawScene } from "@fonteditor/render";
 import {
+  type ToolOptions,
   doubleClick,
   handleVisibility,
   keyDown,
@@ -35,9 +36,17 @@ import styles from "./GlyphCanvas.module.css";
  * — no reconciliation of the tabs, the toolbar, the inspector or the strip,
  * sixty times a second, to move a single node.
  */
-/** The picking options, from the same rule the renderer draws by. */
-function selectOptions(store: EditorStore): { autoHideHandles: boolean } {
-  return { autoHideHandles: handlesAutoHidden(store.getState()) };
+/**
+ * What the select tool needs from the interface: what it may pick, and where a
+ * drag may land. Read from the same rules the renderer draws by.
+ */
+function selectOptions(store: EditorStore): ToolOptions {
+  const state = store.getState();
+  return {
+    autoHideHandles: handlesAutoHidden(state),
+    snapExtremes: state.snapPoints,
+    snapNeighbours: state.snapPoints,
+  };
 }
 
 export function GlyphCanvas({
@@ -119,7 +128,7 @@ export function GlyphCanvas({
           panFrom.current = { x: event.clientX, y: event.clientY };
           return;
         }
-        store.applyTool(pointerMove(store.editor, toInput(event)));
+        store.applyTool(pointerMove(store.editor, toInput(event), selectOptions(store)));
       }}
       onPointerUp={(event) => {
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {

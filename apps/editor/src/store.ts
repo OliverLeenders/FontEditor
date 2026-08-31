@@ -74,6 +74,14 @@ export type StoreState = {
   /** Show handles only where the work is. On by default; the canvas is calmer. */
   readonly autoHideHandles: boolean;
   /**
+   * Let a drag catch on the glyph's own points as well as the font's lines.
+   *
+   * The metric lines are always live and need no setting: the canvas draws them,
+   * so catching on one explains itself. These do not draw yet, which is what the
+   * switch is for.
+   */
+  readonly snapPoints: boolean;
+  /**
    * The spacing workspace's own text and type size.
    *
    * Its own, not the glyph strip's: spacing wants strings like "nonno" that
@@ -123,6 +131,7 @@ export class EditorStore {
       catalogQuery: DEFAULT_QUERY,
       showNeighbours: true,
       autoHideHandles: true,
+      snapPoints: true,
       spacingText: "nonno",
       spacingSize: 128,
       spacingMode: "space",
@@ -334,6 +343,10 @@ export class EditorStore {
 
   toggleAutoHideHandles(): void {
     this.patch({ autoHideHandles: !this.state.autoHideHandles });
+  }
+
+  toggleSnapPoints(): void {
+    this.patch({ snapPoints: !this.state.snapPoints });
   }
 
   setSpacingText(spacingText: string): void {

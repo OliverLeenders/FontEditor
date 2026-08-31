@@ -31,6 +31,7 @@ export function Toolbar(): JSX.Element {
   const activeTool = useStoreValue((s) => s.session.editor.activeTool);
   const scale = useStoreValue((s) => s.session.editor.view.scale);
   const autoHide = useStoreValue((s) => s.autoHideHandles);
+  const snapPoints = useStoreValue((s) => s.snapPoints);
   const undoLabel = useStoreValue((s) => (canUndo(s) ? store.undoLabel() : null));
   const redoLabel = useStoreValue((s) => (canRedo(s) ? store.redoLabel() : null));
 
@@ -90,6 +91,23 @@ export function Toolbar(): JSX.Element {
         onClick={() => store.toggleAutoHideHandles()}
       >
         Handles
+      </button>
+
+      {/* The metric lines are not part of this and are always live: the canvas
+          draws them, so catching on one explains itself. This is for the lines
+          the glyph's own points make, which it does not draw yet. */}
+      <button
+        type="button"
+        className={styles.action}
+        aria-pressed={snapPoints}
+        title={
+          snapPoints
+            ? "Drags line up with the glyph's own points  (S) · hold ctrl to override"
+            : "Drags line up with the font's lines only  (S)"
+        }
+        onClick={() => store.toggleSnapPoints()}
+      >
+        Snap
       </button>
 
       <div className={styles.spacer} />
