@@ -9,6 +9,7 @@ import {
 import type { NeighbourGlyph, SnapGuide } from "@fonteditor/render";
 import {
   DARK_PALETTE,
+  DEFAULT_METRICS,
   LIGHT_PALETTE,
   type RenderPalette,
   type Scene,
@@ -129,6 +130,9 @@ export function sceneFor(
     palette: palette(),
     // The same list a drag snaps to. Drawn and snapped must not part company:
     // a line you can catch on but cannot see is indistinguishable from a bug.
+    // Everything else keeps the renderer's own sizes; only the stroke is a
+    // preference, so only the stroke is overridden.
+    metrics: { ...DEFAULT_METRICS, outlineWidth: state.outlineWidth },
     guides: metricLines(editor.document.info),
     snapGuides: snapGuidesFor(editor),
     tunniSegments: tunniSegments(editor),

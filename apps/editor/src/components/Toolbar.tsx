@@ -1,5 +1,6 @@
 import type { ToolId } from "@fonteditor/tools";
 
+import { MAX_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH } from "../store.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Toolbar.module.css";
 
@@ -32,6 +33,7 @@ export function Toolbar(): JSX.Element {
   const scale = useStoreValue((s) => s.session.editor.view.scale);
   const autoHide = useStoreValue((s) => s.autoHideHandles);
   const snapPoints = useStoreValue((s) => s.snapPoints);
+  const outlineWidth = useStoreValue((s) => s.outlineWidth);
   const undoLabel = useStoreValue((s) => (canUndo(s) ? store.undoLabel() : null));
   const redoLabel = useStoreValue((s) => (canRedo(s) ? store.redoLabel() : null));
 
@@ -109,6 +111,23 @@ export function Toolbar(): JSX.Element {
       >
         Snap
       </button>
+
+      {/* A range rather than a set of choices: the right weight depends on the
+          screen and on how close you are sitting, and neither is something a
+          list of three widths could guess. */}
+      <label className={styles.widthLabel} title="How heavy the outline is drawn">
+        Outline
+        <input
+          type="range"
+          className={styles.width}
+          min={MIN_OUTLINE_WIDTH}
+          max={MAX_OUTLINE_WIDTH}
+          step={0.25}
+          value={outlineWidth}
+          aria-label="Outline thickness"
+          onChange={(event) => store.setOutlineWidth(Number(event.target.value))}
+        />
+      </label>
 
       <div className={styles.spacer} />
 

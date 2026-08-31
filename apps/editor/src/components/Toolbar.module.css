@@ -62,3 +62,19 @@
   color: var(--ink);
   background: var(--selected);
 }
+
+.widthLabel {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .7rem;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.width {
+  width: 5.5rem;
+  accent-color: var(--accent);
+}

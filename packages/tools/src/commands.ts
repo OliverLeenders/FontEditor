@@ -7,7 +7,9 @@ import {
   type GlyphName,
   type IdFactory,
   type NodeId,
+  type HandleLock,
   type NodeType,
+  NO_LOCK,
   addGlyphComponent,
   balanceSegment,
   centreGlyph,
@@ -99,31 +101,39 @@ export function setPointType(
 }
 
 /**
- * Turn the axis constraint on or off for a node.
+ * Turn the axis constraint on or off, for one handle or for both.
  *
- * Switching it on also straightens the handles — see `setHvLock` in the model
- * for why, and for what that means on a smooth node.
+ * Switching it on also straightens the handle — see `setHvLock` in the model for
+ * why, and for what that means on a smooth node.
  */
 export function setNodeHvLock(
   state: EditorState,
   contourId: ContourId,
   nodeId: NodeId,
+  which: "in" | "out" | "both",
   locked: boolean,
 ): ToolResult {
   const document = editCurrentGlyph(state, (g) =>
-    updateContour(g, contourId, (c) => setHvLock(c, nodeId, locked)),
+    updateContour(g, contourId, (c) => setHvLock(c, nodeId, which, locked)),
   );
+
+  const side = which === "both" ? "handles" : which === "in" ? "incoming handle" : "outgoing handle";
   return done(
     state,
     document === null ? null : { ...state, document },
-    locked ? "Lock to axis" : "Unlock from axis",
+    locked ? `Lock ${side} to axis` : `Unlock ${side} from axis`,
   );
 }
 
-export function nodeHvLocked(state: EditorState, contourId: ContourId, nodeId: NodeId): boolean {
+/** Which of a node's handles are held to an axis. */
+export function nodeHvLocked(
+  state: EditorState,
+  contourId: ContourId,
+  nodeId: NodeId,
+): HandleLock {
   const glyph = currentGlyph(state);
   const c = glyph === null ? null : contourById(glyph, contourId);
-  return (c === null ? null : nodeById(c, nodeId))?.hvLock ?? false;
+  return (c === null ? null : nodeById(c, nodeId))?.hvLock ?? NO_LOCK;
 }
 
 /**

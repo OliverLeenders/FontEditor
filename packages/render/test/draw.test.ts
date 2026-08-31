@@ -453,3 +453,54 @@ describe("snap guides", () => {
     expect(restores).toBeGreaterThan(1);
   });
 });
+
+describe("the mark on a locked handle", () => {
+  const ids = counterIds("lockdraw");
+  const withLock = (lock: { in?: boolean; out?: boolean }) =>
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { type: "corner", in: vec(-120, 0), out: vec(0, 120), hvLock: lock }),
+        node(ids.node(), vec(300, 0), { type: "corner", in: vec(240, 40) }),
+      ],
+      false,
+    );
+
+  const strokesNear = (ctx: ReturnType<typeof render>, x: number, y: number) =>
+    ctx.all("moveTo").filter((o) => Math.abs((o.args[0] ?? NaN) - x) < 12 && Math.abs((o.args[1] ?? NaN) - y) < 12);
+
+  it("marks nothing when no handle is locked", () => {
+    const free = render(base(withLock({})));
+    const locked = render(base(withLock({ out: true })));
+    expect(locked.all("moveTo").length).toBe(free.all("moveTo").length + 1);
+  });
+
+  it("marks only the handle that is locked", () => {
+    const one = render(base(withLock({ out: true })));
+    const both = render(base(withLock({ in: true, out: true })));
+    expect(both.all("moveTo").length).toBe(one.all("moveTo").length + 1);
+  });
+
+  it("puts the bar across the handle it belongs to", () => {
+    const ctx = render(base(withLock({ out: true })));
+    const p = toScreen(VIEW, { x: 0, y: 120 });
+    expect(strokesNear(ctx, p.x, p.y).length).toBeGreaterThan(0);
+  });
+
+  it("draws the bar square to the tether, not along it", () => {
+    // Along it is exactly where the tether already is, so a mark drawn there
+    // would be invisible. The out handle runs vertically, so its bar is level:
+    // its two ends share a y and differ in x.
+    const ctx = render(base(withLock({ out: true })));
+    const p = toScreen(VIEW, { x: 0, y: 120 });
+    const at = ctx.indexWhere(
+      (o) =>
+        o.op === "moveTo" &&
+        Math.abs((o.args[0] ?? NaN) - p.x) < 12 &&
+        Math.abs((o.args[1] ?? NaN) - p.y) < 12,
+    );
+    const from = ctx.all("moveTo").find((o) => Math.abs((o.args[1] ?? NaN) - p.y) < 12);
+    expect(at).toBeGreaterThan(-1);
+    expect(from).toBeDefined();
+  });
+});

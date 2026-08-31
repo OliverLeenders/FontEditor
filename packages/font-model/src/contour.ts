@@ -230,7 +230,15 @@ export function setHandle(
 
   if (pt === null) return replaceNode(c, i, withHandleRaw(base, which, null));
 
-  const constrained = base.hvLock ? applyHvLock(base.pt, pt) : pt;
+  // A smooth node's two handles are one straight line, so a lock on the far side
+  // holds this side too: swinging this handle off the axis would drag the locked
+  // one off with it, and the lock would be a lock that does not hold. Alt breaks
+  // the link for this one move, and with it that obligation.
+  const other = which === "in" ? "out" : "in";
+  const held =
+    base.hvLock[which] || (!breakSmooth && base.type === "smooth" && base.hvLock[other]);
+
+  const constrained = held ? applyHvLock(base.pt, pt) : pt;
   const moved = withHandleRaw(base, which, constrained);
   return replaceNode(c, i, breakSmooth ? moved : enforceSmooth(moved, which));
 }
@@ -245,39 +253,59 @@ export function setNodeType(c: Contour, id: NodeId, type: Node["type"]): Contour
 }
 
 /**
- * Turn the node's axis constraint on or off.
+ * Turn the axis constraint on or off, for one handle or for both.
  *
- * Switching it on snaps the handles onto an axis immediately rather than waiting
+ * Switching it on snaps the handle onto an axis immediately rather than waiting
  * for the next drag: a lock that visibly changed nothing would read as broken.
  * The snap rotates rather than projects, so a handle keeps its length and only
  * its direction is corrected — see `snapToAxis` for why those differ.
  *
  * A smooth node needs more care than snapping each handle to its own nearer
  * axis, which would leave one pointing north and the other east and quietly make
- * "smooth" a lie. Instead the longer handle picks the axis and the other is
- * swung to face it, so the node stays smooth and both sides end up on the same
- * line. A corner node has no such obligation, so each handle snaps on its own.
+ * "smooth" a lie. Its handles are one line, so one of them picks the axis and
+ * the other is swung to face it. Which one leads is the one being locked; when
+ * both are, the longer handle leads, since it carries more of the curve's shape
+ * and is the less destructive to keep. A corner node has no such obligation, so
+ * each handle snaps on its own.
  */
-export function setHvLock(c: Contour, id: NodeId, hvLock: boolean): Contour | null {
+export function setHvLock(
+  c: Contour,
+  id: NodeId,
+  which: "in" | "out" | "both",
+  locked: boolean,
+): Contour | null {
   const i = nodeIndex(c, id);
   if (i < 0) return null;
 
   const base = c.nodes[i]!;
-  if (!hvLock) return replaceNode(c, i, { ...base, hvLock: false });
+  const hvLock =
+    which === "both"
+      ? { in: locked, out: locked }
+      : { ...base.hvLock, [which]: locked };
 
-  let next: Node = { ...base, hvLock: true };
+  const next: Node = { ...base, hvLock };
+  if (!locked) return replaceNode(c, i, next);
 
-  if (base.type === "smooth" && base.in !== null && base.out !== null) {
-    const leading = distance(base.pt, base.out) >= distance(base.pt, base.in) ? "out" : "in";
-    const handle = leading === "out" ? base.out : base.in;
-    next = withHandleRaw(next, leading, snapToAxis(base.pt, handle));
-    next = enforceSmooth(next, leading);
-  } else {
-    if (next.in !== null) next = withHandleRaw(next, "in", snapToAxis(base.pt, next.in));
-    if (next.out !== null) next = withHandleRaw(next, "out", snapToAxis(base.pt, next.out));
+  const smooth = base.type === "smooth" && base.in !== null && base.out !== null;
+  if (smooth) {
+    const leading =
+      which === "both"
+        ? distance(base.pt, base.out!) >= distance(base.pt, base.in!)
+          ? "out"
+          : "in"
+        : which;
+    const handle = leading === "out" ? base.out! : base.in!;
+    const swung = withHandleRaw(next, leading, snapToAxis(base.pt, handle));
+    return replaceNode(c, i, enforceSmooth(swung, leading));
   }
 
-  return replaceNode(c, i, next);
+  let snapped = next;
+  for (const side of ["in", "out"] as const) {
+    if (!hvLock[side]) continue;
+    const handle = side === "in" ? snapped.in : snapped.out;
+    if (handle !== null) snapped = withHandleRaw(snapped, side, snapToAxis(base.pt, handle));
+  }
+  return replaceNode(c, i, snapped);
 }
 
 /**
@@ -352,7 +380,7 @@ export function extendHandle(c: Contour, id: NodeId, which: "in" | "out"): Conto
   if (other === undefined) return null;
 
   const at = lerp(n.pt, other.pt, 1 / 3);
-  const placed = n.hvLock ? applyHvLock(n.pt, at) : at;
+  const placed = n.hvLock[which] ? applyHvLock(n.pt, at) : at;
   return replaceNode(c, i, enforceSmooth(withHandleRaw(n, which, placed), which));
 }
 

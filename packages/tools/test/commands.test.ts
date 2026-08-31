@@ -134,7 +134,7 @@ describe("locking handles to an axis", () => {
       false,
     );
     const { s, c } = start(skewed);
-    const next = setNodeHvLock(s, c.id, c.nodes[0]!.id, true).state;
+    const next = setNodeHvLock(s, c.id, c.nodes[0]!.id, "both", true).state;
     const n = nodeAt(next, 0);
 
     // Rotated, not projected: the direction is corrected and the length kept.
@@ -148,7 +148,7 @@ describe("locking handles to an axis", () => {
     expect(n.out!.y).toBeGreaterThan(0);
     expect(distance(n.pt, n.out!)).toBeCloseTo(distance(vec(0, 0), vec(15, 80)), 9);
 
-    expect(n.hvLock).toBe(true);
+    expect(n.hvLock).toEqual({ in: true, out: true });
   });
 
   // The case worth getting right: snapping each handle to its own nearer axis
@@ -165,7 +165,7 @@ describe("locking handles to an axis", () => {
       false,
     );
     const { s, c } = start(skewed);
-    const next = setNodeHvLock(s, c.id, c.nodes[0]!.id, true).state;
+    const next = setNodeHvLock(s, c.id, c.nodes[0]!.id, "both", true).state;
     const n = nodeAt(next, 0);
 
     const toIn = { x: n.in!.x - n.pt.x, y: n.in!.y - n.pt.y };
@@ -190,24 +190,30 @@ describe("locking handles to an axis", () => {
     );
     const { s, c } = start(skewed);
     const before = distance(vec(0, 0), vec(-30, -85));
-    const next = setNodeHvLock(s, c.id, c.nodes[0]!.id, true).state;
+    const next = setNodeHvLock(s, c.id, c.nodes[0]!.id, "both", true).state;
     expect(distance(nodeAt(next, 0).pt, nodeAt(next, 0).in!)).toBeCloseTo(before, 9);
   });
 
   it("unlocks without moving anything", () => {
     const { s, c } = start();
-    const locked = setNodeHvLock(s, c.id, c.nodes[0]!.id, true).state;
-    const unlocked = setNodeHvLock(locked, c.id, c.nodes[0]!.id, false).state;
-    expect(nodeHvLocked(unlocked, c.id, c.nodes[0]!.id)).toBe(false);
+    const locked = setNodeHvLock(s, c.id, c.nodes[0]!.id, "both", true).state;
+    const unlocked = setNodeHvLock(locked, c.id, c.nodes[0]!.id, "both", false).state;
+    expect(nodeHvLocked(unlocked, c.id, c.nodes[0]!.id)).toEqual({ in: false, out: false });
     expect(nodeAt(unlocked, 0).in).toEqual(nodeAt(locked, 0).in);
     expect(nodeAt(unlocked, 0).out).toEqual(nodeAt(locked, 0).out);
   });
 
-  it("reports whether a node is locked", () => {
+  it("reports which handles are locked", () => {
     const { s, c } = start();
-    expect(nodeHvLocked(s, c.id, c.nodes[0]!.id)).toBe(false);
-    const locked = setNodeHvLock(s, c.id, c.nodes[0]!.id, true).state;
-    expect(nodeHvLocked(locked, c.id, c.nodes[0]!.id)).toBe(true);
+    expect(nodeHvLocked(s, c.id, c.nodes[0]!.id)).toEqual({ in: false, out: false });
+    const locked = setNodeHvLock(s, c.id, c.nodes[0]!.id, "both", true).state;
+    expect(nodeHvLocked(locked, c.id, c.nodes[0]!.id)).toEqual({ in: true, out: true });
+  });
+
+  it("locks one handle without locking the other", () => {
+    const { s, c } = start();
+    const locked = setNodeHvLock(s, c.id, c.nodes[0]!.id, "out", true).state;
+    expect(nodeHvLocked(locked, c.id, c.nodes[0]!.id)).toEqual({ in: false, out: true });
   });
 });
 
@@ -360,7 +366,7 @@ describe("transactions", () => {
     const { s, c } = start();
     for (const outcome of [
       setPointType(s, "corner", { contourId: c.id, nodeId: c.nodes[0]!.id }),
-      setNodeHvLock(s, c.id, c.nodes[0]!.id, true),
+      setNodeHvLock(s, c.id, c.nodes[0]!.id, "both", true),
       reverseContourAt(s, c.id),
       retractHandle(s, c.id, c.nodes[0]!.id, "out"),
       convertSegment(s, { contourId: c.id, segmentIndex: 0 }, "line"),

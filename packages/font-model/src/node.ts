@@ -32,22 +32,55 @@ export type NodeType = "corner" | "smooth" | "tangent";
  * null is a straight line, and stays one through a save and load — matching
  * what UFO's glif format and TrueType both record.
  */
+/**
+ * Which of a node's handles are held to the horizontal or vertical.
+ *
+ * Per handle rather than per node, because the two sides of a node are often
+ * doing different jobs: the flat top of an `a` wants its outgoing handle level
+ * while the incoming one follows the curve down into the stem, and one flag for
+ * both could only say yes to both or no to both.
+ *
+ * On a *smooth* node the two handles are one straight line, so a lock on either
+ * end holds the whole line — see `setHandle` for how that is resolved. The flags
+ * still record only what was asked for; the geometry does the rest.
+ */
+export type HandleLock = {
+  readonly in: boolean;
+  readonly out: boolean;
+};
+
+export const NO_LOCK: HandleLock = { in: false, out: false };
+export const BOTH_LOCKED: HandleLock = { in: true, out: true };
+
+/** Whether either handle is held, which is what an interface usually asks. */
+export function anyLocked(lock: HandleLock): boolean {
+  return lock.in || lock.out;
+}
+
 export type Node = {
   readonly id: NodeId;
   readonly pt: Vec2;
   readonly type: NodeType;
   readonly in: Vec2 | null;
   readonly out: Vec2 | null;
-  /** Constrain this node's handles to the horizontal or vertical axis. */
-  readonly hvLock: boolean;
+  /** Which handles are constrained to the horizontal or vertical axis. */
+  readonly hvLock: HandleLock;
 };
 
 export type NodeInit = {
   readonly type?: NodeType;
   readonly in?: Vec2 | null;
   readonly out?: Vec2 | null;
-  readonly hvLock?: boolean;
+  /** `true` locks both handles, which is what the flag used to mean. */
+  readonly hvLock?: boolean | Partial<HandleLock>;
 };
+
+/** Read an init's lock, accepting the boolean the field used to be. */
+export function handleLock(init: NodeInit["hvLock"]): HandleLock {
+  if (init === undefined) return NO_LOCK;
+  if (typeof init === "boolean") return init ? BOTH_LOCKED : NO_LOCK;
+  return { in: init.in ?? false, out: init.out ?? false };
+}
 
 export function node(id: NodeId, pt: Vec2, init: NodeInit = {}): Node {
   return {
@@ -56,7 +89,7 @@ export function node(id: NodeId, pt: Vec2, init: NodeInit = {}): Node {
     type: init.type ?? "corner",
     in: init.in ?? null,
     out: init.out ?? null,
-    hvLock: init.hvLock ?? false,
+    hvLock: handleLock(init.hvLock),
   };
 }
 

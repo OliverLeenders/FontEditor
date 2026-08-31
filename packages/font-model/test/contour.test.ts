@@ -194,7 +194,7 @@ describe("setHandle", () => {
   });
 
   it("snaps to an axis when the node is HV-locked", () => {
-    const c = setHvLock(ringContour(), ringContour().nodes[0]!.id, true)!;
+    const c = setHvLock(ringContour(), ringContour().nodes[0]!.id, "both", true)!;
     const id = c.nodes[0]!.id;
 
     // Mostly horizontal from (0, 250) — snaps to the node's own y.
@@ -448,7 +448,7 @@ describe("extendHandle", () => {
   });
 
   it("respects an axis lock", () => {
-    const locked = setHvLock(triangle(), "t1", true)!;
+    const locked = setHvLock(triangle(), "t1", "both", true)!;
     const out = extendHandle(locked, "t1", "out")!;
     const handle = nodeById(out, "t1")?.out;
     // On the axis, so one coordinate matches the anchor exactly.
@@ -531,5 +531,99 @@ describe("a curve missing one of its handles", () => {
   it("leaves a fully handled segment alone", () => {
     const full = extendSegmentHandles(half(), 0)!;
     expect(extendSegmentHandles(full, 0)).toBe(full);
+  });
+});
+
+describe("locking one handle at a time", () => {
+  /** A corner node whose two handles point in unrelated directions. */
+  function corner() {
+    const ids = counterIds("lock");
+    return contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { type: "corner", in: vec(-90, 20), out: vec(15, 80) }),
+        node(ids.node(), vec(300, 0), { type: "corner", in: vec(240, 40) }),
+      ],
+      false,
+    );
+  }
+
+  /** A smooth node: its two handles are one straight line through it. */
+  function smooth() {
+    const ids = counterIds("sm");
+    return contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { type: "smooth", in: vec(-100, -20), out: vec(50, 10) }),
+        node(ids.node(), vec(300, 0), { type: "corner", in: vec(240, 40) }),
+      ],
+      false,
+    );
+  }
+
+  it("straightens only the handle that was locked", () => {
+    const c = corner();
+    const locked = setHvLock(c, c.nodes[0]!.id, "out", true)!;
+    const n = locked.nodes[0]!;
+
+    expect(n.hvLock).toEqual({ in: false, out: true });
+    // The out handle was nearer the vertical, so it goes upright.
+    expect(n.out).toEqual({ x: 0, y: expect.closeTo(81.4, 1) as unknown as number });
+    // The in handle is untouched, still off both axes.
+    expect(n.in).toEqual({ x: -90, y: 20 });
+  });
+
+  it("holds a locked handle while the other one is dragged, on a smooth node", () => {
+    // Its handles are one line, so swinging the free side would drag the locked
+    // side off its axis with it. A lock that does not hold is not a lock.
+    const c = smooth();
+    const locked = setHvLock(c, c.nodes[0]!.id, "out", true)!;
+    const dragged = setHandle(locked, c.nodes[0]!.id, "in", vec(-70, -55))!;
+    const n = dragged.nodes[0]!;
+
+    expect(n.out!.y).toBeCloseTo(0, 9);
+    expect(n.in!.y).toBeCloseTo(0, 9);
+  });
+
+  it("leaves the free handle free on a corner node", () => {
+    // No collinearity to preserve, so the lock is nobody's business but its own.
+    const c = corner();
+    const locked = setHvLock(c, c.nodes[0]!.id, "out", true)!;
+    const dragged = setHandle(locked, c.nodes[0]!.id, "in", vec(-70, -55))!;
+
+    expect(dragged.nodes[0]!.in).toEqual({ x: -70, y: -55 });
+  });
+
+  it("still projects the locked handle itself onto its axis when dragged", () => {
+    const c = corner();
+    const locked = setHvLock(c, c.nodes[0]!.id, "out", true)!;
+    const dragged = setHandle(locked, c.nodes[0]!.id, "out", vec(30, 90))!;
+
+    // Projected, not rotated: the pointer says how far along the axis.
+    expect(dragged.nodes[0]!.out).toEqual({ x: 0, y: 90 });
+  });
+
+  it("lets alt break the link, and with it the far side's claim", () => {
+    const c = smooth();
+    const locked = setHvLock(c, c.nodes[0]!.id, "out", true)!;
+    const dragged = setHandle(locked, c.nodes[0]!.id, "in", vec(-70, -55), true)!;
+
+    expect(dragged.nodes[0]!.in).toEqual({ x: -70, y: -55 });
+  });
+
+  it("unlocks one side without disturbing the other", () => {
+    const c = corner();
+    let next = setHvLock(c, c.nodes[0]!.id, "both", true)!;
+    next = setHvLock(next, c.nodes[0]!.id, "in", false)!;
+
+    expect(next.nodes[0]!.hvLock).toEqual({ in: false, out: true });
+  });
+
+  it("moves nothing when a lock is switched off", () => {
+    const c = corner();
+    const locked = setHvLock(c, c.nodes[0]!.id, "out", true)!;
+    const unlocked = setHvLock(locked, c.nodes[0]!.id, "out", false)!;
+
+    expect(unlocked.nodes[0]!.out).toEqual(locked.nodes[0]!.out);
   });
 });

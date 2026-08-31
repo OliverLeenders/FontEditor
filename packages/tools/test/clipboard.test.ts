@@ -83,7 +83,8 @@ describe("clipboardText", () => {
     // paste collide with the contour it came from.
     expect(text).not.toContain("c1-a");
     expect(text).not.toContain('"id"');
-    expect(text).toContain('"hvLock": true');
+    expect(text).toContain('"hvLock"');
+    expect(JSON.parse(text).contours[0].nodes[2].hvLock).toEqual({ in: true, out: true });
   });
 
   it("is readable JSON, so a paste elsewhere shows something sensible", () => {
@@ -107,7 +108,7 @@ describe("parseClipboard", () => {
     ]);
     expect(contours[0]?.nodes[1]?.type).toBe("smooth");
     expect(contours[0]?.nodes[0]?.out).toEqual(vec(40, 0));
-    expect(contours[0]?.nodes[2]?.hvLock).toBe(true);
+    expect(contours[0]?.nodes[2]?.hvLock).toEqual({ in: true, out: true });
   });
 
   it("mints fresh ids", () => {

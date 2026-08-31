@@ -18,9 +18,13 @@ export { glyphFileName, glyphNameForCodePoint } from "./names.js";
 export type { ComponentId, ContourId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";
 
-export type { Node, NodeInit, NodeType } from "./node.js";
+export type { HandleLock, Node, NodeInit, NodeType } from "./node.js";
 export {
+  BOTH_LOCKED,
+  NO_LOCK,
+  anyLocked,
   applyHvLock,
+  handleLock,
   enforceSmooth,
   handleOf,
   moveNodeTo,

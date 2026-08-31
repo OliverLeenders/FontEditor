@@ -91,8 +91,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Lock handles to axis",
-        checked: locked,
-        run: () => store.applyTool(setNodeHvLock(editor, contourId, nodeId, !locked)),
+        // Checked only when both are, since that is what this item sets. A node
+        // with one handle locked shows unchecked, and using it locks the pair.
+        checked: locked.in && locked.out,
+        run: () =>
+          store.applyTool(
+            setNodeHvLock(editor, contourId, nodeId, "both", !(locked.in && locked.out)),
+          ),
       },
       { kind: "separator" },
       { kind: "item", label: "Reverse contour", run: () => store.applyTool(reverseContourAt(editor, contourId)) },
@@ -108,9 +113,18 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     items.push(
       {
         kind: "item",
-        label: "Lock handles to axis",
-        checked: locked,
-        run: () => store.applyTool(setNodeHvLock(editor, contourId, nodeId, !locked)),
+        label: "Lock this handle to axis",
+        checked: locked[part],
+        run: () => store.applyTool(setNodeHvLock(editor, contourId, nodeId, part, !locked[part])),
+      },
+      {
+        kind: "item",
+        label: "Lock both handles to axis",
+        checked: locked.in && locked.out,
+        run: () =>
+          store.applyTool(
+            setNodeHvLock(editor, contourId, nodeId, "both", !(locked.in && locked.out)),
+          ),
       },
       { kind: "separator" },
       {

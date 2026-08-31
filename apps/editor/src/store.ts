@@ -46,6 +46,11 @@ import {
 } from "./persistence.js";
 import { starterFont } from "./sample.js";
 
+/** The stroke the renderer has always used, and the range the control offers. */
+export const DEFAULT_OUTLINE_WIDTH = 2;
+export const MIN_OUTLINE_WIDTH = 0.5;
+export const MAX_OUTLINE_WIDTH = 6;
+
 export type { Ownership, StorageState };
 
 /**
@@ -81,6 +86,14 @@ export type StoreState = {
    * switch is for.
    */
   readonly snapPoints: boolean;
+  /**
+   * How heavy the outline is drawn, in screen pixels.
+   *
+   * A preference rather than a fact about the font: a hairline is right for
+   * judging a curve against the grid, and a heavier stroke is right for reading
+   * the shape across the room.
+   */
+  readonly outlineWidth: number;
   /**
    * The spacing workspace's own text and type size.
    *
@@ -132,6 +145,7 @@ export class EditorStore {
       showNeighbours: true,
       autoHideHandles: true,
       snapPoints: true,
+      outlineWidth: DEFAULT_OUTLINE_WIDTH,
       spacingText: "nonno",
       spacingSize: 128,
       spacingMode: "space",
@@ -347,6 +361,11 @@ export class EditorStore {
 
   toggleSnapPoints(): void {
     this.patch({ snapPoints: !this.state.snapPoints });
+  }
+
+  setOutlineWidth(outlineWidth: number): void {
+    if (!Number.isFinite(outlineWidth)) return;
+    this.patch({ outlineWidth: Math.min(MAX_OUTLINE_WIDTH, Math.max(MIN_OUTLINE_WIDTH, outlineWidth)) });
   }
 
   setSpacingText(spacingText: string): void {

@@ -6,9 +6,12 @@ import {
   type FontDocument,
   type FontInfo,
   type Glyph,
+  type HandleLock,
   type Node,
   type NodeType,
+  BOTH_LOCKED,
   DEFAULT_FONT_INFO,
+  NO_LOCK,
   component,
   contour,
   glyph,
@@ -41,8 +44,12 @@ export type StoredNode = {
   readonly type: NodeType;
   readonly in: StoredPoint | null;
   readonly out: StoredPoint | null;
-  /** Omitted when false, which is almost every node. */
-  readonly hvLock?: true;
+  /**
+   * Which handles are held to an axis. Omitted when neither is, which is almost
+   * every node. `true` is the older form, when the lock was one flag for the
+   * whole node, and still reads as both.
+   */
+  readonly hvLock?: true | "in" | "out";
 };
 
 export type StoredContour = {
@@ -131,7 +138,10 @@ function encodeNode(n: Node): StoredNode {
     in: n.in === null ? null : point(n.in),
     out: n.out === null ? null : point(n.out),
   };
-  return n.hvLock ? { ...base, hvLock: true } : base;
+  if (n.hvLock.in && n.hvLock.out) return { ...base, hvLock: true };
+  if (n.hvLock.in) return { ...base, hvLock: "in" };
+  if (n.hvLock.out) return { ...base, hvLock: "out" };
+  return base;
 }
 
 export function encodeFontInfo(document: FontDocument): StoredFontInfo {
@@ -226,9 +236,22 @@ function decodeNode(raw: unknown): Decoded<Node> {
       type: type as NodeType,
       in: incoming,
       out: outgoing,
-      hvLock: raw["hvLock"] === true,
+      hvLock: decodeLock(raw["hvLock"]),
     }),
   );
+}
+
+/**
+ * Read a stored lock, in either the current form or the one before it.
+ *
+ * Anything unrecognised reads as unlocked rather than failing the node. A lock
+ * is a convenience, and losing one is not worth refusing to open a glyph over.
+ */
+function decodeLock(raw: unknown): HandleLock {
+  if (raw === true) return BOTH_LOCKED;
+  if (raw === "in") return { in: true, out: false };
+  if (raw === "out") return { in: false, out: true };
+  return NO_LOCK;
 }
 
 function decodeContour(raw: unknown): Decoded<Contour> {

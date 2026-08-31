@@ -35,7 +35,7 @@ type StoredNode = {
   readonly type: NodeType;
   readonly in: Vec2 | null;
   readonly out: Vec2 | null;
-  readonly hvLock: boolean;
+  readonly hvLock: boolean | { readonly in?: boolean; readonly out?: boolean };
 };
 
 type Payload = {
@@ -82,7 +82,7 @@ export function clipboardText(state: EditorState): string | null {
         type: n.type,
         in: n.in,
         out: n.out,
-        hvLock: n.hvLock,
+        hvLock: { in: n.hvLock.in, out: n.hvLock.out },
       })),
     })),
   };
@@ -135,6 +135,22 @@ function nodeType(value: unknown): NodeType {
  * with a keyboard — so a malformed paste has to be refused rather than trusted
  * into the document, where it would break invariants nothing else can violate.
  */
+/**
+ * Read a pasted lock, from this format or from the boolean it used to be.
+ *
+ * Clipboard text can come from an older build, or from a person editing it by
+ * hand, so anything unrecognised reads as unlocked rather than refusing the
+ * paste.
+ */
+function readLock(raw: unknown): { in: boolean; out: boolean } {
+  if (raw === true) return { in: true, out: true };
+  if (raw !== null && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    return { in: o["in"] === true, out: o["out"] === true };
+  }
+  return { in: false, out: false };
+}
+
 export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
   let raw: unknown;
   try {
@@ -162,7 +178,7 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
           type: nodeType(rawNode["type"]),
           in: point(rawNode["in"]),
           out: point(rawNode["out"]),
-          hvLock: rawNode["hvLock"] === true,
+          hvLock: readLock(rawNode["hvLock"]),
         }),
       );
     }
