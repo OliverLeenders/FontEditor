@@ -18,18 +18,9 @@ import {
   DEFAULT_FONT_INFO,
   fontDocument,
   glyph,
-  glyphBounds,
   randomIds,
 } from "@fonteditor/font-model";
-import {
-  Autosave,
-  type AutosaveStatus,
-  ProjectLock,
-  StorageClient,
-  browserLocks,
-  dirtyGlyphs,
-  requestPersistence,
-} from "@fonteditor/storage";
+import type { AutosaveStatus } from "@fonteditor/storage";
 import {
   type EditorState,
   type ToolId,
@@ -38,20 +29,24 @@ import {
   editorState,
   setActiveTool,
 } from "@fonteditor/tools";
-import { type ViewTransform, fitRect } from "@fonteditor/view";
+import type { ViewTransform } from "@fonteditor/view";
 
+import { frameGlyph } from "./framing.js";
+import {
+  type InspectorPlacement,
+  clampInspector,
+  loadInspector,
+  saveInspector,
+} from "./inspectorPlacement.js";
+import {
+  type Ownership,
+  Persistence,
+  type PersistenceReport,
+  type StorageState,
+} from "./persistence.js";
 import { starterFont } from "./sample.js";
 
-export type StorageState = "connecting" | "ready" | "unavailable";
-
-/**
- * Whether this tab owns the project, and may therefore write to it.
- *
- * `reading` is a full editor over a document it will not save. That is a strange
- * state to be in, so it is named rather than implied by a flag, and the
- * interface says so plainly instead of quietly dropping the work.
- */
-export type Ownership = "owner" | "reading";
+export type { Ownership, StorageState };
 
 /**
  * Everything the interface reads, in one immutable value.
@@ -71,7 +66,7 @@ export type StoreState = {
   readonly stripText: string;
   /** Space held: draw the shape without any controls. */
   readonly previewing: boolean;
-  readonly inspector: { readonly x: number; readonly y: number; readonly open: boolean };
+  readonly inspector: InspectorPlacement;
   /** What the glyph browser is filtered to. Not undoable, so it lives out here. */
   readonly catalogQuery: CatalogQuery;
   /** Draw the glyphs either side, from the strip text, for judging spacing. */
@@ -92,8 +87,6 @@ export type StoreState = {
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
-const INSPECTOR_KEY = "fonteditor.inspector";
-
 /**
  * The editor's state, held outside React.
  *
@@ -105,17 +98,18 @@ const INSPECTOR_KEY = "fonteditor.inspector";
  * while panels subscribe through selectors and wake only when their own slice
  * changes.
  *
+ * What it holds is what the interface reads: the session and its history, the
+ * camera, and the settings that are not part of the document. Getting any of
+ * that to disk belongs to `Persistence`, which this owns but does not
+ * second-guess.
+ *
  * It lives in the app rather than a package because nothing else consumes it.
  * If a second consumer appears, extract it then.
  */
 export class EditorStore {
   private state: StoreState;
   private readonly listeners = new Set<() => void>();
-
-  private storageClient: StorageClient | null = null;
-  private readonly lock: ProjectLock;
-  private lastJournalled: FontDocument | null = null;
-  private readonly autosave: Autosave;
+  private readonly disk: Persistence;
 
   constructor() {
     this.state = {
@@ -137,39 +131,7 @@ export class EditorStore {
       viewport: { width: 0, height: 0 },
     };
 
-    // Losing the lock has to stop writes at once, not at the next save: the tab
-    // that took it is now the truth, and this one still believes in the font it
-    // had.
-    this.lock = new ProjectLock(browserLocks(), () => {
-      this.patch({ ownership: "reading", saveStatus: "idle" });
-    });
-
-    this.autosave = new Autosave({
-      journal: async (document) => {
-        if (!this.writable) return;
-        for (const g of dirtyGlyphs(this.lastJournalled, document)) {
-          await this.storageClient?.journal(g);
-        }
-        this.lastJournalled = document;
-      },
-      save: async (document, previous) => {
-        if (!this.writable) return;
-        await this.storageClient?.saveGlyphs(dirtyGlyphs(previous, document));
-        await this.storageClient?.saveFontInfo(document);
-        // Only when it moved: the table is persistent, so this is exact, and it
-        // can be large enough that rewriting it on every stroke would show.
-        if (previous === null || previous.kerning !== document.kerning) {
-          await this.storageClient?.saveKerning(document);
-        }
-      },
-      saved: () => {
-        void this.storageClient?.clearJournal();
-        this.patch({ saveStatus: this.autosave.status });
-      },
-      failed: (error) => {
-        this.patch({ saveStatus: "failed", storageDetail: error.message });
-      },
-    });
+    this.disk = new Persistence((changes: PersistenceReport) => this.patch(changes));
   }
 
   // ---- subscription ------------------------------------------------------
@@ -190,46 +152,6 @@ export class EditorStore {
 
   // ---- reading -----------------------------------------------------------
 
-  /** Whether this tab may write. Every path to disk is gated on it. */
-  private get writable(): boolean {
-    return this.state.ownership === "owner";
-  }
-
-  /**
-   * Take the project over from whichever tab holds it.
-   *
-   * The document is reloaded afterwards rather than kept: the owning tab may
-   * have changed anything at all, including replacing the font, and writing this
-   * tab's stale copy over it is the exact bug this whole mechanism exists to
-   * stop.
-   */
-  async takeOver(): Promise<void> {
-    if (this.state.ownership === "owner") return;
-    if (!(await this.lock.steal())) return;
-
-    this.patch({ ownership: "owner" });
-    await this.reloadFromDisk();
-  }
-
-  /** Adopt whatever is on disk now, discarding what this tab was showing. */
-  private async reloadFromDisk(): Promise<void> {
-    const client = this.storageClient;
-    if (client === null) return;
-
-    const loaded = await client.load();
-    if (loaded.kind !== "loaded") return;
-
-    this.patch({
-      session: newSession(
-        editorState({ document: loaded.document, view: this.editor.view }),
-      ),
-      recovered: loaded.recovered,
-    });
-    this.setCurrentGlyph(loaded.document.glyphOrder[0] ?? "");
-    this.autosave.markLoaded(loaded.document, loaded.recovered);
-    this.patch({ saveStatus: this.autosave.status });
-  }
-
   get editor(): EditorState {
     return this.state.session.editor;
   }
@@ -244,9 +166,9 @@ export class EditorStore {
   applyTool(outcome: ToolResult): void {
     const session = applyToSession(this.state.session, outcome);
     this.patch({ session });
-    this.autosave.commit(session.editor.document);
-    if (this.state.saveStatus !== this.autosave.status) {
-      this.patch({ saveStatus: this.autosave.status });
+    this.disk.commit(session.editor.document);
+    if (this.state.saveStatus !== this.disk.status) {
+      this.patch({ saveStatus: this.disk.status });
     }
   }
 
@@ -278,12 +200,12 @@ export class EditorStore {
 
   undo(): void {
     this.patch({ session: undo(this.state.session) });
-    this.autosave.commit(this.state.session.editor.document);
+    this.disk.commit(this.state.session.editor.document);
   }
 
   redo(): void {
     this.patch({ session: redo(this.state.session) });
-    this.autosave.commit(this.state.session.editor.document);
+    this.disk.commit(this.state.session.editor.document);
   }
 
   canUndo(): boolean {
@@ -324,31 +246,18 @@ export class EditorStore {
 
   fitGlyph(): void {
     const glyph = this.glyph();
-    const { width, height } = this.state.viewport;
-    if (glyph === null || width === 0 || height === 0) return;
+    if (glyph === null) return;
 
-    // Frame the em box rather than the outline, so switching glyphs does not
-    // rescale the canvas under you — an `l` and an `o` should sit at the same
-    // size, the way they will on the page.
-    const { ascender, descender } = this.editor.document.info;
-    const box = glyphBounds(glyph) ?? { minX: 0, minY: 0, maxX: glyph.advance, maxY: 0 };
-    const fitted = fitRect(
-      {
-        minX: Math.min(0, box.minX),
-        maxX: Math.max(glyph.advance, box.maxX),
-        minY: Math.min(descender, box.minY),
-        maxY: Math.max(ascender, box.maxY),
-      },
-      width,
-      height,
-      60,
-    );
+    const { width, height } = this.state.viewport;
+    const fitted = frameGlyph(glyph, this.editor.document.info, width, height);
     if (fitted !== null) this.setView(fitted);
   }
 
   setPreviewing(previewing: boolean): void {
     if (previewing !== this.state.previewing) this.patch({ previewing });
   }
+
+  // ---- opening a font ----------------------------------------------------
 
   /**
    * Start a new, empty font, discarding whatever is open.
@@ -370,11 +279,6 @@ export class EditorStore {
    * a single ctrl-Z that silently swapped the whole font back would be alarming
    * rather than useful, and the history it restored would describe glyphs that
    * are no longer open. The session starts again on the new font.
-   *
-   * The write goes through `replaceAll` rather than the autosave's per-glyph
-   * path: a few thousand glyphs is one round trip and one pass over the
-   * directory, and it is the only route that clears out the font being
-   * replaced.
    */
   async importFont(bytes: ArrayBuffer): Promise<{
     family: string;
@@ -396,35 +300,24 @@ export class EditorStore {
    *
    * Shared by opening a font and by starting a new one, because they differ only
    * in where the document came from. The history is replaced rather than
-   * appended to: undo is for the shape you are drawing, and a single ctrl-Z that
-   * silently swapped the whole font back would be alarming rather than useful.
+   * appended to, for the reason `importFont` gives.
    */
   private async adoptDocument(document: FontDocument): Promise<void> {
+    this.showDocument(document, false);
+    this.setCatalogQuery(DEFAULT_QUERY);
+    await this.disk.replaceAll(document);
+  }
+
+  /** Put a document on screen, starting its history over. */
+  private showDocument(document: FontDocument, recovered: boolean): void {
     this.patch({
       session: newSession(editorState({ document, view: this.editor.view })),
-      recovered: false,
+      recovered,
     });
     this.setCurrentGlyph(document.glyphOrder[0] ?? "");
-    this.setCatalogQuery(DEFAULT_QUERY);
-
-    const client = this.storageClient;
-    if (client === null) return;
-    // A tab that does not own the project must not replace it. The buttons that
-    // lead here are disabled, so this is the backstop rather than the message.
-    if (!this.writable) return;
-
-    // Before anything is written: a save scheduled or running from the previous
-    // font would otherwise land after the replacement and put its glyphs back,
-    // so the font just discarded returns on the next load.
-    await this.autosave.abandon();
-
-    this.patch({ saveStatus: "saving" });
-    await client.replaceAll(document);
-    // Disk now holds exactly this document, so autosave starts from it rather
-    // than believing every glyph is still unwritten.
-    this.autosave.markLoaded(document, false);
-    this.patch({ saveStatus: this.autosave.status });
   }
+
+  // ---- settings ----------------------------------------------------------
 
   setCatalogQuery(changes: Partial<CatalogQuery>): void {
     const catalogQuery = { ...this.state.catalogQuery, ...changes };
@@ -465,22 +358,21 @@ export class EditorStore {
   }
 
   moveInspector(x: number, y: number): void {
-    const inspector = { ...this.state.inspector, ...clampInspector(x, y) };
-    this.patch({ inspector });
-    saveInspector(inspector);
+    this.placeInspector({ ...this.state.inspector, ...clampInspector(x, y) });
   }
 
   /** Pull the inspector back into view — after a resize, or a restore from a larger window. */
   reclampInspector(): void {
     const { x, y } = clampInspector(this.state.inspector.x, this.state.inspector.y);
     if (x === this.state.inspector.x && y === this.state.inspector.y) return;
-    const inspector = { ...this.state.inspector, x, y };
-    this.patch({ inspector });
-    saveInspector(inspector);
+    this.placeInspector({ ...this.state.inspector, x, y });
   }
 
   toggleInspector(): void {
-    const inspector = { ...this.state.inspector, open: !this.state.inspector.open };
+    this.placeInspector({ ...this.state.inspector, open: !this.state.inspector.open });
+  }
+
+  private placeInspector(inspector: InspectorPlacement): void {
     this.patch({ inspector });
     saveInspector(inspector);
   }
@@ -490,99 +382,58 @@ export class EditorStore {
   /**
    * Open the store and adopt whatever is there.
    *
-   * Everything above works without storage, and everything here may fail: a
-   * browser without OPFS should still give a usable editor that simply cannot
-   * remember anything.
+   * Everything above works without storage, and opening it may fail: a browser
+   * without OPFS should still give a usable editor that simply cannot remember
+   * anything, which is why nothing here is allowed to throw.
    */
   async connectStorage(worker: Worker): Promise<void> {
-    try {
-      const client = new StorageClient(worker);
-      this.storageClient = client;
-      await client.open("project");
+    const loaded = await this.disk.open(worker);
+    if (loaded === null) return;
 
-      // Before anything is read: a tab that cannot write must not journal or
-      // save on the way to finding that out.
-      const owner = await this.lock.tryAcquire();
-      this.patch({ ownership: owner ? "owner" : "reading" });
-
-      const loaded = await client.load();
-      if (loaded.kind === "loaded") {
-        const editor: EditorState = {
-          ...this.editor,
-          document: loaded.document,
-          currentGlyph: loaded.document.glyphOrder[0] ?? "",
-        };
-        this.patch({
-          session: { ...this.state.session, editor },
-          recovered: loaded.recovered,
-        });
-        for (const problem of loaded.problems) console.warn("[storage]", problem);
-        this.fitGlyph();
-      }
-
-      // Only a document read back from the glyph files is genuinely on disk. One
-      // recovered from the journal is ahead of them, and the starter font shown
-      // when the store is empty has never been written at all.
-      const onDisk = loaded.kind === "loaded" && !loaded.recovered;
-      this.autosave.markLoaded(this.editor.document, !onDisk && owner);
-      if (!onDisk && owner) await this.autosave.flush();
-
-      this.patch({ storage: "ready", saveStatus: this.autosave.status });
-      if (!(await requestPersistence())) {
-        console.info("[storage] persistence not granted; the browser may evict this data");
-      }
-    } catch (error) {
-      this.storageClient = null;
+    if (loaded.kind === "loaded") {
+      // The session is still the one the constructor made, so this swaps the
+      // document into it rather than starting a new history over nothing.
       this.patch({
-        storage: "unavailable",
-        storageDetail: error instanceof Error ? error.message : String(error),
+        session: {
+          ...this.state.session,
+          editor: {
+            ...this.editor,
+            document: loaded.document,
+            currentGlyph: loaded.document.glyphOrder[0] ?? "",
+          },
+        },
+        recovered: loaded.recovered,
       });
+      this.fitGlyph();
     }
+
+    // Only a document read back from the glyph files is genuinely on disk. One
+    // recovered from the journal is ahead of them, and the starter font shown
+    // when the store is empty has never been written at all.
+    const onDisk = loaded.kind === "loaded" && !loaded.recovered;
+    await this.disk.settle(this.editor.document, !onDisk);
+  }
+
+  /**
+   * Take the project over from whichever tab holds it.
+   *
+   * The document is reloaded afterwards rather than kept: the owning tab may
+   * have changed anything at all, including replacing the font, and writing this
+   * tab's stale copy over it is the exact bug this whole mechanism exists to
+   * stop.
+   */
+  async takeOver(): Promise<void> {
+    if (!(await this.disk.steal())) return;
+
+    const loaded = await this.disk.reload();
+    if (loaded === null || loaded.kind !== "loaded") return;
+
+    this.showDocument(loaded.document, loaded.recovered);
+    this.disk.markLoaded(loaded.document, loaded.recovered);
+    this.patch({ saveStatus: this.disk.status });
   }
 
   flush(): void {
-    void this.autosave.flush();
-  }
-}
-
-/**
- * Keep enough of the panel on screen to grab it again.
- *
- * A floating panel that can be dragged fully off the edge is a floating panel
- * you cannot get back — and the position is remembered, so it would still be
- * gone after a reload.
- */
-function clampInspector(x: number, y: number): { x: number; y: number } {
-  const grip = 80;
-  const maxX = Math.max(0, window.innerWidth - grip);
-  const maxY = Math.max(0, window.innerHeight - 28);
-  return {
-    x: Math.min(Math.max(0, x), maxX),
-    y: Math.min(Math.max(0, y), maxY),
-  };
-}
-
-function loadInspector(): StoreState["inspector"] {
-  try {
-    const raw = localStorage.getItem(INSPECTOR_KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw) as Partial<StoreState["inspector"]>;
-      const placed = clampInspector(
-        typeof parsed.x === "number" ? parsed.x : 24,
-        typeof parsed.y === "number" ? parsed.y : 24,
-      );
-      return { ...placed, open: parsed.open !== false };
-    }
-  } catch {
-    // Private window, cleared site data, or storage blocked. A default is fine.
-  }
-  return { x: 24, y: 24, open: true };
-}
-
-function saveInspector(inspector: StoreState["inspector"]): void {
-  try {
-    localStorage.setItem(INSPECTOR_KEY, JSON.stringify(inspector));
-  } catch {
-    // Losing a remembered panel position is not worth interrupting anyone for.
+    this.disk.flush();
   }
 }
