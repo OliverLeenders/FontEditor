@@ -6,7 +6,7 @@ import {
   randomIds,
   resolveGlyphComponents,
 } from "@fonteditor/font-model";
-import type { NeighbourGlyph } from "@fonteditor/render";
+import type { NeighbourGlyph, SnapGuide } from "@fonteditor/render";
 import {
   DARK_PALETTE,
   LIGHT_PALETTE,
@@ -14,7 +14,13 @@ import {
   type Scene,
   scene as buildScene,
 } from "@fonteditor/render";
-import { marqueeRect, penPreview, tunniSegments } from "@fonteditor/tools";
+import {
+  type EditorState,
+  marqueeRect,
+  penPreview,
+  snapHold,
+  tunniSegments,
+} from "@fonteditor/tools";
 
 import type { StoreState } from "./store.js";
 
@@ -124,6 +130,7 @@ export function sceneFor(
     // The same list a drag snaps to. Drawn and snapped must not part company:
     // a line you can catch on but cannot see is indistinguishable from a bug.
     guides: metricLines(editor.document.info),
+    snapGuides: snapGuidesFor(editor),
     tunniSegments: tunniSegments(editor),
     selection: editor.selection,
     marquee: marqueeRect(editor),
@@ -136,4 +143,19 @@ export function sceneFor(
       autoHideHandles: handlesAutoHidden(state),
     },
   });
+}
+
+/**
+ * The lines the drag in progress is caught on, as the renderer wants them.
+ *
+ * One per axis at most, which is the whole of it: a drag catches on one line
+ * horizontally and one vertically, and drawing every candidate it could have
+ * caught would be the noise the candidate set exists to avoid.
+ */
+function snapGuidesFor(editor: EditorState): SnapGuide[] {
+  const hold = snapHold(editor);
+  const guides: SnapGuide[] = [];
+  if (hold.x !== null) guides.push({ axis: "x", at: hold.x.at, from: hold.x.from });
+  if (hold.y !== null) guides.push({ axis: "y", at: hold.y.at, from: hold.y.from });
+  return guides;
 }

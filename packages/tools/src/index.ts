@@ -29,6 +29,7 @@ export {
   editCurrentGlyph,
   editorState,
   marqueeRect,
+  snapHold,
   tunniSegments,
 } from "./state.js";
 

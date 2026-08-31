@@ -51,6 +51,10 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   drawOutline(ctx, s);
 
   if (s.options.showControls) {
+    // Under the controls, so a node is never hidden by the guide pointing at it
+    // — and the ring is wider than a node, so it reads as a halo rather than a
+    // thing in its own right.
+    drawSnapGuides(ctx, s);
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
     drawNodes(ctx, s);
@@ -81,6 +85,51 @@ export function drawGuides(ctx: Canvas2D, s: Scene): void {
     ctx.lineTo(s.viewport.width, y);
     ctx.stroke();
   }
+}
+
+/**
+ * The lines the drag in progress is caught on.
+ *
+ * Dashed, where the metric lines are solid: over a metric line the dashes read
+ * as that line being live, and away from one they read as a line that exists
+ * only for as long as the drag does. A ring marks the point that produced it,
+ * which is the half a bare rule cannot say — a coordinate on its own tells you
+ * the drag caught something, not what.
+ */
+export function drawSnapGuides(ctx: Canvas2D, s: Scene): void {
+  if (s.snapGuides.length === 0) return;
+
+  ctx.save();
+  ctx.strokeStyle = s.palette.snapGuide;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+
+  for (const guide of s.snapGuides) {
+    ctx.beginPath();
+    if (guide.axis === "x") {
+      // Half-pixel offset, as the metric lines take, so a one-pixel line lands
+      // on a pixel instead of smearing across two.
+      const x = Math.round(toScreen(s.view, { x: guide.at, y: 0 }).x) + 0.5;
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, s.viewport.height);
+    } else {
+      const y = Math.round(toScreen(s.view, { x: 0, y: guide.at }).y) + 0.5;
+      ctx.moveTo(0, y);
+      ctx.lineTo(s.viewport.width, y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+  for (const guide of s.snapGuides) {
+    if (guide.from === null) continue;
+    const p = toScreen(s.view, guide.from);
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, s.metrics.nodeRadius + 3, 0, TAU);
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }
 
 /**

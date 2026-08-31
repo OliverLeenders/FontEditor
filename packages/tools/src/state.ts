@@ -15,6 +15,7 @@ import {
   type SegmentRef,
   type SnapHold,
   type ViewTransform,
+  NO_HOLD,
   sameSegment,
 } from "@fonteditor/view";
 
@@ -227,4 +228,20 @@ export function marqueeRect(state: EditorState): Rect | null {
     maxX: Math.max(gesture.origin.x, gesture.current.x),
     maxY: Math.max(gesture.origin.y, gesture.current.y),
   };
+}
+
+/**
+ * The lines the drag in progress is caught on, for the renderer to draw.
+ *
+ * Here rather than read off the gesture by the interface, for the same reason
+ * `marqueeRect` is: which gestures snap and where they keep the answer is the
+ * tool's business, and an app that reached in for it would have to be changed
+ * every time a gesture was added.
+ */
+export function snapHold(state: EditorState): SnapHold {
+  const gesture = state.gesture;
+  if (gesture === null) return NO_HOLD;
+  return gesture.kind === "dragSelection" || gesture.kind === "dragHandle"
+    ? gesture.snapped
+    : NO_HOLD;
 }

@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { drawScene } from "../src/draw.js";
 import { LIGHT_PALETTE } from "../src/palette.js";
+import { DEFAULT_METRICS } from "../src/scene.js";
 import { scene } from "../src/scene.js";
 import { RecordingContext } from "./recording-context.js";
 
@@ -399,5 +400,56 @@ describe("state hygiene", () => {
     });
     const dashed = ctx.all("setLineDash");
     expect(dashed[dashed.length - 1]!.args).toEqual([]);
+  });
+});
+
+describe("snap guides", () => {
+  const caught = (from: { x: number; y: number } | null) => ({
+    ...base(ring()),
+    snapGuides: [{ axis: "y" as const, at: 250, from }],
+  });
+
+  it("draws nothing when nothing is caught", () => {
+    const ctx = render(base(ring()));
+    expect(ctx.all("setLineDash").some((o) => (o.args as unknown[]).length > 0)).toBe(false);
+  });
+
+  it("draws the caught line dashed, where the metric lines are solid", () => {
+    const ctx = render(caught(null));
+    const dashes = ctx.all("setLineDash").map((o) => JSON.stringify(o.args));
+    expect(dashes).toContain(JSON.stringify([4, 4]));
+  });
+
+  it("puts the line at the coordinate it caught", () => {
+    const ctx = render(caught(null));
+    const y = toScreen(VIEW, { x: 0, y: 250 }).y;
+    // Half-pixel offset, as the metric lines take.
+    expect(ctx.all("moveTo").some((o) => Math.abs((o.args[1] ?? NaN) - (Math.round(y) + 0.5)) < 0.01)).toBe(
+      true,
+    );
+  });
+
+  it("rings the point that produced it", () => {
+    const from = { x: 250, y: 250 };
+    const ctx = render(caught(from));
+    const p = toScreen(VIEW, from);
+    // Wider than a node, so it haloes the node rather than hiding under it.
+    expect(ctx.arcsAt(p.x, p.y).some((o) => (o.args[2] ?? 0) > DEFAULT_METRICS.nodeRadius)).toBe(true);
+  });
+
+  it("rings nothing for a line the font defines", () => {
+    // The baseline and the advance already span the canvas and are already
+    // drawn. There is no point to indicate, only a line to mark as live.
+    const withRing = render(caught({ x: 250, y: 250 })).all("arc").length;
+    const without = render(caught(null)).all("arc").length;
+    expect(without).toBe(withRing - 1);
+  });
+
+  it("leaves the dash off for everything drawn afterwards", () => {
+    // The guides run inside the controls, and a stray dash would put every
+    // handle and node after them on a dotted stroke.
+    const ctx = render(caught({ x: 250, y: 250 }));
+    const restores = ctx.all("restore").length;
+    expect(restores).toBeGreaterThan(1);
   });
 });

@@ -1,4 +1,4 @@
-import type { Cubic, Rect } from "@fonteditor/geometry";
+import type { Cubic, Rect, Vec2 } from "@fonteditor/geometry";
 import type { Contour, Glyph } from "@fonteditor/font-model";
 import type { Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
@@ -10,6 +10,21 @@ export type HorizontalGuide = {
   readonly y: number;
   /** Drawn heavier. The baseline usually wants this; x-height usually does not. */
   readonly emphasis?: boolean;
+};
+
+/**
+ * A line a drag is currently caught on.
+ *
+ * `from` is the point that produced it, and `null` for a line the font itself
+ * defines — the baseline, the advance. Those already span the canvas and are
+ * already drawn, so there is nothing to point at: the guide over them says
+ * "this one is live" and that is all it needs to say.
+ */
+export type SnapGuide = {
+  readonly axis: "x" | "y";
+  /** Position in design units, on that axis. */
+  readonly at: number;
+  readonly from: Vec2 | null;
 };
 
 /**
@@ -92,6 +107,8 @@ export type Scene = {
   readonly metrics: RenderMetrics;
   readonly options: RenderOptions;
   readonly guides: readonly HorizontalGuide[];
+  /** Lines the drag in progress is caught on. Empty when nothing is caught. */
+  readonly snapGuides: readonly SnapGuide[];
   /**
    * Segments currently showing their Tunni controls — typically the one under
    * the cursor and the one being worked on, which are often but not always the
@@ -141,6 +158,7 @@ export type SceneInit = {
   readonly metrics?: RenderMetrics;
   readonly options?: Partial<RenderOptions>;
   readonly guides?: readonly HorizontalGuide[];
+  readonly snapGuides?: readonly SnapGuide[];
   readonly tunniSegments?: readonly SegmentRef[];
   readonly selection?: Selection;
   readonly marquee?: Rect | null;
@@ -158,6 +176,7 @@ export function scene(init: SceneInit): Scene {
     metrics: init.metrics ?? DEFAULT_METRICS,
     options: { ...DEFAULT_OPTIONS, ...init.options },
     guides: init.guides ?? [],
+    snapGuides: init.snapGuides ?? [],
     tunniSegments: init.tunniSegments ?? [],
     selection: init.selection ?? [],
     marquee: init.marquee ?? null,

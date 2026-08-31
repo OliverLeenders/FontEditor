@@ -28,6 +28,7 @@ export { DARK_PALETTE, LIGHT_PALETTE } from "./palette.js";
 
 export type {
   HorizontalGuide,
+  SnapGuide,
   NeighbourGlyph,
   RenderMetrics,
   RenderOptions,

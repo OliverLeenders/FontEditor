@@ -72,6 +72,51 @@ describe("extremes", () => {
     expect(values(lines.ys)).toEqual([20, 80]);
   });
 
+  it("passes over a node partway along a straight run", () => {
+    // The rule that matters most in practice. A real drawn letter is mostly
+    // straight segments, and calling every node on one a landmark buries the
+    // few that are in a crowd no drag can aim between.
+    const run = contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(0, 0)),
+        node(ids.node(), at(50, 100)),
+        node(ids.node(), at(100, 200)),
+        node(ids.node(), at(0, 200)),
+      ],
+      true,
+    );
+    const lines = alignmentLines(glyph("z", { contours: [run] }), [], { extremes: true });
+    // The middle of the diagonal is not offered on either axis; the corners are.
+    expect(values(lines.xs)).toEqual([0, 100]);
+    expect(values(lines.ys)).toEqual([0, 200]);
+  });
+
+  it("keeps a node level with its neighbour as a landmark on that axis", () => {
+    const flat = contour(
+      ids.contour(),
+      [node(ids.node(), at(0, 0)), node(ids.node(), at(50, 0)), node(ids.node(), at(100, 90))],
+      false,
+    );
+    const lines = alignmentLines(glyph("f", { contours: [flat] }), [], { extremes: true });
+    // The middle node runs straight through in x and is not offered there, but
+    // it sits on a level run and its y is worth aligning to.
+    expect(values(lines.xs)).toEqual([0, 100]);
+    expect(values(lines.ys)).toContain(0);
+  });
+
+  it("treats the end of an open contour as a landmark", () => {
+    // Nothing lies beyond it, so there is no direction to judge it by — and it
+    // really is where the outline stops.
+    const open = contour(
+      ids.contour(),
+      [node(ids.node(), at(10, 10)), node(ids.node(), at(60, 60)), node(ids.node(), at(110, 110))],
+      false,
+    );
+    const lines = alignmentLines(glyph("j", { contours: [open] }), [], { extremes: true });
+    expect(values(lines.xs)).toEqual([10, 110]);
+  });
+
   it("leaves out whatever is being dragged", () => {
     const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" }];
     expect(values(alignmentLines(g, moving, { extremes: true }).xs)).toEqual([60]);

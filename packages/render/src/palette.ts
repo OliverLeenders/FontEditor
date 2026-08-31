@@ -36,6 +36,14 @@ export type RenderPalette = {
   readonly cellCurrent: string;
   /** The origin and advance lines bounding the advance width. */
   readonly margin: string;
+  /**
+   * A line a drag is currently caught on, and the ring marking what produced it.
+   *
+   * The same accent that marks a selected node, deliberately: the rule this
+   * palette already follows is that what is live is ochre, and a snap is as live
+   * as anything on the canvas gets.
+   */
+  readonly snapGuide: string;
   /** Glyphs drawn either side for spacing context. */
   readonly neighbour: string;
   /** Outlines a component contributes: present, but not yours to edit here. */
@@ -65,6 +73,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   cellFocus: "rgba(44,109,175,0.12)",
   cellCurrent: "rgba(169,111,34,0.14)",
   margin: "#9AAEC4",
+  snapGuide: "#A96F22",
   neighbour: "rgba(19,25,34,0.22)",
   component: "rgba(19,25,34,0.55)",
 };
@@ -92,6 +101,7 @@ export const DARK_PALETTE: RenderPalette = {
   cellFocus: "rgba(116,174,226,0.16)",
   cellCurrent: "rgba(214,160,90,0.18)",
   margin: "#4B5D70",
+  snapGuide: "#D6A05A",
   neighbour: "rgba(229,235,242,0.20)",
   component: "rgba(229,235,242,0.55)",
 };

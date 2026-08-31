@@ -45,26 +45,39 @@ const NONE: AlignmentLines = { xs: [], ys: [] };
 /**
  * Whether a node is where the outline turns back on itself, per axis.
  *
- * A local test on the handles rather than the calculus: the outline reverses at
- * a node exactly when both handles leave it on the same side. A node missing a
- * handle is a corner, and a corner is a landmark on both axes — a polygon has no
- * curve extremes and its corners are the only things worth aligning to.
+ * A local test rather than the calculus: the outline reverses at a node exactly
+ * when it leaves on the same side it arrived from. A handle gives that direction
+ * where there is one, and where there is not — a straight segment — the on-curve
+ * point at the far end of that segment gives it instead.
+ *
+ * That second half is the whole of the difference between this being useful and
+ * being noise. Calling every node with a straight side a landmark, which is the
+ * obvious reading of "it has no handle to judge by", turned 21 nodes of a real
+ * drawn `a` into 14 candidates on one axis — several of them within a single
+ * catch radius of each other, so no drag could aim between them. Judging the
+ * straight side by where it goes gives 6, every one distinguishable.
  */
-function extremeAxes(n: Node): { readonly x: boolean; readonly y: boolean } {
-  if (n.in === null || n.out === null) return { x: true, y: true };
+function extremeAxes(n: Node, previous: Vec2, next: Vec2): { readonly x: boolean; readonly y: boolean } {
+  const from = n.in ?? previous;
+  const to = n.out ?? next;
 
-  const inX = n.in.x - n.pt.x;
-  const outX = n.out.x - n.pt.x;
-  const inY = n.in.y - n.pt.y;
-  const outY = n.out.y - n.pt.y;
+  const inX = from.x - n.pt.x;
+  const outX = to.x - n.pt.x;
+  const inY = from.y - n.pt.y;
+  const outY = to.y - n.pt.y;
 
-  return {
-    // Same side, or one of them exactly on the axis. A node whose handles are
-    // both flat in x is a horizontal extreme of the outline in y, not x, which
-    // the other half of this answers.
-    x: inX * outX >= 0,
-    y: inY * outY >= 0,
-  };
+  // Same side, or one of them exactly level: a node the outline arrives at
+  // horizontally and leaves horizontally is a landmark in y even though it is
+  // running straight through in x.
+  return { x: inX * outX >= 0, y: inY * outY >= 0 };
+}
+
+/** The point one step around a contour, or `null` at the end of an open one. */
+function around(c: Contour, index: number, step: -1 | 1): Vec2 | null {
+  const next = index + step;
+  if (next >= 0 && next < c.nodes.length) return c.nodes[next]!.pt;
+  if (!c.closed) return null;
+  return c.nodes[step === 1 ? 0 : c.nodes.length - 1]?.pt ?? null;
 }
 
 /** The nodes before and after one in its contour, respecting whether it closes. */
@@ -134,9 +147,17 @@ export function alignmentLines(
 
   if (options.extremes === true) {
     for (const c of g.contours) {
-      for (const n of c.nodes) {
+      for (const [i, n] of c.nodes.entries()) {
         if (movingNodes.has(`${c.id} ${n.id}`)) continue;
-        const axes = extremeAxes(n);
+
+        // An open contour's ends have nothing beyond them, and a node with a
+        // straight side and no node past it has no direction to be judged by.
+        // Treating it as a landmark is the right answer there: it really is
+        // where the outline stops.
+        const previous = around(c, i, -1) ?? n.pt;
+        const next = around(c, i, 1) ?? n.pt;
+
+        const axes = extremeAxes(n, previous, next);
         if (axes.x || axes.y) add(n.pt, "extreme", axes);
       }
     }
