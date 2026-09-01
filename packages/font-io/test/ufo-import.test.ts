@@ -10,6 +10,7 @@ import {
   kernValue,
   node,
   segmentAt,
+  segmentCubic,
   setKern,
   setKernGroup,
   setKerning,
@@ -137,17 +138,29 @@ describe("a UFO written by us and read back", () => {
     expect(segmentAt(c!, 0)?.kind).toBe("line");
   });
 
-  it("comes back straight where the export wrote it straight", async () => {
-    // Not what anyone would want, and not this importer's doing: `contourPoints`
-    // only writes a segment as a curve when *both* its controls are set, so a
-    // half-handled one leaves as a line and there is no curve here to read back.
-    // Recorded rather than asserted away, so the day the export is fixed this
-    // test fails and says where to look.
+  it("keeps a half-handled curve half-handled, rather than straightening it", async () => {
+    // One control and none facing it is a real shape the model holds. The export
+    // writes the missing one onto its anchor, which is what the segment already
+    // means and is unambiguous in any reader; the import takes it off again.
     const { document } = await back();
     const c = document.glyphs["v"]?.contours[0];
 
-    expect(c?.nodes[2]?.in).toBeNull();
-    expect(segmentAt(c!, 1)?.kind).toBe("line");
+    expect(segmentAt(c!, 1)?.kind).toBe("curve");
+    expect(c?.nodes[2]?.in).toEqual({ x: 200, y: 200 });
+    expect(c?.nodes[1]?.out).toBeNull();
+  });
+
+  it("draws the same curve after the trip as before it", async () => {
+    // The real question a round trip answers. `segmentCubic` reads an absent
+    // handle as a control on its anchor, so the two representations describe one
+    // curve — and this is what would catch it if they ever stopped doing so.
+    const { document } = await back();
+    const { open } = shapes();
+    const before = contour(open.id, open.nodes, false);
+
+    expect(segmentCubic(segmentAt(document.glyphs["v"]!.contours[0]!, 1)!)).toEqual(
+      segmentCubic(segmentAt(before, 1)!),
+    );
   });
 
   it("leaves the glyph the same size it was", async () => {
@@ -180,6 +193,52 @@ describe("a UFO written by us and read back", () => {
 
   it("says nothing it does not have to", async () => {
     expect((await back()).warnings).toEqual([]);
+  });
+});
+
+describe("a half-handled segment that closes a contour", () => {
+  /**
+   * The awkward one. A closed contour's first point carries the *closing*
+   * segment's type, and its controls are written at the end of the list. When
+   * the export decided that type from the segment's kind but emitted controls
+   * only for a fully handled one, a half-handled closing segment produced a
+   * point claiming to be a curve with nothing to curve through.
+   */
+  const closing = () => {
+    const ids = counterIds("close");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(0, 0), { type: "corner", in: at(-40, 60) }),
+        node(ids.node(), at(200, 0)),
+        node(ids.node(), at(100, 200)),
+      ],
+      true,
+    );
+    return fontDocument([glyph("t", { unicodes: [0x74], advance: 300, contours: [c] })], INFO);
+  };
+
+  const reread = async () => {
+    const out = await importUfo(exportUfo(closing()).bytes.buffer as ArrayBuffer, counterIds("c"));
+    if ("reason" in out) throw new Error(out.reason);
+    return out.document;
+  };
+
+  it("comes back as a curve rather than a line", async () => {
+    const c = (await reread()).glyphs["t"]?.contours[0];
+    expect(segmentAt(c!, 2)?.kind).toBe("curve");
+  });
+
+  it("keeps the one handle it had, and does not invent the other", async () => {
+    const c = (await reread()).glyphs["t"]?.contours[0];
+    expect(c?.nodes[0]?.in).toEqual({ x: -40, y: 60 });
+    expect(c?.nodes[2]?.out).toBeNull();
+  });
+
+  it("draws the same closing curve it started with", async () => {
+    const c = (await reread()).glyphs["t"]?.contours[0];
+    const before = closing().glyphs["t"]!.contours[0]!;
+    expect(segmentCubic(segmentAt(c!, 2)!)).toEqual(segmentCubic(segmentAt(before, 2)!));
   });
 });
 

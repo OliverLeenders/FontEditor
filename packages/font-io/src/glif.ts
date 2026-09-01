@@ -232,10 +232,20 @@ const cubicControl = (anchor: Vec2, q: Vec2): Vec2 => ({
  *
  * Each on-curve point becomes a node. The off-curve run immediately before it
  * belongs to the segment arriving there: its last member is this node's `in`,
- * and its first is the previous node's `out`. A run of one is a half-handled
- * curve, which the model represents natively — the missing control sits on its
- * anchor, and that is a real shape rather than an error.
+ * and its first is the previous node's `out`.
+ *
+ * A control that lands exactly on its own anchor is dropped. It is not a handle
+ * — it is the absence of one written down, which is how a half-handled curve
+ * reaches a file that cannot leave a control out without becoming ambiguous.
+ * Keeping it would put a control point where nothing can be clicked, which is
+ * the state `extractHandles` exists to get back out of. The two readings are the
+ * same curve; only one of them is editable.
  */
+/** Whether a control sits exactly on the anchor it belongs to. */
+function onAnchor(handle: Vec2 | null, anchor: Vec2): boolean {
+  return handle !== null && handle.x === anchor.x && handle.y === anchor.y;
+}
+
 function buildContour(points: readonly RawPoint[], closed: boolean, ids: IdFactory): Contour | null {
   const onCurve = points.map((p, i) => ({ p, i })).filter(({ p }) => p.type !== null);
   if (onCurve.length === 0) return null;
@@ -271,8 +281,8 @@ function buildContour(points: readonly RawPoint[], closed: boolean, ids: IdFacto
     const h = handles.get(i)!;
     return node(ids.node(), p.pt, {
       type: p.smooth ? "smooth" : "corner",
-      in: h.in,
-      out: h.out,
+      in: onAnchor(h.in, p.pt) ? null : h.in,
+      out: onAnchor(h.out, p.pt) ? null : h.out,
     });
   });
 

@@ -99,6 +99,16 @@ type Point = {
  * closing segment sit at the end and pair with the first point — which is why
  * the first point is emitted with the closing segment's type rather than its
  * own, and why the loop below stops one short and then emits the tail.
+ *
+ * A curve always writes *both* its control points, putting the missing one of a
+ * half-handled segment on its own anchor. That is what the segment already means
+ * — `segmentCubic` reads an absent handle as a control at the anchor — and
+ * writing it out is the only unambiguous way to say so. UFO does permit a curve
+ * with a single off-curve point, but readers do not agree on what one means:
+ * fontTools takes a two-point curve as a quadratic, which is a different curve
+ * from a cubic whose first control sits on the start anchor. Writing both leaves
+ * nothing to interpret. Reading them back is `parseGlif`'s side of the bargain:
+ * a control that coincides with its anchor is the absence of a handle.
  */
 export function contourPoints(c: Contour): Point[] {
   const all = segments(c);
@@ -125,10 +135,15 @@ export function contourPoints(c: Contour): Point[] {
   const upTo = c.closed ? all.length - 1 : all.length;
   for (let i = 0; i < upTo; i++) {
     const segment = all[i]!;
-    const curve = segment.kind === "curve" && segment.out !== null && segment.in !== null;
+    // A segment is a curve when *either* handle is set, which is the model's own
+    // definition of one. Asking for both here is what used to write a
+    // half-handled curve out as a straight line.
+    const curve = segment.kind === "curve";
     if (curve) {
-      points.push({ x: round(segment.out!.x), y: round(segment.out!.y) });
-      points.push({ x: round(segment.in!.x), y: round(segment.in!.y) });
+      const out = segment.out ?? segment.a;
+      const incoming = segment.in ?? segment.b;
+      points.push({ x: round(out.x), y: round(out.y) });
+      points.push({ x: round(incoming.x), y: round(incoming.y) });
     }
     points.push({
       x: round(segment.b.x),
@@ -140,9 +155,14 @@ export function contourPoints(c: Contour): Point[] {
 
   if (c.closed) {
     const closing = all[all.length - 1];
-    if (closing !== undefined && closing.kind === "curve" && closing.out !== null && closing.in !== null) {
-      points.push({ x: round(closing.out.x), y: round(closing.out.y) });
-      points.push({ x: round(closing.in.x), y: round(closing.in.y) });
+    if (closing !== undefined && closing.kind === "curve") {
+      // The first point was already written with this segment's type, so its
+      // controls have to follow whenever that type is `curve` — otherwise the
+      // file claims a curve and gives it nothing to curve through.
+      const out = closing.out ?? closing.a;
+      const incoming = closing.in ?? closing.b;
+      points.push({ x: round(out.x), y: round(out.y) });
+      points.push({ x: round(incoming.x), y: round(incoming.y) });
     }
   }
 
