@@ -11,6 +11,7 @@ import {
   node,
   segmentAt,
   segmentCubic,
+  setFeatures,
   setKern,
   setKernGroup,
   setKerning,
@@ -368,5 +369,37 @@ describe("reading a glif written by something else", () => {
     const { document } = await read(`<contour><point x="0" y="0" type="line"/></contour>`);
     expect(document.glyphs["a"]?.advance).toBe(500);
     expect(document.glyphs["a"]?.unicodes).toEqual([0x61]);
+  });
+});
+
+describe("feature source through a UFO", () => {
+  const FEATURES = "feature liga {\n    sub f i by fi;\n} liga;\n";
+
+  const roundTrip = async (text: string) => {
+    const doc = setFeatures(source(), text);
+    const out = await importUfo(exportUfo(doc).bytes.buffer as ArrayBuffer, counterIds("fx"));
+    if ("reason" in out) throw new Error(out.reason);
+    return out.document;
+  };
+
+  it("comes back exactly as it was written", async () => {
+    expect((await roundTrip(FEATURES)).features).toBe(FEATURES);
+  });
+
+  it("keeps source this editor cannot compile", async () => {
+    // Dropping what the compiler does not understand would make opening a file a
+    // way to lose work. The UFO is somebody's source, not our intermediate form.
+    const contextual = "feature calt {\n    sub a' b by a.alt;\n} calt;\n";
+    expect((await roundTrip(contextual)).features).toBe(contextual);
+  });
+
+  it("writes no features file for a font with none", async () => {
+    const files = exportUfo(source()).files;
+    const withText = exportUfo(setFeatures(source(), FEATURES)).files;
+    expect(withText).toBe(files + 1);
+  });
+
+  it("leaves a font without features with empty source", async () => {
+    expect((await back()).document.features).toBe("");
   });
 });

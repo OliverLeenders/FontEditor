@@ -89,6 +89,8 @@ export type StoredFontInfo = {
   readonly descender: number;
   readonly xHeight: number;
   readonly capHeight: number;
+  /** Feature source. Omitted when empty, which is most fonts most of the time. */
+  readonly features?: string;
 };
 
 /** Success, or a reason a file could not be understood. */
@@ -145,11 +147,12 @@ function encodeNode(n: Node): StoredNode {
 }
 
 export function encodeFontInfo(document: FontDocument): StoredFontInfo {
-  return {
+  const base = {
     schema: SCHEMA_VERSION,
     glyphOrder: [...document.glyphOrder],
     ...document.info,
   };
+  return document.features === "" ? base : { ...base, features: document.features };
 }
 
 /**
@@ -162,8 +165,9 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
 export function decodeFontInfo(raw: unknown): {
   info: FontInfo;
   glyphOrder: readonly string[];
+  features: string;
 } {
-  if (!isRecord(raw)) return { info: DEFAULT_FONT_INFO, glyphOrder: [] };
+  if (!isRecord(raw)) return { info: DEFAULT_FONT_INFO, glyphOrder: [], features: "" };
 
   const number = (key: keyof FontInfo, fallback: number): number => {
     const value = raw[key];
@@ -187,6 +191,7 @@ export function decodeFontInfo(raw: unknown): {
     glyphOrder: Array.isArray(raw["glyphOrder"])
       ? raw["glyphOrder"].filter((n): n is string => typeof n === "string")
       : [],
+    features: typeof raw["features"] === "string" ? raw["features"] : "",
   };
 }
 

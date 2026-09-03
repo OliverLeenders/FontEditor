@@ -8,6 +8,7 @@ import {
   EMPTY_KERNING,
   fontDocument,
   groupKey,
+  setFeatures,
   setKern,
   setKernGroup,
   setKerning,
@@ -114,7 +115,15 @@ export async function importUfo(
   if (glyphs.length === 0) return { reason: "the archive contains no readable glyphs" };
 
   const kerning = readKerning(at("groups.plist"), at("kerning.plist"), warn);
-  return { document: setKerning(fontDocument(glyphs, info), kerning), warnings };
+  // Taken as it is, not parsed. What could not be compiled is still somebody's
+  // source, and dropping the parts this editor does not understand would make
+  // opening a file a way to lose work.
+  const features = at("features.fea") ?? "";
+
+  return {
+    document: setFeatures(setKerning(fontDocument(glyphs, info), kerning), features),
+    warnings,
+  };
 }
 
 /**

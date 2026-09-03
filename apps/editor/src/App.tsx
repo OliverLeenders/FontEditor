@@ -12,6 +12,7 @@ import { GlyphBrowser } from "./components/GlyphBrowser.js";
 import { GlyphCanvas } from "./components/GlyphCanvas.js";
 import { GlyphStrip } from "./components/GlyphStrip.js";
 import { Inspector } from "./components/Inspector.js";
+import { FeaturesView } from "./components/FeaturesView.js";
 import { ProofView } from "./components/ProofView.js";
 import { SpacingView } from "./components/SpacingView.js";
 import { StatusBar } from "./components/StatusBar.js";
@@ -189,7 +190,11 @@ export function App(): JSX.Element {
         </div>
       ) : null}
       <TabBar current={view} onSelect={setView} glyphName={glyphName} />
-      {view === "proof" ? (
+      {view === "features" ? (
+        <main className={styles.stage}>
+          <FeaturesView />
+        </main>
+      ) : view === "proof" ? (
         <main className={styles.stage}>
           <ProofView />
         </main>

@@ -126,6 +126,7 @@ export {
   renameProblem,
   setFontInfo,
   setGlyphOrder,
+  setFeatures,
   setKerning,
   updateGlyph,
 } from "./document.js";

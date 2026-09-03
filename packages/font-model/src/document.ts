@@ -54,6 +54,16 @@ export type FontDocument = {
    * deleting that glyph would take the pair with it.
    */
   readonly kerning: Kerning;
+  /**
+   * OpenType feature source, as `.fea` text.
+   *
+   * Kept as text rather than as a parsed structure, and deliberately. It is what
+   * a designer writes, what UFO stores, and what every other tool exchanges;
+   * parsing it into a model of its own would mean choosing which of the
+   * language's many constructs the model can hold, and quietly discarding the
+   * rest of somebody's file on the way in.
+   */
+  readonly features: string;
 };
 
 export function fontDocument(
@@ -66,7 +76,7 @@ export function fontDocument(
     if (!(g.name in map)) order.push(g.name);
     map[g.name] = g;
   }
-  return { info, glyphOrder: order, glyphs: map, kerning: EMPTY_KERNING };
+  return { info, glyphOrder: order, glyphs: map, kerning: EMPTY_KERNING, features: "" };
 }
 
 export function glyphNamed(document: FontDocument, name: GlyphName): Glyph | null {
@@ -200,6 +210,11 @@ export function glyphsForString(document: FontDocument, text: string): Array<Gly
   return out;
 }
 
+
+/** Replace the font's feature source, leaving everything else alone. */
+export function setFeatures(document: FontDocument, features: string): FontDocument {
+  return document.features === features ? document : { ...document, features };
+}
 
 /** Replace the font's kerning, leaving the glyphs alone. */
 export function setKerning(document: FontDocument, kerning: Kerning): FontDocument {

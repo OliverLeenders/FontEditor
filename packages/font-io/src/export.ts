@@ -12,6 +12,7 @@ import {
 
 import { buildKerningGpos } from "./gpos.js";
 import { opentype } from "./opentype.js";
+import { compileFeatures } from "./features.js";
 import { withTable } from "./sfnt.js";
 import type { OtGlyph, OtPath } from "opentype.js";
 
@@ -193,10 +194,19 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
   });
 
   const gpos = buildKerningGpos(kernIndex(document.kerning), (name) => order.get(name));
-  if (gpos.length === 0) return { bytes, warnings };
+  const features = compileFeatures(document.features, (name) => order.get(name));
+  for (const problem of features.problems) {
+    warnings.push(`features, line ${String(problem.line)}: ${problem.message}`);
+  }
 
-  const spliced = withTable(new Uint8Array(bytes), "GPOS", gpos);
-  return { bytes: spliced.buffer.slice(0) as ArrayBuffer, warnings };
+  if (gpos.length === 0 && features.table.length === 0) return { bytes, warnings };
+
+  // Spliced one after the other, each on the bytes the last produced, so the
+  // directory and the checksums are right whichever of the two exists.
+  let out: Uint8Array = new Uint8Array(bytes);
+  if (gpos.length > 0) out = withTable(out, "GPOS", gpos);
+  if (features.table.length > 0) out = withTable(out, "GSUB", features.table);
+  return { bytes: out.buffer.slice(0) as ArrayBuffer, warnings };
 }
 
 /**

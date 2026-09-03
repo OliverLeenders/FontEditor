@@ -43,3 +43,8 @@ export type { UfoImport, UfoImportError, UfoWarning } from "./ufo-import.js";
 export { importUfo, looksLikeUfo } from "./ufo-import.js";
 export type { ZipFile } from "./unzip.js";
 export { fileText, unzip } from "./unzip.js";
+
+export type { FeaFeature, FeaProblem, FeaRule, FeaSource } from "./fea.js";
+export { parseFea } from "./fea.js";
+export type { CompiledFeatures } from "./features.js";
+export { NO_FEATURES, compileFeatures } from "./features.js";

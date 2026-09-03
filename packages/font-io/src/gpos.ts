@@ -22,7 +22,7 @@ import {
  * format expresses it.
  */
 
-class Writer {
+export class Writer {
   private readonly bytes: number[] = [];
 
   get length(): number {

@@ -318,6 +318,12 @@ export function ufoFiles(document: FontDocument): ZipEntry[] {
     entries.push({ path: "kerning.plist", text: plist(dict(kernRows)) });
   }
 
+  // Written as its own file, which is where the format keeps it and where every
+  // other tool looks. Omitted when empty rather than written blank.
+  if (document.features.trim() !== "") {
+    entries.push({ path: "features.fea", text: document.features });
+  }
+
   entries.push({
     path: "glyphs/contents.plist",
     text: plist(dict(contents.map(([name, file]) => [name, str(file)] as const))),

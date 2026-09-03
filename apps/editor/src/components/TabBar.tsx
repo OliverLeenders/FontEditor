@@ -8,12 +8,12 @@ const TABS: readonly Tab[] = [
   { id: "font", label: "Font", ready: true },
   { id: "glyph", label: "Glyph", ready: true },
   { id: "spacing", label: "Spacing", ready: true },
-  { id: "features", label: "Features", ready: false },
+  { id: "features", label: "Features", ready: true },
   { id: "proof", label: "Proof", ready: true },
 ];
 
 /**
- * The workspaces, only one of which exists yet.
+ * The workspaces.
  *
  * The unbuilt ones are shown disabled rather than hidden. A font editor is
  * several workspaces, and seeing the shape of the whole thing is worth more than

@@ -19,14 +19,18 @@ import {
   fontDocument,
   glyph,
   randomIds,
+  setFeatures,
 } from "@fonteditor/font-model";
 import type { AutosaveStatus } from "@fonteditor/storage";
 import {
   type EditorState,
   type ToolId,
   type ToolResult,
+  begin,
+  commit,
   currentGlyph,
   editorState,
+  result,
   setActiveTool,
 } from "@fonteditor/tools";
 import type { ViewTransform } from "@fonteditor/view";
@@ -437,6 +441,20 @@ export class EditorStore {
 
   setSpacingMode(spacingMode: "space" | "kern"): void {
     if (spacingMode !== this.state.spacingMode) this.patch({ spacingMode });
+  }
+
+  /**
+   * Replace the font's feature source.
+   *
+   * An edit to the document like any other, so it is undoable and saved — the
+   * feature file is part of the font rather than a setting about it.
+   */
+  setFeatures(features: string): void {
+    const document = setFeatures(this.editor.document, features);
+    if (document === this.editor.document) return;
+    this.applyTool(
+      result({ ...this.editor, document }, [begin("Edit features"), commit]),
+    );
   }
 
   setProofText(proofText: string): void {
