@@ -162,3 +162,6 @@ export { byContour, samePoint, strokeCrossings } from "./crossings.js";
 
 export type { Measurement } from "./measure.js";
 export { measureAngle, measureNormal } from "./measure.js";
+
+export type { OverlapResult } from "./overlap.js";
+export { removeOverlap } from "./overlap.js";

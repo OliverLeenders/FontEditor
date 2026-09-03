@@ -477,3 +477,110 @@ export function intersectSegmentCubic(a: Vec2, b: Vec2, s: Cubic): Crossing[] {
   }
   return out;
 }
+
+/** Where two curves meet, with the parameter along each. */
+export type CurveMeeting = {
+  readonly t1: number;
+  readonly t2: number;
+  readonly point: Vec2;
+};
+
+/**
+ * How close two boxes must get before their curves are called met, how deep the
+ * search may go, and how much work it may do in total.
+ *
+ * A design unit is the scale everything here works in, so a five-hundredth of
+ * one is already far below anything a font can express — and the precision
+ * matters beyond looks, because a caller splits both curves here and two split
+ * points that do not quite coincide leave a hairline gap in the result. The depth allows for the fact
+ * that only one curve is split at a time, so each gets about half of it — enough
+ * to take either from a thousand units down to the tolerance twice over. The
+ * budget is what stops the pathological case: two curves lying along each other
+ * prune nothing, so every branch survives and the search would not end.
+ */
+const MEET_TOLERANCE = 0.002;
+const MEET_DEPTH = 44;
+const MEET_BUDGET = 50_000;
+
+/**
+ * Where two cubics cross.
+ *
+ * By subdivision rather than by algebra. Two cubics meet where a ninth-degree
+ * polynomial vanishes, and the numerical trouble in finding those roots is worse
+ * than the trouble in bisecting: a Bézier lies inside the hull of its control
+ * points, so two curves whose boxes miss cannot meet, and that one fact drives
+ * the whole search.
+ *
+ * Only the larger of the two is split at each step. Splitting both makes four
+ * branches where two will do, and four to the twenty-fourth is not a search.
+ *
+ * `null` when the two overlap along a stretch rather than crossing at points.
+ * That case has no finite answer — every point of the shared stretch is an
+ * intersection — and a caller that treated the flood of near-identical hits as
+ * crossings would tear the outline apart. Saying so is the only honest reply.
+ */
+export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
+  const found: CurveMeeting[] = [];
+  let steps = 0;
+  // On an object rather than in a plain `let` so that reading it after the
+  // search is not treated as reading a variable that was never reassigned:
+  // narrowing does not follow an assignment made inside a closure.
+  const ran = { out: false };
+
+  const search = (a0: number, a1: number, b0: number, b1: number, depth: number): void => {
+    if (ran.out) return;
+    if (++steps > MEET_BUDGET) {
+      ran.out = true;
+      return;
+    }
+
+    const ba = bounds(subcurve(a, a0, a1));
+    const bb = bounds(subcurve(b, b0, b1));
+
+    if (
+      ba.maxX < bb.minX - MEET_TOLERANCE ||
+      bb.maxX < ba.minX - MEET_TOLERANCE ||
+      ba.maxY < bb.minY - MEET_TOLERANCE ||
+      bb.maxY < ba.minY - MEET_TOLERANCE
+    ) {
+      return;
+    }
+
+    const spanA = Math.max(ba.maxX - ba.minX, ba.maxY - ba.minY);
+    const spanB = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY);
+
+    if (spanA <= MEET_TOLERANCE && spanB <= MEET_TOLERANCE) {
+      const t1 = (a0 + a1) / 2;
+      const point = evaluate(a, t1);
+      // Two boxes that both shrank to nothing around the same place are one
+      // crossing found twice, not two crossings.
+      if (found.some((seen) => Math.hypot(seen.point.x - point.x, seen.point.y - point.y) < 0.05)) {
+        return;
+      }
+      found.push({ t1, t2: (b0 + b1) / 2, point });
+      return;
+    }
+
+    if (depth >= MEET_DEPTH) {
+      // Neither box shrank away and the search ran out of room, which is what
+      // curves lying along each other look like from in here.
+      ran.out = true;
+      return;
+    }
+
+    if (spanA >= spanB) {
+      const m = (a0 + a1) / 2;
+      search(a0, m, b0, b1, depth + 1);
+      search(m, a1, b0, b1, depth + 1);
+    } else {
+      const m = (b0 + b1) / 2;
+      search(a0, a1, b0, m, depth + 1);
+      search(a0, a1, m, b1, depth + 1);
+    }
+  };
+
+  search(0, 1, 0, 1, 0);
+  if (ran.out) return null;
+
+  return found.sort((l, r) => l.t1 - r.t1);
+}

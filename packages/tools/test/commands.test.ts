@@ -11,6 +11,7 @@ import {
   node,
   orderedGlyphs,
   segmentAt,
+  rectContour,
   segmentCount,
   sidebearings,
   component,
@@ -33,6 +34,7 @@ import {
   renameRefusal,
   retractHandle,
   reverseContourAt,
+  overlapAt,
   roundCoordinates,
   roundGlyphAt,
   roundSelection,
@@ -745,6 +747,55 @@ describe("renaming the open glyph", () => {
     expect(renameRefusal(state, "alpha")).toBeNull();
     // Its own name is not a collision with itself.
     expect(renameRefusal(state, "a")).toBeNull();
+  });
+});
+
+describe("removing overlap", () => {
+  const ids = counterIds("ov-cmd");
+  const withContours = (...boxes: { minX: number; minY: number; maxX: number; maxY: number }[]) =>
+    editorState({
+      document: fontDocument([
+        glyph("a", { advance: 600, contours: boxes.map((b) => rectContour(ids, b)) }),
+      ]),
+      view: VIEW,
+      currentGlyph: "a",
+    });
+
+  it("unions the contours and says how many crossings it resolved", () => {
+    const s = withContours(
+      { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      { minX: 200, minY: 200, maxX: 500, maxY: 500 },
+    );
+    const { outcome, result } = overlapAt(s, "a", ids);
+
+    expect(outcome).toBe(2);
+    expect(result.state.document.glyphs["a"]!.contours).toHaveLength(1);
+  });
+
+  it("calls a glyph with nothing overlapping clean, and leaves it be", () => {
+    const s = withContours(
+      { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+      { minX: 300, minY: 300, maxX: 400, maxY: 400 },
+    );
+    const { outcome, result } = overlapAt(s, "a", ids);
+
+    expect(outcome).toBe("clean");
+    // The very same state, so nothing lands in the undo stack.
+    expect(result.state).toBe(s);
+  });
+
+  it("tells a refusal apart from a clean glyph", () => {
+    // Two rectangles sharing their bottom-left corner: edges along each other,
+    // which cannot be resolved, and is not the same answer as "nothing to do".
+    const s = withContours(
+      { minX: 0, minY: 0, maxX: 400, maxY: 150 },
+      { minX: 0, minY: 0, maxX: 150, maxY: 400 },
+    );
+    expect(overlapAt(s, "a", ids).outcome).toBe("refused");
+  });
+
+  it("calls a glyph that is not there clean rather than refusing", () => {
+    expect(overlapAt(withContours(), "nope", ids).outcome).toBe("clean");
   });
 });
 

@@ -2,6 +2,7 @@ import type { ToolId } from "@fonteditor/tools";
 
 import { MAX_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH } from "../store.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { RemoveOverlap } from "./RemoveOverlap.js";
 import styles from "./Toolbar.module.css";
 
 type ToolButton = {
@@ -134,6 +135,10 @@ export function Toolbar(): React.JSX.Element {
           onChange={(event) => store.setOutlineWidth(Number(event.target.value))}
         />
       </label>
+
+      <div className={styles.divider} />
+
+      <RemoveOverlap />
 
       <div className={styles.spacer} />
 

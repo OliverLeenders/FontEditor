@@ -100,3 +100,14 @@
   width: 5.5rem;
   accent-color: var(--accent);
 }
+
+/* What the last overlap removal did, said next to the button that did it. The
+   answer is only worth a moment: it is confirmation, not information to keep. */
+.note {
+  font-size: 0.74rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.note[data-refused="true"] {
+  color: var(--warn, var(--ink));
+}
