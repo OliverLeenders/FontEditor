@@ -152,3 +152,6 @@ export {
 export { UNIT_GRID, roundFont, roundGlyph, unroundedGlyphs } from "./round.js";
 
 export { KAPPA, ellipseContour, rectContour } from "./shapes.js";
+
+export type { KnifeCut } from "./knife.js";
+export { cutGlyph } from "./knife.js";

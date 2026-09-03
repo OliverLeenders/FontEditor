@@ -60,6 +60,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawNodes(ctx, s);
     drawPenPreview(ctx, s);
     drawShapePreview(ctx, s);
+    drawKnifeStroke(ctx, s);
     drawMarquee(ctx, s);
   }
 
@@ -347,6 +348,32 @@ export function drawShapePreview(ctx: Canvas2D, s: Scene): void {
   ctx.lineWidth = s.metrics.outlineWidth - 0.5;
   ctx.beginPath();
   traceContour(ctx, s.view, preview);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * The knife's stroke.
+ *
+ * Solid where the other previews are dashed, and in the selection accent. A
+ * dashed line reads as a proposal, which is right for a shape that will become
+ * outline; this one never becomes anything. It is a cut, and what it leaves
+ * behind is on both sides of it.
+ */
+export function drawKnifeStroke(ctx: Canvas2D, s: Scene): void {
+  const stroke = s.knifeStroke;
+  if (stroke === null) return;
+
+  const a = toScreen(s.view, stroke[0]);
+  const b = toScreen(s.view, stroke[1]);
+
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = s.palette.nodeSelected;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
   ctx.stroke();
   ctx.restore();
 }

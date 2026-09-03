@@ -105,3 +105,6 @@ export {
 
 export type { ShapeOptions } from "./shape.js";
 export { shapePreview, shapeRect } from "./shape.js";
+
+export type { KnifeOptions } from "./knife.js";
+export { knifeStroke } from "./knife.js";

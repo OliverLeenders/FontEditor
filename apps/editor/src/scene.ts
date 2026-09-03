@@ -17,6 +17,7 @@ import {
 } from "@fonteditor/render";
 import {
   type EditorState,
+  knifeStroke,
   marqueeRect,
   penPreview,
   shapePreview,
@@ -141,6 +142,7 @@ export function sceneFor(
     marquee: marqueeRect(editor),
     penPreview: penPreview(editor),
     shapePreview: shapePreview(editor, outlineIds),
+    knifeStroke: knifeStroke(editor),
     neighbours: state.showNeighbours
       ? neighboursFor(editor.document, editor.currentGlyph, state.stripText)
       : [],

@@ -150,6 +150,8 @@ export type Scene = {
    * shape you let go of is not the shape you were shown.
    */
   readonly shapePreview: Contour | null;
+  /** The knife's stroke while it is being drawn, in design units. */
+  readonly knifeStroke: readonly [Vec2, Vec2] | null;
 };
 
 /** A glyph drawn for context, at a given offset, not for editing. */
@@ -174,6 +176,7 @@ export type SceneInit = {
   readonly neighbours?: readonly NeighbourGlyph[];
   readonly componentOutlines?: readonly Contour[];
   readonly shapePreview?: Contour | null;
+  readonly knifeStroke?: readonly [Vec2, Vec2] | null;
 };
 
 export function scene(init: SceneInit): Scene {
@@ -193,5 +196,6 @@ export function scene(init: SceneInit): Scene {
     neighbours: init.neighbours ?? [],
     componentOutlines: init.componentOutlines ?? [],
     shapePreview: init.shapePreview ?? null,
+    knifeStroke: init.knifeStroke ?? null,
   };
 }

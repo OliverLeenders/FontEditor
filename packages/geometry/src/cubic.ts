@@ -1,5 +1,5 @@
 import { FLATTEN_TOLERANCE } from "./epsilon.js";
-import { distanceToLine } from "./line.js";
+import { distanceToLine, projectOntoLine } from "./line.js";
 import {
   type Rect,
   type Vec2,
@@ -338,4 +338,140 @@ function collectAxisRoots(p0: number, p1: number, p2: number, p3: number, out: n
 
 function pushIfInside(t: number, out: number[]): void {
   if (Number.isFinite(t) && t > 0 && t < 1) out.push(t);
+}
+
+/**
+ * Real roots of `c3 t³ + c2 t² + c1 t + c0`, in the closed unit interval.
+ *
+ * Written out rather than reached for from a library because the degenerate
+ * cases are the whole difficulty and they are common here: a cubic segment whose
+ * control points happen to be collinear reduces to a quadratic, a straight line
+ * reduces to a linear, and both turn up in ordinary outlines. Solving the general
+ * case and hoping is how an intersection quietly goes missing.
+ *
+ * Cardano's method for the genuine cubic, with the trigonometric form for three
+ * real roots — the algebraic form needs complex arithmetic to get there, and this
+ * avoids it.
+ */
+export function unitRoots(c3: number, c2: number, c1: number, c0: number): number[] {
+  const tiny = 1e-12;
+
+  // Degree reduction, in order. Each is a real case rather than a safety net.
+  if (Math.abs(c3) < tiny) {
+    if (Math.abs(c2) < tiny) {
+      if (Math.abs(c1) < tiny) return [];
+      return inUnit([-c0 / c1]);
+    }
+    const disc = c1 * c1 - 4 * c2 * c0;
+    if (disc < 0) return [];
+    const root = Math.sqrt(disc);
+    return inUnit([(-c1 + root) / (2 * c2), (-c1 - root) / (2 * c2)]);
+  }
+
+  // Depressed cubic: t = x - a/3 turns it into x³ + px + q.
+  const a = c2 / c3;
+  const b = c1 / c3;
+  const c = c0 / c3;
+  const shift = a / 3;
+  const p = b - (a * a) / 3;
+  const q = (2 * a * a * a) / 27 - (a * b) / 3 + c;
+
+  const disc = (q * q) / 4 + (p * p * p) / 27;
+
+  if (disc > tiny) {
+    // One real root.
+    const root = Math.sqrt(disc);
+    const u = Math.cbrt(-q / 2 + root);
+    const v = Math.cbrt(-q / 2 - root);
+    return inUnit([u + v - shift]);
+  }
+
+  if (disc > -tiny) {
+    // Two distinct roots, one of them doubled — or a triple root when p is zero.
+    if (Math.abs(p) < tiny) return inUnit([-shift]);
+    const u = Math.cbrt(-q / 2);
+    return inUnit([2 * u - shift, -u - shift]);
+  }
+
+  // Three real roots, reached through the angle rather than through complex
+  // cube roots.
+  const r = Math.sqrt(-(p * p * p) / 27);
+  const phi = Math.acos(clamp(-q / (2 * r), -1, 1));
+  const m = 2 * Math.cbrt(r);
+  return inUnit([
+    m * Math.cos(phi / 3) - shift,
+    m * Math.cos((phi + 2 * Math.PI) / 3) - shift,
+    m * Math.cos((phi + 4 * Math.PI) / 3) - shift,
+  ]);
+}
+
+const clamp = (v: number, low: number, high: number): number => Math.min(high, Math.max(low, v));
+
+/**
+ * Keep the roots that lie on the curve, snapping the ones a hair outside.
+ *
+ * A root at t = -1e-16 is an endpoint that floating point missed, and dropping
+ * it loses a real crossing. Sorted, and duplicates removed, so a caller can walk
+ * them in order.
+ */
+function inUnit(roots: readonly number[]): number[] {
+  const eps = 1e-9;
+  const kept: number[] = [];
+  for (const raw of roots) {
+    if (!Number.isFinite(raw)) continue;
+    const t = raw < 0 && raw > -eps ? 0 : raw > 1 && raw < 1 + eps ? 1 : raw;
+    if (t < 0 || t > 1) continue;
+    if (!kept.some((seen) => Math.abs(seen - t) < eps)) kept.push(t);
+  }
+  return kept.sort((l, r) => l - r);
+}
+
+/** Where a curve crosses a line, and how far along each the crossing sits. */
+export type Crossing = {
+  /** Parameter along the curve. */
+  readonly t: number;
+  /** Parameter along the line segment, 0 at `a` and 1 at `b`. */
+  readonly u: number;
+  readonly point: Vec2;
+};
+
+/**
+ * Where a cubic crosses a line *segment*.
+ *
+ * Done in the line's own frame rather than by intersecting two curves: the
+ * signed distance from the line is linear in the point, so substituting the
+ * cubic into it gives a cubic in `t` whose roots are exactly the crossings. The
+ * Bernstein coefficients of that cubic are just the four control points'
+ * distances from the line, which is both cheap and numerically kind.
+ *
+ * A crossing outside the segment is dropped: a knife is the stroke that was
+ * drawn, not the infinite line through it.
+ */
+export function intersectSegmentCubic(a: Vec2, b: Vec2, s: Cubic): Crossing[] {
+  const nx = -(b.y - a.y);
+  const ny = b.x - a.x;
+  const length = Math.hypot(nx, ny);
+  // A knife of no length crosses nothing, and would divide by zero deciding so.
+  if (length < 1e-12) return [];
+
+  const at = (p: Vec2): number => (nx * (p.x - a.x) + ny * (p.y - a.y)) / length;
+  const d0 = at(s.a);
+  const d1 = at(s.c1);
+  const d2 = at(s.c2);
+  const d3 = at(s.b);
+
+  // Bernstein to power basis.
+  const c3 = -d0 + 3 * d1 - 3 * d2 + d3;
+  const c2 = 3 * d0 - 6 * d1 + 3 * d2;
+  const c1 = -3 * d0 + 3 * d1;
+  const c0 = d0;
+
+  const out: Crossing[] = [];
+  for (const t of unitRoots(c3, c2, c1, c0)) {
+    const point = evaluate(s, t);
+    const u = projectOntoLine(a, b, point);
+    if (u === null || u < 0 || u > 1) continue;
+    out.push({ t, u, point });
+  }
+  return out;
 }

@@ -9,7 +9,7 @@ import {
   updateGlyph,
 } from "@fonteditor/font-model";
 
-export type ToolId = "select" | "pen" | "rect" | "ellipse";
+export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife";
 import {
   type Selection,
   type SegmentRef,
@@ -155,6 +155,8 @@ export type EditorState = {
   readonly pen: PenState | null;
   /** The shape being dragged out, if any. */
   readonly shape: ShapeDrag | null;
+  /** The stroke the knife is drawing, if any. */
+  readonly knife: { readonly from: Vec2; readonly to: Vec2 } | null;
   readonly view: ViewTransform;
   readonly selection: Selection;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
@@ -191,6 +193,7 @@ export function editorState(init: EditorStateInit): EditorState {
     currentGlyph: init.currentGlyph ?? init.document.glyphOrder[0] ?? "",
     pen: null,
     shape: null,
+    knife: null,
     view: init.view,
     selection: init.selection ?? [],
     hoveredSegment: init.hoveredSegment ?? null,

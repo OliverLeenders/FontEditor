@@ -96,3 +96,6 @@ export {
   tunniPoint,
   tunniStatus,
 } from "./tunni.js";
+
+export type { Crossing } from "./cubic.js";
+export { intersectSegmentCubic, unitRoots } from "./cubic.js";

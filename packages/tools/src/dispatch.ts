@@ -4,6 +4,7 @@ import { type ToolResult, abort, result } from "./effects.js";
 import type { KeyInput, PointerInput } from "./input.js";
 import * as pen from "./pen.js";
 import * as select from "./select.js";
+import * as knife from "./knife.js";
 import * as shape from "./shape.js";
 import type { EditorState, ToolId } from "./state.js";
 
@@ -17,7 +18,8 @@ import type { EditorState, ToolId } from "./state.js";
  */
 export type ToolOptions = select.SelectOptions &
   pen.PenOptions &
-  shape.ShapeOptions & { readonly ids?: IdFactory };
+  shape.ShapeOptions &
+  knife.KnifeOptions & { readonly ids?: IdFactory };
 
 export function pointerDown(
   state: EditorState,
@@ -32,6 +34,8 @@ export function pointerDown(
     case "rect":
     case "ellipse":
       return shape.pointerDown(state, input, options);
+    case "knife":
+      return knife.pointerDown(state, input);
   }
 }
 
@@ -48,6 +52,8 @@ export function pointerMove(
     case "rect":
     case "ellipse":
       return shape.pointerMove(state, input, options);
+    case "knife":
+      return knife.pointerMove(state, input);
   }
 }
 
@@ -64,6 +70,8 @@ export function pointerUp(
     case "rect":
     case "ellipse":
       return shape.pointerUp(state, input, options);
+    case "knife":
+      return knife.pointerUp(state, input, options);
   }
 }
 
@@ -76,6 +84,8 @@ export function pointerLeave(state: EditorState): ToolResult {
     case "rect":
     case "ellipse":
       return shape.pointerLeave(state);
+    case "knife":
+      return knife.pointerLeave(state);
   }
 }
 
@@ -91,6 +101,7 @@ export function doubleClick(
       return pen.doubleClick(state);
     case "rect":
     case "ellipse":
+    case "knife":
       return result(state);
   }
 }
@@ -111,6 +122,8 @@ export function keyDown(
     case "rect":
     case "ellipse":
       return input.key === "Escape" ? shape.cancel(state) : result(state);
+    case "knife":
+      return input.key === "Escape" ? knife.cancel(state) : result(state);
   }
 }
 
@@ -127,6 +140,7 @@ function toolShortcut(input: KeyInput): ToolId | null {
   if (key === "v") return "select";
   if (key === "r") return "rect";
   if (key === "e") return "ellipse";
+  if (key === "k") return "knife";
   return null;
 }
 
@@ -144,6 +158,7 @@ export function setActiveTool(state: EditorState, tool: ToolId): ToolResult {
 
   // A shape half dragged out belongs to the tool being left, so it goes with it.
   if (state.shape !== null) return result({ ...state, shape: null, activeTool: tool }, [abort]);
+  if (state.knife !== null) return result({ ...state, knife: null, activeTool: tool }, [abort]);
 
   if (state.pen !== null) {
     const finished = pen.finish(state);
@@ -152,4 +167,4 @@ export function setActiveTool(state: EditorState, tool: ToolId): ToolResult {
   return result({ ...state, activeTool: tool });
 }
 
-export { pen, select, shape };
+export { knife, pen, select, shape };
