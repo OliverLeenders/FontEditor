@@ -14,7 +14,7 @@ type ToolButton = {
 /**
  * The tools, with the ones that do not exist yet shown disabled.
  *
- * All but `M` are real. The rest are placed so the rail's eventual
+ * All of them are real now. The row is the toolbox rather than a promise. The rest are placed so the rail's eventual
  * shape is visible and honestly marked — the earlier mockups had a letter in
  * this row that stood for nothing, which is the failure being avoided here.
  */
@@ -24,7 +24,7 @@ const TOOLS: readonly ToolButton[] = [
   { id: "knife", key: "K", label: "Knife", hint: "Cut across the outline  (K)" },
   { id: "rect", key: "R", label: "Rectangle", hint: "Draw a rectangle  (R) · shift for a square, alt from the centre" },
   { id: "ellipse", key: "E", label: "Ellipse", hint: "Draw an ellipse  (E) · shift for a circle, alt from the centre" },
-  { id: null, key: "M", label: "Measure", hint: "Measure — not built yet" },
+  { id: "measure", key: "M", label: "Measure", hint: "Measure across a stem  (M) · click to pin" },
 ];
 
 export function Toolbar(): JSX.Element {

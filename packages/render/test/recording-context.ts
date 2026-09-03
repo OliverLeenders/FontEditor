@@ -118,6 +118,14 @@ export class RecordingContext implements Canvas2D {
     }
   }
 
+  strokeText(text: string, x: number, y: number, maxWidth?: number): void {
+    this.record("strokeText", maxWidth === undefined ? [x, y] : [x, y, maxWidth]);
+    const last = this.ops[this.ops.length - 1];
+    if (last !== undefined) {
+      this.ops[this.ops.length - 1] = { ...last, text, font: this.font };
+    }
+  }
+
   // ---- queries used by the tests -----------------------------------------
 
   /** Every recorded call of the given kind, in order. */

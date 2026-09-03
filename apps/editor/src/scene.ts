@@ -19,6 +19,7 @@ import {
   type EditorState,
   knifeStroke,
   marqueeRect,
+  shownMeasurement,
   penPreview,
   shapePreview,
   snapHold,
@@ -143,6 +144,7 @@ export function sceneFor(
     penPreview: penPreview(editor),
     shapePreview: shapePreview(editor, outlineIds),
     knifeStroke: knifeStroke(editor),
+    measurement: measurementFor(state),
     neighbours: state.showNeighbours
       ? neighboursFor(editor.document, editor.currentGlyph, state.stripText)
       : [],
@@ -166,4 +168,19 @@ function snapGuidesFor(editor: EditorState): SnapGuide[] {
   if (hold.x !== null) guides.push({ axis: "x", at: hold.x.at, from: hold.x.from });
   if (hold.y !== null) guides.push({ axis: "y", at: hold.y.at, from: hold.y.from });
   return guides;
+}
+
+/**
+ * The measurement to draw, and whether it was pinned.
+ *
+ * Only while the measure tool is active. A reading left on the canvas by a tool
+ * you have put down is a number about a shape you may since have changed.
+ */
+function measurementFor(state: StoreState): Scene["measurement"] {
+  const editor = state.session.editor;
+  if (editor.activeTool !== "measure") return null;
+
+  const m = shownMeasurement(editor);
+  if (m === null) return null;
+  return { from: m.from, to: m.to, distance: m.distance, pinned: editor.measure !== null };
 }

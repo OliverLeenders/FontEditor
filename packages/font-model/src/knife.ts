@@ -1,4 +1,4 @@
-import { type Cubic, type Vec2, intersectSegmentCubic, subcurve } from "@fonteditor/geometry";
+import { type Cubic, type Vec2, subcurve } from "@fonteditor/geometry";
 
 import {
   type Contour,
@@ -7,6 +7,7 @@ import {
   segmentCount,
   segmentCubic,
 } from "./contour.js";
+import { type StrokeCrossing, byContour, samePoint, strokeCrossings } from "./crossings.js";
 import type { Glyph } from "./glyph.js";
 import type { IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
@@ -38,14 +39,6 @@ export type KnifeCut = {
   readonly skipped: number;
 };
 
-type Hit = {
-  readonly contourIndex: number;
-  readonly segmentIndex: number;
-  readonly t: number;
-  readonly u: number;
-  readonly point: Vec2;
-};
-
 /** A crossing after the contours have been split, when it is a node of its own. */
 type Meeting = {
   readonly contour: number;
@@ -62,39 +55,18 @@ type Meeting = {
  * the same name.
  */
 export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut | null {
-  const hits: Hit[] = [];
+  const found = strokeCrossings(g, a, b);
+  if (found.length === 0) return null;
 
-  for (const [contourIndex, c] of g.contours.entries()) {
-    if (!c.closed || c.nodes.length < 2) continue;
-    for (let segmentIndex = 0; segmentIndex < segmentCount(c); segmentIndex++) {
-      const segment = segmentAt(c, segmentIndex);
-      if (segment === null) continue;
-      for (const crossing of intersectSegmentCubic(a, b, segmentCubic(segment))) {
-        hits.push({ contourIndex, segmentIndex, t: crossing.t, u: crossing.u, point: crossing.point });
-      }
-    }
-  }
-
-  if (hits.length === 0) return null;
+  const perContour = byContour(found);
+  const crossings = found.length;
 
   // A contour crossed an odd number of times has been grazed rather than cut —
   // the stroke came in and did not come out, which means it ended inside or ran
   // along the outline. There is no honest pair of shapes to make from that, so
   // the contour is left exactly as it was and the caller is told.
-  // Deduped by position first. A crossing that lands on a node is found twice,
-  // once from the segment arriving and once from the one leaving, and counting
-  // it twice would make an odd number of crossings look even — which is the
-  // difference between cutting a shape and mangling it.
-  const perContour = new Map<number, Hit[]>();
-  for (const hit of hits) {
-    const list = perContour.get(hit.contourIndex) ?? [];
-    if (!list.some((seen) => near(seen.point, hit.point))) list.push(hit);
-    perContour.set(hit.contourIndex, list);
-  }
-
-  const crossings = [...perContour.values()].reduce((n, list) => n + list.length, 0);
   let skipped = 0;
-  const cutting = new Map<number, Hit[]>();
+  const cutting = new Map<number, StrokeCrossing[]>();
   for (const [index, list] of perContour) {
     if (list.length % 2 === 1) skipped += 1;
     else cutting.set(index, list);
@@ -243,7 +215,7 @@ function arc(c: Contour, from: number, to: number, ids: IdFactory): Node[] {
  */
 function splitAtCrossings(
   c: Contour,
-  hits: readonly Hit[],
+  hits: readonly StrokeCrossing[],
   ids: IdFactory,
   contourIndex: number,
 ): { contour: Contour; meetings: Meeting[] } {
@@ -257,11 +229,11 @@ function splitAtCrossings(
     const segment = segmentAt(c, hit.segmentIndex);
     if (segment === null) continue;
 
-    if (near(hit.point, segment.a)) {
+    if (samePoint(hit.point, segment.a)) {
       onNode.set(hit.segmentIndex, hit.u);
       continue;
     }
-    if (near(hit.point, segment.b)) {
+    if (samePoint(hit.point, segment.b)) {
       onNode.set((hit.segmentIndex + 1) % count, hit.u);
       continue;
     }
@@ -325,7 +297,3 @@ function splitAtCrossings(
   return { contour: contour(c.id, nodes, true), meetings };
 }
 
-/** Whether two points are the same point, allowing for arithmetic. */
-function near(p: Vec2, q: Vec2): boolean {
-  return Math.abs(p.x - q.x) < 1e-6 && Math.abs(p.y - q.y) < 1e-6;
-}

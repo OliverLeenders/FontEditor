@@ -5,6 +5,7 @@ import type { KeyInput, PointerInput } from "./input.js";
 import * as pen from "./pen.js";
 import * as select from "./select.js";
 import * as knife from "./knife.js";
+import * as measure from "./measure.js";
 import * as shape from "./shape.js";
 import type { EditorState, ToolId } from "./state.js";
 
@@ -36,6 +37,8 @@ export function pointerDown(
       return shape.pointerDown(state, input, options);
     case "knife":
       return knife.pointerDown(state, input);
+    case "measure":
+      return measure.pointerDown(state, input);
   }
 }
 
@@ -54,6 +57,8 @@ export function pointerMove(
       return shape.pointerMove(state, input, options);
     case "knife":
       return knife.pointerMove(state, input);
+    case "measure":
+      return measure.pointerMove(state, input);
   }
 }
 
@@ -72,6 +77,9 @@ export function pointerUp(
       return shape.pointerUp(state, input, options);
     case "knife":
       return knife.pointerUp(state, input, options);
+    case "measure":
+      // Nothing to commit: a measurement changes nothing.
+      return result(state);
   }
 }
 
@@ -86,6 +94,8 @@ export function pointerLeave(state: EditorState): ToolResult {
       return shape.pointerLeave(state);
     case "knife":
       return knife.pointerLeave(state);
+    case "measure":
+      return measure.pointerLeave(state);
   }
 }
 
@@ -102,6 +112,7 @@ export function doubleClick(
     case "rect":
     case "ellipse":
     case "knife":
+    case "measure":
       return result(state);
   }
 }
@@ -124,6 +135,8 @@ export function keyDown(
       return input.key === "Escape" ? shape.cancel(state) : result(state);
     case "knife":
       return input.key === "Escape" ? knife.cancel(state) : result(state);
+    case "measure":
+      return input.key === "Escape" ? measure.cancel(state) : result(state);
   }
 }
 
@@ -141,6 +154,7 @@ function toolShortcut(input: KeyInput): ToolId | null {
   if (key === "r") return "rect";
   if (key === "e") return "ellipse";
   if (key === "k") return "knife";
+  if (key === "m") return "measure";
   return null;
 }
 
@@ -159,6 +173,8 @@ export function setActiveTool(state: EditorState, tool: ToolId): ToolResult {
   // A shape half dragged out belongs to the tool being left, so it goes with it.
   if (state.shape !== null) return result({ ...state, shape: null, activeTool: tool }, [abort]);
   if (state.knife !== null) return result({ ...state, knife: null, activeTool: tool }, [abort]);
+  // A pinned measurement belongs to the measure tool and goes with it.
+  if (state.measure !== null) return result({ ...state, measure: null, activeTool: tool });
 
   if (state.pen !== null) {
     const finished = pen.finish(state);
@@ -167,4 +183,4 @@ export function setActiveTool(state: EditorState, tool: ToolId): ToolResult {
   return result({ ...state, activeTool: tool });
 }
 
-export { knife, pen, select, shape };
+export { knife, measure, pen, select, shape };

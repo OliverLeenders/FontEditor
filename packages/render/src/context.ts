@@ -38,4 +38,10 @@ export interface Canvas2D {
   setLineDash(segments: number[]): void;
   /** `maxWidth` squeezes over-long glyph names rather than letting them spill. */
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
+  /**
+   * Outline text, used only to lay a halo behind a label so it stays readable
+   * over a filled shape. Drawn first, in the background colour, and then filled
+   * over.
+   */
+  strokeText(text: string, x: number, y: number, maxWidth?: number): void;
 }

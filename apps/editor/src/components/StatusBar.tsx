@@ -1,3 +1,6 @@
+import { measureAngle } from "@fonteditor/font-model";
+import { shownMeasurement } from "@fonteditor/tools";
+
 import { useStoreValue } from "../useStore.js";
 import styles from "./StatusBar.module.css";
 
@@ -17,6 +20,21 @@ export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): JSX.E
   const recovered = useStoreValue((s) => s.recovered);
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
 
+  // Three scalar selectors rather than one returning the measurement: it is a
+  // fresh object every time, and comparing it by identity would re-render this
+  // line on every store notification.
+  const measured = useStoreValue((s) =>
+    s.session.editor.activeTool === "measure"
+      ? shownMeasurement(s.session.editor)?.distance ?? null
+      : null,
+  );
+  const measuredAngle = useStoreValue((s) => {
+    if (s.session.editor.activeTool !== "measure") return null;
+    const m = shownMeasurement(s.session.editor);
+    return m === null ? null : measureAngle(m);
+  });
+  const pinned = useStoreValue((s) => s.session.editor.measure !== null);
+
   const saved =
     storage === "unavailable"
       ? `not saving — ${detail}`
@@ -33,6 +51,16 @@ export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): JSX.E
       <span><b>{glyphCount}</b> glyphs</span>
       {editing ? <span><b>{selection}</b> selected</span> : null}
       {editing ? <span>{tool}</span> : null}
+      {/* The number itself is on the canvas beside what it measures. What is
+          here is what would clutter the drawing: the angle it was taken at, and
+          whether it is following the pointer or has been pinned. */}
+      {measured === null ? null : (
+        <span className={styles.measure}>
+          <b>{Math.round(measured * 10) / 10}</b> units at{" "}
+          {Math.round((measuredAngle ?? 0) * 10) / 10}&deg;
+          {pinned ? " · pinned" : null}
+        </span>
+      )}
       <span className={storage === "unavailable" || saveStatus === "failed" ? styles.warn : undefined}>
         {saved}
       </span>

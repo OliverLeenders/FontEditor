@@ -61,6 +61,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawPenPreview(ctx, s);
     drawShapePreview(ctx, s);
     drawKnifeStroke(ctx, s);
+    drawMeasurement(ctx, s);
     drawMarquee(ctx, s);
   }
 
@@ -349,6 +350,65 @@ export function drawShapePreview(ctx: Canvas2D, s: Scene): void {
   ctx.beginPath();
   traceContour(ctx, s.view, preview);
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * The measurement: the span, a tick at each end, and the number beside it.
+ *
+ * Ticks rather than arrowheads, and square to the span, because what is being
+ * shown is where the two edges are — an arrow would say "this direction", and
+ * the direction is not the point. The number sits clear of the line on the side
+ * the span leans away from, so it never lies along what it is labelling.
+ */
+export function drawMeasurement(ctx: Canvas2D, s: Scene): void {
+  const m = s.measurement;
+  if (m === null) return;
+
+  const a = toScreen(s.view, m.from);
+  const b = toScreen(s.view, m.to);
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const reach = Math.hypot(dx, dy);
+  if (reach < 0.5) return;
+
+  const ux = dx / reach;
+  const uy = dy / reach;
+  const tick = 5;
+
+  ctx.save();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = s.palette.nodeSelected;
+  ctx.lineWidth = m.pinned ? 1.5 : 1;
+
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  // A tick across each end, square to the span.
+  ctx.moveTo(a.x - uy * tick, a.y + ux * tick);
+  ctx.lineTo(a.x + uy * tick, a.y - ux * tick);
+  ctx.moveTo(b.x - uy * tick, b.y + ux * tick);
+  ctx.lineTo(b.x + uy * tick, b.y - ux * tick);
+  ctx.stroke();
+
+  const label = String(Math.round(m.distance * 10) / 10);
+  const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+  // Clear of the line rather than on it, on whichever side keeps it upright.
+  const off = 10;
+  const nx = -uy * (uy > 0 ? -1 : 1);
+  const ny = ux * (uy > 0 ? -1 : 1);
+
+  ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = s.palette.halo;
+  // A halo behind it, so a number over a filled shape stays readable.
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = s.palette.halo;
+  ctx.strokeText(label, mid.x + nx * off, mid.y + ny * off);
+  ctx.fillStyle = s.palette.nodeSelected;
+  ctx.fillText(label, mid.x + nx * off, mid.y + ny * off);
+
   ctx.restore();
 }
 

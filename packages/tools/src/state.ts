@@ -4,12 +4,13 @@ import {
   type FontDocument,
   type Glyph,
   type GlyphName,
+  type Measurement,
   type NodeId,
   glyphNamed,
   updateGlyph,
 } from "@fonteditor/font-model";
 
-export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife";
+export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure";
 import {
   type Selection,
   type SegmentRef,
@@ -157,6 +158,14 @@ export type EditorState = {
   readonly shape: ShapeDrag | null;
   /** The stroke the knife is drawing, if any. */
   readonly knife: { readonly from: Vec2; readonly to: Vec2 } | null;
+  /**
+   * A measurement pinned in place, if one is.
+   *
+   * Only the pinned one is held. The reading that follows the cursor is derived
+   * from the cursor and what it is over, and storing a copy of it would be a
+   * second answer that could disagree with the first.
+   */
+  readonly measure: Measurement | null;
   readonly view: ViewTransform;
   readonly selection: Selection;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
@@ -194,6 +203,7 @@ export function editorState(init: EditorStateInit): EditorState {
     pen: null,
     shape: null,
     knife: null,
+    measure: null,
     view: init.view,
     selection: init.selection ?? [],
     hoveredSegment: init.hoveredSegment ?? null,

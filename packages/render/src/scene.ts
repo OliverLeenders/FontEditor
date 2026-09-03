@@ -152,6 +152,20 @@ export type Scene = {
   readonly shapePreview: Contour | null;
   /** The knife's stroke while it is being drawn, in design units. */
   readonly knifeStroke: readonly [Vec2, Vec2] | null;
+  /**
+   * The measurement on show, if any.
+   *
+   * Carried as two points and a number rather than as something to work out
+   * here: the drawing and the status bar have to be showing one measurement, and
+   * the surest way is for there to be only one.
+   */
+  readonly measurement: {
+    readonly from: Vec2;
+    readonly to: Vec2;
+    readonly distance: number;
+    /** Pinned readings are drawn a little more firmly than passing ones. */
+    readonly pinned: boolean;
+  } | null;
 };
 
 /** A glyph drawn for context, at a given offset, not for editing. */
@@ -177,6 +191,7 @@ export type SceneInit = {
   readonly componentOutlines?: readonly Contour[];
   readonly shapePreview?: Contour | null;
   readonly knifeStroke?: readonly [Vec2, Vec2] | null;
+  readonly measurement?: Scene["measurement"];
 };
 
 export function scene(init: SceneInit): Scene {
@@ -197,5 +212,6 @@ export function scene(init: SceneInit): Scene {
     componentOutlines: init.componentOutlines ?? [],
     shapePreview: init.shapePreview ?? null,
     knifeStroke: init.knifeStroke ?? null,
+    measurement: init.measurement ?? null,
   };
 }

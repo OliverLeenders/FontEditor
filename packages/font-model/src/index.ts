@@ -155,3 +155,9 @@ export { KAPPA, ellipseContour, rectContour } from "./shapes.js";
 
 export type { KnifeCut } from "./knife.js";
 export { cutGlyph } from "./knife.js";
+
+export type { StrokeCrossing } from "./crossings.js";
+export { byContour, samePoint, strokeCrossings } from "./crossings.js";
+
+export type { Measurement } from "./measure.js";
+export { measureAngle, measureNormal } from "./measure.js";

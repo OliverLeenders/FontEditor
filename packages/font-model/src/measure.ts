@@ -1,0 +1,105 @@
+import { type Vec2, project, tangent } from "@fonteditor/geometry";
+
+import { segmentAt, segmentCubic } from "./contour.js";
+import { strokeCrossings } from "./crossings.js";
+import { type Glyph, glyphBounds } from "./glyph.js";
+import type { ContourId } from "./ids.js";
+
+/**
+ * Measuring across a shape, square to the outline.
+ *
+ * The measurement anyone actually wants from a font editor is a stem width, and
+ * a stem width is a distance along the *normal*. Dragging a straight line across
+ * a round letter measures a chord instead, which is a different and larger
+ * number — so for anything but an upright stem, a ruler answers the wrong
+ * question. This asks the right one.
+ *
+ * Nothing here needs to know what is inside the glyph and what is outside. The
+ * direction comes from where the cursor is relative to the outline, which is
+ * both simpler and exactly what someone pointing at a stem means.
+ */
+
+export type Measurement = {
+  /** Where on the outline the measurement starts. */
+  readonly from: Vec2;
+  /** Where it lands on the far side. */
+  readonly to: Vec2;
+  readonly distance: number;
+  /** Direction from `from` to `to`, as a unit vector. */
+  readonly normal: Vec2;
+  /** The segment measured from, so a caller can show which one it picked. */
+  readonly contourId: ContourId;
+  readonly segmentIndex: number;
+};
+
+/**
+ * Measure from the outline nearest the cursor, square to it, towards the cursor.
+ *
+ * `null` whenever there is no honest answer, and each of those cases is a real
+ * one rather than a guard against nonsense:
+ *
+ *  - the cursor sits on the outline, so "towards the cursor" names no direction
+ *  - the outline has no tangent there, which happens at a cusp or where a handle
+ *    sits on its anchor
+ *  - the ray leaves the glyph without meeting anything, which is what hovering
+ *    outside the letter looks like
+ *
+ * The last is worth being deliberate about: hovering just off the edge of a stem
+ * measures nothing, because the normal points away from the ink. Measurement
+ * happens where there is material between you and the far side.
+ */
+export function measureNormal(
+  g: Glyph,
+  contourId: ContourId,
+  segmentIndex: number,
+  cursor: Vec2,
+): Measurement | null {
+  const c = g.contours.find((each) => each.id === contourId);
+  if (c === undefined) return null;
+
+  const segment = segmentAt(c, segmentIndex);
+  if (segment === null) return null;
+
+  const cubic = segmentCubic(segment);
+  const { t, point } = project(cubic, cursor);
+
+  const along = tangent(cubic, t);
+  if (along === null) return null;
+
+  // Square to the curve, pointing at the side the cursor is on. A cursor exactly
+  // on the outline picks neither side, and either answer would be arbitrary.
+  const away = { x: cursor.x - point.x, y: cursor.y - point.y };
+  const side = -along.y * away.x + along.x * away.y;
+  if (Math.abs(side) < 1e-9) return null;
+
+  const sign = side > 0 ? 1 : -1;
+  const normal = { x: -along.y * sign, y: along.x * sign };
+
+  // Long enough to leave the glyph from anywhere inside it, so a ray that finds
+  // nothing has genuinely found nothing rather than fallen short.
+  const box = glyphBounds(g);
+  if (box === null) return null;
+  const reach = Math.hypot(box.maxX - box.minX, box.maxY - box.minY) + 1;
+
+  const far = { x: point.x + normal.x * reach, y: point.y + normal.y * reach };
+  const crossings = strokeCrossings(g, point, far);
+
+  // The ray starts on the outline, so its first meeting is the place it left.
+  // Anything within a whisker of the start is that, not the far side.
+  const opposite = crossings.find((crossing) => crossing.u * reach > 1e-6);
+  if (opposite === undefined) return null;
+
+  return {
+    from: point,
+    to: opposite.point,
+    distance: Math.hypot(opposite.point.x - point.x, opposite.point.y - point.y),
+    normal,
+    contourId,
+    segmentIndex,
+  };
+}
+
+/** The measurement's angle in degrees, measured from the horizontal. */
+export function measureAngle(m: Measurement): number {
+  return (Math.atan2(m.normal.y, m.normal.x) * 180) / Math.PI;
+}

@@ -20,3 +20,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* The one line here that changes as the pointer moves, so it is given a colour
+   that says "live" rather than sitting among the settled facts. */
+.measure {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
