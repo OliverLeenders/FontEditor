@@ -38,6 +38,14 @@ export type StorageRequest =
   | {
       readonly id: number;
       readonly kind: "replaceAll";
+      /**
+       * Carried with the glyphs rather than sent after them.
+       *
+       * `replaceDocument` writes every file the project has, kerning included,
+       * so anything not in this message is written over as empty. Sending it
+       * afterwards would leave a window in which the font on disk had lost it.
+       */
+      readonly kerning: StoredKerning;
       readonly glyphs: readonly StoredGlyph[];
       readonly info: StoredFontInfo;
     }

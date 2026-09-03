@@ -1,5 +1,5 @@
 import type { FontDocument, Glyph } from "@fonteditor/font-model";
-import { fontDocument, setGlyphOrder, setKerning } from "@fonteditor/font-model";
+import { fontDocument, setFeatures, setGlyphOrder, setKerning } from "@fonteditor/font-model";
 
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import {
@@ -78,10 +78,18 @@ export class StorageClient {
     }
     if (glyphs.length === 0) return { kind: "empty" };
 
-    const { info } = decodeFontInfo(payload.info);
-    const document = setKerning(
-      setGlyphOrder(fontDocument(glyphs, info), glyphs.map((g) => g.name)),
-      decodeKerning(payload.kerning),
+    // Every field the document carries, not only its glyphs. This is the third
+    // place a document is taken apart and put back together — the worker does it
+    // for `replaceAll`, the project does it for a load from disk, and this does
+    // it for a load across the wire — and each is a place where a field added to
+    // the model can be quietly left behind.
+    const { info, features } = decodeFontInfo(payload.info);
+    const document = setFeatures(
+      setKerning(
+        setGlyphOrder(fontDocument(glyphs, info), glyphs.map((g) => g.name)),
+        decodeKerning(payload.kerning),
+      ),
+      features,
     );
 
     return { kind: "loaded", document, recovered: payload.recovered, problems };
@@ -120,6 +128,7 @@ export class StorageClient {
       kind: "replaceAll",
       glyphs: glyphs.map(encodeGlyph),
       info: encodeFontInfo(document),
+      kerning: encodeKerning(document.kerning),
     });
     return result as { written: number; removed: number };
   }

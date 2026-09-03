@@ -1,16 +1,21 @@
-/// <reference lib="webworker" />
-
 import {
   decodeFontInfo,
   decodeGlyph,
+  decodeKerning,
   encodeFontInfo,
   encodeGlyph,
   encodeKerning,
 } from "./schema.js";
-import { type Glyph, fontDocument, orderedGlyphs, setGlyphOrder } from "@fonteditor/font-model";
+import {
+  type Glyph,
+  fontDocument,
+  orderedGlyphs,
+  setFeatures,
+  setGlyphOrder,
+  setKerning,
+} from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
-import { OpfsFileStore } from "./opfs.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import {
   FONT_INFO_PATH,
@@ -36,40 +41,63 @@ import {
  * promise, one frame later than it happened.
  */
 
-let store: FileStore | null = null;
+/**
+ * How the handler gets a store to work in.
+ *
+ * A parameter rather than a hard reference to OPFS, so the request handling can
+ * be driven over a store that is not a browser's — which is the only way this
+ * layer gets tested at all. The shell below supplies the real one.
+ */
+export type OpenStore = (directory: string) => Promise<FileStore>;
 
-const scope = self as unknown as DedicatedWorkerGlobalScope;
+/**
+ * The request handling, with no worker globals in sight.
+ *
+ * Returns the reply rather than posting it. Posting is the shell's job, and
+ * separating them is what lets a test ask "what would this answer" without a
+ * `Worker` to answer into.
+ */
+export function storageHandler(open: OpenStore): (request: StorageRequest) => Promise<StorageResponse> {
+  let store: FileStore | null = null;
 
-scope.addEventListener("message", (event: MessageEvent<StorageRequest>) => {
-  void handle(event.data);
-});
+  const required = (): FileStore => {
+    if (store === null) throw new Error("Storage has not been opened yet.");
+    return store;
+  };
 
-async function handle(request: StorageRequest): Promise<void> {
-  try {
-    const value = await run(request);
-    reply({ id: request.id, ok: true, value });
-  } catch (error) {
-    reply({
-      id: request.id,
-      ok: false,
-      reason: error instanceof Error ? error.message : String(error),
-    });
-  }
+  const run = async (request: StorageRequest): Promise<unknown> => {
+    switch (request.kind) {
+      case "open":
+        store = await open(request.directory);
+        return null;
+      default:
+        return runOn(required(), request);
+    }
+  };
+
+  return async (request: StorageRequest): Promise<StorageResponse> => {
+    try {
+      return { id: request.id, ok: true, value: await run(request) };
+    } catch (error) {
+      // Every failure becomes a rejected reply rather than an exception. That is
+      // the real cost of the Worker: a failed write surfaces on the client's
+      // promise, one frame later than it happened.
+      return {
+        id: request.id,
+        ok: false,
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  };
 }
 
-function reply(response: StorageResponse): void {
-  scope.postMessage(response);
-}
+async function runOn(store: FileStore, request: StorageRequest): Promise<unknown> {
+  const required = (): FileStore => store;
 
-function required(): FileStore {
-  if (store === null) throw new Error("Storage has not been opened yet.");
-  return store;
-}
-
-async function run(request: StorageRequest): Promise<unknown> {
   switch (request.kind) {
+    // Handled before this is reached; it is the one request that decides which
+    // store there is rather than acting on one.
     case "open":
-      store = await OpfsFileStore.open(request.directory);
       return null;
 
     case "load": {
@@ -134,8 +162,17 @@ async function run(request: StorageRequest): Promise<unknown> {
       }
       // The stored order is authoritative: `fontDocument` would otherwise
       // order by the array it was handed, losing the font's own arrangement.
-      const { info, glyphOrder } = decodeFontInfo(request.info);
-      const document = setGlyphOrder(fontDocument(glyphs, info), glyphOrder);
+      const { info, glyphOrder, features } = decodeFontInfo(request.info);
+      // Everything the document carries, not only its glyphs: `replaceDocument`
+      // writes every file the project has, so whatever is left out here is
+      // written over as empty.
+      const document = setFeatures(
+        setKerning(
+          setGlyphOrder(fontDocument(glyphs, info), glyphOrder),
+          decodeKerning(request.kerning),
+        ),
+        features,
+      );
       const report = await replaceDocument(required(), document);
       return report;
     }
