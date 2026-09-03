@@ -17,10 +17,12 @@ import {
   editCurrentGlyph,
   moveCoordinateTo,
   removeComponent,
+  renameCurrentGlyph,
+  renameRefusal,
   result,
   selectedCoordinate,
 } from "@fonteditor/tools";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Inspector.module.css";
@@ -71,8 +73,31 @@ export function Inspector(): JSX.Element | null {
   const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
   const [adding, setAdding] = useState("");
 
+  // The field is only a draft until it is committed, so it holds its own text.
+  // Reset when the open glyph changes, or it would show the last glyph's name.
+  const [draftName, setDraftName] = useState(glyphName);
+  useEffect(() => setDraftName(glyphName), [glyphName]);
+
+  const refusal = renameRefusal(store.editor, draftName);
+  const renameable = draftName.trim() !== glyphName && refusal === null;
+
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   if (!open) return null;
+
+  /**
+   * Commit the name, or put the field back.
+   *
+   * On blur as well as on Enter, because a field that quietly discarded what was
+   * typed the moment you clicked elsewhere would be worse than one that asked.
+   * Escape is the way to change your mind.
+   */
+  const commitName = (): void => {
+    if (!renameable) {
+      setDraftName(glyphName);
+      return;
+    }
+    store.applyTool(renameCurrentGlyph(store.editor, draftName));
+  };
 
   const commitAdvance = (value: number): void => {
     if (!Number.isFinite(value)) return;
@@ -162,7 +187,37 @@ export function Inspector(): JSX.Element | null {
           drag.current = null;
         }}
       >
-        <span className={styles.title}>{glyphName || "no glyph"}</span>
+        {/* The name is a reference — components place a glyph by it and kerning
+            names it on both sides of a pair — so renaming is an edit rather
+            than relabelling, and it belongs with the other fields that edit
+            this glyph. It stays in the header because that is where the name
+            already was, and where anyone would look for it. */}
+        <input
+          className={styles.name}
+          value={draftName}
+          aria-label="Glyph name"
+          spellCheck={false}
+          disabled={glyphName === ""}
+          title={
+            refusal === "taken"
+              ? "Another glyph already has that name"
+              : refusal === "empty"
+                ? "A glyph needs a name"
+                : "Rename this glyph, and everything that refers to it"
+          }
+          data-invalid={refusal !== null && refusal !== "missing" ? "true" : undefined}
+          onPointerDown={(event) => event.stopPropagation()}
+          onChange={(event) => setDraftName(event.target.value)}
+          onBlur={commitName}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+            if (event.key === "Escape") {
+              setDraftName(glyphName);
+              event.currentTarget.blur();
+            }
+            event.stopPropagation();
+          }}
+        />
         <button
           type="button"
           className={styles.dismiss}

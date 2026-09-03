@@ -8,6 +8,8 @@ import {
   DEFAULT_FONT_INFO,
   counterIds,
   fontDocument,
+  renameGlyph,
+  removeGlyph,
   glyph,
   node,
   orderedGlyphs,
@@ -688,5 +690,63 @@ describe("kerning on disk", () => {
     const back = loaded.kind === "loaded" ? loaded.document.kerning : null;
     expect(kernValue(kernIndex(back!), "T", "V")).toBe(-20);
     expect(kernValue(kernIndex(back!), "T", "A")).toBe(0);
+  });
+});
+
+describe("a glyph that is no longer in the font", () => {
+  /** Two glyphs, so one can go and leave the other behind. */
+  const pair = () =>
+    fontDocument([
+      firstGlyph(document()),
+      glyph("v", { unicodes: [0x76], advance: 480 }),
+    ]);
+
+  it("has its file removed, not merely dropped from the index", async () => {
+    const store = new MemoryFileStore();
+    const before = pair();
+    await saveDocument(store, before);
+
+    await saveDocument(store, removeGlyph(before, "v")!, before);
+    expect(store.has(glyphPath("v"))).toBe(false);
+  });
+
+  it("stays gone after a reload", async () => {
+    // The whole point. `loadDocument` reads every file in the directory and
+    // appends any the index does not mention, so a file left behind is a glyph
+    // that comes back — silently, at the end of an order that never named it.
+    const store = new MemoryFileStore();
+    const before = pair();
+    await saveDocument(store, before);
+    await saveDocument(store, removeGlyph(before, "v")!, before);
+
+    const result = await loadDocument(store);
+    expect(result.kind).toBe("loaded");
+    if (result.kind === "loaded") {
+      expect(result.document.glyphOrder).toEqual(["o"]);
+      expect(result.document.glyphs["v"]).toBeUndefined();
+    }
+  });
+
+  it("takes the old file with it when a glyph is renamed", async () => {
+    const store = new MemoryFileStore();
+    const before = pair();
+    await saveDocument(store, before);
+
+    const after = renameGlyph(before, "v", "vee")!;
+    await saveDocument(store, after, before);
+
+    expect(store.has(glyphPath("vee"))).toBe(true);
+    expect(store.has(glyphPath("v"))).toBe(false);
+  });
+
+  it("does not bring the old name back on the next load", async () => {
+    const store = new MemoryFileStore();
+    const before = pair();
+    await saveDocument(store, before);
+    await saveDocument(store, renameGlyph(before, "v", "vee")!, before);
+
+    const result = await loadDocument(store);
+    if (result.kind !== "loaded") throw new Error("expected a document");
+    expect(result.document.glyphOrder).toEqual(["o", "vee"]);
   });
 });

@@ -237,3 +237,60 @@ export function kernPairCount(k: Kerning): number {
   for (const row of Object.values(k.pairs)) n += Object.keys(row).length;
   return n;
 }
+
+/**
+ * Rename a glyph everywhere the kerning mentions it.
+ *
+ * Two places, and missing either loses work silently. A glyph is named directly
+ * on both sides of a pair, and it is named again as a member of any group it
+ * belongs to — so a rename that only fixed the pairs would leave the group
+ * pointing at nothing, and the pair rules that apply through that group would
+ * quietly stop applying to the glyph.
+ *
+ * Group *names* are untouched: a group is not a glyph, and one called "O" that
+ * happens to contain a glyph called "O" is a coincidence rather than a link.
+ */
+export function renameGlyphInKerning(k: Kerning, from: GlyphName, to: GlyphName): Kerning {
+  if (from === to) return k;
+
+  const inGroups = (groups: Kerning["firstGroups"]): Kerning["firstGroups"] => {
+    let changed = false;
+    const next: Record<string, readonly GlyphName[]> = {};
+    for (const [name, members] of Object.entries(groups)) {
+      if (!members.includes(from)) {
+        next[name] = members;
+        continue;
+      }
+      changed = true;
+      // Renaming onto a name the group already holds must not list it twice.
+      next[name] = [...new Set(members.map((m) => (m === from ? to : m)))];
+    }
+    return changed ? next : groups;
+  };
+
+  const side = (key: string): string => (key === from ? to : key);
+
+  let pairsChanged = false;
+  const pairs: Record<string, Record<string, number>> = {};
+  for (const [first, row] of Object.entries(k.pairs)) {
+    const nextFirst = side(first);
+    if (nextFirst !== first) pairsChanged = true;
+
+    // Merged rather than replaced: renaming onto a name that already has kerning
+    // brings two rows together, and the one being renamed wins the overlap —
+    // it is the glyph that is moving, so its values are the ones in hand.
+    const row2: Record<string, number> = { ...pairs[nextFirst] };
+    for (const [second, value] of Object.entries(row)) {
+      const nextSecond = side(second);
+      if (nextSecond !== second) pairsChanged = true;
+      row2[nextSecond] = value;
+    }
+    pairs[nextFirst] = row2;
+  }
+
+  const firstGroups = inGroups(k.firstGroups);
+  const secondGroups = inGroups(k.secondGroups);
+  if (!pairsChanged && firstGroups === k.firstGroups && secondGroups === k.secondGroups) return k;
+
+  return { firstGroups, secondGroups, pairs: pairsChanged ? pairs : k.pairs };
+}

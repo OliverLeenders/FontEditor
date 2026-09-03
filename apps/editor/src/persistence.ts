@@ -7,6 +7,7 @@ import {
   StorageClient,
   browserLocks,
   dirtyGlyphs,
+  removedGlyphs,
   requestPersistence,
 } from "@fonteditor/storage";
 
@@ -74,6 +75,9 @@ export class Persistence {
       save: async (document, previous) => {
         if (!this.owner) return;
         await this.client?.saveGlyphs(dirtyGlyphs(previous, document));
+        // Before the index is rewritten, so a crash in between leaves files the
+        // index still lists rather than files it does not.
+        await this.client?.removeGlyphs(removedGlyphs(previous, document));
         await this.client?.saveFontInfo(document);
         // Only when it moved: the table is persistent, so this is exact, and it
         // can be large enough that rewriting it on every stroke would show.

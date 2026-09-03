@@ -94,6 +94,19 @@ export class StorageClient {
   }
 
   /**
+   * Delete the files of glyphs that are no longer in the font.
+   *
+   * Without this a deleted glyph's file stays where it was, and `loadDocument`
+   * reads every file in the directory — so the glyph comes back on the next
+   * launch, appended to the end of an order that no longer mentions it.
+   */
+  async removeGlyphs(names: readonly string[]): Promise<readonly string[]> {
+    if (names.length === 0) return [];
+    const removed = await this.send({ kind: "removeGlyphs", names });
+    return removed as readonly string[];
+  }
+
+  /**
    * Replace everything on disk with this document, in one message.
    *
    * Returns what the worker actually did, so an import can report how many

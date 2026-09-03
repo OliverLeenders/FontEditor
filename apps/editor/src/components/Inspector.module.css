@@ -143,3 +143,26 @@
   line-height: 1;
 }
 .componentRemove:hover { color: var(--danger, #c2453d); border-color: currentColor; }
+
+/* Looks like the title it replaces until you touch it, so the header still
+   reads as a header rather than as a form. */
+.name {
+  flex: 1;
+  min-width: 0;
+  padding: .1rem .25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+}
+
+.name:hover:not(:disabled) { border-color: var(--rule); }
+.name:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--canvas);
+}
+.name[data-invalid="true"] { border-color: var(--warn, #b4791f); }
+.name:disabled { color: var(--ink-2); }

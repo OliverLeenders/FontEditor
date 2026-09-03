@@ -99,6 +99,7 @@ export {
   isGroupKey,
   kernIndex,
   kernMatch,
+  renameGlyphInKerning,
   kernPairCount,
   kernPairs,
   kernValue,
@@ -108,7 +109,7 @@ export {
   setKernGroup,
 } from "./kerning.js";
 
-export type { FontDocument, FontInfo, GlyphName } from "./document.js";
+export type { FontDocument, FontInfo, GlyphName, RenameProblem } from "./document.js";
 export {
   DEFAULT_FONT_INFO,
   fontDocument,
@@ -119,6 +120,8 @@ export {
   orderedGlyphs,
   putGlyph,
   removeGlyph,
+  renameGlyph,
+  renameProblem,
   setFontInfo,
   setGlyphOrder,
   setKerning,

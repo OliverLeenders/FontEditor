@@ -16,6 +16,18 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "open"; readonly directory: string }
   | { readonly id: number; readonly kind: "load" }
   | { readonly id: number; readonly kind: "saveGlyphs"; readonly glyphs: readonly StoredGlyph[] }
+  | {
+      /**
+       * Delete glyph files by name.
+       *
+       * A separate message rather than something `saveGlyphs` infers, because a
+       * save is told what a document *has* and could never work out from that
+       * what it no longer has.
+       */
+      readonly id: number;
+      readonly kind: "removeGlyphs";
+      readonly names: readonly string[];
+    }
   | { readonly id: number; readonly kind: "saveFontInfo"; readonly info: StoredFontInfo }
   | { readonly id: number; readonly kind: "saveKerning"; readonly kerning: StoredKerning }
   /**

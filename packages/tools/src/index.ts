@@ -50,6 +50,8 @@ export {
   moveCoordinateTo,
   nudgeKern,
   removeComponent,
+  renameCurrentGlyph,
+  renameRefusal,
   roundCoordinates,
   selectedCoordinate,
   unroundedCount,

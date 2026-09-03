@@ -9,6 +9,7 @@ import {
   type NodeId,
   type HandleLock,
   type NodeType,
+  type RenameProblem,
   NO_LOCK,
   addGlyphComponent,
   balanceSegment,
@@ -29,6 +30,8 @@ import {
   removeGlyph,
   removeGlyphComponent,
   removeNode,
+  renameGlyph as renameInDocument,
+  renameProblem,
   reverseContour,
   roundFont,
   segmentAt,
@@ -531,6 +534,31 @@ export function roundCoordinates(state: EditorState): ToolResult {
 /** How many glyphs {@link roundCoordinates} would change, for a caller to say so. */
 export function unroundedCount(state: EditorState): number {
   return unroundedGlyphs(state.document);
+}
+
+/**
+ * Rename a glyph, carrying every reference to it along.
+ *
+ * A name is a reference, not a label — components place a glyph by name, and
+ * kerning names it on both sides of a pair and again inside any group it belongs
+ * to. `renameGlyph` in the model moves all of them together; this is the part
+ * that keeps the editor pointing at the right glyph afterwards.
+ *
+ * Not undoable in the ordinary way is *not* the choice here: it is one step like
+ * any other edit, because it is one, and taking it back should put the old name
+ * and every reference to it back exactly.
+ */
+export function renameCurrentGlyph(state: EditorState, to: GlyphName): ToolResult {
+  const from = state.currentGlyph;
+  const document = renameInDocument(state.document, from, to.trim());
+  if (document === null) return result(state);
+
+  return done(state, { ...state, document, currentGlyph: to.trim() }, "Rename glyph");
+}
+
+/** Why renaming the open glyph would be refused, or `null` if it would not be. */
+export function renameRefusal(state: EditorState, to: string): RenameProblem | null {
+  return renameProblem(state.document, state.currentGlyph, to.trim());
 }
 
 // ---------------------------------------------------------------------------

@@ -110,6 +110,18 @@ async function run(request: StorageRequest): Promise<unknown> {
       return written;
     }
 
+    case "removeGlyphs": {
+      const removed: string[] = [];
+      for (const name of request.names) {
+        const path = glyphPath(name);
+        // A file that is not there is the state being asked for, so removing it
+        // twice is not an error worth failing a save over.
+        await required().remove(path);
+        removed.push(path);
+      }
+      return removed;
+    }
+
     case "replaceAll": {
       // Validated the same way a single save is, and *before* anything is
       // written: a font that fails to round-trip should leave the existing

@@ -29,6 +29,8 @@ import {
   moveCoordinateTo,
   nudgeSidebearing,
   nodeHvLocked,
+  renameCurrentGlyph,
+  renameRefusal,
   retractHandle,
   reverseContourAt,
   roundCoordinates,
@@ -702,5 +704,47 @@ describe("setting a coordinate", () => {
     const { state, contour: c } = withNode();
     const gone = { contourId: c.id, nodeId: "vanished", part: "point" as const };
     expect(moveCoordinateTo(state, gone, { x: 0, y: 0 }).state).toBe(state);
+  });
+});
+
+describe("renaming the open glyph", () => {
+  const twoGlyphs = () =>
+    editorState({
+      document: fontDocument([
+        glyph("a", { unicodes: [0x61], advance: 500 }),
+        glyph("v", { unicodes: [0x76], advance: 480 }),
+      ]),
+      view: VIEW,
+    });
+
+  it("renames it and follows it, so the editor is not left on a name that has gone", () => {
+    const out = renameCurrentGlyph(twoGlyphs(), "alpha");
+
+    expect(out.state.document.glyphs["alpha"]?.advance).toBe(500);
+    expect(out.state.currentGlyph).toBe("alpha");
+  });
+
+  it("is one undo step", () => {
+    const out = renameCurrentGlyph(twoGlyphs(), "alpha");
+    expect(out.effects.filter((e) => e.kind === "beginTransaction")).toHaveLength(1);
+  });
+
+  it("trims what was typed, since a leading space is never meant", () => {
+    expect(renameCurrentGlyph(twoGlyphs(), "  alpha  ").state.currentGlyph).toBe("alpha");
+  });
+
+  it("does nothing at all when the name is refused", () => {
+    const state = twoGlyphs();
+    expect(renameCurrentGlyph(state, "v").state).toBe(state);
+    expect(renameCurrentGlyph(state, "").state).toBe(state);
+  });
+
+  it("says why it would be refused, before anyone commits", () => {
+    const state = twoGlyphs();
+    expect(renameRefusal(state, "v")).toBe("taken");
+    expect(renameRefusal(state, "   ")).toBe("empty");
+    expect(renameRefusal(state, "alpha")).toBeNull();
+    // Its own name is not a collision with itself.
+    expect(renameRefusal(state, "a")).toBeNull();
   });
 });

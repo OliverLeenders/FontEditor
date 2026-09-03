@@ -1,5 +1,5 @@
 import type { Glyph } from "./glyph.js";
-import { type Kerning, EMPTY_KERNING } from "./kerning.js";
+import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js";
 
 export type GlyphName = string;
 
@@ -188,4 +188,76 @@ export function glyphsForString(document: FontDocument, text: string): Array<Gly
 /** Replace the font's kerning, leaving the glyphs alone. */
 export function setKerning(document: FontDocument, kerning: Kerning): FontDocument {
   return kerning === document.kerning ? document : { ...document, kerning };
+}
+
+/**
+ * Why a rename was refused, or `null` when it would go through.
+ *
+ * Separate from the rename itself so an interface can say what is wrong while
+ * someone is still typing, rather than only when they commit.
+ */
+export type RenameProblem = "missing" | "empty" | "taken";
+
+export function renameProblem(
+  document: FontDocument,
+  from: GlyphName,
+  to: GlyphName,
+): RenameProblem | null {
+  if (!(from in document.glyphs)) return "missing";
+  if (to === from) return null;
+  if (to.trim() === "") return "empty";
+  if (to in document.glyphs) return "taken";
+  return null;
+}
+
+/**
+ * Rename a glyph, and everything that refers to it by that name.
+ *
+ * A glyph name is not a label, it is a reference, and it is held in four places:
+ * the map it is keyed by, the order it appears in, the `base` of every component
+ * that places it, and the kerning — where it appears both as a pair's side and
+ * as a member of any group. A rename that fixes only the first two leaves
+ * composites pointing at a glyph that no longer exists and kerning that silently
+ * stops applying, neither of which shows up until much later.
+ *
+ * The position in `glyphOrder` is kept. The order is the font's own, someone
+ * arranged it, and a rename is not a reordering.
+ *
+ * `null` when the rename cannot be made — see {@link renameProblem} for which of
+ * the reasons it was.
+ */
+export function renameGlyph(
+  document: FontDocument,
+  from: GlyphName,
+  to: GlyphName,
+): FontDocument | null {
+  if (renameProblem(document, from, to) !== null) return null;
+  if (from === to) return document;
+
+  const moved = document.glyphs[from];
+  if (moved === undefined) return null;
+
+  const glyphs: Record<GlyphName, Glyph> = {};
+  for (const [name, g] of Object.entries(document.glyphs)) {
+    const renamed = name === from ? { ...g, name: to } : g;
+    // Every glyph is walked, not just the one moving: any of them may place the
+    // renamed glyph as a component, and one that does has to be rewritten too.
+    glyphs[name === from ? to : name] = withComponentBase(renamed, from, to);
+  }
+
+  return {
+    ...document,
+    glyphs,
+    glyphOrder: document.glyphOrder.map((name) => (name === from ? to : name)),
+    kerning: renameGlyphInKerning(document.kerning, from, to),
+  };
+}
+
+/** Point a glyph's components at a renamed base, leaving it alone if none do. */
+function withComponentBase(g: Glyph, from: GlyphName, to: GlyphName): Glyph {
+  if (!g.components.some((c) => c.base === from)) return g;
+  return {
+    ...g,
+    components: g.components.map((c) => (c.base === from ? { ...c, base: to } : c)),
+  };
 }
