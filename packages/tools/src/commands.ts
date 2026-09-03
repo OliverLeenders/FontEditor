@@ -17,6 +17,7 @@ import {
   centreGlyph,
   component,
   contourById,
+  deleteProblem,
   extendHandle,
   extendSegmentHandles,
   insertNodeOnSegment,
@@ -637,6 +638,11 @@ export function renameCurrentGlyph(state: EditorState, to: GlyphName): ToolResul
   if (document === null) return result(state);
 
   return done(state, { ...state, document, currentGlyph: to.trim() }, "Rename glyph");
+}
+
+/** Why deleting a glyph would be refused, or `null` if it would not be. */
+export function deleteRefusal(state: EditorState, name: GlyphName): "missing" | "reserved" | null {
+  return deleteProblem(state.document, name);
 }
 
 /** Why renaming the open glyph would be refused, or `null` if it would not be. */

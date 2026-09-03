@@ -104,8 +104,24 @@ export function putGlyph(document: FontDocument, glyph: Glyph): FontDocument {
   return { ...document, glyphOrder, glyphs };
 }
 
+/**
+ * Why a glyph cannot be deleted, or `null` when it can.
+ *
+ * `.notdef` is kept for the reason it cannot be renamed: a font is required to
+ * have one, and the writer finds it by name. Deleting it is recoverable — the
+ * export synthesises a blank in its place — but what it recovers is a blank, so
+ * whatever was drawn is gone and nothing said so.
+ */
+export function deleteProblem(
+  document: FontDocument,
+  name: GlyphName,
+): "missing" | "reserved" | null {
+  if (!(name in document.glyphs)) return "missing";
+  return name === NOTDEF ? "reserved" : null;
+}
+
 export function removeGlyph(document: FontDocument, name: GlyphName): FontDocument | null {
-  if (!(name in document.glyphs)) return null;
+  if (deleteProblem(document, name) !== null) return null;
   const glyphs = { ...document.glyphs };
   delete glyphs[name];
   return {

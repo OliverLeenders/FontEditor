@@ -121,6 +121,7 @@ export {
   putGlyph,
   removeGlyph,
   NOTDEF,
+  deleteProblem,
   renameGlyph,
   renameProblem,
   setFontInfo,

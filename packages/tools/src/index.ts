@@ -38,6 +38,7 @@ export {
   breakOutKern,
   createGlyphs,
   deleteGlyph,
+  deleteRefusal,
   extractHandles,
   extractSegmentHandles,
   balanceSegmentAt,

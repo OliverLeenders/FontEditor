@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { component } from "../src/component.js";
 import { contour } from "../src/contour.js";
 import {
+  deleteProblem,
   fontDocument,
+  removeGlyph,
   renameGlyph,
   renameProblem,
   setKerning,
@@ -170,5 +172,23 @@ describe("the one name that is not ours to change", () => {
     // without a .notdef may well want to promote one.
     const d = fontDocument([glyph("a", { advance: 500 })]);
     expect(renameGlyph(d, "a", ".notdef")?.glyphOrder).toEqual([".notdef"]);
+  });
+});
+
+describe("deleting .notdef", () => {
+  const d = () => fontDocument([glyph(".notdef", { advance: 500 }), glyph("a", { advance: 500 })]);
+
+  it("is refused, and says why", () => {
+    expect(deleteProblem(d(), ".notdef")).toBe("reserved");
+    expect(removeGlyph(d(), ".notdef")).toBeNull();
+  });
+
+  it("does not stand in the way of deleting anything else", () => {
+    expect(removeGlyph(d(), "a")?.glyphOrder).toEqual([".notdef"]);
+    expect(deleteProblem(d(), "a")).toBeNull();
+  });
+
+  it("still tells a missing glyph apart from a reserved one", () => {
+    expect(deleteProblem(d(), "nope")).toBe("missing");
   });
 });

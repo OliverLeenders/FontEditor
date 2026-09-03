@@ -138,3 +138,52 @@ export function drawGlyphs(ctx: Canvas2D, s: RunScene): void {
     ctx.fill();
   }
 }
+
+/**
+ * A page of text, for judging a font rather than editing one.
+ *
+ * Filled and unadorned: no baselines, no margins, no marks. A proof answers
+ * "does this read", and every line the editor draws to help you work is a line
+ * that stops you seeing the answer.
+ */
+export type ProofScene = {
+  readonly lines: readonly {
+    readonly glyphs: readonly { readonly glyph: Glyph; readonly x: number }[];
+    /** Design units below the first line's baseline. */
+    readonly y: number;
+  }[];
+  readonly view: ViewTransform;
+  readonly viewport: { readonly width: number; readonly height: number };
+  readonly palette: RenderPalette;
+};
+
+export function drawProof(ctx: Canvas2D, s: ProofScene): void {
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = s.palette.background;
+  ctx.beginPath();
+  ctx.rect(0, 0, s.viewport.width, s.viewport.height);
+  ctx.fill();
+
+  for (const line of s.lines) {
+    // Each line is the same view moved down its own baseline, which is exactly
+    // what `drawGlyphs` already does per glyph along the other axis. Drawing a
+    // line is then drawing a run, and there is one piece of glyph-drawing code.
+    const view: ViewTransform = { ...s.view, ty: s.view.ty + line.y * s.view.scale };
+    drawGlyphs(ctx, {
+      glyphs: line.glyphs,
+      view,
+      viewport: s.viewport,
+      palette: s.palette,
+      metrics: { unitsPerEm: 1000, ascender: 0, descender: 0 },
+      selected: [],
+      allMargins: false,
+    });
+  }
+
+  ctx.restore();
+}

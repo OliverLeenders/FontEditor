@@ -46,6 +46,21 @@ import {
 } from "./persistence.js";
 import { starterFont } from "./sample.js";
 
+/**
+ * What the proof shows before anyone types anything.
+ *
+ * Lowercase, because that is what a text face is judged on and what most fonts
+ * here will have first. It says what it is rather than being a pangram: a
+ * pangram exercises the alphabet, which is the glyph browser's job, where a
+ * proof is for reading.
+ */
+const PROOF_TEXT = [
+  "handgloves and the shape of the space between them",
+  "no one reads a letter, they read a line of them",
+  "",
+  "the only way to know whether a font works is to set it and look",
+].join(String.fromCharCode(10));
+
 /** The stroke the renderer has always used, and the range the control offers. */
 export const DEFAULT_OUTLINE_WIDTH = 2;
 export const MIN_OUTLINE_WIDTH = 0.5;
@@ -105,6 +120,17 @@ export type StoreState = {
   readonly spacingSize: number;
   /** Whether the spacing view's arrows adjust a glyph or the gap before it. */
   readonly spacingMode: "space" | "kern";
+  /**
+   * The proof's own text, size and leading.
+   *
+   * Its own again, for the reason spacing has its own: a proof wants paragraphs
+   * and the spacing view wants "nonno", and having to retype one to see the
+   * other would make comparing them a chore rather than a glance.
+   */
+  readonly proofText: string;
+  readonly proofSize: number;
+  /** Line spacing as a multiple of the em, which is how type is set. */
+  readonly proofLeading: number;
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
@@ -149,6 +175,9 @@ export class EditorStore {
       spacingText: "nonno",
       spacingSize: 128,
       spacingMode: "space",
+      proofText: PROOF_TEXT,
+      proofSize: 32,
+      proofLeading: 1.4,
       previewing: false,
       inspector: loadInspector(),
       viewport: { width: 0, height: 0 },
@@ -408,6 +437,20 @@ export class EditorStore {
 
   setSpacingMode(spacingMode: "space" | "kern"): void {
     if (spacingMode !== this.state.spacingMode) this.patch({ spacingMode });
+  }
+
+  setProofText(proofText: string): void {
+    this.patch({ proofText });
+  }
+
+  setProofSize(proofSize: number): void {
+    if (!Number.isFinite(proofSize)) return;
+    this.patch({ proofSize: Math.min(200, Math.max(6, proofSize)) });
+  }
+
+  setProofLeading(proofLeading: number): void {
+    if (!Number.isFinite(proofLeading)) return;
+    this.patch({ proofLeading: Math.min(3, Math.max(0.7, proofLeading)) });
   }
 
   setSpacingSize(spacingSize: number): void {

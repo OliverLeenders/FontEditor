@@ -44,8 +44,9 @@ export {
   drawScene,
 } from "./draw.js";
 
-export type { RunScene } from "./run.js";
+export type { ProofScene, RunScene } from "./run.js";
 export {
+  drawProof,
   drawRun,
 } from "./run.js";
 

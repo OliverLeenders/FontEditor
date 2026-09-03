@@ -92,3 +92,68 @@ export function placedAt(run: GlyphRun, index: number): PlacedGlyph | null {
 export function occurrencesOf(run: GlyphRun, name: GlyphName): number[] {
   return run.glyphs.filter((p) => p.name === name).map((p) => p.index);
 }
+
+/**
+ * A line of a paragraph, and where its baseline sits relative to the first.
+ *
+ * `y` is in design units and grows downward from zero, which is the one place in
+ * this codebase that direction is used — because a paragraph reads downward and
+ * a line's position is naturally "how far below the first line". Whoever draws
+ * it subtracts, as it would for any other design-unit y.
+ */
+export type ProofLine = {
+  readonly run: GlyphRun;
+  readonly y: number;
+};
+
+/**
+ * Break text into lines that fit a width, and stack them.
+ *
+ * Broken at spaces, and at the newlines the text already has — an explicit break
+ * is a decision someone made and is never undone by rewrapping. A word wider
+ * than the measure is left to overhang rather than split: hyphenation is a whole
+ * subject, and a proof that silently cut a word in half would be lying about how
+ * the font sets.
+ *
+ * The width and the leading are in design units, so nothing here knows what size
+ * the proof is being shown at. That is the caller's transform.
+ */
+export function layoutParagraph(
+  document: FontDocument,
+  text: string,
+  measure: number,
+  leading: number,
+): ProofLine[] {
+  const lines: ProofLine[] = [];
+  let y = 0;
+
+  for (const paragraph of text.split("\n")) {
+    // A blank line is a blank line: it still takes its leading.
+    if (paragraph.trim() === "") {
+      lines.push({ run: EMPTY_RUN, y });
+      y += leading;
+      continue;
+    }
+
+    let current = "";
+    for (const word of paragraph.split(" ").filter((w) => w !== "")) {
+      const candidate = current === "" ? word : `${current} ${word}`;
+      if (current !== "" && layoutRun(document, candidate).width > measure) {
+        lines.push({ run: layoutRun(document, current), y });
+        y += leading;
+        current = word;
+      } else {
+        current = candidate;
+      }
+    }
+    lines.push({ run: layoutRun(document, current), y });
+    y += leading;
+  }
+
+  return lines;
+}
+
+/** The width of the widest line, for a caller that wants to centre the block. */
+export function paragraphWidth(lines: readonly ProofLine[]): number {
+  return lines.reduce((widest, line) => Math.max(widest, line.run.width), 0);
+}

@@ -233,7 +233,14 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
         },
       },
       { kind: "separator" },
-      { kind: "item", label: "Delete", run: () => store.applyTool(deleteGlyph(store.editor, name)) },
+      {
+        kind: "item",
+        label: "Delete",
+        // Kept for the same reason it cannot be renamed: a font needs one, and
+        // what the export would put back is a blank.
+        disabled: name === NOTDEF,
+        run: () => store.applyTool(deleteGlyph(store.editor, name)),
+      },
     ];
   };
 

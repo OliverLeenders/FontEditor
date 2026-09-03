@@ -1,8 +1,9 @@
-import { contour, glyph, node } from "@fonteditor/font-model";
+import { contour, counterIds, glyph, node } from "@fonteditor/font-model";
+import { vec } from "@fonteditor/geometry";
 import { describe, expect, it } from "vitest";
 
 import { LIGHT_PALETTE } from "../src/palette.js";
-import { type RunScene, drawRun } from "../src/run.js";
+import { type RunScene, drawProof, drawRun } from "../src/run.js";
 import { RecordingContext } from "./recording-context.js";
 
 const box = (name: string, advance: number) =>
@@ -149,5 +150,72 @@ describe("drawRun", () => {
     const ctx = render({ glyphs: [] });
     expect(ctx.filledIn(LIGHT_PALETTE.outline)).toHaveLength(0);
     expect(ctx.strokedIn(LIGHT_PALETTE.guideEmphasis)).toHaveLength(1);
+  });
+});
+
+describe("drawProof", () => {
+  const ids = counterIds("proof");
+  const box = () =>
+    glyph("o", {
+      advance: 600,
+      contours: [
+        contour(
+          ids.contour(),
+          [
+            node(ids.node(), vec(0, 0)),
+            node(ids.node(), vec(400, 0)),
+            node(ids.node(), vec(400, 500)),
+          ],
+          true,
+        ),
+      ],
+    });
+
+  const scene = (lines: readonly { glyphs: { glyph: ReturnType<typeof box>; x: number }[]; y: number }[]) => ({
+    lines,
+    view: { scale: 0.5, tx: 20, ty: 100 },
+    viewport: { width: 800, height: 600 },
+    palette: LIGHT_PALETTE,
+  });
+
+  const render = (s: Parameters<typeof drawProof>[1]): RecordingContext => {
+    const ctx = new RecordingContext();
+    drawProof(ctx, s);
+    return ctx;
+  };
+
+  it("draws every line", () => {
+    const one = render(scene([{ glyphs: [{ glyph: box(), x: 0 }], y: 0 }]));
+    const two = render(
+      scene([
+        { glyphs: [{ glyph: box(), x: 0 }], y: 0 },
+        { glyphs: [{ glyph: box(), x: 0 }], y: 1000 },
+      ]),
+    );
+    expect(two.all("fill").length).toBe(one.all("fill").length + 1);
+  });
+
+  it("puts a later line below the first, by its own baseline", () => {
+    const ctx = render(
+      scene([
+        { glyphs: [{ glyph: box(), x: 0 }], y: 0 },
+        { glyphs: [{ glyph: box(), x: 0 }], y: 1000 },
+      ]),
+    );
+    const ys = ctx.all("moveTo").map((o) => o.args[1] ?? NaN);
+    // A thousand units down at half scale is five hundred pixels.
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(500, 6);
+  });
+
+  it("draws no baseline, margins or marks", () => {
+    // A proof answers whether the font reads, and every line drawn to help you
+    // work is a line that stops you seeing the answer.
+    const ctx = render(scene([{ glyphs: [{ glyph: box(), x: 0 }], y: 0 }]));
+    expect(ctx.all("stroke")).toHaveLength(0);
+  });
+
+  it("still paints the page when there is nothing set", () => {
+    const ctx = render(scene([]));
+    expect(ctx.filledIn(LIGHT_PALETTE.background)).toHaveLength(1);
   });
 });
