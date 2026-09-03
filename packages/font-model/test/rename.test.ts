@@ -154,3 +154,21 @@ describe("renaming a glyph", () => {
     expect(kernValue(kernIndex(d.kerning), "v", "vee")).toBe(-75);
   });
 });
+
+describe("the one name that is not ours to change", () => {
+  it("refuses to rename .notdef", () => {
+    // The OTF writer finds it by name and puts it at glyph id zero. A renamed
+    // one is not found, and a blank is synthesised over whatever was drawn.
+    const d = fontDocument([glyph(".notdef", { advance: 500 }), glyph("a", { advance: 500 })]);
+
+    expect(renameProblem(d, ".notdef", "notdef")).toBe("reserved");
+    expect(renameGlyph(d, ".notdef", "notdef")).toBeNull();
+  });
+
+  it("does not stand in the way of renaming anything else to it", () => {
+    // Nothing here is claiming the name is magic in both directions: a font
+    // without a .notdef may well want to promote one.
+    const d = fontDocument([glyph("a", { advance: 500 })]);
+    expect(renameGlyph(d, "a", ".notdef")?.glyphOrder).toEqual([".notdef"]);
+  });
+});

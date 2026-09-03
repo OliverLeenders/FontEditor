@@ -120,6 +120,7 @@ export {
   orderedGlyphs,
   putGlyph,
   removeGlyph,
+  NOTDEF,
   renameGlyph,
   renameProblem,
   setFontInfo,

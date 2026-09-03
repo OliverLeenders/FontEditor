@@ -1,6 +1,11 @@
 import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@fonteditor/catalog";
 import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@fonteditor/render";
-import { deleteGlyph } from "@fonteditor/tools";
+import {
+  deleteGlyph,
+  renameCurrentGlyph,
+  roundGlyphAt,
+} from "@fonteditor/tools";
+import { NOTDEF } from "@fonteditor/font-model";
 import {
   type GridLayout,
   cellBox,
@@ -12,6 +17,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { type Item, Menu } from "./ContextMenu.js";
 import { ExportFont } from "./ExportFont.js";
 import { NewFont } from "./NewFont.js";
 import { RoundCoordinates } from "./RoundCoordinates.js";
@@ -157,6 +163,80 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
     setFocused((f) => Math.min(f, Math.max(0, shown.length - 1)));
   }, [shown.length]);
 
+  /** The cell being renamed, and the draft text over it. */
+  const [renaming, setRenaming] = useState<{ index: number; draft: string } | null>(null);
+  // Followed only while a cell is being renamed, so an ordinary scroll through
+  // several thousand glyphs does not re-render anything.
+  const [renameScroll, setRenameScroll] = useState(0);
+  const [menu, setMenu] = useState<{ x: number; y: number; index: number } | null>(null);
+
+  /**
+   * Rename the glyph in a cell.
+   *
+   * Goes through the same command the inspector uses, which renames the *open*
+   * glyph — so the glyph is opened first. That is not a workaround: renaming a
+   * glyph you cannot see, from a grid where the next cell along looks much the
+   * same, is how the wrong one gets renamed.
+   */
+  const commitRename = (index: number, to: string): void => {
+    const name = shown[index]?.name;
+    setRenaming(null);
+    if (name === undefined || to.trim() === "" || to.trim() === name) return;
+
+    store.setCurrentGlyph(name);
+    store.applyTool(renameCurrentGlyph(store.editor, to));
+  };
+
+  const startRename = (index: number): void => {
+    const name = shown[index]?.name;
+    if (name === undefined || name === NOTDEF) return;
+    setRenameScroll(scrollRef.current?.scrollTop ?? 0);
+    setRenaming({ index, draft: name });
+  };
+
+  /**
+   * Where the cell being renamed is on screen.
+   *
+   * `null` once it scrolls out of view, which also takes the field away — a
+   * rename field floating over a cell that is no longer there belongs to
+   * nothing.
+   */
+  const renamingBox = useMemo(() => {
+    if (renaming === null) return null;
+    const box = cellBox(layout, renaming.index);
+    if (box === null) return null;
+    return { ...box, y: box.y - renameScroll };
+  }, [renaming, layout, renameScroll]);
+
+  /** What the menu offers for one cell. */
+  const cellItems = (index: number): Item[] => {
+    const name = shown[index]?.name;
+    if (name === undefined) return [];
+
+    return [
+      { kind: "item", label: "Open", run: () => openAt(index) },
+      {
+        kind: "item",
+        label: "Rename…",
+        // `.notdef` is found by name when a font is written, so renaming it
+        // loses the glyph rather than relabelling it.
+        disabled: name === NOTDEF,
+        run: () => startRename(index),
+      },
+      { kind: "separator" },
+      {
+        kind: "item",
+        label: "Round coordinates",
+        run: () => {
+          store.setCurrentGlyph(name);
+          store.applyTool(roundGlyphAt(store.editor, name));
+        },
+      },
+      { kind: "separator" },
+      { kind: "item", label: "Delete", run: () => store.applyTool(deleteGlyph(store.editor, name)) },
+    ];
+  };
+
   const openAt = (index: number): void => {
     const entry = shown[index];
     if (entry !== undefined) onOpen(entry.name);
@@ -260,6 +340,11 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
                 openAt(focused);
                 return;
               }
+              if (event.key === "F2") {
+                event.preventDefault();
+                startRename(focused);
+                return;
+              }
               // Undo is the safety net, so this does not stop to ask: a
               // confirmation on something one keystroke from reversible is
               // friction rather than protection.
@@ -269,6 +354,9 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
                 if (name !== undefined) store.applyTool(deleteGlyph(store.editor, name));
               }
             }}
+            onScroll={(event) => {
+              if (renaming !== null) setRenameScroll(event.currentTarget.scrollTop);
+            }}
             onClick={(event) => {
               const index = cellFromEvent(event, scrollRef.current, layout);
               if (index !== null) setFocused(index);
@@ -276,6 +364,13 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
             onDoubleClick={(event) => {
               const index = cellFromEvent(event, scrollRef.current, layout);
               if (index !== null) openAt(index);
+            }}
+            onContextMenu={(event) => {
+              const index = cellFromEvent(event, scrollRef.current, layout);
+              if (index === null) return;
+              event.preventDefault();
+              setFocused(index);
+              setMenu({ x: event.clientX, y: event.clientY, index });
             }}
           >
             {/* Gives the scroller its true height. The canvas stays
@@ -286,7 +381,37 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
             />
           </div>
           <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />
+
+          {/* The grid is drawn on a canvas, so the field for renaming a cell has
+              to be placed over it from the same layout the drawing used. Sitting
+              on the cell rather than in a dialog is the point: which glyph is
+              being renamed should not be something you have to remember. */}
+          {renamingBox === null || renaming === null ? null : (
+            <input
+              className={styles.rename}
+              style={{
+                left: `${String(renamingBox.x)}px`,
+                top: `${String(renamingBox.y + renamingBox.height - 18)}px`,
+                width: `${String(renamingBox.width)}px`,
+              }}
+              value={renaming.draft}
+              aria-label="Rename glyph"
+              spellCheck={false}
+              autoFocus
+              onChange={(event) => setRenaming({ ...renaming, draft: event.target.value })}
+              onBlur={() => commitRename(renaming.index, renaming.draft)}
+              onKeyDown={(event) => {
+                event.stopPropagation();
+                if (event.key === "Enter") commitRename(renaming.index, renaming.draft);
+                if (event.key === "Escape") setRenaming(null);
+              }}
+            />
+          )}
         </div>
+
+        {menu === null ? null : (
+          <Menu x={menu.x} y={menu.y} items={cellItems(menu.index)} onClose={() => setMenu(null)} />
+        )}
 
         {shown.length === 0 ? (
           <p className={styles.empty}>

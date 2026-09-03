@@ -34,6 +34,9 @@ import {
   retractHandle,
   reverseContourAt,
   roundCoordinates,
+  roundGlyphAt,
+  roundSelection,
+  unroundedSelected,
   reverseSelectedContour,
   segmentParameterAt,
   selectAllPoints,
@@ -746,5 +749,105 @@ describe("renaming the open glyph", () => {
     expect(renameRefusal(state, "alpha")).toBeNull();
     // Its own name is not a collision with itself.
     expect(renameRefusal(state, "a")).toBeNull();
+  });
+});
+
+describe("rounding a glyph and a selection", () => {
+  const ids = counterIds("round2");
+  const fractional = () =>
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(10.4, 20.6), { type: "corner", in: vec(5.5, 20.6), out: vec(15.7, 20.6) }),
+        node(ids.node(), vec(200.5, 300.5)),
+      ],
+      false,
+    );
+
+  const start = () => {
+    const c = fractional();
+    return {
+      c,
+      s: editorState({
+        document: fontDocument([
+          addContour(glyph("a", { advance: 500.4 }), c),
+          glyph("b", { advance: 300.7 }),
+        ]),
+        view: VIEW,
+      }),
+    };
+  };
+
+  it("rounds one glyph without touching the rest of the font", () => {
+    const { s } = start();
+    const out = roundGlyphAt(s, "a").state;
+
+    expect(firstGlyph(out.document).advance).toBe(500);
+    // The other glyph is the font's business, not this command's.
+    expect(out.document.glyphs["b"]?.advance).toBe(300.7);
+  });
+
+  it("does nothing for a glyph that is already whole, or is not there", () => {
+    const { s } = start();
+    const once = roundGlyphAt(s, "b").state;
+    expect(once).not.toBe(s);
+
+    // Returning the very same state is what keeps a no-op out of the undo stack.
+    expect(roundGlyphAt(once, "b").state).toBe(once);
+    expect(roundGlyphAt(s, "nope").state).toBe(s);
+  });
+
+  it("rounds exactly the selected point, and not its handles", () => {
+    // Literally what was selected. Handles are positions in their own right and
+    // can be selected in their own right; rounding ones nobody picked is how a
+    // command like this stops being predictable.
+    const { s, c } = start();
+    const selected = {
+      ...s,
+      selection: [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" as const }],
+    };
+    const n = nodeAt(roundSelection(selected).state, 0);
+
+    expect(n.pt).toEqual({ x: 10, y: 21 });
+    expect(n.in).toEqual({ x: 5.5, y: 20.6 });
+  });
+
+  it("rounds a selected handle on its own", () => {
+    const { s, c } = start();
+    const selected = {
+      ...s,
+      selection: [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" as const }],
+    };
+    const n = nodeAt(roundSelection(selected).state, 0);
+
+    expect(n.out).toEqual({ x: 16, y: 21 });
+    expect(n.pt).toEqual({ x: 10.4, y: 20.6 });
+  });
+
+  it("leaves a glyph alone when nothing is selected", () => {
+    const { s } = start();
+    expect(roundSelection(s).state).toBe(s);
+  });
+
+  it("counts what it would move, so a caller can say", () => {
+    const { s, c } = start();
+    const selected = {
+      ...s,
+      selection: [
+        { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" as const },
+        { contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" as const },
+      ],
+    };
+    expect(unroundedSelected(selected)).toBe(2);
+    expect(unroundedSelected(roundSelection(selected).state)).toBe(0);
+  });
+
+  it("refuses to rename .notdef through the tool as well", () => {
+    const s = editorState({
+      document: fontDocument([glyph(".notdef", { advance: 500 }), glyph("a", { advance: 400 })]),
+      view: VIEW,
+    });
+    expect(renameRefusal(s, "notdef")).toBe("reserved");
+    expect(renameCurrentGlyph(s, "notdef").state).toBe(s);
   });
 });

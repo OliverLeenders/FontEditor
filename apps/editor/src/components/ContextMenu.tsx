@@ -13,9 +13,12 @@ import {
   reverseContourAt,
   segmentHasMissingHandle,
   segmentParameterAt,
+  roundGlyphAt,
+  roundSelection,
   selectAllPoints,
   setNodeHvLock,
   setPointType,
+  unroundedSelected,
 } from "@fonteditor/tools";
 import type { HitTarget } from "@fonteditor/view";
 import { useEffect, useRef } from "react";
@@ -34,7 +37,14 @@ export type MenuRequest = {
 };
 
 export type Item =
-  | { readonly kind: "item"; readonly label: string; readonly run: () => void; readonly checked?: boolean }
+  | {
+      readonly kind: "item";
+      readonly label: string;
+      readonly run: () => void;
+      readonly checked?: boolean;
+      /** Shown but not usable, for an action that is real here and not now. */
+      readonly disabled?: boolean;
+    }
   | { readonly kind: "separator" };
 
 /** New points from the menu need ids; the app owns the factory. */
@@ -52,9 +62,27 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
   const editor = store.editor;
   const target = request.target;
 
+  const rounding: Item[] = [
+    {
+      kind: "item",
+      label: `Round selection${editor.selection.length === 0 ? "" : ` (${String(unroundedSelected(editor))})`}`,
+      // Offered even with nothing out of place, so the menu does not change
+      // shape between two glyphs that look the same.
+      disabled: editor.selection.length === 0,
+      run: () => store.applyTool(roundSelection(editor)),
+    },
+    {
+      kind: "item",
+      label: "Round this glyph",
+      run: () => store.applyTool(roundGlyphAt(editor, editor.currentGlyph)),
+    },
+  ];
+
   if (target === null) {
     return [
       { kind: "item", label: "Select all points", run: () => store.applyTool(selectAllPoints(editor)) },
+      { kind: "separator" },
+      ...rounding,
     ];
   }
 
@@ -102,6 +130,8 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       { kind: "separator" },
       { kind: "item", label: "Reverse contour", run: () => store.applyTool(reverseContourAt(editor, contourId)) },
       { kind: "item", label: "Delete point", run: () => store.applyTool(deleteSelectedPoints(editor)) },
+      { kind: "separator" },
+      ...rounding,
     );
     return items;
   }
@@ -227,13 +257,22 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
  * Nudged back inside the window when it would open off an edge — a menu you
  * cannot read is worse than one that appears a few pixels from the cursor.
  */
-export function ContextMenu({
-  store,
-  request,
+/**
+ * A menu at a point, with what it holds decided by whoever opened it.
+ *
+ * Separated from `itemsFor` so the glyph browser can use the same menu for its
+ * own items. The dismissal rules and the flip away from a screen edge are the
+ * parts nobody should write twice.
+ */
+export function Menu({
+  x,
+  y,
+  items,
   onClose,
 }: {
-  store: EditorStore;
-  request: MenuRequest;
+  x: number;
+  y: number;
+  items: readonly Item[];
   onClose: () => void;
 }): JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null);
@@ -262,18 +301,17 @@ export function ContextMenu({
     const box = menu.getBoundingClientRect();
     const overflowX = Math.max(0, box.right - window.innerWidth + 6);
     const overflowY = Math.max(0, box.bottom - window.innerHeight + 6);
-    if (overflowX > 0) menu.style.left = `${request.x - overflowX}px`;
-    if (overflowY > 0) menu.style.top = `${request.y - overflowY}px`;
-  }, [request]);
+    if (overflowX > 0) menu.style.left = `${String(x - overflowX)}px`;
+    if (overflowY > 0) menu.style.top = `${String(y - overflowY)}px`;
+  }, [x, y, items]);
 
-  const items = itemsFor(store, request);
   if (items.length === 0) return null;
 
   return (
     <div
       ref={ref}
       className={styles.menu}
-      style={{ left: `${request.x}px`, top: `${request.y}px` }}
+      style={{ left: `${String(x)}px`, top: `${String(y)}px` }}
       role="menu"
     >
       {items.map((item, index) =>
@@ -285,6 +323,7 @@ export function ContextMenu({
             type="button"
             role="menuitemcheckbox"
             aria-checked={item.checked ?? false}
+            disabled={item.disabled ?? false}
             className={styles.item}
             onClick={() => {
               item.run();
@@ -298,4 +337,17 @@ export function ContextMenu({
       )}
     </div>
   );
+}
+
+/** The canvas's menu: what was right-clicked decides what it offers. */
+export function ContextMenu({
+  store,
+  request,
+  onClose,
+}: {
+  store: EditorStore;
+  request: MenuRequest;
+  onClose: () => void;
+}): JSX.Element | null {
+  return <Menu x={request.x} y={request.y} items={itemsFor(store, request)} onClose={onClose} />;
 }

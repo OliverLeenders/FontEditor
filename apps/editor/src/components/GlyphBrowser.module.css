@@ -160,3 +160,19 @@
   font-size: .82rem;
   color: var(--ink-2);
 }
+
+/* Sits over the cell it renames, where the drawn label is. */
+.rename {
+  position: absolute;
+  z-index: 2;
+  padding: .1rem .2rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--canvas);
+  color: var(--ink);
+  font: inherit;
+  font-size: .72rem;
+  text-align: center;
+}
+
+.rename:focus-visible { outline: none; }

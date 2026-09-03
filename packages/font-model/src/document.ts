@@ -196,7 +196,17 @@ export function setKerning(document: FontDocument, kerning: Kerning): FontDocume
  * Separate from the rename itself so an interface can say what is wrong while
  * someone is still typing, rather than only when they commit.
  */
-export type RenameProblem = "missing" | "empty" | "taken";
+export type RenameProblem = "missing" | "empty" | "taken" | "reserved";
+
+/**
+ * The one glyph a font is required to have, and which is found by name.
+ *
+ * The OTF writer puts it at glyph id zero by looking it up as `.notdef` — a
+ * renamed one is not found, and the export quietly synthesises a blank in its
+ * place, throwing away whatever was drawn. So the name is not the user's to
+ * change, and saying so is better than letting it be changed and lost.
+ */
+export const NOTDEF = ".notdef";
 
 export function renameProblem(
   document: FontDocument,
@@ -205,6 +215,7 @@ export function renameProblem(
 ): RenameProblem | null {
   if (!(from in document.glyphs)) return "missing";
   if (to === from) return null;
+  if (from === NOTDEF) return "reserved";
   if (to.trim() === "") return "empty";
   if (to in document.glyphs) return "taken";
   return null;

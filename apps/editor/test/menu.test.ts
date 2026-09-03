@@ -68,8 +68,20 @@ describe("context menu", () => {
     point: { x: 0, y: 0 },
   });
 
-  it("offers nothing but a selection command on empty canvas", () => {
-    expect(labels(store, null)).toEqual(["Select all points"]);
+  it("offers only what is true of empty canvas: the selection, and rounding", () => {
+    // Rounding belongs here because it is about the glyph rather than about
+    // whatever was clicked, so it is reachable from anywhere on the canvas.
+    expect(labels(store, null)).toEqual([
+      "Select all points",
+      "Round selection",
+      "Round this glyph",
+    ]);
+  });
+
+  it("cannot round a selection when there is not one", () => {
+    const items = itemsFor(store, { x: 0, y: 0, target: null, point: { x: 0, y: 0 } });
+    const round = items.find((i) => i.kind === "item" && i.label === "Round selection");
+    expect(round !== undefined && round.kind === "item" && round.disabled).toBe(true);
   });
 
   it("offers point operations on a node, and none of the segment ones", () => {

@@ -80,6 +80,10 @@ export function Inspector(): JSX.Element | null {
 
   const refusal = renameRefusal(store.editor, draftName);
   const renameable = draftName.trim() !== glyphName && refusal === null;
+  // A name is only wrong once it has been changed into something wrong. A glyph
+  // sitting under its own name is never in error, and `.notdef` would otherwise
+  // be marked invalid the moment it was opened.
+  const wrong = draftName !== glyphName && refusal !== null && refusal !== "missing";
 
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   if (!open) return null;
@@ -199,13 +203,16 @@ export function Inspector(): JSX.Element | null {
           spellCheck={false}
           disabled={glyphName === ""}
           title={
-            refusal === "taken"
-              ? "Another glyph already has that name"
-              : refusal === "empty"
-                ? "A glyph needs a name"
-                : "Rename this glyph, and everything that refers to it"
+            refusal === "reserved"
+              ? "A font finds .notdef by name, so this one keeps it"
+              : wrong && refusal === "taken"
+                ? "Another glyph already has that name"
+                : wrong && refusal === "empty"
+                  ? "A glyph needs a name"
+                  : "Rename this glyph, and everything that refers to it"
           }
-          data-invalid={refusal !== null && refusal !== "missing" ? "true" : undefined}
+          data-invalid={wrong ? "true" : undefined}
+          readOnly={refusal === "reserved"}
           onPointerDown={(event) => event.stopPropagation()}
           onChange={(event) => setDraftName(event.target.value)}
           onBlur={commitName}
