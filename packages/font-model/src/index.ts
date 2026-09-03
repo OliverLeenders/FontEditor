@@ -150,3 +150,5 @@ export {
 } from "./glyph.js";
 
 export { UNIT_GRID, roundFont, roundGlyph, unroundedGlyphs } from "./round.js";
+
+export { KAPPA, ellipseContour, rectContour } from "./shapes.js";

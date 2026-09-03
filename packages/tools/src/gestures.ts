@@ -332,7 +332,7 @@ function rectOf(a: Vec2, b: Vec2) {
  * turns the whole thing off, including the rounding, for the times when a
  * coordinate has to be exactly what the cursor says.
  */
-function snappingFor(
+export function snappingFor(
   state: EditorState,
   input: PointerInput,
   options: GestureOptions,

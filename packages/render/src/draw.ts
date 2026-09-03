@@ -59,6 +59,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawHandles(ctx, s);
     drawNodes(ctx, s);
     drawPenPreview(ctx, s);
+    drawShapePreview(ctx, s);
     drawMarquee(ctx, s);
   }
 
@@ -330,6 +331,24 @@ function drawLockBar(ctx: Canvas2D, s: Scene, anchor: Vec2, handle: Vec2): void 
   ctx.moveTo(handle.x - ax, handle.y - ay);
   ctx.lineTo(handle.x + ax, handle.y + ay);
   ctx.stroke();
+}
+
+/**
+ * The shape a drag would make, dashed for the reason the pen's band is: it is a
+ * proposal, and until the button comes up there is nothing in the glyph.
+ */
+export function drawShapePreview(ctx: Canvas2D, s: Scene): void {
+  const preview = s.shapePreview;
+  if (preview === null || preview.nodes.length < 2) return;
+
+  ctx.save();
+  ctx.setLineDash([4, 4]);
+  ctx.strokeStyle = s.palette.marqueeStroke;
+  ctx.lineWidth = s.metrics.outlineWidth - 0.5;
+  ctx.beginPath();
+  traceContour(ctx, s.view, preview);
+  ctx.stroke();
+  ctx.restore();
 }
 
 /**

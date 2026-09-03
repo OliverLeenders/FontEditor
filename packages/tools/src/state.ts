@@ -9,7 +9,7 @@ import {
   updateGlyph,
 } from "@fonteditor/font-model";
 
-export type ToolId = "select" | "pen";
+export type ToolId = "select" | "pen" | "rect" | "ellipse";
 import {
   type Selection,
   type SegmentRef,
@@ -127,6 +127,24 @@ export type PenState = {
   readonly pulled: boolean;
 };
 
+/**
+ * A shape being dragged out.
+ *
+ * Only alive between pointer-down and pointer-up — unlike the pen, a rectangle
+ * is one gesture from start to finish, so there is nothing to survive the
+ * release. The modifiers are kept rather than the resulting box so that letting
+ * go of shift redraws the shape it would now make.
+ */
+export type ShapeDrag = {
+  readonly kind: "rect" | "ellipse";
+  readonly from: Vec2;
+  readonly to: Vec2;
+  /** Shift: as wide as it is tall. */
+  readonly even: boolean;
+  /** Alt: the press was the centre rather than a corner. */
+  readonly fromCentre: boolean;
+};
+
 export type EditorState = {
   /** The versioned slice. Everything else here is ephemeral and never undone. */
   readonly document: FontDocument;
@@ -135,6 +153,8 @@ export type EditorState = {
   readonly currentGlyph: GlyphName;
   /** The contour the pen is partway through, if any. */
   readonly pen: PenState | null;
+  /** The shape being dragged out, if any. */
+  readonly shape: ShapeDrag | null;
   readonly view: ViewTransform;
   readonly selection: Selection;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
@@ -170,6 +190,7 @@ export function editorState(init: EditorStateInit): EditorState {
     activeTool: init.activeTool ?? "select",
     currentGlyph: init.currentGlyph ?? init.document.glyphOrder[0] ?? "",
     pen: null,
+    shape: null,
     view: init.view,
     selection: init.selection ?? [],
     hoveredSegment: init.hoveredSegment ?? null,

@@ -19,6 +19,7 @@ import {
   type EditorState,
   marqueeRect,
   penPreview,
+  shapePreview,
   snapHold,
   tunniSegments,
 } from "@fonteditor/tools";
@@ -139,6 +140,7 @@ export function sceneFor(
     selection: editor.selection,
     marquee: marqueeRect(editor),
     penPreview: penPreview(editor),
+    shapePreview: shapePreview(editor, outlineIds),
     neighbours: state.showNeighbours
       ? neighboursFor(editor.document, editor.currentGlyph, state.stripText)
       : [],

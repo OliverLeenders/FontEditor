@@ -138,11 +138,11 @@ export function GlyphCanvas({
           panFrom.current = null;
           return;
         }
-        store.applyTool(pointerUp(store.editor, toInput(event)));
+        store.applyTool(pointerUp(store.editor, toInput(event), selectOptions(store)));
       }}
       onPointerCancel={() => {
         panFrom.current = null;
-        store.applyTool(pointerUp(store.editor));
+        store.applyTool(pointerUp(store.editor, undefined, selectOptions(store)));
       }}
       onPointerLeave={() => {
         if (panFrom.current === null) store.applyTool(pointerLeave(store.editor));

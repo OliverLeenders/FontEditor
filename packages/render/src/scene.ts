@@ -142,6 +142,14 @@ export type Scene = {
    * the way to change one is to change the glyph it comes from.
    */
   readonly componentOutlines: readonly Contour[];
+  /**
+   * The shape a rectangle or ellipse drag would make, before it exists.
+   *
+   * A contour rather than a rectangle, because an ellipse is not one and because
+   * the preview and the commit must be built by the same code — otherwise the
+   * shape you let go of is not the shape you were shown.
+   */
+  readonly shapePreview: Contour | null;
 };
 
 /** A glyph drawn for context, at a given offset, not for editing. */
@@ -165,6 +173,7 @@ export type SceneInit = {
   readonly penPreview?: Cubic | null;
   readonly neighbours?: readonly NeighbourGlyph[];
   readonly componentOutlines?: readonly Contour[];
+  readonly shapePreview?: Contour | null;
 };
 
 export function scene(init: SceneInit): Scene {
@@ -183,5 +192,6 @@ export function scene(init: SceneInit): Scene {
     penPreview: init.penPreview ?? null,
     neighbours: init.neighbours ?? [],
     componentOutlines: init.componentOutlines ?? [],
+    shapePreview: init.shapePreview ?? null,
   };
 }
