@@ -213,8 +213,15 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     ];
   }
 
+  // The curve and its two Tunni controls, which are the three kinds that name a
+  // segment. The last test is what narrows the type even though the compiler can
+  // already see it is the only kind left — take it away and the properties below
+  // stop being reachable.
   const segment =
-    target.kind === "segment" || target.kind === "tunniPoint" || target.kind === "tunniLine"
+    target.kind === "segment" ||
+    target.kind === "tunniPoint" ||
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    target.kind === "tunniLine"
       ? { contourId: target.contourId, segmentIndex: target.segmentIndex }
       : null;
   if (segment === null) return items;
@@ -302,7 +309,7 @@ export function Menu({
   y: number;
   items: readonly Item[];
   onClose: () => void;
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -378,6 +385,6 @@ export function ContextMenu({
   store: EditorStore;
   request: MenuRequest;
   onClose: () => void;
-}): JSX.Element | null {
+}): React.JSX.Element | null {
   return <Menu x={request.x} y={request.y} items={itemsFor(store, request)} onClose={onClose} />;
 }

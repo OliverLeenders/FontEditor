@@ -3,6 +3,7 @@ import { layoutParagraph } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
+import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./ProofView.module.css";
 
@@ -23,7 +24,7 @@ const MARGIN = 56;
  * sentences, because the thing being judged is a line of type rather than a
  * letter.
  */
-export function ProofView(): JSX.Element {
+export function ProofView(): React.JSX.Element {
   const store = useEditorStore();
   const document = useStoreValue((s) => s.session.editor.document);
   const text = useStoreValue((s) => s.proofText);
@@ -110,12 +111,11 @@ export function ProofView(): JSX.Element {
     surfaceRef.current = surface;
     surface.start();
 
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
     const invalidate = (): void => surface.invalidate();
-    media?.addEventListener("change", invalidate);
+    const stopWatching = watchScheme(invalidate);
 
     return () => {
-      media?.removeEventListener("change", invalidate);
+      stopWatching();
       surface.destroy();
       surfaceRef.current = null;
     };

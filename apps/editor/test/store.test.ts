@@ -131,8 +131,8 @@ describe("EditorStore", () => {
     it("resets the browser filter, which may have been narrowed to the old font", async () => {
       store.setCatalogQuery({ set: "block:greek", search: "omega" });
       await store.newFont();
-      expect(store.state.catalogQuery.set).toBe("all");
-      expect(store.state.catalogQuery.search).toBe("");
+      expect(store.getState().catalogQuery.set).toBe("all");
+      expect(store.getState().catalogQuery.search).toBe("");
     });
   });
 
@@ -140,7 +140,7 @@ describe("EditorStore", () => {
     it("merges partial changes", () => {
       store.setCatalogQuery({ search: "a" });
       store.setCatalogQuery({ order: "name" });
-      expect(store.state.catalogQuery).toMatchObject({ search: "a", order: "name" });
+      expect(store.getState().catalogQuery).toMatchObject({ search: "a", order: "name" });
     });
 
     it("does not notify when nothing actually changed", () => {
@@ -153,21 +153,21 @@ describe("EditorStore", () => {
 
   describe("view preferences", () => {
     it("hides handles by default, and toggles", () => {
-      expect(store.state.autoHideHandles).toBe(true);
+      expect(store.getState().autoHideHandles).toBe(true);
       store.toggleAutoHideHandles();
-      expect(store.state.autoHideHandles).toBe(false);
+      expect(store.getState().autoHideHandles).toBe(false);
     });
 
     it("keeps the inspector on screen when the window is small", () => {
       store.moveInspector(5000, 5000);
-      expect(store.state.inspector.x).toBeLessThanOrEqual(1200);
-      expect(store.state.inspector.y).toBeLessThanOrEqual(800);
+      expect(store.getState().inspector.x).toBeLessThanOrEqual(1200);
+      expect(store.getState().inspector.y).toBeLessThanOrEqual(800);
     });
 
     it("never puts the inspector at a negative position", () => {
       store.moveInspector(-500, -500);
-      expect(store.state.inspector.x).toBe(0);
-      expect(store.state.inspector.y).toBe(0);
+      expect(store.getState().inspector.x).toBe(0);
+      expect(store.getState().inspector.y).toBe(0);
     });
   });
 

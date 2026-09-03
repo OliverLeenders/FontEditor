@@ -566,7 +566,7 @@ describe("locking one handle at a time", () => {
 
     expect(n.hvLock).toEqual({ in: false, out: true });
     // The out handle was nearer the vertical, so it goes upright.
-    expect(n.out).toEqual({ x: 0, y: expect.closeTo(81.4, 1) as unknown as number });
+    expect(n.out).toEqual({ x: 0, y: expect.closeTo(81.4, 1) });
     // The in handle is untouched, still off both axes.
     expect(n.in).toEqual({ x: -90, y: 20 });
   });

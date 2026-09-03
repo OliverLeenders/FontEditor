@@ -1,3 +1,7 @@
+// The declarations are hand-written and belong to this module rather than to a
+// package, so a reference is how they are pulled in; an import would need them
+// to export something they deliberately do not.
+/* eslint-disable-next-line @typescript-eslint/triple-slash-reference */
 /// <reference path="./opentype-js.d.ts" />
 
 import * as module from "opentype.js";
@@ -15,5 +19,4 @@ import type { OpenType } from "opentype.js";
  *
  * Resolved once, here, so no other file has to know.
  */
-export const opentype: OpenType =
-  (module as { default?: OpenType }).default ?? (module as unknown as OpenType);
+export const opentype: OpenType = (module as { default?: OpenType }).default ?? module;

@@ -28,7 +28,7 @@ export function TabBar({
   current: ViewId;
   onSelect: (id: ViewId) => void;
   glyphName: string;
-}): JSX.Element {
+}): React.JSX.Element {
   return (
     <nav className={styles.bar} aria-label="Workspaces">
       {TABS.map((tab) => (

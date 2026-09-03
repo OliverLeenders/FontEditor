@@ -24,6 +24,7 @@ import { useEffect, useRef } from "react";
 
 import { handlesAutoHidden, sceneFor } from "../scene.js";
 import type { EditorStore } from "../store.js";
+import { watchScheme } from "../scheme.js";
 import { useEditorStore } from "../useStore.js";
 import type { MenuRequest } from "./ContextMenu.js";
 import styles from "./GlyphCanvas.module.css";
@@ -53,7 +54,7 @@ export function GlyphCanvas({
   onContextMenu,
 }: {
   onContextMenu: (request: MenuRequest) => void;
-}): JSX.Element {
+}): React.JSX.Element {
   const store = useEditorStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const surfaceRef = useRef<CanvasSurface | null>(null);
@@ -72,12 +73,11 @@ export function GlyphCanvas({
 
     const unsubscribe = store.subscribe(() => surface.invalidate());
     const onScheme = (): void => surface.invalidate();
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
-    media?.addEventListener("change", onScheme);
+    const stopWatching = watchScheme(onScheme);
 
     return () => {
       unsubscribe();
-      media?.removeEventListener("change", onScheme);
+      stopWatching();
       surface.destroy();
       surfaceRef.current = null;
     };

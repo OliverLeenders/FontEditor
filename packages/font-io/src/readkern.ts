@@ -135,7 +135,11 @@ export function kerningFromGpos(gpos: unknown): SourceKerning {
         continue;
       }
 
-      if (subtable.posFormat !== 2) continue;
+      // Read at its real width before checking. The union above is a claim
+      // about what a parsed subtable holds, and it came out of somebody's font
+      // — so the guard is against the data, not against the type.
+      const format: number = subtable.posFormat;
+      if (format !== 2) continue;
 
       const class1 = classMembers(subtable.classDef1);
       const class2 = classMembers(subtable.classDef2);

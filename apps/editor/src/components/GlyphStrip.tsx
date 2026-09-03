@@ -17,7 +17,7 @@ import styles from "./GlyphStrip.module.css";
  * A character the font has nothing for is shown as a gap rather than skipped, so
  * what you typed and what you see stay in step.
  */
-export function GlyphStrip(): JSX.Element {
+export function GlyphStrip(): React.JSX.Element {
   const store = useEditorStore();
   const text = useStoreValue((s) => s.stripText);
   const document = useStoreValue((s) => s.session.editor.document);
@@ -67,7 +67,7 @@ function GlyphCell({
   active: boolean;
   metrics: { unitsPerEm: number; ascender: number; descender: number };
   onSelect: () => void;
-}): JSX.Element {
+}): React.JSX.Element {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

@@ -164,7 +164,7 @@ export class StorageClient {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
       this.waiting.set(id, { resolve, reject });
-      this.worker.postMessage({ ...request, id } as StorageRequest);
+      this.worker.postMessage({ ...request, id });
     });
   }
 }

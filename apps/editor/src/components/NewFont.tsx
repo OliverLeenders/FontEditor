@@ -14,7 +14,7 @@ import styles from "./OpenFont.module.css";
  * The confirmation withdraws itself on Escape or on a click elsewhere, so a
  * mis-click leaves nothing armed and waiting.
  */
-export function NewFont(): JSX.Element {
+export function NewFont(): React.JSX.Element {
   const store = useEditorStore();
   const reading = useStoreValue((s) => s.ownership === "reading");
   const [asking, setAsking] = useState(false);

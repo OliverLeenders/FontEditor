@@ -37,7 +37,7 @@ const TOOLS: readonly ToolButton[] = [
   { id: "measure", key: "M", label: "Measure", hint: "Measure across a stem  (M) · click to pin" },
 ];
 
-export function Toolbar(): JSX.Element {
+export function Toolbar(): React.JSX.Element {
   const store = useEditorStore();
   const activeTool = useStoreValue((s) => s.session.editor.activeTool);
   const scale = useStoreValue((s) => s.session.editor.view.scale);

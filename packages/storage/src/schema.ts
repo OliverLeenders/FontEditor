@@ -213,7 +213,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function decodePoint(raw: unknown): Vec2 | null {
   if (!Array.isArray(raw) || raw.length !== 2) return null;
-  const [x, y] = raw;
+  // `isArray` says `any[]`, so the two are read as unknown and checked below
+  // rather than trusted into a destructuring.
+  const pair = raw as unknown[];
+  const x: unknown = pair[0];
+  const y: unknown = pair[1];
   if (typeof x !== "number" || typeof y !== "number") return null;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
   return { x, y };

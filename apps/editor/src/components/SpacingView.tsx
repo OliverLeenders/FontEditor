@@ -5,6 +5,7 @@ import { type ViewTransform, glyphAtX, layoutRun, occurrencesOf } from "@fontedi
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
+import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./SpacingView.module.css";
 
@@ -53,7 +54,11 @@ export function runView(
  * — which is the honest thing, and the reason all occurrences are banded rather
  * than only the one clicked.
  */
-export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => void }): JSX.Element {
+export function SpacingView({
+  onOpenGlyph,
+}: {
+  onOpenGlyph: (name: string) => void;
+}): React.JSX.Element {
   const store = useEditorStore();
   const document = useStoreValue((s) => s.session.editor.document);
   const text = useStoreValue((s) => s.spacingText);
@@ -102,12 +107,11 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
     surfaceRef.current = surface;
     surface.start();
 
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
     const invalidate = (): void => surface.invalidate();
-    media?.addEventListener("change", invalidate);
+    const stopWatching = watchScheme(invalidate);
 
     return () => {
-      media?.removeEventListener("change", invalidate);
+      stopWatching();
       surface.destroy();
       surfaceRef.current = null;
     };
@@ -128,7 +132,7 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
     const surface = surfaceRef.current;
     if (canvas === null || surface === null) return null;
 
-    const point = surface.toCanvasPoint(event as PointerEvent);
+    const point = surface.toCanvasPoint(event);
     const box = canvas.getBoundingClientRect();
     const view = runView(run.width, size, document.info.unitsPerEm, {
       width: box.width,
@@ -314,7 +318,7 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
   );
 }
 
-function Value({ label, value }: { label: string; value: number }): JSX.Element {
+function Value({ label, value }: { label: string; value: number }): React.JSX.Element {
   return (
     <span className={styles.value}>
       <span className={styles.valueLabel}>{label}</span>

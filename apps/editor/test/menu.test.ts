@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
+import type { Item } from "../src/components/ContextMenu.js";
 import { installBrowserGlobals } from "./browser-globals.js";
 
 installBrowserGlobals();
@@ -159,15 +160,17 @@ describe("context menu", () => {
   });
 
   it("shows the axis lock as checked once it is on", () => {
-    const checked = () =>
+    // Narrowed by a predicate rather than by a comparison, so the separator
+    // variant is gone from the type and `checked` can be read from what is left.
+    const lock = (): Extract<Item, { kind: "item" }> | undefined =>
       itemsFor(store, { x: 0, y: 0, target: node() as never, point: { x: 0, y: 0 } }).find(
-        (i) => i.kind === "item" && i.label === "Lock handles to axis",
+        (i): i is Extract<Item, { kind: "item" }> =>
+          i.kind === "item" && i.label === "Lock handles to axis",
       );
 
-    expect(checked()?.kind === "item" && checked()!.checked).toBeFalsy();
+    expect(lock()?.checked).toBeFalsy();
     run(store, node(), "Lock handles to axis");
-    const after = checked();
-    expect(after?.kind === "item" && after.checked).toBe(true);
+    expect(lock()?.checked).toBe(true);
   });
 
   it("offers centring on a margin line, and centres the glyph", () => {

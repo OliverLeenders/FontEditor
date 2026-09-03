@@ -15,14 +15,7 @@ import {
 } from "@fonteditor/font-model";
 
 import { parseGlif } from "./glif.js";
-import {
-  type PlistDict,
-  isDict,
-  parsePlistDict,
-  plistNumber,
-  plistString,
-  stringEntries,
-} from "./plist.js";
+import { isDict, parsePlistDict, plistNumber, plistString, stringEntries } from "./plist.js";
 import { type ZipFile, fileText, unzip } from "./unzip.js";
 
 /**
@@ -227,7 +220,7 @@ function readKerning(
   const pairs = parsePlistDict(kernSource);
   for (const [first, row] of Object.entries(pairs)) {
     if (!isDict(row)) continue;
-    for (const [second, value] of Object.entries(row as PlistDict)) {
+    for (const [second, value] of Object.entries(row)) {
       if (typeof value !== "number") continue;
 
       const left = named.get(first) ?? bare(first, warn);

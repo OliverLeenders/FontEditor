@@ -47,7 +47,7 @@ export function parseGlyphRequest(raw: string): GlyphSpec | null {
  * an afternoon. It works off the set already selected in the sidebar, whose
  * count is right there, so "add the missing ones" needs no second choice.
  */
-export function NewGlyph(): JSX.Element {
+export function NewGlyph(): React.JSX.Element {
   const store = useEditorStore();
   const reading = useStoreValue((s) => s.ownership === "reading");
   const query = useStoreValue((s) => s.catalogQuery);

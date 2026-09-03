@@ -46,8 +46,8 @@ describe("importing a font into the store", () => {
     store.setCatalogQuery({ set: "block:greek", search: "sigma" });
 
     await store.importFont(threeGlyphFont());
-    expect(store.state.catalogQuery.set).toBe("all");
-    expect(store.state.catalogQuery.search).toBe("");
+    expect(store.getState().catalogQuery.set).toBe("all");
+    expect(store.getState().catalogQuery.search).toBe("");
   });
 
   it("keeps the camera where it was, so the view does not jump", async () => {

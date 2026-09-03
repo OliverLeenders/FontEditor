@@ -32,7 +32,7 @@ type Status =
  * reachable from the keyboard; the drop target exists because dragging a file
  * onto a window is what people actually try first.
  */
-export function OpenFont(): JSX.Element {
+export function OpenFont(): React.JSX.Element {
   const store = useEditorStore();
   const reading = useStoreValue((s) => s.ownership === "reading");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -100,7 +100,7 @@ export function OpenFont(): JSX.Element {
   );
 }
 
-function Message({ status }: { status: Status }): JSX.Element | null {
+function Message({ status }: { status: Status }): React.JSX.Element | null {
   if (status.kind === "idle") return null;
   if (status.kind === "reading") return <span className={styles.note}>{status.name}</span>;
 

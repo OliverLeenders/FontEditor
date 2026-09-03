@@ -17,8 +17,10 @@ export class OpfsFileStore implements FileStore {
   private constructor(private readonly root: FileSystemDirectoryHandle) {}
 
   static async open(directory = "project"): Promise<OpfsFileStore> {
-    const storage = navigator.storage;
-    if (storage?.getDirectory === undefined) {
+    // Typed as always present and absent in plenty of places — an old browser,
+    // an insecure origin, a test environment. The check is on what is there.
+    const storage = navigator.storage as StorageManager | undefined;
+    if (typeof storage?.getDirectory !== "function") {
       throw new Error("This browser does not provide an origin private file system.");
     }
     const root = await storage.getDirectory();
@@ -150,7 +152,10 @@ export class OpfsFileStore implements FileStore {
  */
 export async function requestPersistence(): Promise<boolean> {
   try {
-    return (await navigator.storage?.persist?.()) ?? false;
+    // Typed as always present; absent on an insecure origin and in tests.
+    const storage = navigator.storage as StorageManager | undefined;
+    if (typeof storage?.persist !== "function") return false;
+    return await storage.persist();
   } catch {
     return false;
   }

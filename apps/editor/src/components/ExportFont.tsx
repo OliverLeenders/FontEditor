@@ -19,7 +19,7 @@ type Status =
  * composite glyphs, and none of that survives a trip through this model. A
  * button that said "Save" would be promising something it cannot do.
  */
-export function ExportFont(): JSX.Element {
+export function ExportFont(): React.JSX.Element {
   const store = useEditorStore();
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
   const [status, setStatus] = useState<Status>({ kind: "idle" });

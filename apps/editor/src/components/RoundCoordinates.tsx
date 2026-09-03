@@ -19,7 +19,7 @@ const NOTE_MS = 4000;
  * something: the edit is one undo step, and the note is what says whether that
  * step is worth undoing.
  */
-export function RoundCoordinates(): JSX.Element {
+export function RoundCoordinates(): React.JSX.Element {
   const store = useEditorStore();
   const reading = useStoreValue((s) => s.ownership === "reading");
   const [note, setNote] = useState<string | null>(null);

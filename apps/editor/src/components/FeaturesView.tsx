@@ -18,7 +18,7 @@ import styles from "./FeaturesView.module.css";
  * a file and shipped a font doing less than the file says would be worse than
  * one that admits its limits.
  */
-export function FeaturesView(): JSX.Element {
+export function FeaturesView(): React.JSX.Element {
   const store = useEditorStore();
   const source = useStoreValue((s) => s.session.editor.document.features);
   const glyphOrder = useStoreValue((s) => s.session.editor.document.glyphOrder);

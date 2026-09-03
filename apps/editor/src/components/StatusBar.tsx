@@ -11,7 +11,7 @@ import styles from "./StatusBar.module.css";
  * about dragging Tunni points are not merely useless in the glyph browser, they
  * are wrong — they describe a canvas that is not on screen.
  */
-export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): JSX.Element {
+export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): React.JSX.Element {
   const selection = useStoreValue((s) => s.session.editor.selection.length);
   const tool = useStoreValue((s) => s.session.editor.activeTool);
   const saveStatus = useStoreValue((s) => s.saveStatus);

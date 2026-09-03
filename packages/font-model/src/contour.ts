@@ -283,11 +283,11 @@ export function setHvLock(
   if (smooth) {
     const leading =
       which === "both"
-        ? distance(base.pt, base.out!) >= distance(base.pt, base.in!)
+        ? distance(base.pt, base.out) >= distance(base.pt, base.in)
           ? "out"
           : "in"
         : which;
-    const handle = leading === "out" ? base.out! : base.in!;
+    const handle = leading === "out" ? base.out : base.in;
     const swung = withHandleRaw(next, leading, snapToAxis(base.pt, handle));
     return replaceNode(c, i, enforceSmooth(swung, leading));
   }

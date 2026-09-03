@@ -12,6 +12,7 @@ import {
 } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { prefersDark, watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import { ExportFont } from "./ExportFont.js";
@@ -37,7 +38,7 @@ const FIRST_BLOCK = GLYPH_SETS.findIndex((set) => set.id.startsWith("block:"));
  * written out explicitly instead. That is the price of the canvas, and it is
  * paid here rather than being quietly skipped.
  */
-export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JSX.Element {
+export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): React.JSX.Element {
   const store = useEditorStore();
   const document = useStoreValue((s) => s.session.editor.document);
   const query = useStoreValue((s) => s.catalogQuery);
@@ -93,7 +94,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
 
     const surface = new CanvasSurface(canvas, (ctx, size) => {
       const state = frame.current;
-      const dark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+      const dark = prefersDark();
       const palette = dark ? DARK_PALETTE : LIGHT_PALETTE;
 
       const layout = state.layout;
@@ -138,12 +139,11 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
 
     const invalidate = (): void => surface.invalidate();
     scroller.addEventListener("scroll", invalidate, { passive: true });
-    const media = window.matchMedia?.("(prefers-color-scheme: dark)");
-    media?.addEventListener("change", invalidate);
+    const stopWatching = watchScheme(invalidate);
 
     return () => {
       scroller.removeEventListener("scroll", invalidate);
-      media?.removeEventListener("change", invalidate);
+      stopWatching();
       surface.destroy();
       surfaceRef.current = null;
     };

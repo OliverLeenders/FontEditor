@@ -33,7 +33,7 @@ import styles from "./Inspector.module.css";
  * made — nearly all the screen goes to the work, and in exchange the panel can
  * land on top of what you are editing until you move it.
  */
-export function Inspector(): JSX.Element | null {
+export function Inspector(): React.JSX.Element | null {
   const store = useEditorStore();
   const open = useStoreValue((s) => s.inspector.open);
   const x = useStoreValue((s) => s.inspector.x);
@@ -401,7 +401,13 @@ function shown(v: number): number {
   return Math.round(v * 100) / 100;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
   return (
     <label className={styles.field}>
       <span className={styles.label}>{label}</span>

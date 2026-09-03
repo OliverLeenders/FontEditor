@@ -24,7 +24,7 @@ import { useEditorStore, useStoreValue } from "./useStore.js";
 /** Pasted contours need ids; the application owns the factory. */
 const pasteIds = randomIds();
 
-export function App(): JSX.Element {
+export function App(): React.JSX.Element {
   const store = useEditorStore();
   const [view, setView] = useState<ViewId>("glyph");
   const [menu, setMenu] = useState<MenuRequest | null>(null);

@@ -82,20 +82,20 @@ describe("handlesAutoHidden", () => {
   });
 
   it("is on by default, with the select tool", () => {
-    expect(handlesAutoHidden(store.state)).toBe(true);
+    expect(handlesAutoHidden(store.getState())).toBe(true);
   });
 
   it("is off once the preference is turned off", () => {
     store.toggleAutoHideHandles();
-    expect(handlesAutoHidden(store.state)).toBe(false);
+    expect(handlesAutoHidden(store.getState())).toBe(false);
   });
 
   it("is never on while the pen is out", () => {
     // The pen keeps no hovered or focused segment, so hiding handles would take
     // them away exactly while they are being placed.
     store.applyTool(setActiveTool(store.editor, "pen"));
-    expect(store.state.autoHideHandles).toBe(true);
-    expect(handlesAutoHidden(store.state)).toBe(false);
+    expect(store.getState().autoHideHandles).toBe(true);
+    expect(handlesAutoHidden(store.getState())).toBe(false);
   });
 });
 
@@ -106,7 +106,7 @@ describe("sceneFor", () => {
   });
 
   it("carries the current glyph and the view", () => {
-    const scene = sceneFor(store.state, SIZE);
+    const scene = sceneFor(store.getState(), SIZE);
     expect(scene.glyph.name).toBe(store.editor.currentGlyph);
     expect(scene.view).toBe(store.editor.view);
     expect(scene.viewport).toBe(SIZE);
@@ -114,7 +114,7 @@ describe("sceneFor", () => {
 
   it("draws guides from the font's own metrics", () => {
     const { ascender, descender, xHeight, capHeight } = store.editor.document.info;
-    const ys = sceneFor(store.state, SIZE).guides.map((g) => g.y);
+    const ys = sceneFor(store.getState(), SIZE).guides.map((g) => g.y);
 
     expect(ys).toContain(0);
     expect(ys).toContain(ascender);
@@ -125,34 +125,34 @@ describe("sceneFor", () => {
 
   it("survives a glyph name that does not resolve", () => {
     store.setEditor({ ...store.editor, currentGlyph: "no-such-glyph" });
-    const scene = sceneFor(store.state, SIZE);
+    const scene = sceneFor(store.getState(), SIZE);
     expect(scene.glyph.contours).toEqual([]);
     expect(scene.glyph.advance).toBe(0);
   });
 
   it("hides every control while space is held", () => {
     store.setPreviewing(true);
-    expect(sceneFor(store.state, SIZE).options.showControls).toBe(false);
+    expect(sceneFor(store.getState(), SIZE).options.showControls).toBe(false);
     store.setPreviewing(false);
-    expect(sceneFor(store.state, SIZE).options.showControls).toBe(true);
+    expect(sceneFor(store.getState(), SIZE).options.showControls).toBe(true);
   });
 
   it("passes the auto-hide decision through, rather than deciding again", () => {
-    expect(sceneFor(store.state, SIZE).options.autoHideHandles).toBe(
-      handlesAutoHidden(store.state),
+    expect(sceneFor(store.getState(), SIZE).options.autoHideHandles).toBe(
+      handlesAutoHidden(store.getState()),
     );
     store.toggleAutoHideHandles();
-    expect(sceneFor(store.state, SIZE).options.autoHideHandles).toBe(
-      handlesAutoHidden(store.state),
+    expect(sceneFor(store.getState(), SIZE).options.autoHideHandles).toBe(
+      handlesAutoHidden(store.getState()),
     );
   });
 
   it("draws no neighbours when they are switched off", () => {
     store.setStripText("hello");
     store.setCurrentGlyph("l");
-    expect(sceneFor(store.state, SIZE).neighbours.length).toBeGreaterThan(0);
+    expect(sceneFor(store.getState(), SIZE).neighbours.length).toBeGreaterThan(0);
 
     store.toggleNeighbours();
-    expect(sceneFor(store.state, SIZE).neighbours).toEqual([]);
+    expect(sceneFor(store.getState(), SIZE).neighbours).toEqual([]);
   });
 });

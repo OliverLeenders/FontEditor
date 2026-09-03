@@ -248,8 +248,8 @@ describe("refusing what is not a UFO", () => {
     zip(entries).buffer as ArrayBuffer;
 
   it("refuses something that is not a zip at all", async () => {
-    const out = await importUfo(new TextEncoder().encode("hello").buffer as ArrayBuffer, ids);
-    expect(out).toEqual({ reason: expect.stringContaining("not a zip") as unknown as string });
+    const out = await importUfo(new TextEncoder().encode("hello").buffer, ids);
+    expect(out).toEqual({ reason: expect.stringContaining("not a zip") });
   });
 
   it("refuses a zip with no metainfo.plist", async () => {

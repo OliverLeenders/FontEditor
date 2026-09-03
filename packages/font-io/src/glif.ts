@@ -146,7 +146,7 @@ function parseContour(
 
   // A contour is open exactly when it begins with a move. Everything else wraps.
   const closed = raw[0]?.type !== "move";
-  const points = expandQuadratics(raw, closed, warn);
+  const points = expandQuadratics(raw, warn);
 
   return buildContour(points, closed, ids);
 }
@@ -161,11 +161,7 @@ function parseContour(
  * on-curve point midway between each neighbouring pair, and those are put back
  * before the conversion.
  */
-function expandQuadratics(
-  raw: readonly RawPoint[],
-  closed: boolean,
-  warn: (message: string) => void,
-): RawPoint[] {
+function expandQuadratics(raw: readonly RawPoint[], warn: (message: string) => void): RawPoint[] {
   if (!raw.some((p) => p.type === "qcurve")) return [...raw];
   warn("converted quadratic curves to cubics");
 
@@ -209,9 +205,6 @@ function expandQuadratics(
     if (controls.length === 0) out.push({ ...point, type: "line" });
   }
 
-  // A closed quadratic contour can begin on an implied point; leaving the flag
-  // alone is right either way, and is why it is passed in but not changed.
-  void closed;
   return out;
 }
 

@@ -278,7 +278,7 @@ window.addEventListener("keyup", (event) => {
   }
 });
 
-if (window.matchMedia) {
+if (typeof window.matchMedia === "function") {
   window
     .matchMedia("(prefers-color-scheme: dark)")
     .addEventListener("change", () => surface.invalidate());
@@ -383,7 +383,9 @@ async function initStorage(): Promise<void> {
 }
 
 function prefersDark(): boolean {
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+  // Typed as always present, and absent in plenty of places.
+  if (typeof window.matchMedia !== "function") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 // Fitting needs a laid-out canvas. At module evaluation the element still

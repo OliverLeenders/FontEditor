@@ -102,11 +102,11 @@ async function inflate(raw: Uint8Array): Promise<Uint8Array | null> {
     void writer.close();
 
     const chunks: Uint8Array[] = [];
-    const reader = stream.readable.getReader();
+    const reader = stream.readable.getReader() as ReadableStreamDefaultReader<Uint8Array>;
     for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value !== undefined) chunks.push(value as Uint8Array);
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      chunks.push(chunk.value);
     }
 
     const total = chunks.reduce((n, c) => n + c.length, 0);
