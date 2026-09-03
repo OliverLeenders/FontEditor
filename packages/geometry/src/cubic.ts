@@ -138,8 +138,10 @@ export function bounds(s: Cubic): Rect {
  */
 export function isFlat(s: Cubic, tolerance = FLATTEN_TOLERANCE): boolean {
   if (coincident(s.a, s.b)) {
-    return distanceSq(s.a, s.c1) <= tolerance * tolerance
-      && distanceSq(s.b, s.c2) <= tolerance * tolerance;
+    return (
+      distanceSq(s.a, s.c1) <= tolerance * tolerance &&
+      distanceSq(s.b, s.c2) <= tolerance * tolerance
+    );
   }
   const d1 = distanceToLine(s.a, s.b, s.c1);
   const d2 = distanceToLine(s.a, s.b, s.c2);

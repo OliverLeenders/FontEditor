@@ -171,7 +171,14 @@ describe("coverage", () => {
 
 describe("classDef", () => {
   it("collapses consecutive glyphs of one class into a single range", () => {
-    const bytes = classDef(new Map([[1, 1], [2, 1], [3, 1], [10, 2]]));
+    const bytes = classDef(
+      new Map([
+        [1, 1],
+        [2, 1],
+        [3, 1],
+        [10, 2],
+      ]),
+    );
     expect(bytes[1]).toBe(2);
     expect(bytes[3]).toBe(2);
   });
@@ -242,9 +249,7 @@ describe("withTable", () => {
   it("replaces a table of the same tag rather than adding a second", () => {
     const once = withTable(font(), "TEST", new Uint8Array([1, 2, 3, 4]));
     const twice = withTable(once, "TEST", new Uint8Array([5, 6, 7, 8]));
-    expect(new DataView(twice.buffer).getUint16(4)).toBe(
-      new DataView(once.buffer).getUint16(4),
-    );
+    expect(new DataView(twice.buffer).getUint16(4)).toBe(new DataView(once.buffer).getUint16(4));
   });
 
   it("removes a table when given nothing to write", () => {

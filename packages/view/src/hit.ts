@@ -32,10 +32,32 @@ export type HitKind =
   | "advanceLine";
 
 export type HitTarget =
-  | { readonly kind: "node" | "handleIn" | "handleOut"; readonly contourId: ContourId; readonly nodeId: NodeId; readonly point: Vec2 }
-  | { readonly kind: "tunniPoint"; readonly contourId: ContourId; readonly segmentIndex: number; readonly point: Vec2 }
-  | { readonly kind: "tunniLine"; readonly contourId: ContourId; readonly segmentIndex: number; readonly from: Vec2; readonly to: Vec2 }
-  | { readonly kind: "segment"; readonly contourId: ContourId; readonly segmentIndex: number; readonly cubic: Cubic; readonly status: TunniStatus }
+  | {
+      readonly kind: "node" | "handleIn" | "handleOut";
+      readonly contourId: ContourId;
+      readonly nodeId: NodeId;
+      readonly point: Vec2;
+    }
+  | {
+      readonly kind: "tunniPoint";
+      readonly contourId: ContourId;
+      readonly segmentIndex: number;
+      readonly point: Vec2;
+    }
+  | {
+      readonly kind: "tunniLine";
+      readonly contourId: ContourId;
+      readonly segmentIndex: number;
+      readonly from: Vec2;
+      readonly to: Vec2;
+    }
+  | {
+      readonly kind: "segment";
+      readonly contourId: ContourId;
+      readonly segmentIndex: number;
+      readonly cubic: Cubic;
+      readonly status: TunniStatus;
+    }
   /** The vertical lines bounding the advance width. Full height, so only x matters. */
   | { readonly kind: "originLine" | "advanceLine"; readonly x: number };
 
@@ -181,7 +203,12 @@ export function buildHitIndex(
       // The line is addressable whenever dragging it means something — which is
       // everything but flat and degenerate, including a crossed segment. Making
       // it vanish mid-gesture is worse than letting the drag be refused.
-      if (status !== "flat" && status !== "degenerate" && segment.out !== null && segment.in !== null) {
+      if (
+        status !== "flat" &&
+        status !== "degenerate" &&
+        segment.out !== null &&
+        segment.in !== null
+      ) {
         targets.push({
           kind: "tunniLine",
           contourId: c.id,

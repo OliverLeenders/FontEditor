@@ -22,8 +22,18 @@ const TOOLS: readonly ToolButton[] = [
   { id: "select", key: "V", label: "Select", hint: "Select and edit  (V)" },
   { id: "pen", key: "P", label: "Pen", hint: "Draw contours  (P)" },
   { id: "knife", key: "K", label: "Knife", hint: "Cut across the outline  (K)" },
-  { id: "rect", key: "R", label: "Rectangle", hint: "Draw a rectangle  (R) · shift for a square, alt from the centre" },
-  { id: "ellipse", key: "E", label: "Ellipse", hint: "Draw an ellipse  (E) · shift for a circle, alt from the centre" },
+  {
+    id: "rect",
+    key: "R",
+    label: "Rectangle",
+    hint: "Draw a rectangle  (R) · shift for a square, alt from the centre",
+  },
+  {
+    id: "ellipse",
+    key: "E",
+    label: "Ellipse",
+    hint: "Draw an ellipse  (E) · shift for a circle, alt from the centre",
+  },
   { id: "measure", key: "M", label: "Measure", hint: "Measure across a stem  (M) · click to pin" },
 ];
 
@@ -85,11 +95,7 @@ export function Toolbar(): JSX.Element {
         type="button"
         className={styles.action}
         aria-pressed={autoHide}
-        title={
-          autoHide
-            ? "Handles show near the work  (H)"
-            : "All handles always shown  (H)"
-        }
+        title={autoHide ? "Handles show near the work  (H)" : "All handles always shown  (H)"}
         onClick={() => store.toggleAutoHideHandles()}
       >
         Handles
@@ -149,4 +155,5 @@ const canUndo = (s: { session: { pending: unknown; history: { index: number } } 
   s.session.pending === null && s.session.history.index > 0;
 const canRedo = (s: {
   session: { pending: unknown; history: { index: number; entries: readonly unknown[] } };
-}): boolean => s.session.pending === null && s.session.history.index < s.session.history.entries.length;
+}): boolean =>
+  s.session.pending === null && s.session.history.index < s.session.history.entries.length;

@@ -113,10 +113,7 @@ export function handlesAutoHidden(state: StoreState): boolean {
  * A pure function of the state and the canvas size, which is what lets the
  * canvas redraw straight from a subscription without React being involved.
  */
-export function sceneFor(
-  state: StoreState,
-  size: { width: number; height: number },
-): Scene {
+export function sceneFor(state: StoreState, size: { width: number; height: number }): Scene {
   const editor = state.session.editor;
   const glyph = editor.document.glyphs[editor.currentGlyph] ?? EMPTY;
 

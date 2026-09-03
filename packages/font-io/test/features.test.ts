@@ -1,4 +1,11 @@
-import { contour, counterIds, fontDocument, glyph, node, setFeatures } from "@fonteditor/font-model";
+import {
+  contour,
+  counterIds,
+  fontDocument,
+  glyph,
+  node,
+  setFeatures,
+} from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
 import { compileFeatures } from "../src/features.js";
@@ -49,7 +56,11 @@ describe("reading feature source", () => {
     const parsed = parseFea("feature liga { sub f i by fi; } liga;");
     expect(parsed.problems).toEqual([]);
     expect(parsed.features[0]?.tag).toBe("liga");
-    expect(parsed.features[0]?.rules[0]).toMatchObject({ kind: "ligature", from: ["f", "i"], to: "fi" });
+    expect(parsed.features[0]?.rules[0]).toMatchObject({
+      kind: "ligature",
+      from: ["f", "i"],
+      to: "fi",
+    });
   });
 
   it("reads a class and uses it on both sides", () => {
@@ -94,7 +105,9 @@ describe("reading feature source", () => {
   });
 
   it("keeps the features that did parse when one did not", () => {
-    const parsed = parseFea("feature xxxx { nonsense; } xxxx;\nfeature liga { sub f i by fi; } liga;");
+    const parsed = parseFea(
+      "feature xxxx { nonsense; } xxxx;\nfeature liga { sub f i by fi; } liga;",
+    );
     expect(parsed.features.some((f) => f.tag === "liga" && f.rules.length === 1)).toBe(true);
   });
 });

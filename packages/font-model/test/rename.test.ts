@@ -27,7 +27,11 @@ const at = (x: number, y: number) => ({ x, y });
 
 /** An `a`, an `acute`, an `aacute` built from both, and kerning that names them. */
 function font() {
-  const shape = contour(ids.contour(), [node(ids.node(), at(0, 0)), node(ids.node(), at(100, 300))], true);
+  const shape = contour(
+    ids.contour(),
+    [node(ids.node(), at(0, 0)), node(ids.node(), at(100, 300))],
+    true,
+  );
 
   const document = fontDocument([
     glyph("a", { unicodes: [0x61], advance: 500, contours: [shape] }),
@@ -37,7 +41,11 @@ function font() {
       advance: 500,
       components: [
         component(ids.component(), "a"),
-        component(ids.component(), "acute", { ...component(ids.component(), "x").transform, xOffset: 120, yOffset: 40 }),
+        component(ids.component(), "acute", {
+          ...component(ids.component(), "x").transform,
+          xOffset: 120,
+          yOffset: 40,
+        }),
       ],
     }),
     glyph("v", { unicodes: [0x76], advance: 480 }),

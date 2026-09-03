@@ -94,18 +94,13 @@ describe("clipboardText", () => {
 });
 
 describe("parseClipboard", () => {
-  const roundTrip = (state: EditorState) =>
-    parseClipboard(clipboardText(state)!, counterIds());
+  const roundTrip = (state: EditorState) => parseClipboard(clipboardText(state)!, counterIds());
 
   it("reads back what was written", () => {
     const contours = roundTrip(selectPoints(start(), "c1"))!;
     expect(contours).toHaveLength(1);
     expect(contours[0]?.closed).toBe(true);
-    expect(contours[0]?.nodes.map((n) => n.pt)).toEqual([
-      vec(0, 0),
-      vec(200, 0),
-      vec(200, 300),
-    ]);
+    expect(contours[0]?.nodes.map((n) => n.pt)).toEqual([vec(0, 0), vec(200, 0), vec(200, 300)]);
     expect(contours[0]?.nodes[1]?.type).toBe("smooth");
     expect(contours[0]?.nodes[0]?.out).toEqual(vec(40, 0));
     expect(contours[0]?.nodes[2]?.hvLock).toEqual({ in: true, out: true });
@@ -227,9 +222,7 @@ describe("deleteSelectedContours", () => {
     const { state: afterCut } = deleteSelectedContours(selected);
     const { state: afterPaste } = pasteContours(afterCut, text, counterIds());
 
-    const restored = currentGlyph(afterPaste)!.contours.find(
-      (c) => c.nodes[0]?.pt.x === 0,
-    );
+    const restored = currentGlyph(afterPaste)!.contours.find((c) => c.nodes[0]?.pt.x === 0);
     expect(restored).toBeDefined();
     expect(restored?.nodes.map((n) => n.pt)).toEqual([vec(0, 0), vec(200, 0), vec(200, 300)]);
   });

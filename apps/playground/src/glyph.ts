@@ -100,9 +100,4 @@ export function sampleGlyphs(): Glyph[] {
 }
 
 /** Vertical metrics for the guides, in design units. */
-export const GUIDES = [
-  { y: 0, emphasis: true },
-  { y: 500 },
-  { y: 700 },
-  { y: -200 },
-];
+export const GUIDES = [{ y: 0, emphasis: true }, { y: 500 }, { y: 700 }, { y: -200 }];

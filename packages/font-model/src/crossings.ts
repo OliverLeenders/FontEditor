@@ -69,9 +69,7 @@ export function strokeCrossings(g: Glyph, a: Vec2, b: Vec2): StrokeCrossing[] {
 }
 
 /** The crossings grouped by the contour they belong to. */
-export function byContour(
-  crossings: readonly StrokeCrossing[],
-): Map<number, StrokeCrossing[]> {
+export function byContour(crossings: readonly StrokeCrossing[]): Map<number, StrokeCrossing[]> {
   const out = new Map<number, StrokeCrossing[]>();
   for (const crossing of crossings) {
     const list = out.get(crossing.contourIndex) ?? [];

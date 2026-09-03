@@ -28,9 +28,7 @@ function readTables(font: Uint8Array): { sfntVersion: number; tables: Table[] } 
   const tables: Table[] = [];
   for (let i = 0; i < numTables; i++) {
     const at = HEADER + i * RECORD;
-    const tag = String.fromCharCode(
-      font[at]!, font[at + 1]!, font[at + 2]!, font[at + 3]!,
-    );
+    const tag = String.fromCharCode(font[at]!, font[at + 1]!, font[at + 2]!, font[at + 3]!);
     const offset = view.getUint32(at + 8);
     const length = view.getUint32(at + 12);
     tables.push({ tag, data: font.subarray(offset, offset + length) });
@@ -127,4 +125,3 @@ export function withTable(font: Uint8Array, tag: string, data: Uint8Array): Uint
   }
   return out;
 }
-

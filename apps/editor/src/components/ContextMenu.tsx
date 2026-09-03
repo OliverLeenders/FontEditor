@@ -80,7 +80,11 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
 
   if (target === null) {
     return [
-      { kind: "item", label: "Select all points", run: () => store.applyTool(selectAllPoints(editor)) },
+      {
+        kind: "item",
+        label: "Select all points",
+        run: () => store.applyTool(selectAllPoints(editor)),
+      },
       { kind: "separator" },
       ...rounding,
     ];
@@ -128,8 +132,16 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
           ),
       },
       { kind: "separator" },
-      { kind: "item", label: "Reverse contour", run: () => store.applyTool(reverseContourAt(editor, contourId)) },
-      { kind: "item", label: "Delete point", run: () => store.applyTool(deleteSelectedPoints(editor)) },
+      {
+        kind: "item",
+        label: "Reverse contour",
+        run: () => store.applyTool(reverseContourAt(editor, contourId)),
+      },
+      {
+        kind: "item",
+        label: "Delete point",
+        run: () => store.applyTool(deleteSelectedPoints(editor)),
+      },
       { kind: "separator" },
       ...rounding,
     );
@@ -168,7 +180,11 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
       { kind: "separator" },
-      { kind: "item", label: "Retract handle", run: () => store.applyTool(retractHandle(editor, contourId, nodeId, part)) },
+      {
+        kind: "item",
+        label: "Retract handle",
+        run: () => store.applyTool(retractHandle(editor, contourId, nodeId, part)),
+      },
     );
     if (nodeHasMissingHandle(editor, contourId, nodeId)) {
       items.push({
@@ -189,7 +205,11 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     // The margin lines are about the glyph as a whole, so the menu offers the
     // one spacing operation that is tedious to do with two number fields.
     return [
-      { kind: "item", label: "Centre glyph", run: () => store.applyTool(centreCurrentGlyph(editor)) },
+      {
+        kind: "item",
+        label: "Centre glyph",
+        run: () => store.applyTool(centreCurrentGlyph(editor)),
+      },
     ];
   }
 
@@ -245,8 +265,16 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
   items.push({ kind: "separator" });
 
   items.push(
-    { kind: "item", label: "Balance handles", run: () => store.applyTool(balanceSegmentAt(editor, segment)) },
-    { kind: "item", label: "Reverse contour", run: () => store.applyTool(reverseContourAt(editor, segment.contourId)) },
+    {
+      kind: "item",
+      label: "Balance handles",
+      run: () => store.applyTool(balanceSegmentAt(editor, segment)),
+    },
+    {
+      kind: "item",
+      label: "Reverse contour",
+      run: () => store.applyTool(reverseContourAt(editor, segment.contourId)),
+    },
   );
   return items;
 }
@@ -330,7 +358,9 @@ export function Menu({
               onClose();
             }}
           >
-            <span className={styles.tick} aria-hidden="true">{item.checked === true ? "✓" : ""}</span>
+            <span className={styles.tick} aria-hidden="true">
+              {item.checked === true ? "✓" : ""}
+            </span>
             {item.label}
           </button>
         ),

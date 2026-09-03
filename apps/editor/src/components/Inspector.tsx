@@ -1,6 +1,4 @@
-import {
-  isTranslation,
-} from "@fonteditor/geometry";
+import { isTranslation } from "@fonteditor/geometry";
 import {
   randomIds,
   setAdvance,
@@ -41,7 +39,9 @@ export function Inspector(): JSX.Element | null {
   const x = useStoreValue((s) => s.inspector.x);
   const y = useStoreValue((s) => s.inspector.y);
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
-  const advance = useStoreValue((s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.advance ?? 0);
+  const advance = useStoreValue(
+    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.advance ?? 0,
+  );
   const unicodes = useStoreValue(
     (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.unicodes ?? EMPTY_CODES,
   );
@@ -54,10 +54,14 @@ export function Inspector(): JSX.Element | null {
   // Two selectors rather than one returning an object: a fresh object every time
   // would compare unequal and re-render the panel on every store notification.
   const leftBearing = useStoreValue(
-    (s) => sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)?.left ?? null,
+    (s) =>
+      sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)
+        ?.left ?? null,
   );
   const rightBearing = useStoreValue(
-    (s) => sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)?.right ?? null,
+    (s) =>
+      sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)
+        ?.right ?? null,
   );
 
   // Three scalar selectors rather than one returning the position: an object
@@ -68,7 +72,9 @@ export function Inspector(): JSX.Element | null {
   const coordPart = useStoreValue((s) => selectedCoordinate(s.session.editor)?.item.part ?? null);
 
   const components = useStoreValue(
-    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.components ?? EMPTY_COMPONENTS,
+    (s) =>
+      s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.components ??
+      EMPTY_COMPONENTS,
   );
   const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
   const [adding, setAdding] = useState("");
@@ -415,7 +421,18 @@ const EMPTY_CODES: readonly number[] = [];
  * so a mixed selection shows neither button pressed rather than lying about one.
  */
 function selectedPointType(s: {
-  session: { editor: { currentGlyph: string; selection: readonly { contourId: string; nodeId: string; part: string }[]; document: { glyphs: Record<string, { contours: readonly { id: string; nodes: readonly { id: string; type: string }[] }[] }> } } };
+  session: {
+    editor: {
+      currentGlyph: string;
+      selection: readonly { contourId: string; nodeId: string; part: string }[];
+      document: {
+        glyphs: Record<
+          string,
+          { contours: readonly { id: string; nodes: readonly { id: string; type: string }[] }[] }
+        >;
+      };
+    };
+  };
 }): string | null {
   const editor = s.session.editor;
   const glyph = editor.document.glyphs[editor.currentGlyph];

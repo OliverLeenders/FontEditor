@@ -95,7 +95,10 @@ describe("removeContour and setAdvance", () => {
 describe("serializability", () => {
   // The rule the whole history design rests on: the document is plain data.
   it("survives structuredClone and JSON unchanged", () => {
-    const g = addContour(addContour(glyph("x", { unicodes: [0x78] }), ringContour()), openContour());
+    const g = addContour(
+      addContour(glyph("x", { unicodes: [0x78] }), ringContour()),
+      openContour(),
+    );
     expect(structuredClone(g)).toEqual(g);
     expect(JSON.parse(JSON.stringify(g))).toEqual(g);
   });

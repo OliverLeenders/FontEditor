@@ -92,8 +92,12 @@ describe("neighbours", () => {
       ...base,
       neighbours: [{ glyph: box("a", 50, 300, 350), x: -350 }],
     });
-    const neighbourAt = ctx.indexWhere((o) => o.op === "fill" && o.fillStyle === LIGHT_PALETTE.neighbour);
-    const outlineAt = ctx.indexWhere((o) => o.op === "stroke" && o.strokeStyle === LIGHT_PALETTE.outline);
+    const neighbourAt = ctx.indexWhere(
+      (o) => o.op === "fill" && o.fillStyle === LIGHT_PALETTE.neighbour,
+    );
+    const outlineAt = ctx.indexWhere(
+      (o) => o.op === "stroke" && o.strokeStyle === LIGHT_PALETTE.outline,
+    );
     expect(neighbourAt).toBeGreaterThanOrEqual(0);
     expect(neighbourAt).toBeLessThan(outlineAt);
   });

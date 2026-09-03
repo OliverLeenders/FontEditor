@@ -1,10 +1,23 @@
-import { counterIds, fontDocument, glyph, glyphBounds, orderedGlyphs } from "@fonteditor/font-model";
+import {
+  counterIds,
+  fontDocument,
+  glyph,
+  glyphBounds,
+  orderedGlyphs,
+} from "@fonteditor/font-model";
 import { vec } from "@fonteditor/geometry";
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import { pointerInput } from "../src/input.js";
-import { cancel, pointerDown, pointerLeave, pointerMove, pointerUp, shapeRect } from "../src/shape.js";
+import {
+  cancel,
+  pointerDown,
+  pointerLeave,
+  pointerMove,
+  pointerUp,
+  shapeRect,
+} from "../src/shape.js";
 import { type EditorState, editorState } from "../src/state.js";
 
 const VIEW: ViewTransform = { scale: 1, tx: 0, ty: 0 };

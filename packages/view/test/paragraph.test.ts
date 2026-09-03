@@ -9,9 +9,10 @@ import { layoutParagraph, paragraphWidth } from "../src/run.js";
  */
 const font = () =>
   fontDocument(
-    "abcdefghijklmnopqrstuvwxyz".split("").map((c, i) =>
-      glyph(c, { unicodes: [0x61 + i], advance: 100 }),
-    ).concat([glyph("space", { unicodes: [0x20], advance: 50 })]),
+    "abcdefghijklmnopqrstuvwxyz"
+      .split("")
+      .map((c, i) => glyph(c, { unicodes: [0x61 + i], advance: 100 }))
+      .concat([glyph("space", { unicodes: [0x20], advance: 50 })]),
   );
 
 const LEADING = 1200;

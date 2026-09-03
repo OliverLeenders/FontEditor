@@ -67,9 +67,10 @@ export function pointerDown(
 
   const first = open.nodes[0];
   const closing =
-    first !== undefined
-    && open.nodes.length >= 2
-    && distance(input.point, first.pt) <= screenTolerance(state.view, options.closePixels ?? DEFAULT_CLOSE_PIXELS);
+    first !== undefined &&
+    open.nodes.length >= 2 &&
+    distance(input.point, first.pt) <=
+      screenTolerance(state.view, options.closePixels ?? DEFAULT_CLOSE_PIXELS);
 
   if (closing) {
     const document = editCurrentGlyph(state, (g) =>
@@ -87,7 +88,9 @@ export function pointerDown(
   }
 
   const placed = node(ids.node(), input.point);
-  const document = editCurrentGlyph(state, (g) => updateContour(g, open.id, (c) => appendNode(c, placed)));
+  const document = editCurrentGlyph(state, (g) =>
+    updateContour(g, open.id, (c) => appendNode(c, placed)),
+  );
   if (document === null) return result(base);
 
   return result(
@@ -151,13 +154,13 @@ export function pointerMove(
 
   const document = updateGlyph(state.document, state.currentGlyph, (g) =>
     updateContour(g, pen.contourId, (contourValue) => {
-    const index = contourValue.nodes.findIndex((n) => n.id === pen.lastNodeId);
-    if (index < 0) return null;
-    const existing = contourValue.nodes[index]!;
-    const nodes = contourValue.nodes.slice();
-    nodes[index] = input.modifiers.alt
-      ? { ...existing, type: "corner", out: input.point }
-      : { ...existing, type: "smooth", out: input.point, in: mirrored };
+      const index = contourValue.nodes.findIndex((n) => n.id === pen.lastNodeId);
+      if (index < 0) return null;
+      const existing = contourValue.nodes[index]!;
+      const nodes = contourValue.nodes.slice();
+      nodes[index] = input.modifiers.alt
+        ? { ...existing, type: "corner", out: input.point }
+        : { ...existing, type: "smooth", out: input.point, in: mirrored };
       return { ...contourValue, nodes };
     }),
   );
@@ -239,10 +242,10 @@ function takeBackPoint(state: EditorState): ToolResult {
 
   if (c.nodes.length <= 1) {
     const document = editCurrentGlyph(state, (g) => removeContour(g, pen.contourId));
-    return result(
-      { ...state, document: document ?? state.document, pen: null },
-      [begin("Remove point", false), commit],
-    );
+    return result({ ...state, document: document ?? state.document, pen: null }, [
+      begin("Remove point", false),
+      commit,
+    ]);
   }
 
   const last = c.nodes[c.nodes.length - 1]!;

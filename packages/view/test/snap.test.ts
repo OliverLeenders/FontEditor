@@ -56,12 +56,22 @@ describe("snapPoint", () => {
   });
 
   it("takes the nearer of two lines in reach", () => {
-    const close: Snapping = { ...strict, ys: [metricLine(100), metricLine(106)], enter: 20, stay: 20 };
+    const close: Snapping = {
+      ...strict,
+      ys: [metricLine(100), metricLine(106)],
+      enter: 20,
+      stay: 20,
+    };
     expect(snapPoint(at(0, 105), close).point.y).toBe(106);
   });
 
   it("prefers the line listed first when two are equally near", () => {
-    const tied: Snapping = { ...strict, ys: [metricLine(100), metricLine(110)], enter: 20, stay: 20 };
+    const tied: Snapping = {
+      ...strict,
+      ys: [metricLine(100), metricLine(110)],
+      enter: 20,
+      stay: 20,
+    };
     expect(snapPoint(at(0, 105), tied).point.y).toBe(100);
   });
 

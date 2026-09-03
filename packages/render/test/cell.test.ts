@@ -14,17 +14,16 @@ const square = glyph("A", {
   contours: [
     contour(
       "c1",
-      [
-        node("n1", { x: 100, y: 0 }),
-        node("n2", { x: 400, y: 0 }),
-        node("n3", { x: 400, y: 700 }),
-      ],
+      [node("n1", { x: 100, y: 0 }), node("n2", { x: 400, y: 0 }), node("n3", { x: 400, y: 700 })],
       true,
     ),
   ],
 });
 
-const draw = (g: typeof square | null, state: Partial<Parameters<typeof drawGlyphCell>[5]> = {}) => {
+const draw = (
+  g: typeof square | null,
+  state: Partial<Parameters<typeof drawGlyphCell>[5]> = {},
+) => {
   const ctx = new RecordingContext();
   drawGlyphCell(ctx, g, box, LIGHT_PALETTE, metrics, {
     name: "A",
@@ -79,7 +78,10 @@ describe("drawGlyphCell", () => {
 
   it("keeps the outline clear of the label strip", () => {
     const ctx = draw(square);
-    const ys = ctx.all("moveTo").concat(ctx.all("lineTo")).map((o) => o.args[1] ?? 0);
+    const ys = ctx
+      .all("moveTo")
+      .concat(ctx.all("lineTo"))
+      .map((o) => o.args[1] ?? 0);
     // 26px of the 92px cell is reserved for the name and code point.
     expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height - 26);
   });

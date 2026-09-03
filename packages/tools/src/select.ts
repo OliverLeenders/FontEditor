@@ -221,8 +221,8 @@ export function keyDown(
   if (state.gesture !== null) return result(state);
 
   const size = input.modifiers.shift
-    ? options.largeNudge ?? DEFAULT_LARGE_NUDGE
-    : options.nudge ?? DEFAULT_NUDGE;
+    ? (options.largeNudge ?? DEFAULT_LARGE_NUDGE)
+    : (options.nudge ?? DEFAULT_NUDGE);
 
   const document = editCurrentGlyph(state, (g) =>
     translateSelection(g, state.selection, { x: step.x * size, y: step.y * size }),

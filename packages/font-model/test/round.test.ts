@@ -15,18 +15,26 @@ const fractional = () =>
   contour(
     ids.contour(),
     [
-      node(ids.node(), { x: 100.4, y: 200.6 }, {
-        type: "smooth",
-        in: { x: 50.2, y: 200.6 },
-        out: { x: 150.7, y: 200.6 },
-      }),
+      node(
+        ids.node(),
+        { x: 100.4, y: 200.6 },
+        {
+          type: "smooth",
+          in: { x: 50.2, y: 200.6 },
+          out: { x: 150.7, y: 200.6 },
+        },
+      ),
       node(ids.node(), { x: 300.5, y: 400.5 }),
     ],
     false,
   );
 
 const whole = () =>
-  contour(ids.contour(), [node(ids.node(), { x: 100, y: 200 }), node(ids.node(), { x: 300, y: 0 })], false);
+  contour(
+    ids.contour(),
+    [node(ids.node(), { x: 100, y: 200 }), node(ids.node(), { x: 300, y: 0 })],
+    false,
+  );
 
 describe("roundGlyph", () => {
   it("puts anchors and handles on whole units", () => {
@@ -132,10 +140,7 @@ describe("roundFont", () => {
 
 describe("unroundedGlyphs", () => {
   it("counts only the glyphs that would change", () => {
-    const d = fontDocument([
-      addContour(glyph("a"), fractional()),
-      addContour(glyph("b"), whole()),
-    ]);
+    const d = fontDocument([addContour(glyph("a"), fractional()), addContour(glyph("b"), whole())]);
     expect(unroundedGlyphs(d)).toBe(1);
   });
 

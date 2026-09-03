@@ -27,7 +27,6 @@ import {
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
-
 import { history, push } from "../src/history.js";
 import {
   type EditSession,
@@ -236,7 +235,10 @@ describe("Tunni edits", () => {
     const { s, c } = start();
     const tunni = segmentTunniPoint(c, 0)!;
     const awake = apply(s, pointerMove(s.editor, pointerInput(tunni)));
-    const dragged = drag(awake, tunni, [vec(tunni.x - 10, tunni.y - 20), vec(tunni.x - 20, tunni.y - 40)]);
+    const dragged = drag(awake, tunni, [
+      vec(tunni.x - 10, tunni.y - 20),
+      vec(tunni.x - 20, tunni.y - 40),
+    ]);
 
     expect(dragged.history.entries).toHaveLength(1);
     expect(dragged.history.entries[0]!.label).toBe("Move Tunni point");
@@ -255,11 +257,7 @@ describe("Tunni edits", () => {
     const lopsided = drag(awake, tunni, [vec(tunni.x - 25, tunni.y - 45)], 1000);
     const skewed = segmentTunniPoint(firstGlyph(lopsided.editor.document).contours[0]!, 0)!;
 
-    const balanced = apply(
-      lopsided,
-      doubleClick(lopsided.editor, pointerInput(skewed)),
-      50000,
-    );
+    const balanced = apply(lopsided, doubleClick(lopsided.editor, pointerInput(skewed)), 50000);
     expect(balanced.history.entries).toHaveLength(2);
     expect(balanced.history.entries[1]!.label).toBe("Balance segment");
 

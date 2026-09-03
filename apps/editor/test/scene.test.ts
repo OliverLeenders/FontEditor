@@ -71,9 +71,7 @@ describe("neighboursFor", () => {
     // consistently, or the context would jump as you type.
     const first = neighboursFor(doc(), "l", "hello");
     const again = neighboursFor(doc(), "l", "hello");
-    expect(first.map((n) => [n.glyph.name, n.x])).toEqual(
-      again.map((n) => [n.glyph.name, n.x]),
-    );
+    expect(first.map((n) => [n.glyph.name, n.x])).toEqual(again.map((n) => [n.glyph.name, n.x]));
   });
 });
 

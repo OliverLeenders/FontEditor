@@ -119,9 +119,7 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
 
   // A shorter line must not leave the selection pointing past its end.
   useEffect(() => {
-    setSelected((current) =>
-      current === null || current < run.glyphs.length ? current : null,
-    );
+    setSelected((current) => (current === null || current < run.glyphs.length ? current : null));
   }, [run.glyphs.length]);
 
   /** Screen point to a run index, through the same transform the canvas drew with. */
@@ -147,7 +145,8 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
 
   // In kern mode the selection means the gap *before* the selected letter, so
   // the pair is it and the one preceding it.
-  const previousName = selected === null || selected === 0 ? null : (run.glyphs[selected - 1]?.name ?? null);
+  const previousName =
+    selected === null || selected === 0 ? null : (run.glyphs[selected - 1]?.name ?? null);
   const pair =
     previousName === null || selectedName === null
       ? null
@@ -306,9 +305,7 @@ export function SpacingView({ onOpenGlyph }: { onOpenGlyph: (name: string) => vo
               </>
             )}
             {bands.length > 1 ? (
-              <span className={styles.hint}>
-                {bands.length} occurrences, all moving together
-              </span>
+              <span className={styles.hint}>{bands.length} occurrences, all moving together</span>
             ) : null}
           </>
         )}

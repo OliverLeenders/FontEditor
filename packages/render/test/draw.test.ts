@@ -42,11 +42,7 @@ function triangle(): Contour {
   const ids = counterIds("t");
   return contour(
     ids.contour(),
-    [
-      node(ids.node(), vec(0, 0)),
-      node(ids.node(), vec(300, 0)),
-      node(ids.node(), vec(150, 260)),
-    ],
+    [node(ids.node(), vec(0, 0)), node(ids.node(), vec(300, 0)), node(ids.node(), vec(150, 260))],
     true,
   );
 }
@@ -71,7 +67,9 @@ describe("layer order", () => {
     const ctx = render({ ...base(ring()) });
 
     const fill = ctx.indexWhere((o) => o.op === "fill" && o.fillStyle === LIGHT_PALETTE.fill);
-    const outline = ctx.indexWhere((o) => o.op === "stroke" && o.strokeStyle === LIGHT_PALETTE.outline);
+    const outline = ctx.indexWhere(
+      (o) => o.op === "stroke" && o.strokeStyle === LIGHT_PALETTE.outline,
+    );
     const nodes = ctx.indexWhere((o) => o.op === "fill" && o.fillStyle === LIGHT_PALETTE.node);
 
     expect(fill).toBeGreaterThanOrEqual(0);
@@ -275,7 +273,9 @@ describe("nodes and handles", () => {
     const corner = toScreen(VIEW, vec(0, 0));
     const smooth = toScreen(VIEW, vec(300, 0));
 
-    const squares = ctx.all("rect").filter((o) => Math.abs((o.args[0] ?? NaN) + 5.5 - corner.x) < 0.5);
+    const squares = ctx
+      .all("rect")
+      .filter((o) => Math.abs((o.args[0] ?? NaN) + 5.5 - corner.x) < 0.5);
     expect(squares.length).toBeGreaterThan(0);
     expect(ctx.arcsAt(smooth.x, smooth.y).length).toBeGreaterThan(0);
   });
@@ -424,9 +424,9 @@ describe("snap guides", () => {
     const ctx = render(caught(null));
     const y = toScreen(VIEW, { x: 0, y: 250 }).y;
     // Half-pixel offset, as the metric lines take.
-    expect(ctx.all("moveTo").some((o) => Math.abs((o.args[1] ?? NaN) - (Math.round(y) + 0.5)) < 0.01)).toBe(
-      true,
-    );
+    expect(
+      ctx.all("moveTo").some((o) => Math.abs((o.args[1] ?? NaN) - (Math.round(y) + 0.5)) < 0.01),
+    ).toBe(true);
   });
 
   it("rings the point that produced it", () => {
@@ -434,7 +434,9 @@ describe("snap guides", () => {
     const ctx = render(caught(from));
     const p = toScreen(VIEW, from);
     // Wider than a node, so it haloes the node rather than hiding under it.
-    expect(ctx.arcsAt(p.x, p.y).some((o) => (o.args[2] ?? 0) > DEFAULT_METRICS.nodeRadius)).toBe(true);
+    expect(ctx.arcsAt(p.x, p.y).some((o) => (o.args[2] ?? 0) > DEFAULT_METRICS.nodeRadius)).toBe(
+      true,
+    );
   });
 
   it("rings nothing for a line the font defines", () => {
@@ -460,14 +462,23 @@ describe("the mark on a locked handle", () => {
     contour(
       ids.contour(),
       [
-        node(ids.node(), vec(0, 0), { type: "corner", in: vec(-120, 0), out: vec(0, 120), hvLock: lock }),
+        node(ids.node(), vec(0, 0), {
+          type: "corner",
+          in: vec(-120, 0),
+          out: vec(0, 120),
+          hvLock: lock,
+        }),
         node(ids.node(), vec(300, 0), { type: "corner", in: vec(240, 40) }),
       ],
       false,
     );
 
   const strokesNear = (ctx: ReturnType<typeof render>, x: number, y: number) =>
-    ctx.all("moveTo").filter((o) => Math.abs((o.args[0] ?? NaN) - x) < 12 && Math.abs((o.args[1] ?? NaN) - y) < 12);
+    ctx
+      .all("moveTo")
+      .filter(
+        (o) => Math.abs((o.args[0] ?? NaN) - x) < 12 && Math.abs((o.args[1] ?? NaN) - y) < 12,
+      );
 
   it("marks nothing when no handle is locked", () => {
     const free = render(base(withLock({})));

@@ -4,31 +4,36 @@
   gap: 0;
   background: var(--surface-2);
   border-bottom: 1px solid var(--rule);
-  padding: 0 .35rem;
+  padding: 0 0.35rem;
 }
 
 .tab {
   appearance: none;
   border: 0;
   background: none;
-  padding: .45rem .8rem;
+  padding: 0.45rem 0.8rem;
   cursor: pointer;
   color: var(--ink-2);
   border-bottom: 2px solid transparent;
   display: flex;
   align-items: baseline;
-  gap: .4rem;
+  gap: 0.4rem;
 }
-.tab:hover:not(:disabled) { color: var(--ink); }
+.tab:hover:not(:disabled) {
+  color: var(--ink);
+}
 .tab[aria-current="page"] {
   color: var(--ink);
   font-weight: 500;
   border-bottom-color: var(--accent);
 }
-.tab:disabled { opacity: .38; cursor: default; }
+.tab:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
 
 .detail {
   font-family: var(--font-mono);
-  font-size: .72rem;
+  font-size: 0.72rem;
   color: var(--accent);
 }

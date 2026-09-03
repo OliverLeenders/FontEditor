@@ -1,6 +1,5 @@
 import type { FontDocument } from "@fonteditor/font-model";
 
-
 /**
  * Decides *when* to write, having been told *what* changed.
  *

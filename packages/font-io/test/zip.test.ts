@@ -55,8 +55,8 @@ describe("crc32", () => {
 describe("zip", () => {
   const sample = [
     { path: "metainfo.plist", text: "<plist/>" },
-    { path: "glyphs/o.glif", text: "<glyph name=\"o\"/>" },
-    { path: "glyphs/A_.glif", text: "<glyph name=\"A\"/>" },
+    { path: "glyphs/o.glif", text: '<glyph name="o"/>' },
+    { path: "glyphs/A_.glif", text: '<glyph name="A"/>' },
   ];
 
   it("starts with a local file header", () => {

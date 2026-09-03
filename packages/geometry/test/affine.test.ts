@@ -46,10 +46,21 @@ describe("composeAffine", () => {
   it("agrees with applying the two in turn", () => {
     // The property that matters: composing once must equal transforming twice,
     // or a nested component lands somewhere its own placement never asked for.
-    const inner = { xScale: 2, xyScale: 0.25, yxScale: -0.5, yScale: 1.5, xOffset: 30, yOffset: -10 };
+    const inner = {
+      xScale: 2,
+      xyScale: 0.25,
+      yxScale: -0.5,
+      yScale: 1.5,
+      xOffset: 30,
+      yOffset: -10,
+    };
     const outer = { xScale: -1, xyScale: 0.1, yxScale: 0.2, yScale: 0.5, xOffset: -5, yOffset: 12 };
 
-    for (const point of [{ x: 0, y: 0 }, { x: 10, y: 20 }, { x: -33, y: 7.5 }]) {
+    for (const point of [
+      { x: 0, y: 0 },
+      { x: 10, y: 20 },
+      { x: -33, y: 7.5 },
+    ]) {
       const twice = applyAffine(outer, applyAffine(inner, point));
       const once = applyAffine(composeAffine(outer, inner), point);
       expect(once.x).toBeCloseTo(twice.x, 10);

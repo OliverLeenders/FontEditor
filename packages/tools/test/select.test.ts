@@ -17,7 +17,6 @@ import {
 import type { Selection, ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
-
 import { pointerInput, keyInput } from "../src/input.js";
 import {
   cancel,
@@ -28,7 +27,13 @@ import {
   pointerMove,
   pointerUp,
 } from "../src/select.js";
-import { type EditorState, currentGlyph, editorState, marqueeRect, tunniSegments } from "../src/state.js";
+import {
+  type EditorState,
+  currentGlyph,
+  editorState,
+  marqueeRect,
+  tunniSegments,
+} from "../src/state.js";
 
 /** The document holds many glyphs now; these tests each work with one. */
 const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
@@ -132,7 +137,11 @@ describe("focus", () => {
 
     // Segment 0 is still focused, so its controls are still shown…
     expect(s.focusedSegment!.segmentIndex).toBe(0);
-    expect(tunniSegments(s).map((ref) => ref.segmentIndex).sort()).toEqual([0, 1]);
+    expect(
+      tunniSegments(s)
+        .map((ref) => ref.segmentIndex)
+        .sort(),
+    ).toEqual([0, 1]);
 
     // …and, crucially, still grabbable.
     const stillThere = segmentTunniPoint(firstGlyph(s.document).contours[0]!, 0)!;
@@ -222,9 +231,7 @@ describe("selecting", () => {
   it("selects a node on click", () => {
     const { state, contour: c } = start();
     const next = pointerDown(state, pointerInput(vec(100, 480))).state;
-    expect(next.selection).toEqual([
-      { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" },
-    ]);
+    expect(next.selection).toEqual([{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }]);
   });
 
   // Handles are selectable in their own right, so they can be nudged and drawn
@@ -232,9 +239,7 @@ describe("selecting", () => {
   it("selects a handle as a thing in itself", () => {
     const { state, contour: c } = start();
     const next = pointerDown(state, pointerInput(vec(100, 632))).state;
-    expect(next.selection).toEqual([
-      { contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" },
-    ]);
+    expect(next.selection).toEqual([{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" }]);
   });
 
   it("replaces the selection on a plain click", () => {
@@ -300,9 +305,7 @@ describe("marquee", () => {
     const { state, contour: c } = start();
     let s = pointerDown(state, pointerInput(vec(60, 600))).state;
     s = pointerMove(s, pointerInput(vec(140, 680))).state;
-    expect(s.selection).toEqual([
-      { contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" },
-    ]);
+    expect(s.selection).toEqual([{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" }]);
   });
 
   it("adds to the existing selection when shift is held", () => {
@@ -377,8 +380,7 @@ describe("dragging", () => {
 });
 
 describe("Tunni gestures", () => {
-  const wake = (s: EditorState, p: ReturnType<typeof vec>) =>
-    pointerMove(s, pointerInput(p)).state;
+  const wake = (s: EditorState, p: ReturnType<typeof vec>) => pointerMove(s, pointerInput(p)).state;
 
   it("drags the Tunni point and leaves it where it was put", () => {
     const { state, contour: c } = start();
@@ -418,7 +420,10 @@ describe("Tunni gestures", () => {
     const a = seg.nodes[0]!.pt;
     const b = seg.nodes[1]!.pt;
     const chord = { x: b.x - a.x, y: b.y - a.y };
-    const line = { x: seg.nodes[1]!.in!.x - seg.nodes[0]!.out!.x, y: seg.nodes[1]!.in!.y - seg.nodes[0]!.out!.y };
+    const line = {
+      x: seg.nodes[1]!.in!.x - seg.nodes[0]!.out!.x,
+      y: seg.nodes[1]!.in!.y - seg.nodes[0]!.out!.y,
+    };
     const scale = Math.hypot(chord.x, chord.y) * Math.hypot(line.x, line.y);
     expect(Math.abs(chord.x * line.y - chord.y * line.x) / scale).toBeLessThan(1e-9);
   });
@@ -647,7 +652,11 @@ describe("snapping", () => {
   }
 
   /** Select that node and drag it by the given offset, ending the gesture. */
-  function dragBy(state: EditorState, from: { x: number; y: number }, by: { x: number; y: number }) {
+  function dragBy(
+    state: EditorState,
+    from: { x: number; y: number },
+    by: { x: number; y: number },
+  ) {
     let s = pointerDown(state, pointerInput(vec(from.x, from.y))).state;
     s = pointerMove(s, pointerInput(vec(from.x + by.x, from.y + by.y))).state;
     return pointerUp(s).state;
@@ -754,9 +763,7 @@ describe("point-to-point snapping", () => {
     const loose = contour(ids.contour(), [node(ids.node(), vec(300, 300))], false);
     return {
       state: editorState({
-        document: fontDocument([
-          addContour(addContour(glyph("n", { advance: 640 }), left), loose),
-        ]),
+        document: fontDocument([addContour(addContour(glyph("n", { advance: 640 }), left), loose)]),
         view: VIEW,
       }),
       loose,
@@ -795,7 +802,11 @@ describe("point-to-point snapping", () => {
     // that segment exactly upright.
     const c = contour(
       ids.contour(),
-      [node(ids.node(), vec(200, 0)), node(ids.node(), vec(300, 350)), node(ids.node(), vec(500, 700))],
+      [
+        node(ids.node(), vec(200, 0)),
+        node(ids.node(), vec(300, 350)),
+        node(ids.node(), vec(500, 700)),
+      ],
       false,
     );
     const state = editorState({

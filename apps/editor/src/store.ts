@@ -164,7 +164,9 @@ export class EditorStore {
 
   constructor() {
     this.state = {
-      session: newSession(editorState({ document: starterFont(), view: { scale: 1, tx: 0, ty: 0 } })),
+      session: newSession(
+        editorState({ document: starterFont(), view: { scale: 1, tx: 0, ty: 0 } }),
+      ),
       saveStatus: "idle",
       storage: "connecting",
       storageDetail: "",
@@ -381,7 +383,9 @@ export class EditorStore {
 
     return {
       document: out.document,
-      warnings: out.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
+      warnings: out.warnings.map((w) =>
+        w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
+      ),
     };
   }
 
@@ -432,7 +436,9 @@ export class EditorStore {
 
   setOutlineWidth(outlineWidth: number): void {
     if (!Number.isFinite(outlineWidth)) return;
-    this.patch({ outlineWidth: Math.min(MAX_OUTLINE_WIDTH, Math.max(MIN_OUTLINE_WIDTH, outlineWidth)) });
+    this.patch({
+      outlineWidth: Math.min(MAX_OUTLINE_WIDTH, Math.max(MIN_OUTLINE_WIDTH, outlineWidth)),
+    });
   }
 
   setSpacingText(spacingText: string): void {
@@ -452,9 +458,7 @@ export class EditorStore {
   setFeatures(features: string): void {
     const document = setFeatures(this.editor.document, features);
     if (document === this.editor.document) return;
-    this.applyTool(
-      result({ ...this.editor, document }, [begin("Edit features"), commit]),
-    );
+    this.applyTool(result({ ...this.editor, document }, [begin("Edit features"), commit]));
   }
 
   setProofText(proofText: string): void {

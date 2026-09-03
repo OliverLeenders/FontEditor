@@ -8,22 +8,31 @@
       :root {
         color-scheme: light dark;
         --ink: #131922;
-        --muted: #55616F;
-        --rule: #DCE3EA;
+        --muted: #55616f;
+        --rule: #dce3ea;
         --panel: rgba(255, 255, 255, 0.86);
       }
       @media (prefers-color-scheme: dark) {
         :root {
-          --ink: #E5EBF2;
-          --muted: #98A6B6;
-          --rule: #232D38;
+          --ink: #e5ebf2;
+          --muted: #98a6b6;
+          --rule: #232d38;
           --panel: rgba(21, 28, 36, 0.86);
         }
       }
 
-      html, body { height: 100%; margin: 0; }
+      html,
       body {
-        font: 13px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+        height: 100%;
+        margin: 0;
+      }
+      body {
+        font:
+          13px/1.5 "IBM Plex Sans",
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
         color: var(--ink);
         overflow: hidden;
       }
@@ -52,7 +61,10 @@
         color: var(--muted);
         user-select: none;
       }
-      #status b { color: var(--ink); font-weight: 500; }
+      #status b {
+        color: var(--ink);
+        font-weight: 500;
+      }
     </style>
   </head>
   <body>

@@ -9,8 +9,8 @@
 .bar {
   display: flex;
   align-items: center;
-  gap: .8rem;
-  padding: .5rem .7rem;
+  gap: 0.8rem;
+  padding: 0.5rem 0.7rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
 }
@@ -19,33 +19,38 @@
 .text {
   flex: 1;
   min-width: 0;
-  padding: .3rem .6rem;
+  padding: 0.3rem 0.6rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: .9rem;
-  letter-spacing: .04em;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
 }
-.text:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.text:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
 
 .sizeLabel {
   display: flex;
   align-items: center;
-  gap: .45rem;
+  gap: 0.45rem;
   flex: none;
-  font-size: .76rem;
+  font-size: 0.76rem;
   color: var(--ink-2);
 }
 
-.size { width: 8rem; }
+.size {
+  width: 8rem;
+}
 
 .sizeValue {
   min-width: 2.2rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-size: .76rem;
+  font-size: 0.76rem;
   color: var(--ink-2);
 }
 
@@ -54,39 +59,51 @@
   min-height: 0;
   overflow: hidden;
 }
-.stage:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.stage:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
 
-.canvas { display: block; width: 100%; height: 100%; }
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
 .readout {
   display: flex;
   align-items: baseline;
   gap: 1.1rem;
-  padding: .45rem .8rem;
+  padding: 0.45rem 0.8rem;
   border-top: 1px solid var(--rule);
   background: var(--surface);
-  font-size: .78rem;
+  font-size: 0.78rem;
   color: var(--ink-2);
   min-height: 1.9rem;
 }
 
 .name {
   font-family: var(--font-mono);
-  font-size: .82rem;
+  font-size: 0.82rem;
   color: var(--ink);
 }
 
-.value { font-variant-numeric: tabular-nums; color: var(--ink); }
+.value {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
 
 .valueLabel {
   color: var(--ink-2);
-  margin-right: .35rem;
-  font-size: .72rem;
+  margin-right: 0.35rem;
+  font-size: 0.72rem;
   text-transform: uppercase;
-  letter-spacing: .06em;
+  letter-spacing: 0.06em;
 }
 
-.hint { color: var(--ink-3, var(--ink-2)); }
+.hint {
+  color: var(--ink-3, var(--ink-2));
+}
 
 /* Two exclusive modes, so they read as one control rather than two buttons. */
 .modes {
@@ -98,29 +115,36 @@
 }
 
 .modes button {
-  padding: .25rem .6rem;
+  padding: 0.25rem 0.6rem;
   border: 0;
   background: var(--canvas);
   color: var(--ink-2);
   cursor: pointer;
   font: inherit;
-  font-size: .76rem;
+  font-size: 0.76rem;
 }
-.modes button + button { border-left: 1px solid var(--rule-strong); }
-.modes button:hover { color: var(--ink); }
+.modes button + button {
+  border-left: 1px solid var(--rule-strong);
+}
+.modes button:hover {
+  color: var(--ink);
+}
 .modes button[aria-pressed="true"] {
   background: var(--accent);
   color: var(--surface);
 }
 
 .breakOut {
-  padding: .1rem .45rem;
+  padding: 0.1rem 0.45rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background: none;
   color: var(--ink-2);
   cursor: pointer;
   font: inherit;
-  font-size: .72rem;
+  font-size: 0.72rem;
 }
-.breakOut:hover { color: var(--ink); border-color: var(--accent); }
+.breakOut:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}

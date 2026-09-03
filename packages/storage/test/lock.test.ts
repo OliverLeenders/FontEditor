@@ -28,13 +28,10 @@ class FakeLocks implements LockManagerLike {
 
     return new Promise((resolve, reject) => {
       this.holder = { reject };
-      void callback({ name }).then(
-        () => {
-          this.holder = null;
-          resolve(undefined);
-        },
-        reject,
-      );
+      void callback({ name }).then(() => {
+        this.holder = null;
+        resolve(undefined);
+      }, reject);
     });
   }
 

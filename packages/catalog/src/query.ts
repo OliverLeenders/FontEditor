@@ -37,13 +37,11 @@ const STATE_SETS: readonly GlyphSet[] = [
 /** Every set the browser can filter by: states first, then Unicode blocks. */
 export const GLYPH_SETS: readonly GlyphSet[] = [
   ...STATE_SETS,
-  ...UNICODE_BLOCKS.map(
-    (block): GlyphSet => ({
-      id: `block:${block.id}`,
-      label: block.label,
-      includes: (e) => e.block?.id === block.id,
-    }),
-  ),
+  ...UNICODE_BLOCKS.map((block): GlyphSet => ({
+    id: `block:${block.id}`,
+    label: block.label,
+    includes: (e) => e.block?.id === block.id,
+  })),
 ];
 
 export function glyphSet(id: string): GlyphSet | null {

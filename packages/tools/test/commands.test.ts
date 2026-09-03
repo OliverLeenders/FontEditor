@@ -498,11 +498,7 @@ describe("createGlyphs", () => {
   });
 
   it("skips the ones that exist and adds the rest", () => {
-    const { state } = createGlyphs(
-      start(),
-      [{ name: "a" }, { name: "b" }, { name: "c" }],
-      500,
-    );
+    const { state } = createGlyphs(start(), [{ name: "a" }, { name: "b" }, { name: "c" }], 500);
     expect(state.document.glyphOrder).toEqual(["a", "b", "c"]);
   });
 
@@ -758,7 +754,11 @@ describe("rounding a glyph and a selection", () => {
     contour(
       ids.contour(),
       [
-        node(ids.node(), vec(10.4, 20.6), { type: "corner", in: vec(5.5, 20.6), out: vec(15.7, 20.6) }),
+        node(ids.node(), vec(10.4, 20.6), {
+          type: "corner",
+          in: vec(5.5, 20.6),
+          out: vec(15.7, 20.6),
+        }),
         node(ids.node(), vec(200.5, 300.5)),
       ],
       false,

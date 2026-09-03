@@ -92,10 +92,10 @@ export function push(h: History, entry: HistoryEntry, options: PushOptions = {})
   const previous = kept[kept.length - 1];
 
   const mergeable =
-    previous !== undefined
-    && previous.label === entry.label
-    && entry.at - previous.at <= coalesceMs
-    && previous.after === entry.before;
+    previous !== undefined &&
+    previous.label === entry.label &&
+    entry.at - previous.at <= coalesceMs &&
+    previous.after === entry.before;
 
   if (mergeable) {
     const merged: HistoryEntry = {

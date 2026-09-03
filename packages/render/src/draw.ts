@@ -277,9 +277,7 @@ export function drawHandles(ctx: Canvas2D, s: Scene): void {
         if (handle === null) continue;
         if (!handleIsVisible(c, nodeIndex, part, visibility)) continue;
         const p = toScreen(s.view, handle);
-        const isChosen = chosen.has(
-          selectionKey({ contourId: c.id, nodeId: n.id, part }),
-        );
+        const isChosen = chosen.has(selectionKey({ contourId: c.id, nodeId: n.id, part }));
 
         ctx.strokeStyle = s.palette.handleLine;
         ctx.lineWidth = s.metrics.handleLineWidth;
@@ -685,7 +683,6 @@ export function formatCodePoint(codePoint: number): string {
   return `U+${codePoint.toString(16).toUpperCase().padStart(4, "0")}`;
 }
 
-
 /**
  * The origin and advance lines, which bound the glyph's advance width.
  *
@@ -742,7 +739,6 @@ export function drawNeighbours(ctx: Canvas2D, s: Scene): void {
   }
   ctx.restore();
 }
-
 
 /**
  * The outlines this glyph's components contribute.

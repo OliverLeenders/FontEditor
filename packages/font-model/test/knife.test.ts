@@ -11,7 +11,10 @@ const at = (x: number, y: number) => ({ x, y });
 
 /** A 400 x 400 square from (0,0) to (400,400). */
 const square = () =>
-  glyph("a", { advance: 500, contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 400, maxY: 400 })] });
+  glyph("a", {
+    advance: 500,
+    contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 400, maxY: 400 })],
+  });
 
 /** A ring: a big circle with a smaller one inside it, as an `o` is. */
 const ring = () =>
@@ -131,7 +134,9 @@ describe("what a cut refuses", () => {
   it("ignores an open contour", () => {
     const open = glyph("v", {
       advance: 400,
-      contours: [{ ...rectContour(ids, { minX: 0, minY: 0, maxX: 200, maxY: 200 }), closed: false }],
+      contours: [
+        { ...rectContour(ids, { minX: 0, minY: 0, maxX: 200, maxY: 200 }), closed: false },
+      ],
     });
     expect(cutGlyph(open, at(-50, 100), at(250, 100), ids)).toBeNull();
   });

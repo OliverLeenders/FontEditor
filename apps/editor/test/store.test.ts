@@ -199,9 +199,7 @@ describe("EditorStore", () => {
 describe("the starter font", () => {
   it("has glyphs with real outlines and sane sidebearings", () => {
     const store = freshStore();
-    const drawn = Object.values(store.editor.document.glyphs).filter(
-      (g) => g.contours.length > 0,
-    );
+    const drawn = Object.values(store.editor.document.glyphs).filter((g) => g.contours.length > 0);
     expect(drawn.length).toBeGreaterThan(0);
 
     for (const g of drawn) {

@@ -50,9 +50,8 @@ export class CanvasSurface {
     this.target = ctx as unknown as Canvas2D;
     this.onFrame = onFrame;
 
-    this.observer = typeof ResizeObserver === "function"
-      ? new ResizeObserver(() => this.resize())
-      : null;
+    this.observer =
+      typeof ResizeObserver === "function" ? new ResizeObserver(() => this.resize()) : null;
     this.observer?.observe(canvas);
 
     this.resize();

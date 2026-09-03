@@ -11,7 +11,10 @@ const at = (x: number, y: number) => ({ x, y });
 
 /** An upright stem 80 wide and 700 tall, starting at x = 100. */
 const stem = () =>
-  glyph("l", { advance: 300, contours: [rectContour(ids, { minX: 100, minY: 0, maxX: 180, maxY: 700 })] });
+  glyph("l", {
+    advance: 300,
+    contours: [rectContour(ids, { minX: 100, minY: 0, maxX: 180, maxY: 700 })],
+  });
 
 /** A ring with a wall 100 units thick all the way round. */
 const ring = () =>

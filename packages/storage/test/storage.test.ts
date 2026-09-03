@@ -64,9 +64,7 @@ function ring(): Contour {
 }
 
 function document(): FontDocument {
-  return fontDocument([
-    addContour(glyph("o", { unicodes: [0x6f], advance: 600 }), ring()),
-  ]);
+  return fontDocument([addContour(glyph("o", { unicodes: [0x6f], advance: 600 }), ring())]);
 }
 
 describe("serialization", () => {
@@ -79,7 +77,10 @@ describe("serialization", () => {
 
   it("keeps a straight segment straight through a round trip", () => {
     const ids = counterIds("t");
-    const line = contour(ids.contour(), [node(ids.node(), vec(0, 0)), node(ids.node(), vec(100, 0))]);
+    const line = contour(ids.contour(), [
+      node(ids.node(), vec(0, 0)),
+      node(ids.node(), vec(100, 0)),
+    ]);
     const g = addContour(glyph("hyphen"), line);
     const decoded = decodeGlyph(encodeGlyph(g));
     expect(decoded.ok).toBe(true);
@@ -471,7 +472,10 @@ describe("autosave", () => {
 
 describe("replaceDocument", () => {
   const font = (names: string[]) =>
-    fontDocument(names.map((n) => glyph(n, { advance: 500 })), DEFAULT_FONT_INFO);
+    fontDocument(
+      names.map((n) => glyph(n, { advance: 500 })),
+      DEFAULT_FONT_INFO,
+    );
 
   it("writes every glyph and the font info", async () => {
     const store = new MemoryFileStore();
@@ -528,7 +532,10 @@ describe("replaceDocument", () => {
 
 describe("abandoning a save when the project is replaced", () => {
   const doc = (names: string[]) =>
-    fontDocument(names.map((n) => glyph(n, { advance: 500 })), DEFAULT_FONT_INFO);
+    fontDocument(
+      names.map((n) => glyph(n, { advance: 500 })),
+      DEFAULT_FONT_INFO,
+    );
 
   /** An autosave whose save blocks until released, like a slow worker call. */
   function blockingAutosave(): {
@@ -548,7 +555,14 @@ describe("abandoning a save when the project is replaced", () => {
           });
         },
       },
-      { debounceMs: 0, setTimer: (fn) => { fn(); return 0; }, clearTimer: () => {} },
+      {
+        debounceMs: 0,
+        setTimer: (fn) => {
+          fn();
+          return 0;
+        },
+        clearTimer: () => {},
+      },
     );
     return { autosave, written, release: () => release() };
   }
@@ -608,7 +622,14 @@ describe("abandoning a save when the project is replaced", () => {
     const written: string[][] = [];
     const autosave = new Autosave(
       { journal: async () => {}, save: async (d) => void written.push([...d.glyphOrder]) },
-      { debounceMs: 0, setTimer: (fn) => { fn(); return 0; }, clearTimer: () => {} },
+      {
+        debounceMs: 0,
+        setTimer: (fn) => {
+          fn();
+          return 0;
+        },
+        clearTimer: () => {},
+      },
     );
 
     autosave.markSaved(doc(["A", "B", "C"]));
@@ -696,10 +717,7 @@ describe("kerning on disk", () => {
 describe("a glyph that is no longer in the font", () => {
   /** Two glyphs, so one can go and leave the other behind. */
   const pair = () =>
-    fontDocument([
-      firstGlyph(document()),
-      glyph("v", { unicodes: [0x76], advance: 480 }),
-    ]);
+    fontDocument([firstGlyph(document()), glyph("v", { unicodes: [0x76], advance: 480 })]);
 
   it("has its file removed, not merely dropped from the index", async () => {
     const store = new MemoryFileStore();

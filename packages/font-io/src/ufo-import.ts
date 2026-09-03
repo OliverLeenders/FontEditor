@@ -154,9 +154,7 @@ function defaultLayer(source: string | null): string {
   // An array of [name, directory] pairs rather than a dict, so the plist reader
   // would give a nested list to walk for one string. The pairing is what is
   // being matched, and matching it directly says so.
-  const match = source.match(
-    /<string>public\.default<\/string>\s*<string>([^<]+)<\/string>/,
-  );
+  const match = source.match(/<string>public\.default<\/string>\s*<string>([^<]+)<\/string>/);
   return match?.[1] ?? "glyphs";
 }
 

@@ -85,16 +85,16 @@ declare module "opentype.js" {
     readonly tables: {
       readonly os2?: { readonly sxHeight?: number; readonly sCapHeight?: number };
       readonly gpos?: unknown;
-    /**
-     * Parsed GSUB, when the font has one. Typed loosely on purpose: what the
-     * tests ask of it is that the lookups our writer produced come back with the
-     * types and tags we gave them, and pinning the whole shape of somebody
-     * else's parse tree would be a second specification to maintain.
-     */
-    readonly gsub?: {
-      readonly features: readonly { readonly tag: string }[];
-      readonly lookups: readonly { readonly lookupType: number }[];
-    };
+      /**
+       * Parsed GSUB, when the font has one. Typed loosely on purpose: what the
+       * tests ask of it is that the lookups our writer produced come back with the
+       * types and tags we gave them, and pinning the whole shape of somebody
+       * else's parse tree would be a second specification to maintain.
+       */
+      readonly gsub?: {
+        readonly features: readonly { readonly tag: string }[];
+        readonly lookups: readonly { readonly lookupType: number }[];
+      };
     };
   }
 

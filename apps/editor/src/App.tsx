@@ -41,8 +41,7 @@ export function App(): JSX.Element {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       const typing =
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLSelectElement;
+        event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement;
 
       // Undo is not a drawing shortcut. Every workspace that edits the document
       // needs it, and gating it on the glyph view left spacing edits with no way
@@ -181,8 +180,8 @@ export function App(): JSX.Element {
       {ownership === "reading" ? (
         <div className={styles.readOnly} role="status">
           <span>
-            This font is open in another tab, which is the one saving. Nothing you
-            change here will be kept.
+            This font is open in another tab, which is the one saving. Nothing you change here will
+            be kept.
           </span>
           <button type="button" onClick={() => void store.takeOver()}>
             Edit here instead

@@ -188,9 +188,15 @@ describe("hoveredSegment", () => {
 
 describe("sameSegment", () => {
   it("compares by contour and index", () => {
-    expect(sameSegment({ contourId: "c1", segmentIndex: 2 }, { contourId: "c1", segmentIndex: 2 })).toBe(true);
-    expect(sameSegment({ contourId: "c1", segmentIndex: 2 }, { contourId: "c1", segmentIndex: 3 })).toBe(false);
-    expect(sameSegment({ contourId: "c1", segmentIndex: 2 }, { contourId: "c2", segmentIndex: 2 })).toBe(false);
+    expect(
+      sameSegment({ contourId: "c1", segmentIndex: 2 }, { contourId: "c1", segmentIndex: 2 }),
+    ).toBe(true);
+    expect(
+      sameSegment({ contourId: "c1", segmentIndex: 2 }, { contourId: "c1", segmentIndex: 3 }),
+    ).toBe(false);
+    expect(
+      sameSegment({ contourId: "c1", segmentIndex: 2 }, { contourId: "c2", segmentIndex: 2 }),
+    ).toBe(false);
   });
 
   it("treats two nulls as the same and one null as different", () => {

@@ -190,9 +190,7 @@ export function pairPosClasses(
 }
 
 /** PairPos format 1: pairs listed per first glyph. Used for the exceptions. */
-export function pairPosGlyphs(
-  pairs: ReadonlyMap<number, ReadonlyMap<number, number>>,
-): Uint8Array {
+export function pairPosGlyphs(pairs: ReadonlyMap<number, ReadonlyMap<number, number>>): Uint8Array {
   const firsts = [...pairs.keys()].sort((a, b) => a - b);
   const coverageBytes = coverage(firsts);
 

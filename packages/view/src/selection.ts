@@ -1,5 +1,11 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
-import { type ContourId, type Glyph, type NodeId, contourById, nodeById } from "@fonteditor/font-model";
+import {
+  type ContourId,
+  type Glyph,
+  type NodeId,
+  contourById,
+  nodeById,
+} from "@fonteditor/font-model";
 
 import type { HitTarget } from "./hit.js";
 

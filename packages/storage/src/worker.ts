@@ -57,7 +57,9 @@ export type OpenStore = (directory: string) => Promise<FileStore>;
  * separating them is what lets a test ask "what would this answer" without a
  * `Worker` to answer into.
  */
-export function storageHandler(open: OpenStore): (request: StorageRequest) => Promise<StorageResponse> {
+export function storageHandler(
+  open: OpenStore,
+): (request: StorageRequest) => Promise<StorageResponse> {
   let store: FileStore | null = null;
 
   const required = (): FileStore => {

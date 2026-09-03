@@ -87,9 +87,7 @@ export function GlyphCanvas({
   const toInput = (event: React.PointerEvent<HTMLCanvasElement> | PointerEvent) => {
     const surface = surfaceRef.current;
     const view = store.editor.view;
-    const point = surface === null
-      ? { x: 0, y: 0 }
-      : toDesign(view, surface.toCanvasPoint(event));
+    const point = surface === null ? { x: 0, y: 0 } : toDesign(view, surface.toCanvasPoint(event));
     return {
       point,
       modifiers: {

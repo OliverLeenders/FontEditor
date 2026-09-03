@@ -57,8 +57,7 @@ describe("totality", () => {
 
         const scales = tunniLambdas(segment);
         expect(
-          scales === null
-            || (Number.isFinite(scales.lambda1) && Number.isFinite(scales.lambda2)),
+          scales === null || (Number.isFinite(scales.lambda1) && Number.isFinite(scales.lambda2)),
         ).toBe(true);
 
         const balanced = balance(segment);
@@ -145,10 +144,12 @@ describe("invariants shared by every Tunni operation", () => {
         fc.property(wellFormedSegment, ({ segment }) => {
           const result = operation(segment);
           if (result === null) return;
-          expect(sineBetween(sub(segment.c1, segment.a), sub(result.c1, result.a)))
-            .toBeLessThan(1e-6);
-          expect(sineBetween(sub(segment.c2, segment.b), sub(result.c2, result.b)))
-            .toBeLessThan(1e-6);
+          expect(sineBetween(sub(segment.c1, segment.a), sub(result.c1, result.a))).toBeLessThan(
+            1e-6,
+          );
+          expect(sineBetween(sub(segment.c2, segment.b), sub(result.c2, result.b))).toBeLessThan(
+            1e-6,
+          );
         }),
         { numRuns: RUNS },
       );
@@ -231,8 +232,9 @@ describe("balance", () => {
       fc.property(wellFormedSegment, ({ segment }) => {
         const result = balance(segment);
         expect(result).not.toBeNull();
-        expect(sineBetween(sub(result!.b, result!.a), sub(result!.c2, result!.c1)))
-          .toBeLessThan(1e-6);
+        expect(sineBetween(sub(result!.b, result!.a), sub(result!.c2, result!.c1))).toBeLessThan(
+          1e-6,
+        );
       }),
       { numRuns: RUNS },
     );
@@ -287,8 +289,7 @@ describe("moveTunniLine", () => {
         };
         const result = moveTunniLine(segment, target);
         if (result === null) return;
-        expect(sineBetween(sub(result.c2, result.c1), sub(target, result.c1)))
-          .toBeLessThan(1e-6);
+        expect(sineBetween(sub(result.c2, result.c1), sub(target, result.c1))).toBeLessThan(1e-6);
       }),
       { numRuns: RUNS },
     );
@@ -299,8 +300,9 @@ describe("moveTunniLine", () => {
       fc.property(wellFormedSegment, ({ segment }) => {
         const result = moveTunniLine(segment, segment.c1);
         if (result === null) return;
-        expect(sineBetween(sub(segment.c2, segment.c1), sub(result.c2, result.c1)))
-          .toBeLessThan(1e-6);
+        expect(sineBetween(sub(segment.c2, segment.c1), sub(result.c2, result.c1))).toBeLessThan(
+          1e-6,
+        );
       }),
       { numRuns: RUNS },
     );

@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  distanceToLine,
-  intersectLines,
-  projectOntoLine,
-  sameSide,
-  sideOf,
-} from "../src/line.js";
+import { distanceToLine, intersectLines, projectOntoLine, sameSide, sideOf } from "../src/line.js";
 import { vec } from "../src/vec2.js";
 
 describe("intersectLines", () => {
@@ -37,12 +31,7 @@ describe("intersectLines", () => {
   it("detects parallelism at any scale", () => {
     // A fixed absolute epsilon on the determinant would call these parallel,
     // because the determinant is tiny purely from the coordinates being small.
-    const p = intersectLines(
-      vec(0, 0),
-      vec(0.001, 0),
-      vec(0, -0.001),
-      vec(0.001, 0.001),
-    );
+    const p = intersectLines(vec(0, 0), vec(0.001, 0), vec(0, -0.001), vec(0.001, 0.001));
     expect(p).not.toBeNull();
   });
 });

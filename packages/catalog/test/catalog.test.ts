@@ -1,10 +1,4 @@
-import {
-  contour,
-  counterIds,
-  fontDocument,
-  glyph,
-  node,
-} from "@fonteditor/font-model";
+import { contour, counterIds, fontDocument, glyph, node } from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
 import { blockOf } from "../src/blocks.js";

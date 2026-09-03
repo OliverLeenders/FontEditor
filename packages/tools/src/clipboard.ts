@@ -101,10 +101,10 @@ export function deleteSelectedContours(state: EditorState): ToolResult {
   }
   if (editor === state) return result(state);
 
-  return result(
-    { ...editor, selection: [], focusedSegment: null, hoveredSegment: null },
-    [begin(contours.length === 1 ? "Cut contour" : "Cut contours", false), commit],
-  );
+  return result({ ...editor, selection: [], focusedSegment: null, hoveredSegment: null }, [
+    begin(contours.length === 1 ? "Cut contour" : "Cut contours", false),
+    commit,
+  ]);
 }
 
 // ---------------------------------------------------------------------------

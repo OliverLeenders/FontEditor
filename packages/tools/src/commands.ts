@@ -103,7 +103,11 @@ export function setPointType(
     );
     if (document !== null) editor = { ...editor, document };
   }
-  return done(state, editor === state ? null : editor, type === "corner" ? "Make corner" : "Make smooth");
+  return done(
+    state,
+    editor === state ? null : editor,
+    type === "corner" ? "Make corner" : "Make smooth",
+  );
 }
 
 /**
@@ -123,7 +127,8 @@ export function setNodeHvLock(
     updateContour(g, contourId, (c) => setHvLock(c, nodeId, which, locked)),
   );
 
-  const side = which === "both" ? "handles" : which === "in" ? "incoming handle" : "outgoing handle";
+  const side =
+    which === "both" ? "handles" : which === "in" ? "incoming handle" : "outgoing handle";
   return done(
     state,
     document === null ? null : { ...state, document },
@@ -132,11 +137,7 @@ export function setNodeHvLock(
 }
 
 /** Which of a node's handles are held to an axis. */
-export function nodeHvLocked(
-  state: EditorState,
-  contourId: ContourId,
-  nodeId: NodeId,
-): HandleLock {
+export function nodeHvLocked(state: EditorState, contourId: ContourId, nodeId: NodeId): HandleLock {
   const glyph = currentGlyph(state);
   const c = glyph === null ? null : contourById(glyph, contourId);
   return (c === null ? null : nodeById(c, nodeId))?.hvLock ?? NO_LOCK;
@@ -339,14 +340,10 @@ export function createGlyphs(
 
   let document = state.document;
   for (const g of fresh) {
-    document = putGlyph(
-      document,
-      glyph(g.name, { unicodes: g.unicodes ?? [], advance }),
-    );
+    document = putGlyph(document, glyph(g.name, { unicodes: g.unicodes ?? [], advance }));
   }
 
-  const label =
-    fresh.length === 1 ? `Add ${fresh[0]!.name}` : `Add ${String(fresh.length)} glyphs`;
+  const label = fresh.length === 1 ? `Add ${fresh[0]!.name}` : `Add ${String(fresh.length)} glyphs`;
   const first = fresh[0]!.name;
   return result({ ...state, document, currentGlyph: first, selection: [] }, [
     begin(label, false),
@@ -367,7 +364,7 @@ export function deleteGlyph(state: EditorState, name: GlyphName): ToolResult {
   if (document === null) return result(state);
 
   const currentGlyph =
-    state.currentGlyph === name ? document.glyphOrder[0] ?? "" : state.currentGlyph;
+    state.currentGlyph === name ? (document.glyphOrder[0] ?? "") : state.currentGlyph;
 
   return result(
     { ...state, document, currentGlyph, selection: [], focusedSegment: null, hoveredSegment: null },
@@ -386,11 +383,7 @@ export function deleteGlyph(state: EditorState, name: GlyphName): ToolResult {
  * drawing nothing: "that would make a refer to itself" is a far better answer
  * than a glyph that silently stops appearing.
  */
-export function addComponent(
-  state: EditorState,
-  base: GlyphName,
-  ids: IdFactory,
-): ToolResult {
+export function addComponent(state: EditorState, base: GlyphName, ids: IdFactory): ToolResult {
   const owner = state.currentGlyph;
   if (base === "" || state.document.glyphs[base] === undefined) return result(state);
 
@@ -450,11 +443,7 @@ export function nudgeKern(
  * Does nothing when the pair is already its own, since there is nothing to
  * break out of.
  */
-export function breakOutKern(
-  state: EditorState,
-  left: GlyphName,
-  right: GlyphName,
-): ToolResult {
+export function breakOutKern(state: EditorState, left: GlyphName, right: GlyphName): ToolResult {
   const index = kernIndex(state.document.kerning);
   const existing = kernMatch(index, left, right);
   if (existing === null || !existing.grouped) return result(state);
@@ -598,11 +587,7 @@ function roundParts(n: Node, parts: ReadonlySet<string>): Node {
   const incoming = n.in !== null && parts.has(`${n.id} in`) ? whole(n.in) : n.in;
   const outgoing = n.out !== null && parts.has(`${n.id} out`) ? whole(n.out) : n.out;
 
-  const same =
-    pt.x === n.pt.x &&
-    pt.y === n.pt.y &&
-    incoming === n.in &&
-    outgoing === n.out;
+  const same = pt.x === n.pt.x && pt.y === n.pt.y && incoming === n.in && outgoing === n.out;
 
   return same ? n : { ...n, pt, in: incoming, out: outgoing };
 }
@@ -679,11 +664,7 @@ export function selectedCoordinate(
  * smooth node smooth by swinging its other side — the same thing that would have
  * happened had it been dragged there.
  */
-export function moveCoordinateTo(
-  state: EditorState,
-  item: SelectionItem,
-  point: Vec2,
-): ToolResult {
+export function moveCoordinateTo(state: EditorState, item: SelectionItem, point: Vec2): ToolResult {
   const glyph = currentGlyph(state);
   const from = glyph === null ? null : itemPoint(glyph, item);
   if (from === null) return result(state);

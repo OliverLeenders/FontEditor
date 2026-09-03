@@ -86,7 +86,10 @@ export class StorageClient {
     const { info, features } = decodeFontInfo(payload.info);
     const document = setFeatures(
       setKerning(
-        setGlyphOrder(fontDocument(glyphs, info), glyphs.map((g) => g.name)),
+        setGlyphOrder(
+          fontDocument(glyphs, info),
+          glyphs.map((g) => g.name),
+        ),
         decodeKerning(payload.kerning),
       ),
       features,

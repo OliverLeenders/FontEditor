@@ -74,7 +74,10 @@ export function compileFeatures(
           // A glyph substituted twice in one feature is a rule that contradicts
           // an earlier one, and the table can hold only one answer.
           if (singleFrom.includes(id)) {
-            problems.push({ line: rule.line, message: `${from} is already substituted in ${feature.tag}` });
+            problems.push({
+              line: rule.line,
+              message: `${from} is already substituted in ${feature.tag}`,
+            });
             continue;
           }
           singleFrom.push(id);

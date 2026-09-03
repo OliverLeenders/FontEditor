@@ -233,7 +233,9 @@ describe("setSegmentCubic", () => {
   });
 
   it("returns null for an out-of-range index", () => {
-    expect(setSegmentCubic(ringContour(), 9, segmentCubic(segmentAt(ringContour(), 0)!))).toBeNull();
+    expect(
+      setSegmentCubic(ringContour(), 9, segmentCubic(segmentAt(ringContour(), 0)!)),
+    ).toBeNull();
   });
 });
 
@@ -422,11 +424,7 @@ describe("extendHandle", () => {
   const triangle = () =>
     contour(
       ids.contour(),
-      [
-        node("t1", vec(0, 0)),
-        node("t2", vec(300, 0)),
-        node("t3", vec(0, 300)),
-      ],
+      [node("t1", vec(0, 0)), node("t2", vec(300, 0)), node("t3", vec(0, 300))],
       true,
     );
 

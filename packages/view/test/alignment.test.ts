@@ -38,7 +38,8 @@ function throughContour() {
   );
 }
 
-const values = (lines: readonly { at: number }[]): number[] => lines.map((l) => l.at).sort((a, b) => a - b);
+const values = (lines: readonly { at: number }[]): number[] =>
+  lines.map((l) => l.at).sort((a, b) => a - b);
 
 describe("extremes", () => {
   const c = ring();
@@ -175,7 +176,9 @@ describe("extremes", () => {
       [node(ids.node(), at(100, 0)), node(ids.node(), at(100, 500))],
       false,
     );
-    expect(alignmentLines(glyph("t", { contours: [twin] }), [], { extremes: true }).xs).toHaveLength(1);
+    expect(
+      alignmentLines(glyph("t", { contours: [twin] }), [], { extremes: true }).xs,
+    ).toHaveLength(1);
   });
 });
 

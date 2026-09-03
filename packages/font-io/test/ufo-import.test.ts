@@ -274,18 +274,17 @@ describe("refusing what is not a UFO", () => {
 });
 
 describe("reading a glif written by something else", () => {
-  const wrap = (outline: string) =>
-    [
-      { path: "x.ufo/metainfo.plist", text: "<plist><dict/></plist>" },
-      {
-        path: "x.ufo/glyphs/contents.plist",
-        text: "<plist><dict><key>a</key><string>a.glif</string></dict></plist>",
-      },
-      {
-        path: "x.ufo/glyphs/a.glif",
-        text: `<?xml version="1.0"?><glyph name="a" format="2"><advance width="500"/><unicode hex="0061"/><outline>${outline}</outline></glyph>`,
-      },
-    ];
+  const wrap = (outline: string) => [
+    { path: "x.ufo/metainfo.plist", text: "<plist><dict/></plist>" },
+    {
+      path: "x.ufo/glyphs/contents.plist",
+      text: "<plist><dict><key>a</key><string>a.glif</string></dict></plist>",
+    },
+    {
+      path: "x.ufo/glyphs/a.glif",
+      text: `<?xml version="1.0"?><glyph name="a" format="2"><advance width="500"/><unicode hex="0061"/><outline>${outline}</outline></glyph>`,
+    },
+  ];
 
   const read = async (outline: string) => {
     const out = await importUfo(zip(wrap(outline)).buffer as ArrayBuffer, counterIds("g"));

@@ -35,11 +35,7 @@ function triangle(): Contour {
   const ids = counterIds("t");
   return contour(
     ids.contour(),
-    [
-      node(ids.node(), vec(0, 0)),
-      node(ids.node(), vec(100, 0)),
-      node(ids.node(), vec(50, 90)),
-    ],
+    [node(ids.node(), vec(0, 0)), node(ids.node(), vec(100, 0)), node(ids.node(), vec(50, 90))],
     true,
   );
 }
@@ -202,8 +198,8 @@ describe("pickAll", () => {
       const previous = hits[i - 1]!;
       const current = hits[i]!;
       const samePriority =
-        previous.target.kind === current.target.kind
-        || (previous.target.kind === "handleIn" && current.target.kind === "handleOut");
+        previous.target.kind === current.target.kind ||
+        (previous.target.kind === "handleIn" && current.target.kind === "handleOut");
       if (samePriority) expect(current.distance).toBeGreaterThanOrEqual(previous.distance);
     }
   });

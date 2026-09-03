@@ -134,11 +134,7 @@ export function nodeIndex(c: Contour, id: NodeId): number {
  * Returns `null` at the ends of an open contour, where one side of the end node
  * has no segment to govern.
  */
-export function segmentIndexForHandle(
-  c: Contour,
-  id: NodeId,
-  which: "in" | "out",
-): number | null {
+export function segmentIndexForHandle(c: Contour, id: NodeId, which: "in" | "out"): number | null {
   const i = nodeIndex(c, id);
   if (i < 0) return null;
 
@@ -235,8 +231,7 @@ export function setHandle(
   // one off with it, and the lock would be a lock that does not hold. Alt breaks
   // the link for this one move, and with it that obligation.
   const other = which === "in" ? "out" : "in";
-  const held =
-    base.hvLock[which] || (!breakSmooth && base.type === "smooth" && base.hvLock[other]);
+  const held = base.hvLock[which] || (!breakSmooth && base.type === "smooth" && base.hvLock[other]);
 
   const constrained = held ? applyHvLock(base.pt, pt) : pt;
   const moved = withHandleRaw(base, which, constrained);
@@ -279,9 +274,7 @@ export function setHvLock(
 
   const base = c.nodes[i]!;
   const hvLock =
-    which === "both"
-      ? { in: locked, out: locked }
-      : { ...base.hvLock, [which]: locked };
+    which === "both" ? { in: locked, out: locked } : { ...base.hvLock, [which]: locked };
 
   const next: Node = { ...base, hvLock };
   if (!locked) return replaceNode(c, i, next);

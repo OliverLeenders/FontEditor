@@ -6,9 +6,8 @@ installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store.js");
 const { itemsFor } = await import("../src/components/ContextMenu.js");
-const { contourById, segmentAt, segmentCount, sidebearings } = await import(
-  "@fonteditor/font-model"
-);
+const { contourById, segmentAt, segmentCount, sidebearings } =
+  await import("@fonteditor/font-model");
 const { segmentCubic } = await import("@fonteditor/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
@@ -188,10 +187,9 @@ describe("context menu", () => {
 
   it("reverses a contour from any of the targets that name one", () => {
     const first = () =>
-      contourById(
-        store.editor.document.glyphs[store.editor.currentGlyph]!,
-        contourId,
-      )!.nodes.map((n) => n.id);
+      contourById(store.editor.document.glyphs[store.editor.currentGlyph]!, contourId)!.nodes.map(
+        (n) => n.id,
+      );
 
     const before = first();
     run(store, node(), "Reverse contour");

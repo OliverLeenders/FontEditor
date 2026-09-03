@@ -12,13 +12,22 @@
     "dev:playground": "pnpm --filter @fonteditor/playground dev",
     "test": "pnpm --filter \"./packages/*\" --filter @fonteditor/editor test",
     "test:watch": "pnpm --filter @fonteditor/geometry test:watch",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.10.2",
-    "typescript": "^5.7.2",
-    "vitest": "^2.1.8",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
     "fast-check": "^3.23.2",
-    "vite": "^5.4.21"
+    "prettier": "^3.9.6",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.69.0",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.8"
   }
 }

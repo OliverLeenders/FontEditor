@@ -12,8 +12,14 @@ import {
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
-
-import { doubleClick, keyDown, pointerDown, pointerMove, pointerUp, setActiveTool } from "../src/dispatch.js";
+import {
+  doubleClick,
+  keyDown,
+  pointerDown,
+  pointerMove,
+  pointerUp,
+  setActiveTool,
+} from "../src/dispatch.js";
 import { keyInput, pointerInput } from "../src/input.js";
 import { penPreview } from "../src/pen.js";
 import { type EditorState, editorState } from "../src/state.js";

@@ -28,10 +28,26 @@ function ellipse(
   return contour(
     ids.contour(),
     [
-      node(ids.node(), vec(cx + rx, cy), { type: "smooth", in: vec(cx + rx, cy - s * hy), out: vec(cx + rx, cy + s * hy) }),
-      node(ids.node(), vec(cx, cy + s * ry), { type: "smooth", in: vec(cx + hx, cy + s * ry), out: vec(cx - hx, cy + s * ry) }),
-      node(ids.node(), vec(cx - rx, cy), { type: "smooth", in: vec(cx - rx, cy + s * hy), out: vec(cx - rx, cy - s * hy) }),
-      node(ids.node(), vec(cx, cy - s * ry), { type: "smooth", in: vec(cx - hx, cy - s * ry), out: vec(cx + hx, cy - s * ry) }),
+      node(ids.node(), vec(cx + rx, cy), {
+        type: "smooth",
+        in: vec(cx + rx, cy - s * hy),
+        out: vec(cx + rx, cy + s * hy),
+      }),
+      node(ids.node(), vec(cx, cy + s * ry), {
+        type: "smooth",
+        in: vec(cx + hx, cy + s * ry),
+        out: vec(cx - hx, cy + s * ry),
+      }),
+      node(ids.node(), vec(cx - rx, cy), {
+        type: "smooth",
+        in: vec(cx - rx, cy + s * hy),
+        out: vec(cx - rx, cy - s * hy),
+      }),
+      node(ids.node(), vec(cx, cy - s * ry), {
+        type: "smooth",
+        in: vec(cx - hx, cy - s * ry),
+        out: vec(cx + hx, cy - s * ry),
+      }),
     ],
     true,
   );
@@ -59,19 +75,28 @@ function box(
 function ring(name: string, codePoint: number): Glyph {
   const ids = counterIds(`${name}-`);
   return addContour(
-    addContour(glyph(name, { unicodes: [codePoint], advance: 600 }), ellipse(ids, 300, 250, 240, 260, false)),
+    addContour(
+      glyph(name, { unicodes: [codePoint], advance: 600 }),
+      ellipse(ids, 300, 250, 240, 260, false),
+    ),
     ellipse(ids, 300, 250, 130, 150, true),
   );
 }
 
 function stem(name: string, codePoint: number): Glyph {
   const ids = counterIds(`${name}-`);
-  return addContour(glyph(name, { unicodes: [codePoint], advance: 300 }), box(ids, 100, 0, 100, 700));
+  return addContour(
+    glyph(name, { unicodes: [codePoint], advance: 300 }),
+    box(ids, 100, 0, 100, 700),
+  );
 }
 
 function shortStem(name: string, codePoint: number): Glyph {
   const ids = counterIds(`${name}-`);
-  return addContour(glyph(name, { unicodes: [codePoint], advance: 300 }), box(ids, 100, 0, 100, 500));
+  return addContour(
+    glyph(name, { unicodes: [codePoint], advance: 300 }),
+    box(ids, 100, 0, 100, 500),
+  );
 }
 
 function blank(name: string, codePoint: number, advance: number): Glyph {

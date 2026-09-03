@@ -81,10 +81,18 @@ export class RecordingContext implements Canvas2D {
     this.record("restore");
   }
 
-  beginPath(): void { this.record("beginPath"); }
-  closePath(): void { this.record("closePath"); }
-  moveTo(x: number, y: number): void { this.record("moveTo", [x, y]); }
-  lineTo(x: number, y: number): void { this.record("lineTo", [x, y]); }
+  beginPath(): void {
+    this.record("beginPath");
+  }
+  closePath(): void {
+    this.record("closePath");
+  }
+  moveTo(x: number, y: number): void {
+    this.record("moveTo", [x, y]);
+  }
+  lineTo(x: number, y: number): void {
+    this.record("lineTo", [x, y]);
+  }
 
   bezierCurveTo(c1x: number, c1y: number, c2x: number, c2y: number, x: number, y: number): void {
     this.record("bezierCurveTo", [c1x, c1y, c2x, c2y, x, y]);
@@ -98,8 +106,12 @@ export class RecordingContext implements Canvas2D {
     this.record("rect", [x, y, width, height]);
   }
 
-  fill(): void { this.record("fill"); }
-  stroke(): void { this.record("stroke"); }
+  fill(): void {
+    this.record("fill");
+  }
+  stroke(): void {
+    this.record("stroke");
+  }
 
   clearRect(x: number, y: number, width: number, height: number): void {
     this.record("clearRect", [x, y, width, height]);
@@ -146,7 +158,8 @@ export class RecordingContext implements Canvas2D {
   /** Every `arc` whose centre is within `epsilon` of the given point. */
   arcsAt(x: number, y: number, epsilon = 0.5): Op[] {
     return this.all("arc").filter(
-      (o) => Math.abs((o.args[0] ?? NaN) - x) <= epsilon && Math.abs((o.args[1] ?? NaN) - y) <= epsilon,
+      (o) =>
+        Math.abs((o.args[0] ?? NaN) - x) <= epsilon && Math.abs((o.args[1] ?? NaN) - y) <= epsilon,
     );
   }
 

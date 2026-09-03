@@ -1,12 +1,6 @@
 import { type Cubic, type Vec2, subcurve } from "@fonteditor/geometry";
 
-import {
-  type Contour,
-  contour,
-  segmentAt,
-  segmentCount,
-  segmentCubic,
-} from "./contour.js";
+import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { type StrokeCrossing, byContour, samePoint, strokeCrossings } from "./crossings.js";
 import type { Glyph } from "./glyph.js";
 import type { IdFactory } from "./ids.js";
@@ -296,4 +290,3 @@ function splitAtCrossings(
 
   return { contour: contour(c.id, nodes, true), meetings };
 }
-

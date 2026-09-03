@@ -10,12 +10,7 @@ import { type XmlElement, isElement, parseXml, textOf } from "./xml.js";
  */
 
 export type PlistValue =
-  | string
-  | number
-  | boolean
-  | null
-  | readonly PlistValue[]
-  | { readonly [key: string]: PlistValue };
+  string | number | boolean | null | readonly PlistValue[] | { readonly [key: string]: PlistValue };
 
 export type PlistDict = { readonly [key: string]: PlistValue };
 

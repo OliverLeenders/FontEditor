@@ -71,7 +71,8 @@ function unescapeXml(raw: string): string {
  */
 export function parseXml(source: string): XmlElement | null {
   let at = 0;
-  const stack: Array<{ name: string; attributes: Record<string, string>; children: XmlNode[] }> = [];
+  const stack: Array<{ name: string; attributes: Record<string, string>; children: XmlNode[] }> =
+    [];
   let root: XmlElement | null = null;
 
   const push = (node: XmlNode): void => {
@@ -129,7 +130,7 @@ export function parseXml(source: string): XmlElement | null {
   }
 
   // An unclosed root still yields what was read, which is more use than nothing.
-  return root ?? (stack[0] ?? null);
+  return root ?? stack[0] ?? null;
 }
 
 function skipDeclaration(source: string, open: number): number {

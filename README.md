@@ -14,19 +14,19 @@ around a canvas where you draw contours, edit them with Tunni lines, undo, and s
 glyphs — with everything autosaving. Next is the glyph browser, then the per-glyph work
 of phase 3.
 
-| Phase | | Status |
-| --- | --- | --- |
-| 0 | Foundations and the geometry kernel | done |
-| 1 | The editing surface | done |
-| 2 | Undo, redo, persistence | done |
-| 3 | From paths to a glyph | not started |
-| 4 | From a glyph to a font | multi-glyph document done; browser and font info panel pending |
-| 5 | Binary import and export | not started |
-| 6 | Proofing and shaping | not started |
-| 7 | Spacing and kerning | not started |
-| 8 | OpenType features | not started |
-| 9 | Variable fonts | not started |
-| 10 | Production polish | not started |
+| Phase |                                     | Status                                                         |
+| ----- | ----------------------------------- | -------------------------------------------------------------- |
+| 0     | Foundations and the geometry kernel | done                                                           |
+| 1     | The editing surface                 | done                                                           |
+| 2     | Undo, redo, persistence             | done                                                           |
+| 3     | From paths to a glyph               | not started                                                    |
+| 4     | From a glyph to a font              | multi-glyph document done; browser and font info panel pending |
+| 5     | Binary import and export            | not started                                                    |
+| 6     | Proofing and shaping                | not started                                                    |
+| 7     | Spacing and kerning                 | not started                                                    |
+| 8     | OpenType features                   | not started                                                    |
+| 9     | Variable fonts                      | not started                                                    |
+| 10    | Production polish                   | not started                                                    |
 
 ## Getting started
 

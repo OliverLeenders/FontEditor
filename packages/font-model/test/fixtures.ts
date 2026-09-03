@@ -45,11 +45,7 @@ export function triangleContour(): Contour {
   const ids = counterIds("t");
   return contour(
     ids.contour(),
-    [
-      node(ids.node(), vec(0, 0)),
-      node(ids.node(), vec(100, 0)),
-      node(ids.node(), vec(50, 90)),
-    ],
+    [node(ids.node(), vec(0, 0)), node(ids.node(), vec(100, 0)), node(ids.node(), vec(50, 90))],
     true,
   );
 }

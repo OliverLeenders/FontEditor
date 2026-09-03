@@ -25,7 +25,7 @@ export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): JSX.E
   // line on every store notification.
   const measured = useStoreValue((s) =>
     s.session.editor.activeTool === "measure"
-      ? shownMeasurement(s.session.editor)?.distance ?? null
+      ? (shownMeasurement(s.session.editor)?.distance ?? null)
       : null,
   );
   const measuredAngle = useStoreValue((s) => {
@@ -48,8 +48,14 @@ export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): JSX.E
 
   return (
     <div className={styles.bar}>
-      <span><b>{glyphCount}</b> glyphs</span>
-      {editing ? <span><b>{selection}</b> selected</span> : null}
+      <span>
+        <b>{glyphCount}</b> glyphs
+      </span>
+      {editing ? (
+        <span>
+          <b>{selection}</b> selected
+        </span>
+      ) : null}
       {editing ? <span>{tool}</span> : null}
       {/* The number itself is on the canvas beside what it measures. What is
           here is what would clutter the drawing: the angle it was taken at, and
@@ -61,7 +67,9 @@ export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): JSX.E
           {pinned ? " · pinned" : null}
         </span>
       )}
-      <span className={storage === "unavailable" || saveStatus === "failed" ? styles.warn : undefined}>
+      <span
+        className={storage === "unavailable" || saveStatus === "failed" ? styles.warn : undefined}
+      >
         {saved}
       </span>
       {recovered ? <span className={styles.warn}>recovered unsaved work</span> : null}

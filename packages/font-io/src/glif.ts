@@ -64,7 +64,7 @@ export function parseGlif(
 
   const name = root.attributes["name"] ?? "";
   const advanceElement = childNamed(root, "advance");
-  const advance = advanceElement === null ? 0 : number(advanceElement.attributes["width"]) ?? 0;
+  const advance = advanceElement === null ? 0 : (number(advanceElement.attributes["width"]) ?? 0);
 
   const unicodes: number[] = [];
   for (const u of childrenNamed(root, "unicode")) {
@@ -202,11 +202,7 @@ function expandQuadratics(
 
       out.push({ pt: cubicControl(start, q), type: null, smooth: false });
       out.push({ pt: cubicControl(end, q), type: null, smooth: false });
-      out.push(
-        last
-          ? { ...point, type: "curve" }
-          : { pt: end, type: "curve", smooth: true },
-      );
+      out.push(last ? { ...point, type: "curve" } : { pt: end, type: "curve", smooth: true });
       start = end;
     }
 
@@ -246,7 +242,11 @@ function onAnchor(handle: Vec2 | null, anchor: Vec2): boolean {
   return handle !== null && handle.x === anchor.x && handle.y === anchor.y;
 }
 
-function buildContour(points: readonly RawPoint[], closed: boolean, ids: IdFactory): Contour | null {
+function buildContour(
+  points: readonly RawPoint[],
+  closed: boolean,
+  ids: IdFactory,
+): Contour | null {
   const onCurve = points.map((p, i) => ({ p, i })).filter(({ p }) => p.type !== null);
   if (onCurve.length === 0) return null;
 

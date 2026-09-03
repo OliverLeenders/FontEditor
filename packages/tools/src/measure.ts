@@ -52,7 +52,11 @@ export function pointerDown(state: EditorState, input: PointerInput): ToolResult
 
 export function pointerLeave(state: EditorState): ToolResult {
   // A pinned reading stays: it was pinned so it would still be there later.
-  return result({ ...state, cursor: null, hoveredSegment: state.measure === null ? null : state.hoveredSegment });
+  return result({
+    ...state,
+    cursor: null,
+    hoveredSegment: state.measure === null ? null : state.hoveredSegment,
+  });
 }
 
 export function cancel(state: EditorState): ToolResult {

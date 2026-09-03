@@ -3,9 +3,9 @@
 .zone {
   display: flex;
   align-items: center;
-  gap: .5rem;
+  gap: 0.5rem;
   min-width: 0;
-  padding: .1rem .25rem;
+  padding: 0.1rem 0.25rem;
   border: 1px dashed transparent;
   border-radius: var(--radius);
 }
@@ -15,37 +15,46 @@
   background: var(--selected);
 }
 
-.input { display: none; }
+.input {
+  display: none;
+}
 
 .button {
   flex: none;
-  padding: .28rem .6rem;
+  padding: 0.28rem 0.6rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background: var(--canvas);
   color: var(--ink);
   cursor: pointer;
   font: inherit;
-  font-size: .78rem;
+  font-size: 0.78rem;
 }
-.button:hover:not(:disabled) { border-color: var(--accent); }
-.button:disabled { opacity: .6; cursor: default; }
+.button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 
 .note {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: .76rem;
+  font-size: 0.76rem;
   color: var(--ink-2);
 }
 
-.warn { color: var(--warn, #b4791f); }
+.warn {
+  color: var(--warn, #b4791f);
+}
 
 .error {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: .76rem;
+  font-size: 0.76rem;
   color: var(--danger, #c2453d);
 }
 
@@ -54,7 +63,7 @@
 .confirm {
   display: flex;
   align-items: center;
-  gap: .35rem;
+  gap: 0.35rem;
   flex: none;
 }
 
@@ -62,19 +71,26 @@
   border-color: var(--danger, #c2453d);
   color: var(--danger, #c2453d);
 }
-.danger:hover:not(:disabled) { border-color: var(--danger, #c2453d); }
+.danger:hover:not(:disabled) {
+  border-color: var(--danger, #c2453d);
+}
 
 /* Narrow: a glyph name is short, and the search box beside it wants the room. */
 .glyphName {
   flex: none;
   width: 7rem;
-  padding: .3rem .5rem;
+  padding: 0.3rem 0.5rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: .78rem;
+  font-size: 0.78rem;
 }
-.glyphName:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
-.glyphName:disabled { opacity: .5; }
+.glyphName:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.glyphName:disabled {
+  opacity: 0.5;
+}

@@ -108,9 +108,8 @@ export function putGlyph(document: FontDocument, glyph: Glyph): FontDocument {
   if (document.glyphs[glyph.name] === glyph) return document;
 
   const glyphs = { ...document.glyphs, [glyph.name]: glyph };
-  const glyphOrder = glyph.name in document.glyphs
-    ? document.glyphOrder
-    : [...document.glyphOrder, glyph.name];
+  const glyphOrder =
+    glyph.name in document.glyphs ? document.glyphOrder : [...document.glyphOrder, glyph.name];
   return { ...document, glyphOrder, glyphs };
 }
 
@@ -209,7 +208,6 @@ export function glyphsForString(document: FontDocument, text: string): Array<Gly
   }
   return out;
 }
-
 
 /** Replace the font's feature source, leaving everything else alone. */
 export function setFeatures(document: FontDocument, features: string): FontDocument {

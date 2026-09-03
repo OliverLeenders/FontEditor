@@ -27,7 +27,13 @@ export type PathCommand =
       readonly x: number;
       readonly y: number;
     }
-  | { readonly type: "Q"; readonly x1: number; readonly y1: number; readonly x: number; readonly y: number }
+  | {
+      readonly type: "Q";
+      readonly x1: number;
+      readonly y1: number;
+      readonly x: number;
+      readonly y: number;
+    }
   | { readonly type: "Z" };
 
 /**
@@ -113,7 +119,11 @@ function finish(draft: Draft, id: IdFactory, epsilon: number): Contour | null {
 
   const nodes: Node[] = points.map((pt, i) => {
     const leaving = spans[i] ?? null;
-    const arriving = draft.closed ? spans[(i - 1 + count) % count] ?? null : (i === 0 ? null : spans[i - 1] ?? null);
+    const arriving = draft.closed
+      ? (spans[(i - 1 + count) % count] ?? null)
+      : i === 0
+        ? null
+        : (spans[i - 1] ?? null);
     const out = leaving?.c1 ?? null;
     const incoming = arriving?.c2 ?? null;
     return node(id.node(), pt, { type: inferType(pt, incoming, out), in: incoming, out });

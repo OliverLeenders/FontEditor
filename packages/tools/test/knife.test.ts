@@ -1,10 +1,23 @@
-import { counterIds, fontDocument, glyph, orderedGlyphs, rectContour } from "@fonteditor/font-model";
+import {
+  counterIds,
+  fontDocument,
+  glyph,
+  orderedGlyphs,
+  rectContour,
+} from "@fonteditor/font-model";
 import { vec } from "@fonteditor/geometry";
 import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import { pointerInput } from "../src/input.js";
-import { cancel, knifeStroke, pointerDown, pointerLeave, pointerMove, pointerUp } from "../src/knife.js";
+import {
+  cancel,
+  knifeStroke,
+  pointerDown,
+  pointerLeave,
+  pointerMove,
+  pointerUp,
+} from "../src/knife.js";
 import { type EditorState, editorState } from "../src/state.js";
 
 const VIEW: ViewTransform = { scale: 1, tx: 0, ty: 0 };
@@ -25,7 +38,11 @@ function start(): EditorState {
   });
 }
 
-const stroke = (state: EditorState, from: { x: number; y: number }, to: { x: number; y: number }) => {
+const stroke = (
+  state: EditorState,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+) => {
   let s = pointerDown(state, pointerInput(vec(from.x, from.y))).state;
   s = pointerMove(s, pointerInput(vec(to.x, to.y))).state;
   return pointerUp(s, pointerInput(vec(to.x, to.y)), opts);
@@ -72,7 +89,10 @@ describe("the knife tool", () => {
   it("shows the stroke while it is being drawn, and not after", () => {
     let s = pointerDown(start(), pointerInput(vec(-50, 200))).state;
     s = pointerMove(s, pointerInput(vec(450, 200))).state;
-    expect(knifeStroke(s)).toEqual([{ x: -50, y: 200 }, { x: 450, y: 200 }]);
+    expect(knifeStroke(s)).toEqual([
+      { x: -50, y: 200 },
+      { x: 450, y: 200 },
+    ]);
 
     expect(knifeStroke(pointerUp(s, undefined, opts).state)).toBeNull();
   });
@@ -98,6 +118,9 @@ describe("the knife tool", () => {
     // at, and the crossing is what matters, not the stroke's own ends.
     let s = pointerDown(start(), pointerInput(vec(-50.4, 200.7))).state;
     s = pointerMove(s, pointerInput(vec(450.3, 200.7))).state;
-    expect(knifeStroke(s)).toEqual([{ x: -50.4, y: 200.7 }, { x: 450.3, y: 200.7 }]);
+    expect(knifeStroke(s)).toEqual([
+      { x: -50.4, y: 200.7 },
+      { x: 450.3, y: 200.7 },
+    ]);
   });
 });

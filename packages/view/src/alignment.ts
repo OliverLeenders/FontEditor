@@ -84,7 +84,11 @@ function level(d: Vec2, axis: "x" | "y"): boolean {
  *
  * The other half is {@link LEVEL}: a turn that is nearly flat is a turn.
  */
-function extremeAxes(n: Node, previous: Vec2, next: Vec2): { readonly x: boolean; readonly y: boolean } {
+function extremeAxes(
+  n: Node,
+  previous: Vec2,
+  next: Vec2,
+): { readonly x: boolean; readonly y: boolean } {
   const from = { x: (n.in ?? previous).x - n.pt.x, y: (n.in ?? previous).y - n.pt.y };
   const to = { x: (n.out ?? next).x - n.pt.x, y: (n.out ?? next).y - n.pt.y };
 

@@ -1,11 +1,5 @@
 import { fontDocument, glyphBounds } from "@fonteditor/font-model";
-import {
-  CanvasSurface,
-  DARK_PALETTE,
-  LIGHT_PALETTE,
-  drawScene,
-  scene,
-} from "@fonteditor/render";
+import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawScene, scene } from "@fonteditor/render";
 import {
   type EditorState,
   doubleClick,
@@ -236,7 +230,13 @@ window.addEventListener("keydown", (event) => {
     const at = order.indexOf(current().currentGlyph);
     const next = order[(at + (event.key === "PageDown" ? 1 : order.length - 1)) % order.length];
     if (next !== undefined) {
-      setEditor({ ...current(), currentGlyph: next, selection: [], pen: null, focusedSegment: null });
+      setEditor({
+        ...current(),
+        currentGlyph: next,
+        selection: [],
+        pen: null,
+        focusedSegment: null,
+      });
       fitGlyph();
     }
     return;

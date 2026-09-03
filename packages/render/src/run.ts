@@ -108,9 +108,7 @@ export function drawRunMargins(ctx: Canvas2D, s: RunScene): void {
     const placed = s.glyphs[index];
     if (placed === undefined) continue;
     boundaries.add(Math.round(toScreen(s.view, { x: placed.x, y: 0 }).x));
-    boundaries.add(
-      Math.round(toScreen(s.view, { x: placed.x + placed.glyph.advance, y: 0 }).x),
-    );
+    boundaries.add(Math.round(toScreen(s.view, { x: placed.x + placed.glyph.advance, y: 0 }).x));
   }
 
   ctx.strokeStyle = s.palette.margin;

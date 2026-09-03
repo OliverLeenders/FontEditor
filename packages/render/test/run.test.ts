@@ -42,7 +42,6 @@ const render = (scene: Partial<RunScene> = {}) => {
   return ctx;
 };
 
-
 /**
  * The x of every line actually stroked in the margin colour.
  *
@@ -129,9 +128,7 @@ describe("drawRun", () => {
     const band = ctx.indexWhere(
       (o) => o.op === "fill" && o.fillStyle === LIGHT_PALETTE.cellCurrent,
     );
-    const outline = ctx.indexWhere(
-      (o) => o.op === "fill" && o.fillStyle === LIGHT_PALETTE.outline,
-    );
+    const outline = ctx.indexWhere((o) => o.op === "fill" && o.fillStyle === LIGHT_PALETTE.outline);
     expect(band).toBeLessThan(outline);
   });
 
@@ -171,7 +168,9 @@ describe("drawProof", () => {
       ],
     });
 
-  const scene = (lines: readonly { glyphs: { glyph: ReturnType<typeof box>; x: number }[]; y: number }[]) => ({
+  const scene = (
+    lines: readonly { glyphs: { glyph: ReturnType<typeof box>; x: number }[]; y: number }[],
+  ) => ({
     lines,
     view: { scale: 0.5, tx: 20, ty: 100 },
     viewport: { width: 800, height: 600 },

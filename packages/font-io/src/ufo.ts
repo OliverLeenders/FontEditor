@@ -244,12 +244,24 @@ export function ufoFiles(document: FontDocument): ZipEntry[] {
   const entries: ZipEntry[] = [
     {
       path: "metainfo.plist",
-      text: plist(dict([["creator", str(CREATOR)], ["formatVersion", int(3)]])),
+      text: plist(
+        dict([
+          ["creator", str(CREATOR)],
+          ["formatVersion", int(3)],
+        ]),
+      ),
     },
     {
       path: "layercontents.plist",
       text: plist(
-        ["<array>", "\t<array>", `\t\t${str("public.default")}`, `\t\t${str("glyphs")}`, "\t</array>", "</array>"].join("\n"),
+        [
+          "<array>",
+          "\t<array>",
+          `\t\t${str("public.default")}`,
+          `\t\t${str("glyphs")}`,
+          "\t</array>",
+          "</array>",
+        ].join("\n"),
       ),
     },
   ];

@@ -189,11 +189,7 @@ export type JournalRecord = {
   readonly glyph: StoredGlyph;
 };
 
-export async function appendJournal(
-  store: FileStore,
-  glyph: Glyph,
-  at: number,
-): Promise<void> {
+export async function appendJournal(store: FileStore, glyph: Glyph, at: number): Promise<void> {
   const record: JournalRecord = { at, glyph: encodeGlyph(glyph) };
   await store.append(JOURNAL_PATH, `${JSON.stringify(record)}\n`);
 }
@@ -301,7 +297,10 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
 
   const document = setFeatures(
     setKerning(
-      setGlyphOrder(fontDocument(ordered, info), ordered.map((g) => g.name)),
+      setGlyphOrder(
+        fontDocument(ordered, info),
+        ordered.map((g) => g.name),
+      ),
       kerning,
     ),
     features,

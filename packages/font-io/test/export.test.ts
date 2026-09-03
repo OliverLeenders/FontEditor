@@ -27,10 +27,26 @@ const ring = (name: string, code: number) =>
       contour(
         ids.contour(),
         [
-          node(ids.node(), { x: 300, y: 0 }, { type: "smooth", in: { x: 420, y: 0 }, out: { x: 180, y: 0 } }),
-          node(ids.node(), { x: 60, y: 350 }, { type: "smooth", in: { x: 60, y: 160 }, out: { x: 60, y: 540 } }),
-          node(ids.node(), { x: 300, y: 700 }, { type: "smooth", in: { x: 180, y: 700 }, out: { x: 420, y: 700 } }),
-          node(ids.node(), { x: 540, y: 350 }, { type: "smooth", in: { x: 540, y: 540 }, out: { x: 540, y: 160 } }),
+          node(
+            ids.node(),
+            { x: 300, y: 0 },
+            { type: "smooth", in: { x: 420, y: 0 }, out: { x: 180, y: 0 } },
+          ),
+          node(
+            ids.node(),
+            { x: 60, y: 350 },
+            { type: "smooth", in: { x: 60, y: 160 }, out: { x: 60, y: 540 } },
+          ),
+          node(
+            ids.node(),
+            { x: 300, y: 700 },
+            { type: "smooth", in: { x: 180, y: 700 }, out: { x: 420, y: 700 } },
+          ),
+          node(
+            ids.node(),
+            { x: 540, y: 350 },
+            { type: "smooth", in: { x: 540, y: 540 }, out: { x: 540, y: 160 } },
+          ),
         ],
         true,
       ),

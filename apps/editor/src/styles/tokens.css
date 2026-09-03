@@ -7,20 +7,20 @@
  * redefines only the tokens, so a component never needs to know which is active.
  */
 :root {
-  --ground: #F6F8FA;
-  --surface: #FFFFFF;
-  --surface-2: #EEF2F6;
-  --canvas: #FBFCFD;
+  --ground: #f6f8fa;
+  --surface: #ffffff;
+  --surface-2: #eef2f6;
+  --canvas: #fbfcfd;
   --ink: #131922;
-  --ink-2: #55616F;
-  --ink-3: #7C8896;
-  --rule: #DCE3EA;
-  --rule-strong: #C2CDD8;
-  --accent: #2C6DAF;
-  --accent-ink: #1F548A;
-  --accent-soft: #E4EEF8;
-  --warn: #A96F22;
-  --shadow: 0 2px 4px rgba(19, 25, 34, .06), 0 10px 28px -14px rgba(19, 25, 34, .30);
+  --ink-2: #55616f;
+  --ink-3: #7c8896;
+  --rule: #dce3ea;
+  --rule-strong: #c2cdd8;
+  --accent: #2c6daf;
+  --accent-ink: #1f548a;
+  --accent-soft: #e4eef8;
+  --warn: #a96f22;
+  --shadow: 0 2px 4px rgba(19, 25, 34, 0.06), 0 10px 28px -14px rgba(19, 25, 34, 0.3);
 
   --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
@@ -31,26 +31,33 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ground: #0D1218;
-    --surface: #151C24;
-    --surface-2: #1B242E;
-    --canvas: #10171F;
-    --ink: #E5EBF2;
-    --ink-2: #98A6B6;
-    --ink-3: #74828F;
-    --rule: #232D38;
-    --rule-strong: #33404E;
-    --accent: #74AEE2;
-    --accent-ink: #A6CCEE;
+    --ground: #0d1218;
+    --surface: #151c24;
+    --surface-2: #1b242e;
+    --canvas: #10171f;
+    --ink: #e5ebf2;
+    --ink-2: #98a6b6;
+    --ink-3: #74828f;
+    --rule: #232d38;
+    --rule-strong: #33404e;
+    --accent: #74aee2;
+    --accent-ink: #a6ccee;
     --accent-soft: #142838;
-    --warn: #D6A05A;
-    --shadow: 0 2px 4px rgba(0, 0, 0, .35), 0 10px 28px -14px rgba(0, 0, 0, .8);
+    --warn: #d6a05a;
+    --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
   }
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
-html, body, #root { height: 100%; margin: 0; }
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
 
 body {
   background: var(--ground);
@@ -62,7 +69,10 @@ body {
   overflow: hidden;
 }
 
-button { font: inherit; color: inherit; }
+button {
+  font: inherit;
+  color: inherit;
+}
 button:focus-visible,
 input:focus-visible {
   outline: 2px solid var(--accent);

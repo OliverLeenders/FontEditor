@@ -23,7 +23,14 @@ export { abort, begin, commit, result } from "./effects.js";
 
 export type { NewGlyph } from "./commands.js";
 
-export type { EditorState, EditorStateInit, Gesture, PenState, ShapeDrag, ToolId } from "./state.js";
+export type {
+  EditorState,
+  EditorStateInit,
+  Gesture,
+  PenState,
+  ShapeDrag,
+  ToolId,
+} from "./state.js";
 export {
   currentGlyph,
   editCurrentGlyph,

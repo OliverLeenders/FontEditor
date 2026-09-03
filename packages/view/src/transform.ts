@@ -128,11 +128,7 @@ export function fitRect(
 }
 
 /** The design-space rectangle currently visible in a viewport of this size. */
-export function visibleRect(
-  v: ViewTransform,
-  viewportWidth: number,
-  viewportHeight: number,
-): Rect {
+export function visibleRect(v: ViewTransform, viewportWidth: number, viewportHeight: number): Rect {
   const topLeft = toDesign(v, { x: 0, y: 0 });
   const bottomRight = toDesign(v, { x: viewportWidth, y: viewportHeight });
   return {

@@ -5,11 +5,7 @@ import { opentype } from "./opentype.js";
 import type { Affine } from "@fonteditor/geometry";
 
 import type { PathCommand } from "./commands.js";
-import {
-  type SourceKerning,
-  kerningFromGpos,
-  kerningFromKernTable,
-} from "./readkern.js";
+import { type SourceKerning, kerningFromGpos, kerningFromKernTable } from "./readkern.js";
 
 /**
  * The only file that knows which parser we use.

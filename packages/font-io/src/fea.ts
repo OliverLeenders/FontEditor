@@ -295,10 +295,7 @@ function readFeature(
       continue;
     }
 
-    complain(
-      token.line,
-      `only substitution rules are compiled, and "${token.text}" is not one`,
-    );
+    complain(token.line, `only substitution rules are compiled, and "${token.text}" is not one`);
     while (peek() !== undefined && peek()!.text !== ";" && peek()!.text !== "}") take();
     if (peek()?.text === ";") take();
   }

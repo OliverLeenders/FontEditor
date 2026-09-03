@@ -1,10 +1,6 @@
 import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@fonteditor/catalog";
 import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@fonteditor/render";
-import {
-  deleteGlyph,
-  renameCurrentGlyph,
-  roundGlyphAt,
-} from "@fonteditor/tools";
+import { deleteGlyph, renameCurrentGlyph, roundGlyphAt } from "@fonteditor/tools";
 import { NOTDEF } from "@fonteditor/font-model";
 import {
   type GridLayout,
@@ -123,7 +119,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
         // of the viewport however tall the grid gets; only this offset moves.
         drawGlyphCell(
           ctx,
-          entry.drawn ? state.document.glyphs[entry.name] ?? null : null,
+          entry.drawn ? (state.document.glyphs[entry.name] ?? null) : null,
           { x: box.x, y: box.y - scrollTop, width: box.width, height: box.height },
           palette,
           metrics,
@@ -268,7 +264,9 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): JS
             <button
               key={set.id}
               type="button"
-              className={index === FIRST_BLOCK ? `${styles.set} ${styles.sectionStart}` : styles.set}
+              className={
+                index === FIRST_BLOCK ? `${styles.set} ${styles.sectionStart}` : styles.set
+              }
               aria-current={set.id === query.set ? "true" : undefined}
               // A block the font has nothing in is greyed rather than hidden:
               // "Cyrillic 0" answers the question; an absent row does not.

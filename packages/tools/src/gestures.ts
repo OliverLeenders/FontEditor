@@ -126,7 +126,7 @@ export function startItemDrag(
   // segment is being worked on. A node sits between two and names neither, so
   // dragging one leaves focus where it was rather than guessing.
   const focusedSegment = isHandle
-    ? handleSegment(state, item) ?? state.focusedSegment
+    ? (handleSegment(state, item) ?? state.focusedSegment)
     : state.focusedSegment;
 
   const gesture: Gesture =
@@ -275,7 +275,8 @@ export function translateSelection(g: Glyph, selection: Selection, delta: Vec2):
 
   for (const item of selection) {
     if (item.part !== "point") continue;
-    next = updateContour(next, item.contourId, (c) => translateNodeBy(c, item.nodeId, delta)) ?? next;
+    next =
+      updateContour(next, item.contourId, (c) => translateNodeBy(c, item.nodeId, delta)) ?? next;
   }
 
   for (const item of selection) {
@@ -527,8 +528,13 @@ function continueTunni(
   apply: (c: Parameters<typeof setSegmentTunniPoint>[0], index: number, p: Vec2) => unknown,
 ): EditorState {
   const next = updateGlyph(gesture.before, state.currentGlyph, (g) =>
-    updateContour(g, gesture.segment.contourId, (c) =>
-      apply(c, gesture.segment.segmentIndex, input.point) as ReturnType<typeof setSegmentTunniPoint>,
+    updateContour(
+      g,
+      gesture.segment.contourId,
+      (c) =>
+        apply(c, gesture.segment.segmentIndex, input.point) as ReturnType<
+          typeof setSegmentTunniPoint
+        >,
     ),
   );
   return {

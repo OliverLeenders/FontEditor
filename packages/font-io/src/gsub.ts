@@ -34,9 +34,7 @@ export type LigatureSub = {
  * because nothing keeps a font ordered that way and the saving is a few bytes.
  */
 export function singleSubst(sub: SingleSub): Uint8Array {
-  const pairs = sub.from
-    .map((id, i) => ({ id, to: sub.to[i]! }))
-    .sort((l, r) => l.id - r.id);
+  const pairs = sub.from.map((id, i) => ({ id, to: sub.to[i]! })).sort((l, r) => l.id - r.id);
 
   const cover = coverage(pairs.map((p) => p.id));
   const w = new Writer();

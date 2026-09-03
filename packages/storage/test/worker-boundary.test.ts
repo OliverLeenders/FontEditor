@@ -182,7 +182,9 @@ describe("replacing the whole project", () => {
     // file the project has — so anything left out of the message was written
     // over as empty.
     const { client } = await open();
-    const text = ["feature liga {", "    sub o v by o;", "} liga;", ""].join(String.fromCharCode(10));
+    const text = ["feature liga {", "    sub o v by o;", "} liga;", ""].join(
+      String.fromCharCode(10),
+    );
     await client.replaceAll(setFeatures(document(), text));
 
     const loaded = await client.load();

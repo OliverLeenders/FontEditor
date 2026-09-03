@@ -69,8 +69,7 @@ export function NewGlyph(): JSX.Element {
     covered === null
       ? []
       : covered.filter(
-          (code) =>
-            !Object.values(document.glyphs).some((g) => g.unicodes.includes(code)),
+          (code) => !Object.values(document.glyphs).some((g) => g.unicodes.includes(code)),
         );
 
   const addMissing = (): void => {

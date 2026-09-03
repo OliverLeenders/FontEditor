@@ -48,9 +48,7 @@ export function FeaturesView(): JSX.Element {
             </>
           )}
         </span>
-        <span
-          className={compiled.problems.length === 0 ? styles.clean : styles.problemCount}
-        >
+        <span className={compiled.problems.length === 0 ? styles.clean : styles.problemCount}>
           {compiled.problems.length === 0
             ? "no problems"
             : compiled.problems.length === 1
@@ -90,15 +88,23 @@ export function FeaturesView(): JSX.Element {
               another tool needs to know what will survive the trip, and finding
               out from the exported font is finding out too late. */}
           <ul className={styles.supported}>
-            <li>glyph classes — <code>@FIGS = [zero one];</code></li>
-            <li>ligatures — <code>sub f i by fi;</code></li>
-            <li>single substitution — <code>sub a by a.sc;</code></li>
-            <li>class substitution — <code>sub @LOWER by @SMALL;</code></li>
+            <li>
+              glyph classes — <code>@FIGS = [zero one];</code>
+            </li>
+            <li>
+              ligatures — <code>sub f i by fi;</code>
+            </li>
+            <li>
+              single substitution — <code>sub a by a.sc;</code>
+            </li>
+            <li>
+              class substitution — <code>sub @LOWER by @SMALL;</code>
+            </li>
           </ul>
           <p className={styles.note}>
-            Contextual rules, alternates and positioning are kept in the file and
-            written to the UFO, but are not compiled into the exported OTF.
-            Kerning has its own workspace and is written from there.
+            Contextual rules, alternates and positioning are kept in the file and written to the
+            UFO, but are not compiled into the exported OTF. Kerning has its own workspace and is
+            written from there.
           </p>
         </aside>
       </div>

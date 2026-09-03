@@ -94,7 +94,8 @@ export type StoredFontInfo = {
 };
 
 /** Success, or a reason a file could not be understood. */
-export type Decoded<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: string };
+export type Decoded<T> =
+  { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: string };
 
 const ok = <T>(value: T): Decoded<T> => ({ ok: true, value });
 const fail = <T>(reason: string): Decoded<T> => ({ ok: false, reason });
@@ -231,10 +232,12 @@ function decodeNode(raw: unknown): Decoded<Node> {
   }
 
   const incoming = raw["in"] === null || raw["in"] === undefined ? null : decodePoint(raw["in"]);
-  if (raw["in"] != null && incoming === null) return fail(`node ${raw["id"]} has an invalid in handle`);
+  if (raw["in"] != null && incoming === null)
+    return fail(`node ${raw["id"]} has an invalid in handle`);
 
   const outgoing = raw["out"] === null || raw["out"] === undefined ? null : decodePoint(raw["out"]);
-  if (raw["out"] != null && outgoing === null) return fail(`node ${raw["id"]} has an invalid out handle`);
+  if (raw["out"] != null && outgoing === null)
+    return fail(`node ${raw["id"]} has an invalid out handle`);
 
   return ok(
     node(raw["id"], pt, {
@@ -320,11 +323,21 @@ function decodeComponent(raw: unknown): Component | null {
     numbers.push(value);
   }
   const [xScale, xyScale, yxScale, yScale, xOffset, yOffset] = numbers as [
-    number, number, number, number, number, number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
   ];
 
   return component(raw["id"], raw["base"], {
-    xScale, xyScale, yxScale, yScale, xOffset, yOffset,
+    xScale,
+    xyScale,
+    yxScale,
+    yScale,
+    xOffset,
+    yOffset,
   });
 }
 
@@ -370,7 +383,6 @@ export function migrate(raw: unknown): Decoded<Record<string, unknown>> {
   }
   return ok(current);
 }
-
 
 // ---------------------------------------------------------------------------
 // kerning

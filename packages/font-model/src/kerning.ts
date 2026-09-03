@@ -222,9 +222,7 @@ export function removeKernGroup(k: Kerning, side: "first" | "second", name: stri
 }
 
 /** Every pair as a flat list, for writing files and for counting. */
-export function kernPairs(
-  k: Kerning,
-): Array<{ first: string; second: string; value: number }> {
+export function kernPairs(k: Kerning): Array<{ first: string; second: string; value: number }> {
   const out: Array<{ first: string; second: string; value: number }> = [];
   for (const [first, row] of Object.entries(k.pairs)) {
     for (const [second, value] of Object.entries(row)) out.push({ first, second, value });
