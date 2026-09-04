@@ -10,6 +10,14 @@ export type HorizontalGuide = {
   readonly y: number;
   /** Drawn heavier. The baseline usually wants this; x-height usually does not. */
   readonly emphasis?: boolean;
+  /**
+   * What the line is, written at the edge of the canvas.
+   *
+   * Optional because a guide can be a bare rule — but a font's own lines all
+   * have names, and four unlabelled rules across a glyph are four rules you have
+   * to work out from where they sit.
+   */
+  readonly label?: string;
 };
 
 /**

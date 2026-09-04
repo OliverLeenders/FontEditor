@@ -130,7 +130,15 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
     // Everything else keeps the renderer's own sizes; only the stroke is a
     // preference, so only the stroke is overridden.
     metrics: { ...DEFAULT_METRICS, outlineWidth: state.outlineWidth },
-    guides: metricLines(editor.document.info),
+    // The names come with the lines; the renderer writes them at the edge.
+    guides: metricLines(editor.document.info).map((line) => ({
+      y: line.y,
+      // Spread rather than assigned: an absent `emphasis` and one set to
+      // `undefined` are different types here, and only the first is a guide
+      // that simply is not emphasised.
+      ...(line.emphasis === true ? { emphasis: true } : {}),
+      label: line.name,
+    })),
     snapGuides: snapGuidesFor(editor),
     tunniSegments: tunniSegments(editor),
     selection: editor.selection,

@@ -1,0 +1,68 @@
+.holder {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Anchored under its button rather than centred on the window: it edits seven
+   small facts, and a dialog over the whole browser would say they were larger
+   than they are. */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.45rem;
+  min-width: 17rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.field {
+  display: grid;
+  grid-template-columns: 6.5rem 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.input {
+  width: 100%;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.input[data-wrong="true"] {
+  border-color: var(--warn);
+}
+
+/* Spans both columns, so the reason sits under the box it refuses. */
+.problem {
+  grid-column: 1 / -1;
+  font-size: 0.72rem;
+  color: var(--warn);
+}
+
+.note {
+  margin: 0.1rem 0 0;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}

@@ -370,6 +370,53 @@ describe("guides", () => {
     const move = ctx.all("moveTo").find((o) => o.args[0] === 0 && o.args[1] === expected);
     expect(move).toBeDefined();
   });
+
+  it("writes the name of a line that has one", () => {
+    const ctx = render({
+      ...base(ring()),
+      guides: [
+        { y: 0, emphasis: true, label: "baseline" },
+        { y: 500, label: "x-height" },
+      ],
+    });
+    expect(ctx.texts()).toEqual(["baseline", "x-height"]);
+  });
+
+  it("says nothing about a guide with no name", () => {
+    const ctx = render({ ...base(ring()), guides: [{ y: 500 }] });
+    expect(ctx.texts()).toEqual([]);
+  });
+
+  it("drops the second of two names that would land on each other", () => {
+    // A font whose cap height is its ascender draws two rules in the same place,
+    // and two names on top of one another read as neither.
+    const ctx = render({
+      ...base(ring()),
+      guides: [
+        { y: 700, label: "cap height" },
+        { y: 700, label: "ascender" },
+      ],
+    });
+    expect(ctx.texts()).toEqual(["cap height"]);
+  });
+
+  it("keeps both when they are far enough apart", () => {
+    const ctx = render({
+      ...base(ring()),
+      guides: [
+        { y: 700, label: "cap height" },
+        { y: 0, label: "baseline" },
+      ],
+    });
+    expect(ctx.texts()).toEqual(["cap height", "baseline"]);
+  });
+
+  it("writes the name above its line, not on it", () => {
+    const ctx = render({ ...base(ring()), guides: [{ y: 500, label: "x-height" }] });
+    const line = Math.round(toScreen(VIEW, vec(0, 500)).y) + 0.5;
+    const text = ctx.all("fillText")[0];
+    expect(text?.args[1]).toBeLessThan(line);
+  });
 });
 
 describe("state hygiene", () => {

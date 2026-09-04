@@ -17,6 +17,7 @@ import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import { ExportFont } from "./ExportFont.js";
 import { NewFont } from "./NewFont.js";
+import { FontInfoPanel } from "./FontInfoPanel.js";
 import { RoundCoordinates } from "./RoundCoordinates.js";
 import { NewGlyph } from "./NewGlyph.js";
 import { OpenFont } from "./OpenFont.js";
@@ -286,6 +287,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           <NewFont />
           <ExportFont />
           <NewGlyph />
+          <FontInfoPanel />
           <RoundCoordinates />
           <input
             type="search"

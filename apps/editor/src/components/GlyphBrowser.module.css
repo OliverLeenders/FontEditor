@@ -75,8 +75,12 @@
   position: relative;
 }
 
+/* Wraps rather than clips. There are seven controls and a search field here
+   now, and in a narrow window the last of them was being cut off at the edge —
+   a button you cannot see is a button that does not exist. */
 .bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   padding: 0.45rem 0.6rem;

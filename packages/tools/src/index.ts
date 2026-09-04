@@ -58,6 +58,8 @@ export {
   moveCoordinateTo,
   nudgeKern,
   removeComponent,
+  setInfo,
+  infoProblem,
   removeOverlapAt,
   overlapAt,
   type OverlapOutcome,

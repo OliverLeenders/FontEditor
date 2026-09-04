@@ -76,8 +76,13 @@ export function clearBackground(ctx: Canvas2D, s: Scene): void {
   ctx.fill();
 }
 
+/** How near two labels may come, in pixels, before the lower one is dropped. */
+const LABEL_CLEARANCE = 13;
+
 export function drawGuides(ctx: Canvas2D, s: Scene): void {
   ctx.lineWidth = 1;
+  const drawn: number[] = [];
+
   for (const guide of s.guides) {
     // Half-pixel offset so a one-pixel line lands on a pixel rather than
     // straddling two and rendering as a soft two-pixel smear.
@@ -87,6 +92,23 @@ export function drawGuides(ctx: Canvas2D, s: Scene): void {
     ctx.moveTo(0, y);
     ctx.lineTo(s.viewport.width, y);
     ctx.stroke();
+
+    if (guide.label === undefined) continue;
+
+    // Two lines at the same height — a cap height set to the ascender, a
+    // zoomed-out view where everything is within a few pixels — would print
+    // their names on top of each other, which is less legible than one name.
+    // The first one wins, and `metricLines` puts the baseline first.
+    if (drawn.some((at) => Math.abs(at - y) < LABEL_CLEARANCE)) continue;
+    drawn.push(y);
+
+    ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = guide.emphasis === true ? s.palette.guideEmphasis : s.palette.guide;
+    // Above the line and inset from the left edge, where the drawing is not:
+    // a name sitting on the outline would be one more thing to read past.
+    ctx.fillText(guide.label, 6, y - 3);
   }
 }
 

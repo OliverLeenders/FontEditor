@@ -34,8 +34,10 @@ import {
   renameRefusal,
   retractHandle,
   reverseContourAt,
+  infoProblem,
   overlapAt,
   roundCoordinates,
+  setInfo,
   roundGlyphAt,
   roundSelection,
   unroundedSelected,
@@ -747,6 +749,62 @@ describe("renaming the open glyph", () => {
     expect(renameRefusal(state, "alpha")).toBeNull();
     // Its own name is not a collision with itself.
     expect(renameRefusal(state, "a")).toBeNull();
+  });
+});
+
+describe("font info", () => {
+  const start = () =>
+    editorState({
+      document: fontDocument([glyph("a", { advance: 500 })]),
+      view: VIEW,
+    });
+
+  it("changes one field and leaves the rest alone", () => {
+    const out = setInfo(start(), { familyName: "Cormorant" }).state;
+    expect(out.document.info.familyName).toBe("Cormorant");
+    expect(out.document.info.unitsPerEm).toBe(1000);
+  });
+
+  it("is one undo step, and a no-op when nothing changed", () => {
+    const s = start();
+    const named = setInfo(s, { styleName: "Italic" });
+    expect(named.state).not.toBe(s);
+    expect(named.effects.length).toBeGreaterThan(0);
+
+    // The same value again is not an edit, and must not land in the history.
+    expect(setInfo(named.state, { styleName: "Italic" }).state).toBe(named.state);
+  });
+
+  it("refuses an em of zero rather than dividing by it later", () => {
+    const s = start();
+    expect(setInfo(s, { unitsPerEm: 0 }).state).toBe(s);
+    expect(infoProblem({ ...s.document.info, unitsPerEm: 0 })).not.toBeNull();
+  });
+
+  it("refuses an ascender below its descender", () => {
+    const s = start();
+    expect(setInfo(s, { ascender: -400 }).state).toBe(s);
+  });
+
+  it("refuses a font with no family name", () => {
+    const s = start();
+    expect(setInfo(s, { familyName: "   " }).state).toBe(s);
+  });
+
+  it("does not move the drawings when the em changes", () => {
+    // Changing the em changes what the numbers mean, not where the outlines
+    // are. Rescaling a font is a different operation.
+    const s = editorState({
+      document: fontDocument([addContour(glyph("a", { advance: 500 }), ring())]),
+      view: VIEW,
+    });
+    const out = setInfo(s, { unitsPerEm: 2048 }).state;
+    expect(out.document.glyphs["a"]?.contours).toEqual(s.document.glyphs["a"]?.contours);
+    expect(out.document.glyphs["a"]?.advance).toBe(500);
+  });
+
+  it("takes an x-height of zero, which is a font with no lower case", () => {
+    expect(setInfo(start(), { xHeight: 0 }).state.document.info.xHeight).toBe(0);
   });
 });
 
