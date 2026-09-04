@@ -9,24 +9,44 @@ derives from the reverse-engineering write-up in
 
 ## Status
 
-**There is a real editor now.** Tabs, a toolbar, a floating inspector and a glyph strip
-around a canvas where you draw contours, edit them with Tunni lines, undo, and switch
-glyphs — with everything autosaving. Next is the glyph browser, then the per-glyph work
-of phase 3.
+**A font drawn here can be exported and installed.** Five workspaces — Font, Glyph,
+Spacing, Features, Proof — around a canvas with select, pen, knife, rectangle, ellipse
+and measure tools, snapping, boolean union, components, kerning, a `.fea` subset, and
+OTF and UFO in both directions. Everything autosaves.
 
-| Phase |                                     | Status                                                         |
-| ----- | ----------------------------------- | -------------------------------------------------------------- |
-| 0     | Foundations and the geometry kernel | done                                                           |
-| 1     | The editing surface                 | done                                                           |
-| 2     | Undo, redo, persistence             | done                                                           |
-| 3     | From paths to a glyph               | not started                                                    |
-| 4     | From a glyph to a font              | multi-glyph document done; browser and font info panel pending |
-| 5     | Binary import and export            | not started                                                    |
-| 6     | Proofing and shaping                | not started                                                    |
-| 7     | Spacing and kerning                 | not started                                                    |
-| 8     | OpenType features                   | not started                                                    |
-| 9     | Variable fonts                      | not started                                                    |
-| 10    | Production polish                   | not started                                                    |
+| Phase |                                     | Status                                                                      |
+| ----- | ----------------------------------- | --------------------------------------------------------------------------- |
+| 0     | Foundations and the geometry kernel | done                                                                        |
+| 1     | The editing surface                 | done                                                                        |
+| 2     | Undo, redo, persistence             | done                                                                        |
+| 3     | From paths to a glyph               | done                                                                        |
+| 4     | From a glyph to a font              | browser done; **no way to edit font info** — see below                      |
+| 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools           |
+| 6     | Proofing and shaping                | proofing done; **nothing is shaped** — no feature is applied                |
+| 7     | Spacing and kerning                 | done; groups can be read and broken out of, but not edited                  |
+| 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual       |
+| 9     | Variable fonts                      | not started                                                                 |
+| 10    | Production polish                   | lint, format and 1163 tests; no CI, and view preferences are lost on reload |
+
+### What the table is hiding
+
+The gaps worth naming, in the order they would bite someone using this:
+
+- **Font info cannot be edited.** Family, style, units per em and the vertical metrics
+  exist in the model and are read from an imported file, but nothing in the interface
+  writes them — a font drawn from scratch exports as "Untitled Regular" at 1000 upem.
+- **The proof does not apply features.** Kerning is laid out, substitution is not, so a
+  ligature that compiles into the exported font cannot be seen before exporting it.
+  The proof shows the glyphs the characters map to, one for one.
+- **Overlap removal declines edges that lie along each other**, and does not look at a
+  contour that crosses itself. Both refuse rather than guess, which is the right
+  failure, and both are real shapes a designer will draw.
+- **Kerning groups** are modelled, imported, exported and shown, but there is no way to
+  create or change one from the interface.
+- **View preferences do not survive a reload** — outline weight, handle visibility,
+  snapping, and the type sizes in Spacing and Proof all return to their defaults.
+- **The UFO writer has never been read by anything but itself.** The importer round-trips
+  it, which proves consistency, not correctness.
 
 ## Getting started
 
@@ -49,9 +69,11 @@ without the interface around them:
 pnpm dev:playground
 ```
 
-Use PgUp and PgDn to move between glyphs. Press `V` for the select tool and `P` for the pen. With the pen, click for a corner
-point and drag for a smooth one, Alt while dragging to leave only one handle, click the
-first point to close, Enter or Escape to finish open, Backspace to take a point back.
+Use PgUp and PgDn to move between glyphs. The toolbar is icons; every one names its
+shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
+`M` measure. With the pen, click for a corner point and drag for a smooth one, Alt while
+dragging to leave only one handle, click the first point to close, Enter or Escape to
+finish open, Backspace to take a point back.
 
 With the select tool: drag nodes, handles, the blue Tunni line and the amber Tunni
 point. Double-click a Tunni point to balance the segment. Shift extends the selection,
@@ -64,8 +86,9 @@ reverse contour and delete. A handle offers the axis lock, its node's type, retr
 and reverse. A segment offers insert-point-here, line/curve conversion, balance and
 reverse. Which items appear depends on what is under the pointer, using the same hit
 index the tools use — the menu can never offer an action for something the canvas is
-not showing. Space previews without controls, the wheel zooms, middle-drag
-pans, and Ctrl-0 refits.
+not showing. Space previews without controls, the wheel pans, Ctrl-wheel zooms at the
+cursor, middle-drag pans, and Ctrl-0 refits. Ctrl-wheel also sets the type size in the
+Spacing and Proof workspaces.
 
 Edits autosave to the browser's private filesystem after a second's pause, so closing
 the tab and coming back keeps your work. Note that this store belongs to the browser,
@@ -92,13 +115,15 @@ packages/
   font-model/   Nodes, contours, glyphs. Plain serializable data.
   view/         Design↔screen transforms, hit testing, segment activation. Pure.
   render/       Canvas drawing. Pure draw functions plus a thin surface helper.
-  tools/        Select and pen, as pure reducers over editor state.
+  tools/        Every tool, as pure reducers over editor state.
   edit-core/    Transactions, undo and redo over the document.
   storage/      Autosave to OPFS, in a worker. Local-first; nothing leaves the browser.
+  font-io/      OTF and UFO, read and written by hand. Zip, plist, XML, GPOS, GSUB, .fea.
+  catalog/      Unicode blocks and the glyph browser's query layer.
 ```
 
 Packages are consumed directly from TypeScript source — there is no build step until
-something needs to ship. Later phases add `edit-core`, `tools`, `font-io`, and an `apps/editor` shell.
+something needs to ship.
 
 ### Two decisions worth knowing before reading the code
 
