@@ -22,9 +22,16 @@
   border-radius: var(--radius);
   background: none;
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
+  padding: 0;
   color: var(--ink-2);
+}
+
+/* Lucide is drawn on a 24 box with a 2 stroke, so this is the size at which the
+   stroke lands near a whole pixel on an ordinary screen. Smaller and the round
+   ends start to blur into the ink. */
+.tool svg {
+  width: 1.3rem;
+  height: 1.3rem;
 }
 .tool:hover:not(:disabled) {
   background: var(--surface-2);
@@ -37,24 +44,6 @@
 }
 .tool:disabled {
   opacity: 0.3;
-  cursor: default;
-}
-
-.action {
-  padding: 0.18rem 0.55rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  cursor: pointer;
-  font-size: 0.78rem;
-  color: var(--ink-2);
-}
-.action:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--accent);
-}
-.action:disabled {
-  opacity: 0.38;
   cursor: default;
 }
 
@@ -77,12 +66,14 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A toggled action reads as pressed but stays quieter than an active tool: it
-   is a view preference, not the mode the pointer is in. */
-.action[aria-pressed="true"] {
+/* A toggled view preference reads as on, but stays quieter than the active
+   tool: it is a preference, not the mode the pointer is in. Now that both are
+   icon buttons of the same size, this distinction has to be carried entirely by
+   the colour — so the tool fills with the accent and the toggle only tints. */
+.tool.toggle[aria-pressed="true"] {
+  background: var(--accent-soft);
   border-color: var(--accent);
-  color: var(--ink);
-  background: var(--selected);
+  color: var(--accent-ink);
 }
 
 .widthLabel {

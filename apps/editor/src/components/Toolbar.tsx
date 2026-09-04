@@ -2,6 +2,20 @@ import type { ToolId } from "@fonteditor/tools";
 
 import { MAX_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH } from "../store.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import {
+  EllipseIcon,
+  FitIcon,
+  HandlesIcon,
+  type IconComponent,
+  KnifeIcon,
+  MeasureIcon,
+  PenIcon,
+  RectIcon,
+  RedoIcon,
+  SelectIcon,
+  SnapIcon,
+  UndoIcon,
+} from "./icons.js";
 import { RemoveOverlap } from "./RemoveOverlap.js";
 import styles from "./Toolbar.module.css";
 
@@ -10,32 +24,43 @@ type ToolButton = {
   readonly key: string;
   readonly label: string;
   readonly hint: string;
+  readonly icon: IconComponent;
 };
 
 /**
- * The tools, with the ones that do not exist yet shown disabled.
+ * The tools.
  *
- * All of them are real now. The row is the toolbox rather than a promise. The rest are placed so the rail's eventual
- * shape is visible and honestly marked — the earlier mockups had a letter in
- * this row that stood for nothing, which is the failure being avoided here.
+ * Icons rather than the letters that were here before. The letter had one real
+ * virtue — it taught the keyboard shortcut for free — so the shortcut is now
+ * carried by every tooltip instead, and the tooltip is the only place it is
+ * written. A row of six letters says nothing about what any of them do until you
+ * have learned all six.
  */
 const TOOLS: readonly ToolButton[] = [
-  { id: "select", key: "V", label: "Select", hint: "Select and edit  (V)" },
-  { id: "pen", key: "P", label: "Pen", hint: "Draw contours  (P)" },
-  { id: "knife", key: "K", label: "Knife", hint: "Cut across the outline  (K)" },
+  { id: "select", key: "V", label: "Select", hint: "Select and edit  (V)", icon: SelectIcon },
+  { id: "pen", key: "P", label: "Pen", hint: "Draw contours  (P)", icon: PenIcon },
+  { id: "knife", key: "K", label: "Knife", hint: "Cut across the outline  (K)", icon: KnifeIcon },
   {
     id: "rect",
     key: "R",
     label: "Rectangle",
     hint: "Draw a rectangle  (R) · shift for a square, alt from the centre",
+    icon: RectIcon,
   },
   {
     id: "ellipse",
     key: "E",
     label: "Ellipse",
     hint: "Draw an ellipse  (E) · shift for a circle, alt from the centre",
+    icon: EllipseIcon,
   },
-  { id: "measure", key: "M", label: "Measure", hint: "Measure across a stem  (M) · click to pin" },
+  {
+    id: "measure",
+    key: "M",
+    label: "Measure",
+    hint: "Measure across a stem  (M) · click to pin",
+    icon: MeasureIcon,
+  },
 ];
 
 export function Toolbar(): React.JSX.Element {
@@ -62,7 +87,7 @@ export function Toolbar(): React.JSX.Element {
             aria-label={tool.label}
             onClick={() => tool.id !== null && store.setTool(tool.id)}
           >
-            {tool.key}
+            <tool.icon />
           </button>
         ))}
       </div>
@@ -70,23 +95,27 @@ export function Toolbar(): React.JSX.Element {
       <div className={styles.divider} />
 
       <div className={styles.group} role="group" aria-label="History">
+        {/* The tooltip is doing more work than before: it is the only place the
+            step being undone is named, now that the button is an arrow. */}
         <button
           type="button"
-          className={styles.action}
+          className={styles.tool}
           disabled={undoLabel === null}
           title={undoLabel === null ? "Nothing to undo" : `Undo ${undoLabel}  (Ctrl-Z)`}
+          aria-label="Undo"
           onClick={() => store.undo()}
         >
-          Undo
+          <UndoIcon />
         </button>
         <button
           type="button"
-          className={styles.action}
+          className={styles.tool}
           disabled={redoLabel === null}
           title={redoLabel === null ? "Nothing to redo" : `Redo ${redoLabel}  (Ctrl-Shift-Z)`}
+          aria-label="Redo"
           onClick={() => store.redo()}
         >
-          Redo
+          <RedoIcon />
         </button>
       </div>
 
@@ -94,12 +123,13 @@ export function Toolbar(): React.JSX.Element {
 
       <button
         type="button"
-        className={styles.action}
+        className={`${styles.tool} ${styles.toggle}`}
         aria-pressed={autoHide}
         title={autoHide ? "Handles show near the work  (H)" : "All handles always shown  (H)"}
+        aria-label="Handles"
         onClick={() => store.toggleAutoHideHandles()}
       >
-        Handles
+        <HandlesIcon />
       </button>
 
       {/* The metric lines are not part of this and are always live: the canvas
@@ -107,16 +137,17 @@ export function Toolbar(): React.JSX.Element {
           the glyph's own points make, which it does not draw yet. */}
       <button
         type="button"
-        className={styles.action}
+        className={`${styles.tool} ${styles.toggle}`}
         aria-pressed={snapPoints}
         title={
           snapPoints
             ? "Drags line up with the glyph's own points  (S) · hold ctrl to override"
             : "Drags line up with the font's lines only  (S)"
         }
+        aria-label="Snap"
         onClick={() => store.toggleSnapPoints()}
       >
-        Snap
+        <SnapIcon />
       </button>
 
       {/* A range rather than a set of choices: the right weight depends on the
@@ -144,11 +175,12 @@ export function Toolbar(): React.JSX.Element {
 
       <button
         type="button"
-        className={styles.action}
+        className={styles.tool}
         title="Fit the glyph in the window  (Ctrl-0)"
+        aria-label="Fit"
         onClick={() => store.fitGlyph()}
       >
-        Fit
+        <FitIcon />
       </button>
       <span className={styles.zoom}>{Math.round(scale * 100)}%</span>
     </div>

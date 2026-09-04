@@ -2,6 +2,7 @@ import { overlapAt } from "@fonteditor/tools";
 import { useEffect, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { OverlapIcon } from "./icons.js";
 import styles from "./Toolbar.module.css";
 
 /** How long the result of the last removal stays on screen. */
@@ -35,13 +36,14 @@ export function RemoveOverlap(): React.JSX.Element {
     <>
       <button
         type="button"
-        className={styles.action}
+        className={styles.tool}
         disabled={reading}
         title={
           reading
             ? "Another tab is saving this project"
             : "Replace the overlapping contours with their outline"
         }
+        aria-label="Remove overlap"
         onClick={() => {
           const editor = store.editor;
           const { outcome, result } = overlapAt(editor, editor.currentGlyph);
@@ -65,7 +67,7 @@ export function RemoveOverlap(): React.JSX.Element {
           });
         }}
       >
-        Overlap
+        <OverlapIcon />
       </button>
       {note === null ? null : (
         <span className={styles.note} data-refused={note.refused} role="status">
