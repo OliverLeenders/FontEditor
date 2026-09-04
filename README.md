@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                                  |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual |
 | 9     | Variable fonts                      | not started                                                           |
-| 10    | Production polish                   | lint, format and 1269 tests, run on CI; preferences persist           |
+| 10    | Production polish                   | lint, format and 1283 tests, run on CI; preferences persist           |
 
 ### What the table is hiding
 

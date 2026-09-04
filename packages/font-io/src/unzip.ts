@@ -98,8 +98,16 @@ async function inflate(raw: Uint8Array): Promise<Uint8Array | null> {
     const writer = stream.writable.getWriter();
     // A fresh copy: a subarray shares its buffer with the whole archive, and the
     // stream is entitled to detach whatever it is handed.
-    void writer.write(new Uint8Array(raw));
-    void writer.close();
+    //
+    // Both of these reject when the data turns out not to be deflate, and
+    // neither is awaited — writing does not settle until the reader has taken
+    // the bytes, so awaiting here would wait for a reader that has not started.
+    // Swallowed rather than left floating: the failure is reported once, by the
+    // read below, and an unhandled rejection beside it would be the same news
+    // arriving as an error nobody asked for.
+    const ignore = (): undefined => undefined;
+    void writer.write(new Uint8Array(raw)).catch(ignore);
+    void writer.close().catch(ignore);
 
     const chunks: Uint8Array[] = [];
     const reader = stream.readable.getReader() as ReadableStreamDefaultReader<Uint8Array>;
