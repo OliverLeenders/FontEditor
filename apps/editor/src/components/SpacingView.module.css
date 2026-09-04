@@ -7,7 +7,14 @@
 }
 
 .bar {
+  /* The kerning groups panel hangs under the whole bar rather than under its
+     own button, which is too near the right edge to hold something this wide. */
+  position: relative;
   display: flex;
+  /* Wraps rather than running off the side: the controls are each a fixed
+     width, and a narrow window would otherwise push the last of them past the
+     edge and take the panel hanging under the bar with it. */
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.8rem;
   padding: 0.5rem 0.7rem;

@@ -41,8 +41,11 @@ export {
 } from "./state.js";
 
 export {
+  type KernSide,
   addComponent,
+  addKernGroup,
   breakOutKern,
+  deleteKernGroup,
   createGlyphs,
   deleteGlyph,
   deleteRefusal,
@@ -55,6 +58,12 @@ export {
   deleteSelectedPoints,
   insertPointOnSegment,
   kerningFor,
+  kernGroupHolding,
+  kernGroupPairs,
+  kernGroupProblem,
+  putGlyphInKernGroup,
+  renameKernGroupTo,
+  takeGlyphFromKernGroup,
   moveCoordinateTo,
   nudgeKern,
   removeComponent,

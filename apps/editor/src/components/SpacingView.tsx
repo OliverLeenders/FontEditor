@@ -10,6 +10,7 @@ import {
 } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { KernGroups } from "./KernGroups.js";
 import { palette } from "../scene.js";
 import { shaperFrom } from "../shaping.js";
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store.js";
@@ -74,6 +75,7 @@ export function SpacingView({
   const text = useStoreValue((s) => s.spacingText);
   const size = useStoreValue((s) => s.spacingSize);
   const mode = useStoreValue((s) => s.spacingMode);
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const [selected, setSelected] = useState<number | null>(null);
   // How far the line has been pushed along, in screen pixels. Zero is where the
   // line puts itself, so the view has a resting place to return to.
@@ -303,6 +305,15 @@ export function SpacingView({
         >
           Features
         </button>
+        {/* Groups belong beside the line rather than in a workspace of their
+            own: which class a letter is in is a question that arrives while
+            looking at a gap, not before. */}
+        <KernGroups
+          open={groupsOpen}
+          onOpenChange={setGroupsOpen}
+          first={previousName}
+          second={selectedName}
+        />
         <label className={styles.sizeLabel}>
           Size
           <input
@@ -406,6 +417,17 @@ export function SpacingView({
                 ) : (
                   <span className={styles.hint}>this pair only</span>
                 )}
+                {/* Opens the panel already showing the classes these two are
+                    in, because the moment you want a class is the moment a
+                    pair turns out to be one of a family. */}
+                <button
+                  type="button"
+                  className={styles.breakOut}
+                  title="The classes these two letters kern by"
+                  onClick={() => setGroupsOpen(true)}
+                >
+                  Group…
+                </button>
               </>
             )}
           </>

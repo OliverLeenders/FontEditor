@@ -1,0 +1,234 @@
+/* Not positioned, deliberately: the panel is two columns wide and the button
+   sits near the right end of the bar, so hanging it off the button would put
+   half of it past the edge of the window. It hangs off the bar instead, which
+   is why the bar is the positioned ancestor. */
+.holder {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.open {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--canvas);
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+}
+.open:hover:not(:disabled) {
+  color: var(--ink);
+}
+.open[aria-expanded="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+}
+.open:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Both sides at once, because a group is only half the answer: the same letter
+   belongs to one class by its right flank and another by its left, and choosing
+   one while the other is out of sight is how they drift apart. */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0.7rem;
+  right: 0.7rem;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.1rem;
+  /* Wide enough for two lists side by side, and no wider: a panel stretched
+     across a large display puts the two columns further apart than the reason
+     for comparing them. */
+  max-width: 46rem;
+  padding: 0.8rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.side {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.side + .side {
+  padding-left: 1.1rem;
+  border-left: 1px solid var(--rule);
+}
+
+.title {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.groups {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0.2rem;
+  max-height: 11rem;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--ground);
+}
+
+.group {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.2rem 0.4rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+}
+.group:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+.group[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.groupName {
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  opacity: 0.75;
+}
+
+.actions,
+.naming,
+.add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.action {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.74rem;
+}
+.action:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+.action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* The one button here that takes something away with it. */
+.action[data-danger="true"]:hover {
+  color: var(--warn);
+  border-color: var(--warn);
+}
+
+.input {
+  flex: 1;
+  min-width: 5rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.input[data-wrong="true"] {
+  border-color: var(--warn);
+}
+
+/* The members, as things you can take back out one at a time. */
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--rule);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.1rem 0.2rem 0.1rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+}
+
+.drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+  line-height: 1;
+}
+.drop:hover {
+  color: var(--warn);
+}
+
+.add {
+  flex-basis: 100%;
+}
+
+.empty,
+.note {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.problem {
+  flex-basis: 100%;
+  font-size: 0.72rem;
+  color: var(--warn);
+}

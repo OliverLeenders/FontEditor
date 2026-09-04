@@ -221,6 +221,115 @@ export function removeKernGroup(k: Kerning, side: "first" | "second", name: stri
   return { ...k, [key]: groups, pairs };
 }
 
+/**
+ * Rename a group, carrying its pairs with it.
+ *
+ * Pairs name a group by its name, so a rename that touched only the group list
+ * would leave every rule pointing at something that is no longer there. Refuses
+ * a name already taken on that side rather than quietly merging two groups.
+ */
+export function renameKernGroup(
+  k: Kerning,
+  side: "first" | "second",
+  from: string,
+  to: string,
+): Kerning {
+  if (from === to) return k;
+  const key = side === "first" ? "firstGroups" : "secondGroups";
+  if (!(from in k[key]) || to in k[key]) return k;
+
+  // Rebuilt in place rather than deleted and appended, so renaming a group does
+  // not move it to the end of a list someone is reading down.
+  const groups: Record<string, readonly GlyphName[]> = {};
+  for (const [name, glyphs] of Object.entries(k[key])) groups[name === from ? to : name] = glyphs;
+
+  const was = groupKey(from);
+  const now = groupKey(to);
+  const pairs: Record<string, Record<string, number>> = {};
+  for (const [first, row] of Object.entries(k.pairs)) {
+    const kept: Record<string, number> = {};
+    for (const [second, value] of Object.entries(row)) {
+      kept[side === "second" && second === was ? now : second] = value;
+    }
+    pairs[side === "first" && first === was ? now : first] = kept;
+  }
+
+  return { ...k, [key]: groups, pairs };
+}
+
+/**
+ * Which group a glyph sits in on one side, or `null`.
+ *
+ * The first group listed, matching how `kernIndex` resolves a glyph that an
+ * imported font put in two.
+ */
+export function kernGroupOf(k: Kerning, side: "first" | "second", glyph: GlyphName): string | null {
+  const key = side === "first" ? "firstGroups" : "secondGroups";
+  for (const [name, glyphs] of Object.entries(k[key])) if (glyphs.includes(glyph)) return name;
+  return null;
+}
+
+/**
+ * Put a glyph in a group, taking it out of whichever group on that side held it.
+ *
+ * A glyph in two groups on one side kerns differently depending on which group
+ * is read first. Importing tolerates that, because such fonts exist; nothing
+ * made here should write one.
+ */
+export function addToKernGroup(
+  k: Kerning,
+  side: "first" | "second",
+  name: string,
+  glyph: GlyphName,
+): Kerning {
+  const key = side === "first" ? "firstGroups" : "secondGroups";
+  if (!(name in k[key])) return k;
+
+  const groups: Record<string, readonly GlyphName[]> = {};
+  let changed = false;
+  for (const [each, glyphs] of Object.entries(k[key])) {
+    if (each === name) {
+      if (glyphs.includes(glyph)) groups[each] = glyphs;
+      else {
+        groups[each] = [...glyphs, glyph];
+        changed = true;
+      }
+    } else if (glyphs.includes(glyph)) {
+      groups[each] = glyphs.filter((one) => one !== glyph);
+      changed = true;
+    } else groups[each] = glyphs;
+  }
+
+  return changed ? { ...k, [key]: groups } : k;
+}
+
+/** Take a glyph out of a group, leaving the group and its pairs in place. */
+export function removeFromKernGroup(
+  k: Kerning,
+  side: "first" | "second",
+  name: string,
+  glyph: GlyphName,
+): Kerning {
+  const key = side === "first" ? "firstGroups" : "secondGroups";
+  const glyphs = k[key][name];
+  if (glyphs === undefined || !glyphs.includes(glyph)) return k;
+  return { ...k, [key]: { ...k[key], [name]: glyphs.filter((one) => one !== glyph) } };
+}
+
+/** How many pairs name a group, so deleting it can say what that costs. */
+export function kernGroupPairCount(k: Kerning, side: "first" | "second", name: string): number {
+  const reference = groupKey(name);
+  let n = 0;
+  for (const [first, row] of Object.entries(k.pairs)) {
+    if (side === "first") {
+      if (first === reference) n += Object.keys(row).length;
+      continue;
+    }
+    for (const second of Object.keys(row)) if (second === reference) n++;
+  }
+  return n;
+}
+
 /** Every pair as a flat list, for writing files and for counting. */
 export function kernPairs(k: Kerning): Array<{ first: string; second: string; value: number }> {
   const out: Array<{ first: string; second: string; value: number }> = [];

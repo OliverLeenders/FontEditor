@@ -5,12 +5,17 @@ import {
   type Kerning,
   clearKern,
   groupKey,
+  addToKernGroup,
+  kernGroupOf,
+  kernGroupPairCount,
   kernIndex,
   kernMatch,
   kernPairCount,
   kernPairs,
   kernValue,
+  removeFromKernGroup,
   removeKernGroup,
+  renameKernGroup,
   setKern,
   setKernException,
   setKernGroup,
@@ -179,5 +184,117 @@ describe("kernPairs", () => {
     expect(all).toHaveLength(4);
     expect(all).toContainEqual({ first: "T", second: "A", value: -95 });
     expect(all).toContainEqual({ first: "@O", second: "@A", value: -40 });
+  });
+});
+
+describe("renameKernGroup", () => {
+  it("carries the pairs written against a first-side group", () => {
+    const k = renameKernGroup(sample(), "first", "O", "round");
+    expect(Object.keys(k.firstGroups)).toEqual(["round", "T"]);
+    // The rule still governs the same letters, under the new name.
+    expect(value(k, "Q", "A")).toBe(-40);
+    expect(k.pairs["@round"]?.["@A"]).toBe(-40);
+  });
+
+  it("carries the pairs written against a second-side group", () => {
+    const k = renameKernGroup(sample(), "second", "A", "triangle");
+    expect(value(k, "O", "Aacute")).toBe(-40);
+    expect(value(k, "T", "A")).toBe(-95); // the exception names glyphs, not groups
+  });
+
+  it("keeps the group where it was in the list", () => {
+    const k = renameKernGroup(sample(), "first", "O", "zzz");
+    expect(Object.keys(k.firstGroups)).toEqual(["zzz", "T"]);
+  });
+
+  it("refuses a name already taken on that side", () => {
+    // Allowing it would merge two groups, losing one of them and its pairs.
+    const k = sample();
+    expect(renameKernGroup(k, "first", "O", "T")).toBe(k);
+  });
+
+  it("does nothing for a group that is not there, or for its own name", () => {
+    const k = sample();
+    expect(renameKernGroup(k, "first", "nope", "something")).toBe(k);
+    expect(renameKernGroup(k, "first", "O", "O")).toBe(k);
+  });
+
+  it("leaves the other side alone", () => {
+    // "A" is a group on the second side only; renaming it on the first must not
+    // reach across.
+    const k = sample();
+    expect(renameKernGroup(k, "first", "A", "whatever")).toBe(k);
+  });
+});
+
+describe("kernGroupOf", () => {
+  it("says which group holds a glyph on a side", () => {
+    expect(kernGroupOf(sample(), "first", "Q")).toBe("O");
+    expect(kernGroupOf(sample(), "second", "Aacute")).toBe("A");
+  });
+
+  it("is null for a glyph in no group on that side", () => {
+    expect(kernGroupOf(sample(), "first", "A")).toBeNull();
+    expect(kernGroupOf(sample(), "second", "V")).toBeNull();
+  });
+});
+
+describe("addToKernGroup", () => {
+  it("takes the glyph out of whichever group on that side held it", () => {
+    // Two groups holding one glyph on one side is a font that kerns by
+    // whichever is read first — a rule nobody wrote.
+    const k = addToKernGroup(sample(), "first", "O", "T");
+    expect(k.firstGroups["O"]).toContain("T");
+    expect(k.firstGroups["T"]).toEqual([]);
+    expect(kernGroupOf(k, "first", "T")).toBe("O");
+  });
+
+  it("leaves the same glyph on the other side alone", () => {
+    const k = addToKernGroup(sample(), "first", "O", "Aacute");
+    expect(kernGroupOf(k, "second", "Aacute")).toBe("A");
+  });
+
+  it("does nothing when the glyph is already in that group", () => {
+    const k = sample();
+    expect(addToKernGroup(k, "first", "O", "Q")).toBe(k);
+  });
+
+  it("does nothing for a group that is not there", () => {
+    const k = sample();
+    expect(addToKernGroup(k, "first", "nope", "Q")).toBe(k);
+  });
+});
+
+describe("removeFromKernGroup", () => {
+  it("drops the member and leaves the group's pairs standing", () => {
+    const k = removeFromKernGroup(sample(), "first", "O", "Q");
+    expect(k.firstGroups["O"]).toEqual(["O", "C", "G"]);
+    expect(value(k, "O", "A")).toBe(-40);
+    expect(value(k, "Q", "A")).toBe(0); // Q is no longer one of them
+  });
+
+  it("does nothing when the glyph is not a member", () => {
+    const k = sample();
+    expect(removeFromKernGroup(k, "first", "O", "V")).toBe(k);
+    expect(removeFromKernGroup(k, "first", "nope", "O")).toBe(k);
+  });
+});
+
+describe("kernGroupPairCount", () => {
+  it("counts the pairs that name a group", () => {
+    const k = sample();
+    expect(kernGroupPairCount(k, "first", "O")).toBe(1);
+    expect(kernGroupPairCount(k, "second", "A")).toBe(2);
+  });
+
+  it("is what removing the group would take with it", () => {
+    const k = sample();
+    const before = kernPairCount(k);
+    const after = kernPairCount(removeKernGroup(k, "second", "A"));
+    expect(before - after).toBe(kernGroupPairCount(k, "second", "A"));
+  });
+
+  it("is zero for a group nothing is written against", () => {
+    expect(kernGroupPairCount(sample(), "first", "nope")).toBe(0);
   });
 });

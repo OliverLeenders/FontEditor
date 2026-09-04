@@ -2,11 +2,17 @@ import { cross, distance, vec } from "@fonteditor/geometry";
 import {
   type Contour,
   type FontDocument,
+  type Kerning,
+  EMPTY_KERNING,
   type Glyph,
   addContour,
   contour,
   counterIds,
   fontDocument,
+  groupKey,
+  setKern,
+  setKernGroup,
+  setKerning,
   glyph,
   node,
   orderedGlyphs,
@@ -20,7 +26,16 @@ import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import {
+  addKernGroup,
   balanceSegmentAt,
+  deleteKernGroup,
+  kernGroupHolding,
+  kernGroupPairs,
+  kernGroupProblem,
+  kerningFor,
+  putGlyphInKernGroup,
+  renameKernGroupTo,
+  takeGlyphFromKernGroup,
   clearSelection,
   convertSegment,
   deleteSelectedPoints,
@@ -958,5 +973,126 @@ describe("rounding a glyph and a selection", () => {
     });
     expect(renameRefusal(s, "notdef")).toBe("reserved");
     expect(renameCurrentGlyph(s, "notdef").state).toBe(s);
+  });
+});
+
+describe("kerning groups", () => {
+  /** Four letters, two groups on the first side, one pair between classes. */
+  const spaced = (): EditorState => {
+    let kerning: Kerning = EMPTY_KERNING;
+    kerning = setKernGroup(kerning, "first", "O", ["O", "Q"]);
+    kerning = setKernGroup(kerning, "first", "T", ["T"]);
+    kerning = setKernGroup(kerning, "second", "A", ["A"]);
+    kerning = setKern(kerning, groupKey("O"), groupKey("A"), -40);
+    kerning = setKern(kerning, groupKey("T"), groupKey("A"), -80);
+
+    const document = setKerning(
+      fontDocument([
+        glyph("O", { unicodes: [0x4f], advance: 500 }),
+        glyph("Q", { unicodes: [0x51], advance: 500 }),
+        glyph("T", { unicodes: [0x54], advance: 500 }),
+        glyph("A", { unicodes: [0x41], advance: 500 }),
+      ]),
+      kerning,
+    );
+    return editorState({ document, view: VIEW, currentGlyph: "O" });
+  };
+
+  const groups = (s: EditorState, side: "first" | "second") =>
+    side === "first" ? s.document.kerning.firstGroups : s.document.kerning.secondGroups;
+
+  describe("naming", () => {
+    it("wants a name", () => {
+      expect(kernGroupProblem(spaced().document.kerning, "first", "  ")).not.toBeNull();
+    });
+
+    it("refuses characters a UFO group key should not carry", () => {
+      const k = spaced().document.kerning;
+      expect(kernGroupProblem(k, "first", "round shapes")).not.toBeNull();
+      expect(kernGroupProblem(k, "first", ".hidden")).not.toBeNull();
+      expect(kernGroupProblem(k, "first", "O.alt-1_2")).toBeNull();
+    });
+
+    it("refuses a name taken on the same side, but not on the other", () => {
+      const k = spaced().document.kerning;
+      expect(kernGroupProblem(k, "first", "O")).not.toBeNull();
+      expect(kernGroupProblem(k, "second", "O")).toBeNull();
+    });
+
+    it("lets a group keep its own name while being renamed", () => {
+      const k = spaced().document.kerning;
+      expect(kernGroupProblem(k, "first", "O", "O")).toBeNull();
+    });
+  });
+
+  it("starts a group with no members", () => {
+    const after = addKernGroup(spaced(), "first", "H").state;
+    expect(groups(after, "first")["H"]).toEqual([]);
+  });
+
+  it("refuses to start one whose name is no good", () => {
+    const s = spaced();
+    expect(addKernGroup(s, "first", "O").state).toBe(s);
+    expect(addKernGroup(s, "first", "").state).toBe(s);
+  });
+
+  it("moves a glyph out of the group that held it", () => {
+    const after = putGlyphInKernGroup(spaced(), "first", "O", "T").state;
+    expect(groups(after, "first")["O"]).toContain("T");
+    expect(groups(after, "first")["T"]).toEqual([]);
+    expect(kernGroupHolding(after, "first", "T")).toBe("O");
+  });
+
+  it("will not put a glyph that does not exist into a group", () => {
+    // The panel takes a typed name, and a typo should not become a member that
+    // no file can ever write.
+    const s = spaced();
+    expect(putGlyphInKernGroup(s, "first", "O", "Omega").state).toBe(s);
+  });
+
+  it("takes a glyph back out", () => {
+    const after = takeGlyphFromKernGroup(spaced(), "first", "O", "Q").state;
+    expect(groups(after, "first")["O"]).toEqual(["O"]);
+    expect(kernGroupHolding(after, "first", "Q")).toBeNull();
+  });
+
+  it("renames a group and keeps its kerning", () => {
+    const after = renameKernGroupTo(spaced(), "first", "O", "round").state;
+    expect(kerningFor(after, "Q", "A")?.value).toBe(-40);
+    expect(groups(after, "first")["O"]).toBeUndefined();
+  });
+
+  it("refuses a rename onto a name already in use", () => {
+    const s = spaced();
+    expect(renameKernGroupTo(s, "first", "O", "T").state).toBe(s);
+  });
+
+  it("says how many pairs a delete would take with it", () => {
+    const s = spaced();
+    expect(kernGroupPairs(s, "first", "O")).toBe(1);
+    expect(kernGroupPairs(s, "second", "A")).toBe(2);
+
+    const after = deleteKernGroup(s, "second", "A").state;
+    expect(kerningFor(after, "O", "A")).toBeNull();
+    expect(kerningFor(after, "T", "A")).toBeNull();
+  });
+
+  it("puts every change on the undo stack under its own name", () => {
+    const s = spaced();
+    for (const effects of [
+      addKernGroup(s, "first", "H").effects,
+      putGlyphInKernGroup(s, "first", "O", "T").effects,
+      renameKernGroupTo(s, "first", "O", "round").effects,
+      deleteKernGroup(s, "first", "O").effects,
+    ]) {
+      expect(effects.map((e) => e.kind)).toEqual(["beginTransaction", "commitTransaction"]);
+    }
+  });
+
+  it("does nothing, and says so, when there is nothing to do", () => {
+    const s = spaced();
+    expect(takeGlyphFromKernGroup(s, "first", "O", "A").state).toBe(s);
+    expect(deleteKernGroup(s, "first", "nope").state).toBe(s);
+    expect(putGlyphInKernGroup(s, "first", "O", "Q").state).toBe(s);
   });
 });
