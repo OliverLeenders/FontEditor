@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FontInfoPanel.module.css";
 import shared from "./OpenFont.module.css";
+import { Stepper } from "./Stepper.js";
 
 /**
  * The font's own facts: what it is called, how big its em is, where its lines
@@ -143,36 +144,61 @@ function Field({
     ...({ [field.key]: field.kind === "number" ? Number(draft) : draft } as Partial<FontInfo>),
   });
 
+  const stepped = (input: React.JSX.Element): React.JSX.Element =>
+    field.kind === "number" ? (
+      <Stepper
+        value={Number.isFinite(Number(draft)) ? Number(draft) : null}
+        label={field.label}
+        // The em is a grid people speak of in round hundreds; the rest are
+        // units, and a unit is the smallest thing there is.
+        step={1}
+        bigStep={field.key === "unitsPerEm" ? 64 : 10}
+        onStep={(next) => {
+          setDraft(String(next));
+          const patch = { [field.key]: next } as Partial<FontInfo>;
+          if (infoProblem({ ...info, ...patch }) === null) {
+            store.applyTool(setInfo(store.editor, patch));
+          }
+        }}
+      >
+        {input}
+      </Stepper>
+    ) : (
+      input
+    );
+
   return (
     <label className={styles.field}>
       <span className={styles.label}>{field.label}</span>
-      <input
-        className={styles.input}
-        type={field.kind === "number" ? "number" : "text"}
-        value={draft}
-        title={field.hint}
-        aria-label={field.label}
-        aria-invalid={editing && problem !== null}
-        data-wrong={editing && problem !== null ? "true" : undefined}
-        onFocus={() => setEditing(true)}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            commit();
-            event.currentTarget.blur();
-          }
-          // Abandoning the edit rather than the panel: the box goes back to what
-          // it held, and the panel stays up.
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            setDraft(settled);
-            setEditing(false);
-            event.currentTarget.blur();
-          }
-        }}
-      />
+      {stepped(
+        <input
+          className={styles.input}
+          type={field.kind === "number" ? "number" : "text"}
+          value={draft}
+          title={field.hint}
+          aria-label={field.label}
+          aria-invalid={editing && problem !== null}
+          data-wrong={editing && problem !== null ? "true" : undefined}
+          onFocus={() => setEditing(true)}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit();
+              event.currentTarget.blur();
+            }
+            // Abandoning the edit rather than the panel: the box goes back to what
+            // it held, and the panel stays up.
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              setDraft(settled);
+              setEditing(false);
+              event.currentTarget.blur();
+            }
+          }}
+        />,
+      )}
       {editing && problem !== null ? (
         <span className={styles.problem} role="alert">
           {problem}

@@ -6,6 +6,7 @@ import { applyTheme } from "./scheme.js";
 import { EditorStore } from "./store.js";
 import { StoreProvider } from "./useStore.js";
 import "./styles/tokens.css";
+import "./styles/controls.css";
 
 const root = document.getElementById("root");
 if (root === null) throw new Error("The page has no #root to mount into.");

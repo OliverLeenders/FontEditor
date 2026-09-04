@@ -32,6 +32,14 @@
 
   --bar: 2.1rem;
   --radius: 3px;
+
+  /*
+   * What the browser paints for itself: spinners, scrollbars, the inside of a
+   * select, a focus ring. None of it reads our tokens, all of it reads this —
+   * which is why a dark editor had a white box of arrows in the corner of every
+   * number field.
+   */
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -50,6 +58,7 @@
     --accent-soft: #142838;
     --warn: #d6a05a;
     --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
+    color-scheme: dark;
   }
 }
 
@@ -68,6 +77,15 @@
   --accent-soft: #142838;
   --warn: #d6a05a;
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
+  color-scheme: dark;
+}
+
+/*
+ * A light choice on a dark machine has to say so too, or the browser keeps
+ * painting its own chrome dark under a light interface.
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 * {

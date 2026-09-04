@@ -95,7 +95,6 @@
 
 .range {
   width: 6rem;
-  accent-color: var(--accent);
 }
 
 .value {
@@ -108,7 +107,6 @@
 }
 
 .check {
-  accent-color: var(--accent);
   width: 0.9rem;
   height: 0.9rem;
 }

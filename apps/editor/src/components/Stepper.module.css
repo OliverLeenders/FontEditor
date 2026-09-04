@@ -1,0 +1,60 @@
+/* The field and its arrows are one control, so the arrows sit inside the field's
+   own box rather than beside it. */
+.holder {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.holder > input {
+  flex: 1;
+  min-width: 0;
+  /* Room for the arrows, so a long number does not run under them. */
+  padding-right: 1.25rem;
+}
+
+.arrows {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  display: flex;
+  flex-direction: column;
+  width: 1.05rem;
+  overflow: hidden;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+/* Quiet until reached for: the number is what the field is for, and two arrows
+   at full strength in every field would be a column of chevrons down the panel. */
+.arrow {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.arrow:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.arrow:active:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.arrow:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Sized to the half-field each arrow gets rather than to the icon's own idea of
+   itself: the inspector's fields are shorter than the font info panel's, and an
+   icon that fitted one was being clipped in the other. */
+.arrow svg {
+  width: 0.7rem;
+  height: 0.7rem;
+}

@@ -23,6 +23,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { Stepper } from "./Stepper.js";
 import styles from "./Inspector.module.css";
 
 /**
@@ -252,12 +253,18 @@ export function Inspector(): React.JSX.Element | null {
         </Field>
 
         <Field label="Advance">
-          <input
-            className={styles.input}
-            type="number"
+          <Stepper
             value={Math.round(advance)}
-            onChange={(event) => commitAdvance(Number(event.target.value))}
-          />
+            label="Advance"
+            onStep={(next) => commitAdvance(next)}
+          >
+            <input
+              className={styles.input}
+              type="number"
+              value={Math.round(advance)}
+              onChange={(event) => commitAdvance(Number(event.target.value))}
+            />
+          </Stepper>
         </Field>
 
         {/* Disabled rather than hidden for a glyph with no outline: a space has
@@ -265,24 +272,38 @@ export function Inspector(): React.JSX.Element | null {
             bug where a greyed one reads as the fact it is. */}
         <Field label="Sidebearings">
           <div className={styles.pair}>
-            <input
-              className={styles.input}
-              type="number"
-              aria-label="Left sidebearing"
-              title="Left sidebearing"
+            <Stepper
+              value={leftBearing === null ? null : Math.round(leftBearing)}
+              label="left sidebearing"
               disabled={leftBearing === null}
-              value={leftBearing === null ? "" : Math.round(leftBearing)}
-              onChange={(event) => commitBearing("left", Number(event.target.value))}
-            />
-            <input
-              className={styles.input}
-              type="number"
-              aria-label="Right sidebearing"
-              title="Right sidebearing"
+              onStep={(next) => commitBearing("left", next)}
+            >
+              <input
+                className={styles.input}
+                type="number"
+                aria-label="Left sidebearing"
+                title="Left sidebearing"
+                disabled={leftBearing === null}
+                value={leftBearing === null ? "" : Math.round(leftBearing)}
+                onChange={(event) => commitBearing("left", Number(event.target.value))}
+              />
+            </Stepper>
+            <Stepper
+              value={rightBearing === null ? null : Math.round(rightBearing)}
+              label="right sidebearing"
               disabled={rightBearing === null}
-              value={rightBearing === null ? "" : Math.round(rightBearing)}
-              onChange={(event) => commitBearing("right", Number(event.target.value))}
-            />
+              onStep={(next) => commitBearing("right", next)}
+            >
+              <input
+                className={styles.input}
+                type="number"
+                aria-label="Right sidebearing"
+                title="Right sidebearing"
+                disabled={rightBearing === null}
+                value={rightBearing === null ? "" : Math.round(rightBearing)}
+                onChange={(event) => commitBearing("right", Number(event.target.value))}
+              />
+            </Stepper>
           </div>
         </Field>
 
@@ -364,24 +385,38 @@ export function Inspector(): React.JSX.Element | null {
             Disabled rather than hidden, for the reason the sidebearings are. */}
         <Field label={coordPart === "in" || coordPart === "out" ? "Handle position" : "Position"}>
           <div className={styles.pair}>
-            <input
-              className={styles.input}
-              type="number"
-              aria-label="X position"
-              title="X position"
+            <Stepper
+              value={coordX}
+              label="x position"
               disabled={coordX === null}
-              value={coordX === null ? "" : shown(coordX)}
-              onChange={(event) => commitCoordinate("x", Number(event.target.value))}
-            />
-            <input
-              className={styles.input}
-              type="number"
-              aria-label="Y position"
-              title="Y position"
+              onStep={(next) => commitCoordinate("x", next)}
+            >
+              <input
+                className={styles.input}
+                type="number"
+                aria-label="X position"
+                title="X position"
+                disabled={coordX === null}
+                value={coordX === null ? "" : shown(coordX)}
+                onChange={(event) => commitCoordinate("x", Number(event.target.value))}
+              />
+            </Stepper>
+            <Stepper
+              value={coordY}
+              label="y position"
               disabled={coordY === null}
-              value={coordY === null ? "" : shown(coordY)}
-              onChange={(event) => commitCoordinate("y", Number(event.target.value))}
-            />
+              onStep={(next) => commitCoordinate("y", next)}
+            >
+              <input
+                className={styles.input}
+                type="number"
+                aria-label="Y position"
+                title="Y position"
+                disabled={coordY === null}
+                value={coordY === null ? "" : shown(coordY)}
+                onChange={(event) => commitCoordinate("y", Number(event.target.value))}
+              />
+            </Stepper>
           </div>
         </Field>
       </div>

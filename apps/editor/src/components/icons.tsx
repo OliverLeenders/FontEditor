@@ -124,6 +124,19 @@ export const RedoIcon: IconComponent = () => (
   </Glyph>
 );
 
+/** The stepper's arrows, beside a number field. */
+export const ChevronUpIcon: IconComponent = () => (
+  <Glyph>
+    <path d="m18 15-6-6-6 6" />
+  </Glyph>
+);
+
+export const ChevronDownIcon: IconComponent = () => (
+  <Glyph>
+    <path d="m6 9 6 6 6-6" />
+  </Glyph>
+);
+
 /** Preferences: sliders, which is what most of the panel is. */
 export const PreferencesIcon: IconComponent = () => (
   <Glyph>

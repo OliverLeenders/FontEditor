@@ -1,0 +1,100 @@
+/*
+ * The form controls, defined once for the whole editor.
+ *
+ * Global, like the tokens and for the same reason: a slider is the same control
+ * wherever it appears, and four modules each drawing their own was how the
+ * spacing view ended up with a slider a different height and colour from the
+ * proof's. The modules keep doing layout — how wide a slider is, where it sits —
+ * and the look lives here.
+ *
+ * Everything is drawn from the tokens, so a control follows the theme the way
+ * the rest of the interface does. What the browser still paints for itself —
+ * scrollbars, the inside of a select — follows `color-scheme`, which tokens.css
+ * sets alongside the palette.
+ */
+
+/* The tick in a checkbox and the fill in a progress bar, in one line. */
+input,
+select,
+button {
+  accent-color: var(--accent);
+}
+
+/*
+ * Sliders, drawn rather than inherited.
+ *
+ * A thin rule with a round handle: the value is the handle's position, and a
+ * track thicker than the rules on the canvas would compete with them. Both
+ * vendors are written out — WebKit and Gecko share no pseudo-element here, and a
+ * missing one silently leaves that browser with the platform's own slider.
+ */
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 1rem;
+  background: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--rule-strong);
+}
+input[type="range"]::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--rule-strong);
+}
+
+/* The ring is the surface colour, so the handle reads as sitting on the track
+   rather than threaded onto it. */
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+input[type="range"]:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+input[type="range"]:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/*
+ * The platform's spinners are gone, replaced by the stepper beside the field.
+ *
+ * Not a matter of taste: they are eleven pixels of arrow drawn to a different
+ * grid than everything around them, and no amount of `color-scheme` makes them
+ * the same control as the buttons they sit next to.
+ */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  appearance: none;
+  -webkit-appearance: none;
+  margin: 0;
+}
