@@ -165,6 +165,11 @@ export function Toolbar(): React.JSX.Element {
           aria-label="Outline thickness"
           onChange={(event) => store.setOutlineWidth(Number(event.target.value))}
         />
+        {/* The number is the whole point of a slider whose steps are quarters of
+            a pixel: without it, going back to the width you liked yesterday is
+            done by eye. Fixed at two decimals so the row does not reflow while
+            the handle is being dragged. */}
+        <span className={styles.widthValue}>{outlineWidth.toFixed(2)}</span>
       </label>
 
       <div className={styles.divider} />

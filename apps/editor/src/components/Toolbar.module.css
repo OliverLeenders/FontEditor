@@ -87,6 +87,17 @@
   white-space: nowrap;
 }
 
+.widthValue {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+  min-width: 2.1rem;
+  text-align: right;
+}
+
 .width {
   width: 5.5rem;
   accent-color: var(--accent);
