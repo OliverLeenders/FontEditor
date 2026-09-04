@@ -77,7 +77,7 @@ export function clearBackground(ctx: Canvas2D, s: Scene): void {
 }
 
 /** How near two labels may come, in pixels, before the lower one is dropped. */
-const LABEL_CLEARANCE = 13;
+const LABEL_CLEARANCE = 16;
 
 export function drawGuides(ctx: Canvas2D, s: Scene): void {
   ctx.lineWidth = 1;
@@ -102,10 +102,10 @@ export function drawGuides(ctx: Canvas2D, s: Scene): void {
     if (drawn.some((at) => Math.abs(at - y) < LABEL_CLEARANCE)) continue;
     drawn.push(y);
 
-    ctx.font = "10px ui-sans-serif, system-ui, sans-serif";
+    ctx.font = "12px ui-sans-serif, system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = guide.emphasis === true ? s.palette.guideEmphasis : s.palette.guide;
+    ctx.fillStyle = s.palette.guideLabel;
     // Above the line and inset from the left edge, where the drawing is not:
     // a name sitting on the outline would be one more thing to read past.
     ctx.fillText(guide.label, 6, y - 3);

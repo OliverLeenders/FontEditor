@@ -10,6 +10,15 @@ export type RenderPalette = {
   /** Baseline, x-height and other horizontal metric lines. */
   readonly guide: string;
   readonly guideEmphasis: string;
+  /**
+   * The names written along the metric lines.
+   *
+   * Deliberately not the colour of the line itself. A rule can afford to be
+   * nearly invisible — it is a straight edge two hundred pixels long and the eye
+   * finds it anyway — where five characters at eleven pixels in the same colour
+   * cannot be read at all.
+   */
+  readonly guideLabel: string;
   readonly outline: string;
   /** Fill for the glyph preview. Expected to carry its own alpha. */
   readonly fill: string;
@@ -54,6 +63,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   background: "#FFFFFF",
   guide: "#E8EDF3",
   guideEmphasis: "#C2CDD8",
+  guideLabel: "#7C8896",
   outline: "#131922",
   fill: "rgba(44,109,175,0.10)",
   node: "#2C6DAF",
@@ -82,6 +92,7 @@ export const DARK_PALETTE: RenderPalette = {
   background: "#10171F",
   guide: "#1E2833",
   guideEmphasis: "#33404E",
+  guideLabel: "#8B99A8",
   outline: "#E5EBF2",
   fill: "rgba(116,174,226,0.13)",
   node: "#74AEE2",
