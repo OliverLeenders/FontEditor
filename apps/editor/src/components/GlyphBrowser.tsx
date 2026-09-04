@@ -12,7 +12,7 @@ import {
 } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { prefersDark, watchScheme } from "../scheme.js";
+import { isDarkNow, watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import { ExportFont } from "./ExportFont.js";
@@ -95,7 +95,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
 
     const surface = new CanvasSurface(canvas, (ctx, size) => {
       const state = frame.current;
-      const dark = prefersDark();
+      const dark = isDarkNow();
       const palette = dark ? DARK_PALETTE : LIGHT_PALETTE;
 
       const layout = state.layout;

@@ -1,6 +1,5 @@
 import type { ToolId } from "@fonteditor/tools";
 
-import { MAX_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH } from "../store.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import {
   EllipseIcon,
@@ -16,6 +15,7 @@ import {
   SnapIcon,
   UndoIcon,
 } from "./icons.js";
+import { PreferencesPanel } from "./PreferencesPanel.js";
 import { RemoveOverlap } from "./RemoveOverlap.js";
 import styles from "./Toolbar.module.css";
 
@@ -69,7 +69,6 @@ export function Toolbar(): React.JSX.Element {
   const scale = useStoreValue((s) => s.session.editor.view.scale);
   const autoHide = useStoreValue((s) => s.autoHideHandles);
   const snapPoints = useStoreValue((s) => s.snapPoints);
-  const outlineWidth = useStoreValue((s) => s.outlineWidth);
   const undoLabel = useStoreValue((s) => (canUndo(s) ? store.undoLabel() : null));
   const redoLabel = useStoreValue((s) => (canRedo(s) ? store.redoLabel() : null));
 
@@ -150,28 +149,6 @@ export function Toolbar(): React.JSX.Element {
         <SnapIcon />
       </button>
 
-      {/* A range rather than a set of choices: the right weight depends on the
-          screen and on how close you are sitting, and neither is something a
-          list of three widths could guess. */}
-      <label className={styles.widthLabel} title="How heavy the outline is drawn">
-        Outline
-        <input
-          type="range"
-          className={styles.width}
-          min={MIN_OUTLINE_WIDTH}
-          max={MAX_OUTLINE_WIDTH}
-          step={0.25}
-          value={outlineWidth}
-          aria-label="Outline thickness"
-          onChange={(event) => store.setOutlineWidth(Number(event.target.value))}
-        />
-        {/* The number is the whole point of a slider whose steps are quarters of
-            a pixel: without it, going back to the width you liked yesterday is
-            done by eye. Fixed at two decimals so the row does not reflow while
-            the handle is being dragged. */}
-        <span className={styles.widthValue}>{outlineWidth.toFixed(2)}</span>
-      </label>
-
       <div className={styles.divider} />
 
       <RemoveOverlap />
@@ -188,6 +165,10 @@ export function Toolbar(): React.JSX.Element {
         <FitIcon />
       </button>
       <span className={styles.zoom}>{Math.round(scale * 100)}%</span>
+
+      <div className={styles.divider} />
+
+      <PreferencesPanel />
     </div>
   );
 }

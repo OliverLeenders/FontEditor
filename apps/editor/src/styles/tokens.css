@@ -5,6 +5,11 @@
  * same palette through `RenderPalette`, so a colour that only existed inside a
  * CSS Module could not be shared with what is drawn. Light is the base and dark
  * redefines only the tokens, so a component never needs to know which is active.
+ *
+ * Three states, not two. A reader who has chosen stamps `data-theme` on the
+ * root; a reader who has not stamps nothing and is answered by the media query.
+ * So the dark media query is guarded against an explicit light choice, and the
+ * dark stamp repeats the same tokens to win over a light machine.
  */
 :root {
   --ground: #f6f8fa;
@@ -30,7 +35,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --ground: #0d1218;
     --surface: #151c24;
     --surface-2: #1b242e;
@@ -46,6 +51,23 @@
     --warn: #d6a05a;
     --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
   }
+}
+
+:root[data-theme="dark"] {
+  --ground: #0d1218;
+  --surface: #151c24;
+  --surface-2: #1b242e;
+  --canvas: #10171f;
+  --ink: #e5ebf2;
+  --ink-2: #98a6b6;
+  --ink-3: #74828f;
+  --rule: #232d38;
+  --rule-strong: #33404e;
+  --accent: #74aee2;
+  --accent-ink: #a6ccee;
+  --accent-soft: #142838;
+  --warn: #d6a05a;
+  --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
 }
 
 * {

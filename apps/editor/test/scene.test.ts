@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { installBrowserGlobals } from "./browser-globals.js";
+import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js";
 
 installBrowserGlobals();
 
@@ -78,6 +78,9 @@ describe("neighboursFor", () => {
 describe("handlesAutoHidden", () => {
   let store: Store;
   beforeEach(() => {
+    // Preferences outlive a store now, and these tests share one page: without
+    // this, the toggle in one test is still in force in the next.
+    clearStoredSettings();
     store = new EditorStore();
   });
 
@@ -102,6 +105,7 @@ describe("handlesAutoHidden", () => {
 describe("sceneFor", () => {
   let store: Store;
   beforeEach(() => {
+    clearStoredSettings();
     store = new EditorStore();
   });
 

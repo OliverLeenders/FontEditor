@@ -37,11 +37,24 @@ import type { ViewTransform } from "@fonteditor/view";
 
 import { frameGlyph } from "./framing.js";
 import {
+  MAX_OUTLINE_WIDTH,
+  MAX_PROOF_LEADING,
+  MAX_PROOF_SIZE,
+  MAX_SPACING_SIZE,
+  MIN_OUTLINE_WIDTH,
+  MIN_PROOF_LEADING,
+  MIN_PROOF_SIZE,
+  MIN_SPACING_SIZE,
+} from "./limits.js";
+import {
+  DEFAULT_PREFERENCES,
   type InspectorPlacement,
+  type Preferences,
+  type ThemeChoice,
   clampInspector,
-  loadInspector,
-  saveInspector,
-} from "./inspectorPlacement.js";
+  loadPreferences,
+  savePreferences,
+} from "./preferences.js";
 import {
   type Ownership,
   Persistence,
@@ -65,22 +78,22 @@ const PROOF_TEXT = [
   "the only way to know whether a font works is to set it and look",
 ].join(String.fromCharCode(10));
 
-/** The stroke the renderer has always used, and the range the control offers. */
-export const DEFAULT_OUTLINE_WIDTH = 2;
-export const MIN_OUTLINE_WIDTH = 0.5;
-export const MAX_OUTLINE_WIDTH = 6;
-
-/**
- * The type sizes the spacing line and the proof will show.
- *
- * Here rather than on the sliders because the wheel now sets them too, and a
- * wheel that could go somewhere the slider cannot would leave the handle pinned
- * at one end while the text kept growing.
- */
-export const MIN_SPACING_SIZE = 24;
-export const MAX_SPACING_SIZE = 320;
-export const MIN_PROOF_SIZE = 8;
-export const MAX_PROOF_SIZE = 140;
+// Re-exported so the panels that already read these from the store keep working;
+// they live in `limits.ts` because the preferences need them too, and preferences
+// are read before this store exists.
+export {
+  DEFAULT_OUTLINE_WIDTH,
+  MAX_OUTLINE_WIDTH,
+  MAX_PROOF_SIZE,
+  MAX_PROOF_LEADING,
+  MAX_SPACING_SIZE,
+  MIN_OUTLINE_WIDTH,
+  MIN_PROOF_SIZE,
+  MIN_PROOF_LEADING,
+  MIN_SPACING_SIZE,
+} from "./limits.js";
+export { DEFAULT_PREFERENCES } from "./preferences.js";
+export type { InspectorPlacement, Preferences, ThemeChoice } from "./preferences.js";
 
 export type { Ownership, StorageState };
 
@@ -103,6 +116,8 @@ export type StoreState = {
   /** Space held: draw the shape without any controls. */
   readonly previewing: boolean;
   readonly inspector: InspectorPlacement;
+  /** Which palette to draw with, or "system" to follow the reader's machine. */
+  readonly theme: ThemeChoice;
   /** What the glyph browser is filtered to. Not undoable, so it lives out here. */
   readonly catalogQuery: CatalogQuery;
   /** Draw the glyphs either side, from the strip text, for judging spacing. */
@@ -175,6 +190,10 @@ export class EditorStore {
   private readonly disk: Persistence;
 
   constructor() {
+    // Read once, before anything renders, so the first frame is already in the
+    // reader's theme rather than flashing the default and correcting itself.
+    const preferences = loadPreferences();
+
     this.state = {
       session: newSession(
         editorState({ document: starterFont(), view: { scale: 1, tx: 0, ty: 0 } }),
@@ -186,18 +205,19 @@ export class EditorStore {
       ownership: "owner",
       stripText: "hello",
       catalogQuery: DEFAULT_QUERY,
-      showNeighbours: true,
-      autoHideHandles: true,
-      snapPoints: true,
-      outlineWidth: DEFAULT_OUTLINE_WIDTH,
+      showNeighbours: preferences.showNeighbours,
+      autoHideHandles: preferences.autoHideHandles,
+      snapPoints: preferences.snapPoints,
+      outlineWidth: preferences.outlineWidth,
       spacingText: "nonno",
-      spacingSize: 128,
+      spacingSize: preferences.spacingSize,
       spacingMode: "space",
       proofText: PROOF_TEXT,
-      proofSize: 32,
-      proofLeading: 1.4,
+      proofSize: preferences.proofSize,
+      proofLeading: preferences.proofLeading,
       previewing: false,
-      inspector: loadInspector(),
+      inspector: preferences.inspector,
+      theme: preferences.theme,
       viewport: { width: 0, height: 0 },
     };
 
@@ -439,16 +459,21 @@ export class EditorStore {
   }
 
   toggleAutoHideHandles(): void {
-    this.patch({ autoHideHandles: !this.state.autoHideHandles });
+    this.remember({ autoHideHandles: !this.state.autoHideHandles });
   }
 
   toggleSnapPoints(): void {
-    this.patch({ snapPoints: !this.state.snapPoints });
+    this.remember({ snapPoints: !this.state.snapPoints });
+  }
+
+  setTheme(theme: ThemeChoice): void {
+    if (theme === this.state.theme) return;
+    this.remember({ theme });
   }
 
   setOutlineWidth(outlineWidth: number): void {
     if (!Number.isFinite(outlineWidth)) return;
-    this.patch({
+    this.remember({
       outlineWidth: Math.min(MAX_OUTLINE_WIDTH, Math.max(MIN_OUTLINE_WIDTH, outlineWidth)),
     });
   }
@@ -479,23 +504,65 @@ export class EditorStore {
 
   setProofSize(proofSize: number): void {
     if (!Number.isFinite(proofSize)) return;
-    this.patch({ proofSize: Math.min(MAX_PROOF_SIZE, Math.max(MIN_PROOF_SIZE, proofSize)) });
+    this.remember({ proofSize: Math.min(MAX_PROOF_SIZE, Math.max(MIN_PROOF_SIZE, proofSize)) });
   }
 
   setProofLeading(proofLeading: number): void {
     if (!Number.isFinite(proofLeading)) return;
-    this.patch({ proofLeading: Math.min(3, Math.max(0.7, proofLeading)) });
+    this.remember({
+      proofLeading: Math.min(MAX_PROOF_LEADING, Math.max(MIN_PROOF_LEADING, proofLeading)),
+    });
   }
 
   setSpacingSize(spacingSize: number): void {
     if (!Number.isFinite(spacingSize)) return;
-    this.patch({
+    this.remember({
       spacingSize: Math.min(MAX_SPACING_SIZE, Math.max(MIN_SPACING_SIZE, spacingSize)),
     });
   }
 
   toggleNeighbours(): void {
-    this.patch({ showNeighbours: !this.state.showNeighbours });
+    this.remember({ showNeighbours: !this.state.showNeighbours });
+  }
+
+  /** Put every preference back where it started. */
+  resetPreferences(): void {
+    this.remember({
+      theme: DEFAULT_PREFERENCES.theme,
+      outlineWidth: DEFAULT_PREFERENCES.outlineWidth,
+      autoHideHandles: DEFAULT_PREFERENCES.autoHideHandles,
+      snapPoints: DEFAULT_PREFERENCES.snapPoints,
+      showNeighbours: DEFAULT_PREFERENCES.showNeighbours,
+      spacingSize: DEFAULT_PREFERENCES.spacingSize,
+      proofSize: DEFAULT_PREFERENCES.proofSize,
+      proofLeading: DEFAULT_PREFERENCES.proofLeading,
+    });
+  }
+
+  /**
+   * Patch the state and write the preferences that came out of it.
+   *
+   * One door, so a setting cannot be added to the store and quietly not be
+   * remembered — which is what happened to every one of these before now.
+   */
+  private remember(changes: Partial<StoreState>): void {
+    this.patch(changes);
+    savePreferences(this.preferences());
+  }
+
+  private preferences(): Preferences {
+    const s = this.state;
+    return {
+      theme: s.theme,
+      outlineWidth: s.outlineWidth,
+      autoHideHandles: s.autoHideHandles,
+      snapPoints: s.snapPoints,
+      showNeighbours: s.showNeighbours,
+      spacingSize: s.spacingSize,
+      proofSize: s.proofSize,
+      proofLeading: s.proofLeading,
+      inspector: s.inspector,
+    };
   }
 
   setStripText(stripText: string): void {
@@ -518,8 +585,7 @@ export class EditorStore {
   }
 
   private placeInspector(inspector: InspectorPlacement): void {
-    this.patch({ inspector });
-    saveInspector(inspector);
+    this.remember({ inspector });
   }
 
   // ---- storage -----------------------------------------------------------

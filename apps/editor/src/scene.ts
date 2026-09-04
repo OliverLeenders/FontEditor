@@ -26,7 +26,7 @@ import {
   tunniSegments,
 } from "@fonteditor/tools";
 
-import { prefersDark } from "./scheme.js";
+import { isDarkNow } from "./scheme.js";
 import type { StoreState } from "./store.js";
 
 const EMPTY: Glyph = { name: "", unicodes: [], advance: 0, contours: [], components: [] };
@@ -35,7 +35,7 @@ const EMPTY: Glyph = { name: "", unicodes: [], advance: 0, contours: [], compone
 const outlineIds = randomIds();
 
 export function palette(): RenderPalette {
-  return prefersDark() ? DARK_PALETTE : LIGHT_PALETTE;
+  return isDarkNow() ? DARK_PALETTE : LIGHT_PALETTE;
 }
 
 /**

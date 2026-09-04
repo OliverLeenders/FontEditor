@@ -14,19 +14,19 @@ Spacing, Features, Proof — around a canvas with select, pen, knife, rectangle,
 and measure tools, snapping, boolean union, components, kerning, a `.fea` subset, and
 OTF and UFO in both directions. Everything autosaves.
 
-| Phase |                                     | Status                                                                      |
-| ----- | ----------------------------------- | --------------------------------------------------------------------------- |
-| 0     | Foundations and the geometry kernel | done                                                                        |
-| 1     | The editing surface                 | done                                                                        |
-| 2     | Undo, redo, persistence             | done                                                                        |
-| 3     | From paths to a glyph               | done                                                                        |
-| 4     | From a glyph to a font              | browser done; **no way to edit font info** — see below                      |
-| 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools           |
-| 6     | Proofing and shaping                | proofing done; **nothing is shaped** — no feature is applied                |
-| 7     | Spacing and kerning                 | done; groups can be read and broken out of, but not edited                  |
-| 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual       |
-| 9     | Variable fonts                      | not started                                                                 |
-| 10    | Production polish                   | lint, format and 1163 tests; no CI, and view preferences are lost on reload |
+| Phase |                                     | Status                                                                |
+| ----- | ----------------------------------- | --------------------------------------------------------------------- |
+| 0     | Foundations and the geometry kernel | done                                                                  |
+| 1     | The editing surface                 | done                                                                  |
+| 2     | Undo, redo, persistence             | done                                                                  |
+| 3     | From paths to a glyph               | done                                                                  |
+| 4     | From a glyph to a font              | browser done; **no way to edit font info** — see below                |
+| 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools     |
+| 6     | Proofing and shaping                | proofing done; **nothing is shaped** — no feature is applied          |
+| 7     | Spacing and kerning                 | done; groups can be read and broken out of, but not edited            |
+| 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual |
+| 9     | Variable fonts                      | not started                                                           |
+| 10    | Production polish                   | lint, format and 1190 tests; preferences persist; no CI yet           |
 
 ### What the table is hiding
 
@@ -43,8 +43,6 @@ The gaps worth naming, in the order they would bite someone using this:
   failure, and both are real shapes a designer will draw.
 - **Kerning groups** are modelled, imported, exported and shown, but there is no way to
   create or change one from the interface.
-- **View preferences do not survive a reload** — outline weight, handle visibility,
-  snapping, and the type sizes in Spacing and Proof all return to their defaults.
 - **The UFO writer has never been read by anything but itself.** The importer round-trips
   it, which proves consistency, not correctness.
 
@@ -89,6 +87,11 @@ index the tools use — the menu can never offer an action for something the can
 not showing. Space previews without controls, the wheel pans, Ctrl-wheel zooms at the
 cursor, middle-drag pans, and Ctrl-0 refits. Ctrl-wheel also sets the type size in the
 Spacing and Proof workspaces.
+
+Preferences — theme, outline weight, what the canvas shows, the type sizes in Spacing
+and Proof — are kept in this browser rather than in the font, and are edited from the
+sliders button at the right of the toolbar. The theme follows the operating system
+until you choose light or dark yourself.
 
 Edits autosave to the browser's private filesystem after a second's pause, so closing
 the tab and coming back keeps your work. Note that this store belongs to the browser,

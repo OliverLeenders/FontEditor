@@ -1,4 +1,9 @@
 .bar {
+  /* Positioned so the popovers it holds can float over the canvas. Without a
+     stacking context of its own, the panel opened *behind* the inspector, which
+     is absolutely positioned later in the document. */
+  position: relative;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -74,33 +79,6 @@
   background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--accent-ink);
-}
-
-.widthLabel {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-  white-space: nowrap;
-}
-
-.widthValue {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  text-transform: none;
-  letter-spacing: 0;
-  min-width: 2.1rem;
-  text-align: right;
-}
-
-.width {
-  width: 5.5rem;
-  accent-color: var(--accent);
 }
 
 /* What the last overlap removal did, said next to the button that did it. The

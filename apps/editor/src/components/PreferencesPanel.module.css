@@ -1,0 +1,142 @@
+.holder {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* The same square as a tool button: it sits in the same row, and a control of a
+   different size there would read as a different kind of thing. */
+.button {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.button:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.button[aria-expanded="true"] {
+  background: var(--surface-2);
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+.button svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+
+/* Anchored to the right edge of its button: this sits at the end of the toolbar,
+   and a panel growing rightwards from there would leave the window. */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.5rem;
+  min-width: 15.5rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.label {
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.choices {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.choice {
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.choice:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.choice[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.slide {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.range {
+  width: 6rem;
+  accent-color: var(--accent);
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.1rem;
+  text-align: right;
+}
+
+.check {
+  accent-color: var(--accent);
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.note {
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
+
+.reset {
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.reset:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}

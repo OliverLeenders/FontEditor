@@ -7,6 +7,8 @@ import {
 } from "@fonteditor/tools";
 import { useEffect, useRef, useState } from "react";
 
+import { applyTheme } from "./scheme.js";
+
 import { ContextMenu, type MenuRequest } from "./components/ContextMenu.js";
 import { GlyphBrowser } from "./components/GlyphBrowser.js";
 import { GlyphCanvas } from "./components/GlyphCanvas.js";
@@ -35,6 +37,14 @@ export function App(): React.JSX.Element {
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const inspectorOpen = useStoreValue((s) => s.inspector.open);
   const ownership = useStoreValue((s) => s.ownership);
+  const theme = useStoreValue((s) => s.theme);
+
+  // The document carries the choice, and the canvases read it back through
+  // `isDarkNow`. Done here rather than in the store so the store stays free of
+  // the DOM, which is what lets it be built and driven in a test.
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
 
   // Application shortcuts live on the window; the tools' own keys are handled by
   // the canvas, which only receives them while it has focus.
