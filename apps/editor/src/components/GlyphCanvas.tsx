@@ -18,6 +18,7 @@ import {
   pick,
   screenTolerance,
   toDesign,
+  wheelIntent,
   zoomAt,
 } from "@fonteditor/view";
 import { useEffect, useRef } from "react";
@@ -81,6 +82,35 @@ export function GlyphCanvas({
       surface.destroy();
       surfaceRef.current = null;
     };
+  }, [store]);
+
+  /**
+   * The wheel, on a listener of its own rather than React's `onWheel`.
+   *
+   * React attaches wheel handlers passively, and a passive handler cannot call
+   * `preventDefault` — so ctrl-wheel would zoom the browser's own page around
+   * the editor while the canvas zoomed the glyph. This has to be non-passive to
+   * take the gesture away from the browser.
+   */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (canvas === null) return;
+
+    const onWheel = (event: WheelEvent): void => {
+      const surface = surfaceRef.current;
+      if (surface === null) return;
+      event.preventDefault();
+
+      const intent = wheelIntent(event);
+      if (intent.kind === "zoom") {
+        store.setView(zoomAt(store.editor.view, surface.toCanvasPoint(event), intent.factor));
+        return;
+      }
+      store.setView(panBy(store.editor.view, intent.dx, intent.dy));
+    };
+
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
   }, [store]);
 
   /** The one place screen pixels become design units. */
@@ -180,12 +210,6 @@ export function GlyphCanvas({
         }
 
         onContextMenu({ x: event.clientX, y: event.clientY, target, point });
-      }}
-      onWheel={(event) => {
-        const surface = surfaceRef.current;
-        if (surface === null) return;
-        const anchor = surface.toCanvasPoint(event.nativeEvent);
-        store.setView(zoomAt(store.editor.view, anchor, Math.exp(-event.deltaY * 0.0015)));
       }}
       onKeyDown={(event) => {
         // Tool keys and Escape belong to the tools; the application's own

@@ -1,10 +1,17 @@
 import { breakOutKern, kerningFor, nudgeKern, nudgeSidebearing } from "@fonteditor/tools";
 import { CanvasSurface, type RunScene, drawRun } from "@fonteditor/render";
 import { sidebearings } from "@fonteditor/font-model";
-import { type ViewTransform, glyphAtX, layoutRun, occurrencesOf } from "@fonteditor/view";
+import {
+  type ViewTransform,
+  glyphAtX,
+  layoutRun,
+  occurrencesOf,
+  wheelIntent,
+} from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
+import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./SpacingView.module.css";
@@ -29,14 +36,16 @@ export function runView(
   size: number,
   unitsPerEm: number,
   viewport: { width: number; height: number },
+  panX = 0,
 ): ViewTransform {
   const scale = size / unitsPerEm;
   const drawn = runWidth * scale;
   return {
     scale,
     // Centred when it fits, inset when it does not, so a long line runs off the
-    // right rather than off both sides at once.
-    tx: drawn < viewport.width - RUN_INSET * 2 ? (viewport.width - drawn) / 2 : RUN_INSET,
+    // right rather than off both sides at once. The pan is added on top of that
+    // resting place, so a line that has not been dragged is still centred.
+    tx: (drawn < viewport.width - RUN_INSET * 2 ? (viewport.width - drawn) / 2 : RUN_INSET) + panX,
     ty: viewport.height * 0.72,
   };
 }
@@ -65,8 +74,12 @@ export function SpacingView({
   const size = useStoreValue((s) => s.spacingSize);
   const mode = useStoreValue((s) => s.spacingMode);
   const [selected, setSelected] = useState<number | null>(null);
+  // How far the line has been pushed along, in screen pixels. Zero is where the
+  // line puts itself, so the view has a resting place to return to.
+  const [panX, setPanX] = useState(0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<CanvasSurface | null>(null);
 
   const run = useMemo(() => layoutRun(document, text), [document, text]);
@@ -77,8 +90,8 @@ export function SpacingView({
     [run, selectedName],
   );
 
-  const frame = useRef({ run, document, bands, size });
-  frame.current = { run, document, bands, size };
+  const frame = useRef({ run, document, bands, size, panX });
+  frame.current = { run, document, bands, size, panX };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -90,7 +103,7 @@ export function SpacingView({
 
       const scene: RunScene = {
         glyphs: state.run.glyphs.map((p) => ({ glyph: p.glyph, x: p.x })),
-        view: runView(state.run.width, state.size, info.unitsPerEm, viewport),
+        view: runView(state.run.width, state.size, info.unitsPerEm, viewport, state.panX),
         viewport,
         palette: palette(),
         metrics: {
@@ -119,7 +132,71 @@ export function SpacingView({
 
   useEffect(() => {
     surfaceRef.current?.invalidate();
-  }, [run, bands, size, document]);
+  }, [run, bands, size, document, panX]);
+
+  // A new line starts where a line starts. Carrying the old offset over would
+  // open a different word off the side of the canvas.
+  useEffect(() => {
+    setPanX(0);
+  }, [text]);
+
+  /**
+   * The wheel: along the line, or into it with ctrl held.
+   *
+   * Non-passive, like the glyph canvas, because a ctrl-wheel that is not claimed
+   * here is a ctrl-wheel the browser uses to zoom the whole editor.
+   */
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (stage === null) return;
+
+    const onWheel = (event: WheelEvent): void => {
+      const surface = surfaceRef.current;
+      const canvas = canvasRef.current;
+      if (surface === null || canvas === null) return;
+      event.preventDefault();
+
+      const intent = wheelIntent(event);
+      if (intent.kind === "pan") {
+        // One line of text: there is nothing above or below it to reach, so a
+        // vertical wheel moves along the line as a horizontal one does.
+        setPanX((at) => at + (intent.dx !== 0 ? intent.dx : intent.dy));
+        return;
+      }
+
+      // Zooming is a change of type size here, not of a separate view scale —
+      // the size is the thing being judged, and there is only one of it. What
+      // has to be preserved is the letter under the cursor, which the resting
+      // place would otherwise slide out from under as the line grows.
+      const state = frame.current;
+      const box = canvas.getBoundingClientRect();
+      const viewport = { width: box.width, height: box.height };
+      const before = runView(
+        state.run.width,
+        state.size,
+        state.document.info.unitsPerEm,
+        viewport,
+        state.panX,
+      );
+      const cursor = surface.toCanvasPoint(event).x;
+      const held = (cursor - before.tx) / before.scale;
+
+      const wanted = state.size * intent.factor;
+      store.setSpacingSize(wanted);
+      const settled = store.getState().spacingSize;
+      const resting = runView(
+        state.run.width,
+        settled,
+        state.document.info.unitsPerEm,
+        viewport,
+        0,
+      );
+      setPanX(cursor - held * resting.scale - resting.tx);
+    };
+
+    stage.addEventListener("wheel", onWheel, { passive: false });
+    return () => stage.removeEventListener("wheel", onWheel);
+  }, [store]);
 
   // A shorter line must not leave the selection pointing past its end.
   useEffect(() => {
@@ -134,10 +211,13 @@ export function SpacingView({
 
     const point = surface.toCanvasPoint(event);
     const box = canvas.getBoundingClientRect();
-    const view = runView(run.width, size, document.info.unitsPerEm, {
-      width: box.width,
-      height: box.height,
-    });
+    const view = runView(
+      run.width,
+      size,
+      document.info.unitsPerEm,
+      { width: box.width, height: box.height },
+      panX,
+    );
 
     return glyphAtX(run, (point.x - view.tx) / view.scale)?.index ?? null;
   };
@@ -199,18 +279,22 @@ export function SpacingView({
           <input
             type="range"
             className={styles.size}
-            min={24}
-            max={320}
+            min={MIN_SPACING_SIZE}
+            max={MAX_SPACING_SIZE}
             step={4}
             value={size}
             aria-label="Type size"
             onChange={(event) => store.setSpacingSize(Number(event.target.value))}
           />
-          <span className={styles.sizeValue}>{size}</span>
+          {/* The wheel sets a fractional size, because a zoom that snapped to
+              whole pixels would stall on a trackpad's small deltas. The reader
+              is shown the number they would type. */}
+          <span className={styles.sizeValue}>{Math.round(size)}</span>
         </label>
       </div>
 
       <div
+        ref={stageRef}
         className={styles.stage}
         tabIndex={0}
         role="application"

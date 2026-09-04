@@ -26,6 +26,9 @@ export {
   zoomAt,
 } from "./transform.js";
 
+export type { WheelIntent, WheelLike } from "./wheel.js";
+export { wheelIntent } from "./wheel.js";
+
 export type { Selection, SelectionItem, SelectionPart } from "./selection.js";
 export {
   addItems,

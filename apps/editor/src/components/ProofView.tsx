@@ -1,8 +1,9 @@
 import { CanvasSurface, type ProofScene, drawProof } from "@fonteditor/render";
-import { layoutParagraph } from "@fonteditor/view";
+import { layoutParagraph, wheelIntent } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
+import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./ProofView.module.css";
@@ -80,6 +81,10 @@ export function ProofView(): React.JSX.Element {
     return MARGIN * 2 + size + lastBaseline + size * 0.4;
   }, [lines, size, unitsPerEm]);
 
+  // Where the reader should end up once the proof has been re-set at a new
+  // size. Null when nothing is waiting.
+  const wantedScroll = useRef<number | null>(null);
+
   const frame = useRef({ lines, size, unitsPerEm });
   frame.current = { lines, size, unitsPerEm };
 
@@ -125,6 +130,53 @@ export function ProofView(): React.JSX.Element {
     surfaceRef.current?.invalidate();
   }, [lines, size, contentHeight]);
 
+  // After the page has grown or shrunk, and not before.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller === null || wantedScroll.current === null) return;
+    scroller.scrollTop = wantedScroll.current;
+    wantedScroll.current = null;
+    surfaceRef.current?.invalidate();
+  }, [contentHeight]);
+
+  /**
+   * Ctrl-wheel sets the type size; the wheel on its own scrolls the page.
+   *
+   * Zooming a proof is changing the size it is set at, so the text rewraps —
+   * which is the point of a proof and the reason there is no separate view
+   * scale to zoom instead. What cannot be kept is the exact word under the
+   * cursor: the line breaks move. What is kept is the position through the
+   * proof, by scaling the scroll with the size, so the reader stays roughly
+   * where they were rather than being thrown back to the first paragraph.
+   *
+   * Non-passive, and only for the ctrl case: a plain wheel is handed straight
+   * back to the scroller, which is better at scrolling than this would be.
+   */
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (scroller === null) return;
+
+    const onWheel = (event: WheelEvent): void => {
+      const intent = wheelIntent(event);
+      if (intent.kind !== "zoom") return;
+      event.preventDefault();
+
+      const before = store.getState().proofSize;
+      store.setProofSize(before * intent.factor);
+      const after = store.getState().proofSize;
+      if (after === before) return;
+
+      // Left for the effect below rather than set here. The page has to be
+      // re-set and re-measured at the new size before it can be scrolled that
+      // far, and a value assigned now is clamped to the old, shorter page —
+      // which drags the reader towards the top on every notch.
+      wantedScroll.current = scroller.scrollTop * (after / before);
+    };
+
+    scroller.addEventListener("wheel", onWheel, { passive: false });
+    return () => scroller.removeEventListener("wheel", onWheel);
+  }, [store]);
+
   return (
     <div className={styles.proof}>
       <div className={styles.bar}>
@@ -133,14 +185,14 @@ export function ProofView(): React.JSX.Element {
           <input
             type="range"
             className={styles.slider}
-            min={8}
-            max={140}
+            min={MIN_PROOF_SIZE}
+            max={MAX_PROOF_SIZE}
             step={1}
             value={size}
             aria-label="Type size"
             onChange={(event) => store.setProofSize(Number(event.target.value))}
           />
-          <span className={styles.value}>{size}</span>
+          <span className={styles.value}>{Math.round(size)}</span>
         </label>
 
         <label className={styles.sizeLabel}>

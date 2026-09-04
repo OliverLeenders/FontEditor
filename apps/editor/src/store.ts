@@ -70,6 +70,18 @@ export const DEFAULT_OUTLINE_WIDTH = 2;
 export const MIN_OUTLINE_WIDTH = 0.5;
 export const MAX_OUTLINE_WIDTH = 6;
 
+/**
+ * The type sizes the spacing line and the proof will show.
+ *
+ * Here rather than on the sliders because the wheel now sets them too, and a
+ * wheel that could go somewhere the slider cannot would leave the handle pinned
+ * at one end while the text kept growing.
+ */
+export const MIN_SPACING_SIZE = 24;
+export const MAX_SPACING_SIZE = 320;
+export const MIN_PROOF_SIZE = 8;
+export const MAX_PROOF_SIZE = 140;
+
 export type { Ownership, StorageState };
 
 /**
@@ -467,7 +479,7 @@ export class EditorStore {
 
   setProofSize(proofSize: number): void {
     if (!Number.isFinite(proofSize)) return;
-    this.patch({ proofSize: Math.min(200, Math.max(6, proofSize)) });
+    this.patch({ proofSize: Math.min(MAX_PROOF_SIZE, Math.max(MIN_PROOF_SIZE, proofSize)) });
   }
 
   setProofLeading(proofLeading: number): void {
@@ -477,7 +489,9 @@ export class EditorStore {
 
   setSpacingSize(spacingSize: number): void {
     if (!Number.isFinite(spacingSize)) return;
-    this.patch({ spacingSize: Math.min(400, Math.max(8, spacingSize)) });
+    this.patch({
+      spacingSize: Math.min(MAX_SPACING_SIZE, Math.max(MIN_SPACING_SIZE, spacingSize)),
+    });
   }
 
   toggleNeighbours(): void {
