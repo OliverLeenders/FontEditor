@@ -47,7 +47,7 @@ The gaps worth naming, in the order they would bite someone using this:
 
 ## Getting started
 
-Requires Node 20+ and pnpm.
+Requires Node 22.13+ and pnpm.
 
 ```bash
 pnpm install

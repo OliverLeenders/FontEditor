@@ -6,7 +6,7 @@
   "packageManager": "pnpm@11.24.0",
   "description": "A browser font editor with Tunni-line curve control.",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
   "scripts": {
     "dev": "pnpm --filter @fonteditor/editor dev",

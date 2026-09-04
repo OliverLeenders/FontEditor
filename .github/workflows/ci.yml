@@ -36,13 +36,17 @@ jobs:
   # The suite, on both ends of what package.json claims to support. The editor
   # runs in a browser, but everything below it is meant to run under plain Node
   # and inside a Worker, so the floor is worth testing rather than asserting.
+  #
+  # The floor is 22 because pnpm 11 reads its store through node:sqlite, which
+  # Node 20 does not have — on 20 the package manager crashes before installing
+  # anything, so there is no version of this repository a Node 20 could build.
   test:
     name: Tests on Node ${{ matrix.node }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node: [20, 24]
+        node: [22, 24]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
