@@ -584,3 +584,65 @@ export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
 
   return found.sort((l, r) => l.t1 - r.t1);
 }
+
+/**
+ * Where a cubic crosses itself, or `null` when it does not.
+ *
+ * One segment can make a loop on its own — handles long enough and crossed over
+ * take the curve out, round and back through its own path — and a designer
+ * dragging a handle produces it without meaning to. It is the same problem as
+ * two curves crossing and none of the same arithmetic, since a curve cannot be
+ * subdivided against itself: every box overlaps its own.
+ *
+ * By algebra instead, which for this one question is short. Writing the curve
+ * as `a t³ + b t² + c t + d`, the difference between two points on it factors:
+ *
+ *     B(u) − B(v) = (u − v) · [ a(u² + uv + v²) + b(u + v) + c ]
+ *
+ * so two distinct parameters land on the same point exactly when the bracket
+ * vanishes. In terms of their sum `S` and product `P` that bracket is
+ * `a(S² − P) + bS + c`, which — taking `U = S² − P` — is *linear* in `U` and `S`
+ * in each of x and y. Two equations, two unknowns, one determinant. `u` and `v`
+ * are then the roots of `z² − Sz + P`.
+ */
+export function selfIntersection(s: Cubic): CurveMeeting | null {
+  const ax = -s.a.x + 3 * s.c1.x - 3 * s.c2.x + s.b.x;
+  const ay = -s.a.y + 3 * s.c1.y - 3 * s.c2.y + s.b.y;
+  const bx = 3 * (s.a.x - 2 * s.c1.x + s.c2.x);
+  const by = 3 * (s.a.y - 2 * s.c1.y + s.c2.y);
+  const cx = 3 * (s.c1.x - s.a.x);
+  const cy = 3 * (s.c1.y - s.a.y);
+
+  // No cubic term in one direction, or the two terms parallel: the curve is a
+  // quadratic or a line in disguise, and neither can cross itself.
+  const det = ax * by - ay * bx;
+  const scale = Math.max(Math.abs(ax), Math.abs(ay), Math.abs(bx), Math.abs(by));
+  if (scale === 0 || Math.abs(det) <= 1e-9 * scale * scale) return null;
+
+  const u = (bx * cy - by * cx) / det;
+  const sum = (ay * cx - ax * cy) / det;
+
+  // z² − Sz + P with P = S² − U, so the discriminant is 4U − 3S². Not positive
+  // means the two parameters coincide or are imaginary: the curve turns sharply
+  // but never actually meets itself.
+  const disc = 4 * u - 3 * sum * sum;
+  if (!(disc > 0)) return null;
+
+  const root = Math.sqrt(disc);
+  const t1 = (sum - root) / 2;
+  const t2 = (sum + root) / 2;
+  // A loop lies within the segment. A pair of parameters outside it belongs to
+  // the infinite curve this segment is a piece of, which is not on the outline.
+  if (!(t1 > 0 && t2 < 1)) return null;
+
+  const point = evaluate(s, t1);
+  const other = evaluate(s, t2);
+  // The algebra is exact and the arithmetic is not. A pair that does not land
+  // on the same place is a near-degenerate curve reporting a loop it has not
+  // got, and saying nothing is better than splitting at a point that is not on
+  // the curve twice.
+  const size = Math.max(Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y), scale, 1);
+  if (Math.hypot(other.x - point.x, other.y - point.y) > 1e-6 * size) return null;
+
+  return { t1, t2, point };
+}

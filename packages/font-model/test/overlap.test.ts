@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { segmentCount } from "../src/contour.js";
+import { contour, segmentCount } from "../src/contour.js";
 import { glyph, glyphBounds } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
+import { node } from "../src/node.js";
 import { removeOverlap } from "../src/overlap.js";
 import { ellipseContour, rectContour } from "../src/shapes.js";
 
@@ -116,5 +117,97 @@ describe("removing overlap", () => {
 
     expect(box.minX).toBeCloseTo(0, 1);
     expect(box.maxX).toBeCloseTo(500, 1);
+  });
+});
+
+/**
+ * A contour that crosses itself: the two diagonals of a square, walked in the
+ * order that makes a bowtie. Two triangles joined at a point, drawn as one loop.
+ */
+const bowtie = () =>
+  glyph("a", {
+    advance: 600,
+    contours: [
+      contour(
+        ids.contour(),
+        [
+          node(ids.node(), { x: 0, y: 0 }),
+          node(ids.node(), { x: 100, y: 100 }),
+          node(ids.node(), { x: 100, y: 0 }),
+          node(ids.node(), { x: 0, y: 100 }),
+        ],
+        true,
+      ),
+    ],
+  });
+
+/** One curve with a loop in it, closed by a line back to where it started. */
+const knot = () =>
+  glyph("a", {
+    advance: 600,
+    contours: [
+      contour(
+        ids.contour(),
+        [
+          node(ids.node(), { x: 0, y: 0 }, { out: { x: 150, y: 100 } }),
+          node(ids.node(), { x: 100, y: 0 }, { in: { x: -50, y: 100 } }),
+        ],
+        true,
+      ),
+    ],
+  });
+
+describe("a contour that crosses itself", () => {
+  it("finds the crossing", () => {
+    // The same seam two overlapping shapes leave, made by one stroke laid back
+    // across its own path.
+    expect(removeOverlap(bowtie(), ids)?.crossings).toBe(1);
+  });
+
+  it("leaves an outline that no longer crosses itself", () => {
+    // The test that matters: run it again and there is nothing left to find.
+    const out = removeOverlap(bowtie(), ids)!;
+    expect(removeOverlap(out.glyph, ids)?.crossings).toBe(0);
+    expect(out.glyph.contours.every((c) => c.closed)).toBe(true);
+  });
+
+  it("covers the same ground it did before", () => {
+    const out = removeOverlap(bowtie(), ids)!;
+    expect(glyphBounds(out.glyph)).toEqual({ minX: 0, minY: 0, maxX: 100, maxY: 100 });
+  });
+
+  it("puts a node where the crossing was", () => {
+    const out = removeOverlap(bowtie(), ids)!;
+    const at = out.glyph.contours.flatMap((c) => c.nodes);
+    expect(at.some((n) => Math.abs(n.pt.x - 50) < 0.1 && Math.abs(n.pt.y - 50) < 0.1)).toBe(true);
+  });
+
+  it("finds a loop inside a single curve, which no search for two curves can", () => {
+    // A curve cannot be subdivided against itself — every box overlaps its own —
+    // so this one crossing is found by algebra rather than by looking.
+    const out = removeOverlap(knot(), ids)!;
+    expect(out.crossings).toBeGreaterThan(0);
+    expect(removeOverlap(out.glyph, ids)?.crossings).toBe(0);
+  });
+
+  it("keeps the curve curved through the loop", () => {
+    const out = removeOverlap(knot(), ids)!;
+    expect(out.glyph.contours.flatMap((c) => c.nodes).some((n) => n.out !== null)).toBe(true);
+  });
+
+  it("says there is nothing to do for a contour that behaves", () => {
+    // Every corner of a shape meets the edge beside it, and a curve that turns
+    // sharply looks like a loop to arithmetic that is not careful. Neither is a
+    // crossing, and reporting either would rebuild a glyph that was already
+    // right.
+    const round = glyph("o", {
+      contours: [ellipseContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 200 })],
+    });
+    expect(removeOverlap(round, ids)?.glyph).toBe(round);
+
+    const box = glyph("a", {
+      contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 100, maxY: 100 })],
+    });
+    expect(removeOverlap(box, ids)?.glyph).toBe(box);
   });
 });

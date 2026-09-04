@@ -4,6 +4,7 @@ import {
   evaluate,
   flatten,
   intersectCubics,
+  selfIntersection,
   subcurve,
   tangent,
 } from "@fonteditor/geometry";
@@ -31,7 +32,9 @@ import { type Node, node } from "./node.js";
  * The rule for keeping a piece is the whole of the algorithm: a piece is on the
  * boundary of the union exactly when the shape is filled on one side of it and
  * empty on the other. That is true of an outer edge and of the edge of a
- * counter alike, which is why nothing here needs to know what a counter is.
+ * counter alike, which is why nothing here needs to know what a counter is —
+ * and of a contour laid across itself, which is why one contour needs no
+ * separate treatment from two.
  */
 
 export type OverlapResult = {
@@ -60,13 +63,20 @@ const JOIN = 0.05;
  */
 export function removeOverlap(g: Glyph, ids: IdFactory): OverlapResult | null {
   const closed = g.contours.filter((c) => c.closed && c.nodes.length >= 2);
-  if (closed.length < 2) return { glyph: g, crossings: 0 };
+  if (closed.length === 0) return { glyph: g, crossings: 0 };
 
-  // Where every contour meets every other. Splits within one contour are not
-  // sought: a contour that crosses itself is a different problem, and one this
-  // does not claim to solve.
+  // Where every contour meets every other, and where each meets itself. The two
+  // are the same problem: a stroke laid back across its own path leaves exactly
+  // the seam that two overlapping shapes do, and the rule for which pieces
+  // survive cannot tell them apart either.
   const cuts = new Map<string, number[]>();
   let crossings = 0;
+
+  for (const [index, c] of closed.entries()) {
+    const found = selfMeetings(c, index, cuts);
+    if (found === null) return null;
+    crossings += found;
+  }
 
   for (let i = 0; i < closed.length; i++) {
     for (let j = i + 1; j < closed.length; j++) {
@@ -125,26 +135,92 @@ function meetings(
       const sb = segmentAt(b, t);
       if (sb === null) continue;
 
-      const met = intersectCubics(segmentCubic(sa), segmentCubic(sb));
+      const ca = segmentCubic(sa);
+      const cb = segmentCubic(sb);
+      const met = intersectCubics(ca, cb);
       // Two edges lying along each other rather than crossing. There is no set
       // of points to split at, so there is no honest answer to give.
       if (met === null) return null;
 
       for (const m of met) {
-        add(cuts, `${String(ai)}:${String(s)}`, m.t1);
-        add(cuts, `${String(bi)}:${String(t)}`, m.t2);
-        count += 1;
+        const one = add(cuts, `${String(ai)}:${String(s)}`, m.t1, ca);
+        const two = add(cuts, `${String(bi)}:${String(t)}`, m.t2, cb);
+        if (one || two) count += 1;
       }
     }
   }
   return count;
 }
 
-function add(cuts: Map<string, number[]>, key: string, t: number): void {
-  if (!(t > 1e-6 && t < 1 - 1e-6)) return;
+/**
+ * Record where a contour crosses itself.
+ *
+ * Two ways to do it, and both happen. A segment can loop on its own, which is
+ * algebra rather than search — a curve cannot be subdivided against itself,
+ * since every box overlaps its own. Two different segments of the same contour
+ * cross the same way two contours do.
+ *
+ * Neighbours are compared like any other pair. They meet at the node they
+ * share, and a meeting at the very end of a segment records no cut and counts
+ * as nothing, which is what keeps every contour in the glyph from reporting a
+ * crossing at each of its own corners.
+ */
+function selfMeetings(c: Contour, index: number, cuts: Map<string, number[]>): number | null {
+  let count = 0;
+
+  for (let s = 0; s < segmentCount(c); s++) {
+    const sa = segmentAt(c, s);
+    if (sa === null) continue;
+
+    const ca = segmentCubic(sa);
+
+    const loop = selfIntersection(ca);
+    if (loop !== null) {
+      const one = add(cuts, `${String(index)}:${String(s)}`, loop.t1, ca);
+      const two = add(cuts, `${String(index)}:${String(s)}`, loop.t2, ca);
+      if (one || two) count += 1;
+    }
+
+    for (let t = s + 1; t < segmentCount(c); t++) {
+      const sb = segmentAt(c, t);
+      if (sb === null) continue;
+
+      const cb = segmentCubic(sb);
+      const met = intersectCubics(ca, cb);
+      if (met === null) return null;
+
+      for (const m of met) {
+        const one = add(cuts, `${String(index)}:${String(s)}`, m.t1, ca);
+        const two = add(cuts, `${String(index)}:${String(t)}`, m.t2, cb);
+        if (one || two) count += 1;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * Note a place to split, and say whether it was one that had not been seen.
+ *
+ * An end of the segment is not a place to split: there is a node there already,
+ * and the piece it would cut off has no length. Judged by where the point lands
+ * rather than by how near the parameter is to nought or one, because the search
+ * that found it works to a distance and the parameter it reports is only as
+ * precise as the segment is long — every corner of a square would otherwise
+ * record a crossing with the edge beside it.
+ */
+function add(cuts: Map<string, number[]>, key: string, t: number, curve: Cubic): boolean {
+  if (!(t > 0 && t < 1)) return false;
+
+  const p = evaluate(curve, t);
+  if (Math.hypot(p.x - curve.a.x, p.y - curve.a.y) < JOIN) return false;
+  if (Math.hypot(p.x - curve.b.x, p.y - curve.b.y) < JOIN) return false;
+
   const list = cuts.get(key) ?? [];
-  if (!list.some((seen) => Math.abs(seen - t) < 1e-5)) list.push(t);
+  if (list.some((seen) => Math.abs(seen - t) < 1e-5)) return false;
+  list.push(t);
   cuts.set(key, list);
+  return true;
 }
 
 /** Break a contour into the pieces between its crossings. */

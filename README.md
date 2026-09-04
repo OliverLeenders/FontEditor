@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                                  |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual |
 | 9     | Variable fonts                      | not started                                                           |
-| 10    | Production polish                   | lint, format and 1257 tests, run on CI; preferences persist           |
+| 10    | Production polish                   | lint, format and 1269 tests, run on CI; preferences persist           |
 
 ### What the table is hiding
 
@@ -37,9 +37,10 @@ The gaps worth naming, in the order they would bite someone using this:
   lists them. There is no contextual matching, no mark attachment and no bidi — and the
   glyph strip under the canvas is deliberately left unshaped, since it is there to show
   the letter you are drawing beside its neighbours.
-- **Overlap removal declines edges that lie along each other**, and does not look at a
-  contour that crosses itself. Both refuse rather than guess, which is the right
-  failure, and both are real shapes a designer will draw.
+- **Overlap removal declines edges that lie along each other.** Two shapes sharing a
+  whole edge have no crossing points to split at, so it refuses rather than guesses,
+  which is the right failure for a shape a designer will really draw. A contour that
+  crosses itself is handled, including a single curve that loops.
 - **The UFO writer has never been read by anything but itself.** The importer round-trips
   it, which proves consistency, not correctness.
 

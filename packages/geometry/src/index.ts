@@ -99,4 +99,4 @@ export {
 
 export type { Crossing } from "./cubic.js";
 export type { CurveMeeting } from "./cubic.js";
-export { intersectCubics, intersectSegmentCubic, unitRoots } from "./cubic.js";
+export { intersectCubics, intersectSegmentCubic, selfIntersection, unitRoots } from "./cubic.js";
