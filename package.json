@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.24.0",
   "description": "A browser font editor with Tunni-line curve control.",
   "engines": {
     "node": ">=20"

@@ -20,21 +20,18 @@ OTF and UFO in both directions. Everything autosaves.
 | 1     | The editing surface                 | done                                                                  |
 | 2     | Undo, redo, persistence             | done                                                                  |
 | 3     | From paths to a glyph               | done                                                                  |
-| 4     | From a glyph to a font              | browser done; **no way to edit font info** — see below                |
+| 4     | From a glyph to a font              | done                                                                  |
 | 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools     |
-| 6     | Proofing and shaping                | proofing done; **nothing is shaped** — no feature is applied          |
+| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                      |
 | 7     | Spacing and kerning                 | done; groups can be read and broken out of, but not edited            |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual |
 | 9     | Variable fonts                      | not started                                                           |
-| 10    | Production polish                   | lint, format and 1190 tests; preferences persist; no CI yet           |
+| 10    | Production polish                   | lint, format and 1221 tests, run on CI; preferences persist           |
 
 ### What the table is hiding
 
 The gaps worth naming, in the order they would bite someone using this:
 
-- **Font info cannot be edited.** Family, style, units per em and the vertical metrics
-  exist in the model and are read from an imported file, but nothing in the interface
-  writes them — a font drawn from scratch exports as "Untitled Regular" at 1000 upem.
 - **Shaping is this editor's `.fea` subset, not a shaping engine.** Ligatures and single
   substitutions are applied to the Spacing line and the Proof, in the order the file
   lists them. There is no contextual matching, no mark attachment and no bidi — and the

@@ -1,0 +1,54 @@
+# Runs the same three commands the README tells a person to run, on every push
+# and every pull request. Nothing here is a check the repository does not
+# already hold itself to locally — CI only makes it impossible to forget one.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# A second push to the same branch makes the first run's answer worthless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Formatting, lint and types: one node, since none of the three can depend on
+  # which version is running them.
+  check:
+    name: Format, lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+
+  # The suite, on both ends of what package.json claims to support. The editor
+  # runs in a browser, but everything below it is meant to run under plain Node
+  # and inside a Worker, so the floor is worth testing rather than asserting.
+  test:
+    name: Tests on Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 24]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
