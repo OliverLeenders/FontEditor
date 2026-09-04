@@ -11,6 +11,7 @@ import {
   tunniSegments,
 } from "@fonteditor/tools";
 import {
+  PICK_TOLERANCE_SCALE,
   buildHitIndex,
   itemForTarget,
   hasItem,
@@ -42,6 +43,9 @@ import styles from "./GlyphCanvas.module.css";
  * What the select tool needs from the interface: what it may pick, and where a
  * drag may land. Read from the same rules the renderer draws by.
  */
+/** The pick radius the select tool uses, which the cursor has to agree with. */
+const HIT_PIXELS = 11;
+
 function selectOptions(store: EditorStore): ToolOptions {
   const state = store.getState();
   return {
@@ -129,6 +133,69 @@ export function GlyphCanvas({
     };
   };
 
+  /**
+   * The cursor over the margin lines.
+   *
+   * Those two lines are the only thing on the canvas that is dragged along one
+   * axis, and the only thing whose grabbable area gives no sign of itself: a
+   * node looks like a handle you can take hold of, and a line the height of the
+   * window looks like a rule. The cursor is what says otherwise.
+   *
+   * Checked in two steps, so an ordinary move costs two subtractions. The
+   * distance to each line is arithmetic — they are vertical and unbounded, so
+   * only the horizontal gap counts — and only when the pointer is within reach
+   * of one is the hit index built to ask what would actually be picked there. A
+   * node sitting on the origin wins that pick, and must therefore leave the
+   * cursor alone: a cursor promising one thing while the click does another is
+   * worse than no cursor at all.
+   */
+  const marginCursor = (event: React.PointerEvent<HTMLCanvasElement>): void => {
+    const canvas = canvasRef.current;
+    const surface = surfaceRef.current;
+    if (canvas === null || surface === null) return;
+
+    const editor = store.editor;
+    // Only the select tool drags a margin. Under the knife or the pen the lines
+    // are scenery, and a resize cursor over them would be an offer that is not
+    // being made.
+    if (editor.activeTool !== "select") {
+      canvas.style.cursor = "";
+      return;
+    }
+
+    // Mid-drag the answer is already known, and the pointer has usually left the
+    // line by then — the whole point of the drag is that the line follows it.
+    if (editor.gesture?.kind === "dragMargin") {
+      canvas.style.cursor = "ew-resize";
+      return;
+    }
+
+    const glyph = editor.document.glyphs[editor.currentGlyph];
+    if (glyph === undefined) {
+      canvas.style.cursor = "";
+      return;
+    }
+
+    const point = toDesign(editor.view, surface.toCanvasPoint(event));
+    const reach = screenTolerance(editor.view, HIT_PIXELS) * (PICK_TOLERANCE_SCALE.originLine ?? 1);
+    const near = Math.abs(point.x) <= reach || Math.abs(point.x - glyph.advance) <= reach;
+    if (!near) {
+      canvas.style.cursor = "";
+      return;
+    }
+
+    const target = pick(
+      buildHitIndex(glyph, tunniSegments(editor), {
+        margins: true,
+        handles: handleVisibility(editor, selectOptions(store)),
+      }),
+      point,
+      screenTolerance(editor.view, HIT_PIXELS),
+    );
+    const onMargin = target?.kind === "originLine" || target?.kind === "advanceLine";
+    canvas.style.cursor = onMargin ? "ew-resize" : "";
+  };
+
   return (
     <canvas
       ref={canvasRef}
@@ -156,6 +223,7 @@ export function GlyphCanvas({
           panFrom.current = { x: event.clientX, y: event.clientY };
           return;
         }
+        marginCursor(event);
         store.applyTool(pointerMove(store.editor, toInput(event), selectOptions(store)));
       }}
       onPointerUp={(event) => {
@@ -172,7 +240,9 @@ export function GlyphCanvas({
         panFrom.current = null;
         store.applyTool(pointerUp(store.editor, undefined, selectOptions(store)));
       }}
-      onPointerLeave={() => {
+      onPointerLeave={(event) => {
+        // The cursor belongs to the canvas, so it goes back with the pointer.
+        event.currentTarget.style.cursor = "";
         if (panFrom.current === null) store.applyTool(pointerLeave(store.editor));
       }}
       onDoubleClick={(event) => {
@@ -198,7 +268,7 @@ export function GlyphCanvas({
                   handles: handleVisibility(editor, selectOptions(store)),
                 }),
                 point,
-                screenTolerance(editor.view, 11),
+                screenTolerance(editor.view, HIT_PIXELS),
               );
         // Right-clicking selects what it lands on, the way every editor does —
         // and it is what makes the menu's selection-based actions ("Delete
