@@ -11,6 +11,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
+import { shaperFrom } from "../shaping.js";
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -82,7 +83,16 @@ export function SpacingView({
   const stageRef = useRef<HTMLDivElement>(null);
   const surfaceRef = useRef<CanvasSurface | null>(null);
 
-  const run = useMemo(() => layoutRun(document, text), [document, text]);
+  // The features the font itself defines are applied here, so the line is set
+  // the way the font would set it — a ligature in the source shows as one letter
+  // rather than as the two it replaces.
+  const applyFeatures = useStoreValue((s) => s.applyFeatures);
+  const shape = useMemo(
+    () => shaperFrom(document.features, applyFeatures),
+    [document.features, applyFeatures],
+  );
+  const hasFeatures = document.features.trim() !== "";
+  const run = useMemo(() => layoutRun(document, text, shape), [document, text, shape]);
 
   const selectedName = selected === null ? null : (run.glyphs[selected]?.name ?? null);
   const bands = useMemo(
@@ -274,6 +284,25 @@ export function SpacingView({
             Kern
           </button>
         </div>
+        {/* Off is not "plain text": it is the letters the substitutions stand
+            in for, which is what you want the moment a ligature looks wrong and
+            you need to see what went into it. */}
+        <button
+          type="button"
+          className={styles.features}
+          aria-pressed={applyFeatures}
+          disabled={!hasFeatures}
+          title={
+            hasFeatures
+              ? applyFeatures
+                ? "Set with the font's features — click to see the letters behind them"
+                : "Set without the font's features"
+              : "This font defines no features yet"
+          }
+          onClick={() => store.toggleApplyFeatures()}
+        >
+          Features
+        </button>
         <label className={styles.sizeLabel}>
           Size
           <input

@@ -3,6 +3,7 @@ import { layoutParagraph, wheelIntent } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
+import { shaperFrom } from "../shaping.js";
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -60,11 +61,23 @@ export function ProofView(): React.JSX.Element {
    * changes — which is what makes it a page of text rather than a picture of one.
    */
   const { unitsPerEm } = document.info;
+  const applyFeatures = useStoreValue((s) => s.applyFeatures);
+  const shape = useMemo(
+    () => shaperFrom(document.features, applyFeatures),
+    [document.features, applyFeatures],
+  );
+  const hasFeatures = document.features.trim() !== "";
   const lines = useMemo(() => {
     const scale = size / unitsPerEm;
     const measure = (width - MARGIN * 2) / Math.max(scale, 0.0001);
-    return layoutParagraph(document, text, Math.max(measure, unitsPerEm), leading * unitsPerEm);
-  }, [document, text, size, leading, unitsPerEm, width]);
+    return layoutParagraph(
+      document,
+      text,
+      Math.max(measure, unitsPerEm),
+      leading * unitsPerEm,
+      shape,
+    );
+  }, [document, text, size, leading, unitsPerEm, width, shape]);
 
   /**
    * How tall the set text is, so the page can be scrolled through.
@@ -209,6 +222,26 @@ export function ProofView(): React.JSX.Element {
           />
           <span className={styles.value}>{leading.toFixed(2)}</span>
         </label>
+
+        {/* Off is not "plain text": it is the letters the substitutions stand
+            in for, which is what you want the moment a ligature looks wrong and
+            you need to see what went into it. */}
+        <button
+          type="button"
+          className={styles.features}
+          aria-pressed={applyFeatures}
+          disabled={!hasFeatures}
+          title={
+            hasFeatures
+              ? applyFeatures
+                ? "Set with the font's features — click to see the letters behind them"
+                : "Set without the font's features"
+              : "This font defines no features yet"
+          }
+          onClick={() => store.toggleApplyFeatures()}
+        >
+          Features
+        </button>
 
         <span className={styles.count}>
           {lines.length === 1 ? "1 line" : `${String(lines.length)} lines`}

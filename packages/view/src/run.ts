@@ -28,6 +28,33 @@ export type GlyphRun = {
 export const EMPTY_RUN: GlyphRun = { glyphs: [], width: 0 };
 
 /**
+ * Turns the glyph names a string maps to into the names to set.
+ *
+ * The font's substitutions, as a function, so that laying text out does not
+ * depend on where those rules were written down.
+ */
+export type Shaper = (names: readonly string[]) => readonly string[];
+
+/**
+ * The glyphs to set, after the font's own substitutions have had their say.
+ *
+ * A name the shaper produces that the font has no glyph for is dropped, the way
+ * a character with no glyph is: a rule naming a glyph that was since deleted
+ * should cost that glyph, not the line it was in.
+ */
+function shapedGlyphs(
+  document: FontDocument,
+  text: string,
+  shape: Shaper | undefined,
+): Array<Glyph | null> {
+  const direct = glyphsForString(document, text);
+  if (shape === undefined) return direct;
+
+  const named = direct.filter((glyph): glyph is Glyph => glyph !== null).map((g) => g.name);
+  return shape(named).map((name) => document.glyphs[name] ?? null);
+}
+
+/**
  * Lay a string out as a run of glyphs, advance by advance, kerning included.
  *
  * Kerning applies here and nowhere else, which is why this takes a document
@@ -40,14 +67,21 @@ export const EMPTY_RUN: GlyphRun = { glyphs: [], width: 0 };
  * measurement you cannot trust, and silence is the lesser harm. It does mean the
  * run index and the character index part company, which is why placements carry
  * their own.
+ *
+ * `shape` is given the glyph names the characters mapped to and returns the
+ * names to set — which is how a ligature reaches the line. It is passed in
+ * rather than worked out here because the rules are written in `.fea`, which is
+ * a file format, and this package knows nothing about files. Kerning is looked
+ * up *after* it runs, on the glyphs that survived: an "fi" ligature kerns as an
+ * "fi", not as the f and i it was made from.
  */
-export function layoutRun(document: FontDocument, text: string): GlyphRun {
+export function layoutRun(document: FontDocument, text: string, shape?: Shaper): GlyphRun {
   const glyphs: PlacedGlyph[] = [];
   const index = kernIndex(document.kerning);
   let x = 0;
   let previous: string | null = null;
 
-  for (const glyph of glyphsForString(document, text)) {
+  for (const glyph of shapedGlyphs(document, text, shape)) {
     if (glyph === null) continue;
 
     // The kern goes before the glyph it precedes, so a pair moves the second
@@ -123,6 +157,7 @@ export function layoutParagraph(
   text: string,
   measure: number,
   leading: number,
+  shape?: Shaper,
 ): ProofLine[] {
   const lines: ProofLine[] = [];
   let y = 0;
@@ -138,15 +173,15 @@ export function layoutParagraph(
     let current = "";
     for (const word of paragraph.split(" ").filter((w) => w !== "")) {
       const candidate = current === "" ? word : `${current} ${word}`;
-      if (current !== "" && layoutRun(document, candidate).width > measure) {
-        lines.push({ run: layoutRun(document, current), y });
+      if (current !== "" && layoutRun(document, candidate, shape).width > measure) {
+        lines.push({ run: layoutRun(document, current, shape), y });
         y += leading;
         current = word;
       } else {
         current = candidate;
       }
     }
-    lines.push({ run: layoutRun(document, current), y });
+    lines.push({ run: layoutRun(document, current, shape), y });
     y += leading;
   }
 

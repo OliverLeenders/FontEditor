@@ -148,3 +148,29 @@
   color: var(--ink);
   border-color: var(--accent);
 }
+
+/* A toggle, not an action: it says how the line is being set, and reads as on
+   because that is the state you spend nearly all your time in. */
+.features {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.76rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.features:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.features[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.features:disabled {
+  opacity: 0.45;
+  cursor: default;
+}

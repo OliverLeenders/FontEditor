@@ -51,6 +51,13 @@ export type Preferences = {
   readonly snapPoints: boolean;
   /** Draw the glyphs either side, from the strip text. */
   readonly showNeighbours: boolean;
+  /**
+   * Apply the font's own features to the spacing line and the proof.
+   *
+   * On, because a proof is judged as it would be set. Off is for the moment you
+   * want to see the letters a ligature is standing in for.
+   */
+  readonly applyFeatures: boolean;
   readonly spacingSize: number;
   readonly proofSize: number;
   readonly proofLeading: number;
@@ -70,6 +77,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autoHideHandles: true,
   snapPoints: true,
   showNeighbours: true,
+  applyFeatures: true,
   spacingSize: 128,
   proofSize: 32,
   proofLeading: 1.4,
@@ -116,6 +124,7 @@ export function loadPreferences(): Preferences {
     autoHideHandles: boolean(raw["autoHideHandles"], DEFAULT_PREFERENCES.autoHideHandles),
     snapPoints: boolean(raw["snapPoints"], DEFAULT_PREFERENCES.snapPoints),
     showNeighbours: boolean(raw["showNeighbours"], DEFAULT_PREFERENCES.showNeighbours),
+    applyFeatures: boolean(raw["applyFeatures"], DEFAULT_PREFERENCES.applyFeatures),
     spacingSize: number(raw["spacingSize"], DEFAULT_PREFERENCES.spacingSize, {
       min: MIN_SPACING_SIZE,
       max: MAX_SPACING_SIZE,

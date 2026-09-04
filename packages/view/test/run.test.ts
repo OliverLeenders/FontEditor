@@ -1,7 +1,15 @@
-import { contour, fontDocument, glyph, node } from "@fonteditor/font-model";
+import { contour, fontDocument, glyph, node, setKerning } from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
-import { EMPTY_RUN, glyphAtX, layoutRun, occurrencesOf, placedAt } from "../src/run.js";
+import {
+  EMPTY_RUN,
+  type Shaper,
+  glyphAtX,
+  layoutParagraph,
+  layoutRun,
+  occurrencesOf,
+  placedAt,
+} from "../src/run.js";
 
 const box = (name: string, code: number, advance: number) =>
   glyph(name, {
@@ -26,6 +34,73 @@ const doc = fontDocument([
   box("o", 0x6f, 600),
   glyph("space", { unicodes: [0x20], advance: 250 }),
 ]);
+
+/** A font with an "no" ligature, which is easier to see in a test than "fi". */
+const ligatured = fontDocument([
+  box("n", 0x6e, 500),
+  box("o", 0x6f, 600),
+  box("n_o", 0x0, 800),
+  glyph("space", { unicodes: [0x20], advance: 250 }),
+]);
+
+/** Stands in for the real shaper: this package never learns what `.fea` is. */
+const joinNO: Shaper = (names) => {
+  const out: string[] = [];
+  for (let i = 0; i < names.length; i++) {
+    if (names[i] === "n" && names[i + 1] === "o") {
+      out.push("n_o");
+      i += 1;
+    } else {
+      out.push(names[i]!);
+    }
+  }
+  return out;
+};
+
+describe("shaped layout", () => {
+  it("sets the glyphs the shaper asks for", () => {
+    const run = layoutRun(ligatured, "non", joinNO);
+    expect(run.glyphs.map((p) => p.name)).toEqual(["n_o", "n"]);
+  });
+
+  it("measures the ligature's own advance, not the letters it replaced", () => {
+    expect(layoutRun(ligatured, "no", joinNO).width).toBe(800);
+    expect(layoutRun(ligatured, "no").width).toBe(1100);
+  });
+
+  it("kerns the pair the ligature makes, not the pair it came from", () => {
+    // The kern is looked up after substitution: an n_o followed by an n is an
+    // n_o/n pair, and the o/n pair that used to be there is simply not in the
+    // line any more.
+    const kerned = setKerning(ligatured, {
+      firstGroups: {},
+      secondGroups: {},
+      pairs: { o: { n: -100 }, n_o: { n: -50 } },
+    });
+    expect(layoutRun(kerned, "non", joinNO).glyphs[1]?.kern).toBe(-50);
+    expect(layoutRun(kerned, "non").glyphs[2]?.kern).toBe(-100);
+  });
+
+  it("drops a name the font has no glyph for", () => {
+    // A rule naming a glyph that was since deleted costs that glyph, not the
+    // line it was in.
+    const gone: Shaper = () => ["n", "nothing-here", "o"];
+    expect(layoutRun(ligatured, "no", gone).glyphs.map((p) => p.name)).toEqual(["n", "o"]);
+  });
+
+  it("carries the shaper through every line of a paragraph", () => {
+    const lines = layoutParagraph(ligatured, "no no", 10_000, 1000, joinNO);
+    expect(lines[0]?.run.glyphs.map((p) => p.name)).toEqual(["n_o", "space", "n_o"]);
+  });
+
+  it("wraps on the shaped width, since that is what will be set", () => {
+    // One "no" is 800 shaped and 1100 unshaped, so a measure of 1000 fits the
+    // ligature and not the pair.
+    expect(layoutParagraph(ligatured, "no no", 1000, 1000, joinNO)).toHaveLength(2);
+    expect(layoutParagraph(ligatured, "no", 1000, 1000, joinNO)).toHaveLength(1);
+    expect(layoutParagraph(ligatured, "no", 1000, 1000)).toHaveLength(1);
+  });
+});
 
 describe("layoutRun", () => {
   it("places each glyph at the running pen position", () => {

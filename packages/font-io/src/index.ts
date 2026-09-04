@@ -48,3 +48,12 @@ export type { FeaFeature, FeaProblem, FeaRule, FeaSource } from "./fea.js";
 export { parseFea } from "./fea.js";
 export type { CompiledFeatures } from "./features.js";
 export { NO_FEATURES, compileFeatures } from "./features.js";
+
+export type { Shaper } from "./shaping.js";
+export {
+  DEFAULT_FEATURES,
+  NO_SHAPING,
+  featureTags,
+  shaperFor,
+  shaperForParsed,
+} from "./shaping.js";

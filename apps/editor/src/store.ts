@@ -132,6 +132,8 @@ export type StoreState = {
    * switch is for.
    */
   readonly snapPoints: boolean;
+  /** Apply the font's features when setting the spacing line and the proof. */
+  readonly applyFeatures: boolean;
   /**
    * How heavy the outline is drawn, in screen pixels.
    *
@@ -208,6 +210,7 @@ export class EditorStore {
       showNeighbours: preferences.showNeighbours,
       autoHideHandles: preferences.autoHideHandles,
       snapPoints: preferences.snapPoints,
+      applyFeatures: preferences.applyFeatures,
       outlineWidth: preferences.outlineWidth,
       spacingText: "nonno",
       spacingSize: preferences.spacingSize,
@@ -525,6 +528,10 @@ export class EditorStore {
     this.remember({ showNeighbours: !this.state.showNeighbours });
   }
 
+  toggleApplyFeatures(): void {
+    this.remember({ applyFeatures: !this.state.applyFeatures });
+  }
+
   /** Put every preference back where it started. */
   resetPreferences(): void {
     this.remember({
@@ -533,6 +540,7 @@ export class EditorStore {
       autoHideHandles: DEFAULT_PREFERENCES.autoHideHandles,
       snapPoints: DEFAULT_PREFERENCES.snapPoints,
       showNeighbours: DEFAULT_PREFERENCES.showNeighbours,
+      applyFeatures: DEFAULT_PREFERENCES.applyFeatures,
       spacingSize: DEFAULT_PREFERENCES.spacingSize,
       proofSize: DEFAULT_PREFERENCES.proofSize,
       proofLeading: DEFAULT_PREFERENCES.proofLeading,
@@ -558,6 +566,7 @@ export class EditorStore {
       autoHideHandles: s.autoHideHandles,
       snapPoints: s.snapPoints,
       showNeighbours: s.showNeighbours,
+      applyFeatures: s.applyFeatures,
       spacingSize: s.spacingSize,
       proofSize: s.proofSize,
       proofLeading: s.proofLeading,

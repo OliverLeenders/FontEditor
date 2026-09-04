@@ -35,9 +35,11 @@ The gaps worth naming, in the order they would bite someone using this:
 - **Font info cannot be edited.** Family, style, units per em and the vertical metrics
   exist in the model and are read from an imported file, but nothing in the interface
   writes them — a font drawn from scratch exports as "Untitled Regular" at 1000 upem.
-- **The proof does not apply features.** Kerning is laid out, substitution is not, so a
-  ligature that compiles into the exported font cannot be seen before exporting it.
-  The proof shows the glyphs the characters map to, one for one.
+- **Shaping is this editor's `.fea` subset, not a shaping engine.** Ligatures and single
+  substitutions are applied to the Spacing line and the Proof, in the order the file
+  lists them. There is no contextual matching, no mark attachment and no bidi — and the
+  glyph strip under the canvas is deliberately left unshaped, since it is there to show
+  the letter you are drawing beside its neighbours.
 - **Overlap removal declines edges that lie along each other**, and does not look at a
   contour that crosses itself. Both refuse rather than guess, which is the right
   failure, and both are real shapes a designer will draw.

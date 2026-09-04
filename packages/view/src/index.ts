@@ -26,6 +26,7 @@ export {
   zoomAt,
 } from "./transform.js";
 
+export type { Shaper } from "./run.js";
 export type { WheelIntent, WheelLike } from "./wheel.js";
 export { wheelIntent } from "./wheel.js";
 
