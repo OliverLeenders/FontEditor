@@ -10,6 +10,7 @@ import {
   counterIds,
   fontDocument,
   groupKey,
+  kernPairCount,
   setKern,
   setKernGroup,
   setKerning,
@@ -27,6 +28,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   addKernGroup,
+  breakOutKern,
+  nudgeKern,
   balanceSegmentAt,
   deleteKernGroup,
   kernGroupHolding,
@@ -1094,5 +1097,64 @@ describe("kerning groups", () => {
     expect(takeGlyphFromKernGroup(s, "first", "O", "A").state).toBe(s);
     expect(deleteKernGroup(s, "first", "nope").state).toBe(s);
     expect(putGlyphInKernGroup(s, "first", "O", "Q").state).toBe(s);
+  });
+});
+
+describe("nudging a pair once there are classes", () => {
+  /** Two classes and no pairs at all: a font whose kerning is about to start. */
+  const font = (): EditorState => {
+    let kerning: Kerning = EMPTY_KERNING;
+    kerning = setKernGroup(kerning, "first", "O", ["O", "Q"]);
+    kerning = setKernGroup(kerning, "second", "A", ["A", "Aacute"]);
+
+    const document = setKerning(
+      fontDocument([
+        glyph("O", { unicodes: [0x4f], advance: 500 }),
+        glyph("Q", { unicodes: [0x51], advance: 500 }),
+        glyph("A", { unicodes: [0x41], advance: 500 }),
+        glyph("Aacute", { unicodes: [0xc1], advance: 500 }),
+        glyph("T", { unicodes: [0x54], advance: 500 }),
+      ]),
+      kerning,
+    );
+    return editorState({ document, view: VIEW, currentGlyph: "O" });
+  };
+
+  it("writes a new pair between the classes the two sides are in", () => {
+    // The point of putting a letter in a class: correcting this gap corrects it
+    // for every letter that behaves the same way.
+    const after = nudgeKern(font(), "O", "A", -10).state;
+    const pair = kerningFor(after, "O", "A");
+    expect(pair?.first).toBe("@O");
+    expect(pair?.second).toBe("@A");
+    expect(kerningFor(after, "Q", "Aacute")?.value).toBe(-10);
+  });
+
+  it("names the glyph on a side that is in no class", () => {
+    const after = nudgeKern(font(), "O", "T", -10).state;
+    const pair = kerningFor(after, "O", "T");
+    expect(pair?.first).toBe("@O");
+    expect(pair?.second).toBe("T");
+  });
+
+  it("writes a plain pair when neither side is in one", () => {
+    const after = nudgeKern(font(), "T", "T", -10).state;
+    expect(kerningFor(after, "T", "T")?.grouped).toBe(false);
+  });
+
+  it("goes on adjusting the class it wrote", () => {
+    let state = nudgeKern(font(), "O", "A", -10).state;
+    // A different member of the same two classes: the same rule, not a new one.
+    state = nudgeKern(state, "Q", "A", -5).state;
+    expect(kerningFor(state, "O", "A")?.value).toBe(-15);
+    expect(kernPairCount(state.document.kerning)).toBe(1);
+  });
+
+  it("still adjusts an exception rather than the class behind it", () => {
+    let state = nudgeKern(font(), "O", "A", -10).state;
+    state = breakOutKern(state, "Q", "A").state;
+    state = nudgeKern(state, "Q", "A", -5).state;
+    expect(kerningFor(state, "Q", "A")?.value).toBe(-15);
+    expect(kerningFor(state, "O", "A")?.value).toBe(-10);
   });
 });

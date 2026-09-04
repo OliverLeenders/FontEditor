@@ -32,6 +32,7 @@ import {
   makeSegmentCurve,
   makeSegmentLine,
   glyph,
+  groupKey,
   nodeById,
   putGlyph,
   removeGlyph,
@@ -423,7 +424,14 @@ export function removeComponent(state: EditorState, id: ComponentId): ToolResult
  * Written to whichever pair already governs them, so nudging a pair that is
  * kerned by a class adjusts the class — which is what a designer means by
  * "these are too far apart" when the two letters are examples of a category.
- * Making it an exception instead is a deliberate act, and a separate one.
+ * Making it an exception instead is a deliberate act, and a separate one:
+ * `breakOutKern`.
+ *
+ * With no rule yet, a new one is written between whatever classes the two sides
+ * belong to, and only falls back to the glyph itself where a side is in no
+ * class. That is what putting a letter in a class is for — the alternative is a
+ * font whose classes are filled in and never used, and a designer correcting
+ * the same gap once for every member of them.
  */
 export function nudgeKern(
   state: EditorState,
@@ -435,8 +443,8 @@ export function nudgeKern(
 
   const index = kernIndex(state.document.kerning);
   const existing = kernMatch(index, left, right);
-  const first = existing?.first ?? left;
-  const second = existing?.second ?? right;
+  const first = existing?.first ?? classOf(index.firstOf, left);
+  const second = existing?.second ?? classOf(index.secondOf, right);
   const value = (existing?.value ?? 0) + delta;
 
   const kerning = setKern(state.document.kerning, first, second, value);
@@ -446,6 +454,12 @@ export function nudgeKern(
     begin(`Kern ${first} ${second}`),
     commit,
   ]);
+}
+
+/** A pair key: the glyph's class where it has one, and the glyph where it has not. */
+function classOf(of: ReadonlyMap<GlyphName, string>, glyphName: GlyphName): string {
+  const group = of.get(glyphName);
+  return group === undefined ? glyphName : groupKey(group);
 }
 
 /**

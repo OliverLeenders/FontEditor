@@ -23,10 +23,10 @@ OTF and UFO in both directions. Everything autosaves.
 | 4     | From a glyph to a font              | done                                                                  |
 | 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools     |
 | 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                      |
-| 7     | Spacing and kerning                 | done; groups are edited here, but see below                           |
+| 7     | Spacing and kerning                 | done                                                                  |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual |
 | 9     | Variable fonts                      | not started                                                           |
-| 10    | Production polish                   | lint, format and 1252 tests, run on CI; preferences persist           |
+| 10    | Production polish                   | lint, format and 1257 tests, run on CI; preferences persist           |
 
 ### What the table is hiding
 
@@ -40,10 +40,6 @@ The gaps worth naming, in the order they would bite someone using this:
 - **Overlap removal declines edges that lie along each other**, and does not look at a
   contour that crosses itself. Both refuse rather than guess, which is the right
   failure, and both are real shapes a designer will draw.
-- **A new pair is written between the two glyphs, never between their classes.** Groups
-  can now be made, renamed and filled from the Spacing view, and a pair that already
-  belongs to a class still adjusts the class — but the arrow keys have no way to start a
-  class pair, so a font drawn here kerns by class only where its classes were imported.
 - **The UFO writer has never been read by anything but itself.** The importer round-trips
   it, which proves consistency, not correctness.
 
