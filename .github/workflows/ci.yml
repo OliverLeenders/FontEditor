@@ -56,3 +56,43 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+
+  # A UFO that only this repository has ever read proves consistency, not
+  # correctness: a misreading of the format shared by our writer and our reader
+  # passes every test in the suite. fontTools is the reference implementation
+  # the type world is built on, and it exists only in Python — which is the
+  # whole reason there is a Python step in a TypeScript repository.
+  ufo:
+    name: UFO against fontTools
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: tools/ufo-check/requirements.txt
+      - run: pnpm install --frozen-lockfile
+      - run: pip install -r tools/ufo-check/requirements.txt
+
+      - name: Export the proof font
+        run: UFO_OUT="$RUNNER_TEMP/ufo" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
+
+      - name: Read it with fontTools
+        run: python tools/ufo-check/check_ufo.py "$RUNNER_TEMP/ufo/TunniProof-Regular.ufo"
+
+      - name: Have fontTools write the whole font back
+        run: >
+          python tools/ufo-check/rewrite_ufo.py
+          "$RUNNER_TEMP/ufo/TunniProof-Regular.ufo"
+          "$RUNNER_TEMP/ufo/FromFontTools.ufo"
+          "$RUNNER_TEMP/ufo/FromFontTools.ufo.zip"
+
+      # The only test here whose input was written by something other than us.
+      - name: Read back what fontTools wrote
+        run: FOREIGN_UFO="$RUNNER_TEMP/ufo/FromFontTools.ufo.zip" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
