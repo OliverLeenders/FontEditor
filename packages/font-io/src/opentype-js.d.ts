@@ -93,7 +93,11 @@ declare module "opentype.js" {
        */
       readonly gsub?: {
         readonly features: readonly { readonly tag: string }[];
-        readonly lookups: readonly { readonly lookupType: number }[];
+        readonly lookups: readonly {
+          readonly lookupType: number;
+          /** Loosely typed for the same reason: only a contextual rule looks inside one. */
+          readonly subtables: readonly unknown[];
+        }[];
       };
     };
   }

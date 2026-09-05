@@ -121,3 +121,95 @@ describe("which features run", () => {
     expect(out).not.toBe(names);
   });
 });
+
+const CALT = `
+feature calt {
+  sub a b' c by b.alt;
+} calt;
+`;
+
+const CLASSES = `
+@round = [o c e];
+feature calt {
+  sub @round n' by n.alt;
+} calt;
+`;
+
+const IGNORING = `
+feature calt {
+  ignore sub f a';
+  sub a' by a.alt;
+} calt;
+`;
+
+describe("shaping a run in context", () => {
+  it("replaces the marked glyph only where the context holds", () => {
+    expect(shaperFor(CALT)(["a", "b", "c"])).toEqual(["a", "b.alt", "c"]);
+    expect(shaperFor(CALT)(["x", "b", "c"])).toEqual(["x", "b", "c"]);
+    expect(shaperFor(CALT)(["a", "b", "x"])).toEqual(["a", "b", "x"]);
+  });
+
+  it("wants the whole context, not the end of the run", () => {
+    // Nothing follows the b, so the lookahead cannot match.
+    expect(shaperFor(CALT)(["a", "b"])).toEqual(["a", "b"]);
+  });
+
+  it("matches a class anywhere in the context", () => {
+    expect(shaperFor(CLASSES)(["o", "n"])).toEqual(["o", "n.alt"]);
+    expect(shaperFor(CLASSES)(["e", "n"])).toEqual(["e", "n.alt"]);
+    expect(shaperFor(CLASSES)(["t", "n"])).toEqual(["t", "n"]);
+  });
+
+  it("lets an ignore rule stop the rule behind it", () => {
+    expect(shaperFor(IGNORING)(["x", "a"])).toEqual(["x", "a.alt"]);
+    expect(shaperFor(IGNORING)(["f", "a"])).toEqual(["f", "a"]);
+  });
+
+  it("applies a ligature that only happens in context", () => {
+    const source = `feature calt { sub x f' i' by f_i; } calt;`;
+    expect(shaperFor(source)(["x", "f", "i"])).toEqual(["x", "f_i"]);
+    expect(shaperFor(source)(["y", "f", "i"])).toEqual(["y", "f", "i"]);
+  });
+
+  it("pairs a marked class off with its replacements", () => {
+    const source = `
+      @from = [a b];
+      @to = [a.alt b.alt];
+      feature calt { sub x @from' by @to; } calt;
+    `;
+    expect(shaperFor(source)(["x", "a"])).toEqual(["x", "a.alt"]);
+    expect(shaperFor(source)(["x", "b"])).toEqual(["x", "b.alt"]);
+  });
+
+  it("steps past everything it matched, not just the first glyph", () => {
+    // Both marked glyphs are consumed, so the second cannot start a match of
+    // its own. Without that a rule whose output feeds its own input never ends.
+    const source = `feature calt { sub x a' a' by aa; } calt;`;
+    expect(shaperFor(source)(["x", "a", "a", "a"])).toEqual(["x", "aa", "a"]);
+  });
+
+  it("lets what it produced satisfy the next match", () => {
+    // The x it writes is the x the following a needs behind it, so both are
+    // replaced. That is what a shaper does: the context is the run as it now
+    // stands, not the text that was typed.
+    const source = `feature calt { sub x a' by x; } calt;`;
+    expect(shaperFor(source)(["x", "a", "a"])).toEqual(["x", "x", "x"]);
+  });
+
+  it("sees the run as it now stands when it looks backwards", () => {
+    // The first rule turns the b into b.alt, and the second is written against
+    // what the first produced — which is what a shaper does and the only reading
+    // under which two rules in a row compose.
+    const source = `
+      feature calt {
+        sub a b' by b.alt;
+        sub b.alt c' by c.alt;
+      } calt;
+    `;
+    expect(shaperFor(source)(["a", "b", "c"])).toEqual(["a", "b.alt", "c.alt"]);
+  });
+
+  it("leaves a run alone when the feature is not asked for", () => {
+    expect(shaperFor(CALT, ["liga"])(["a", "b", "c"])).toEqual(["a", "b", "c"]);
+  });
+});

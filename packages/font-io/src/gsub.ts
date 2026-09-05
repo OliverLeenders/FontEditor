@@ -9,8 +9,9 @@ import { Writer, coverage } from "./gpos.js";
  * GPOS's is written for the single `kern` feature it needs; if GPOS ever wants a
  * second feature it should come here rather than grow one of its own.
  *
- * Only two lookup types, and they are the two that a font being drawn actually
- * uses: one glyph for another, and a run of glyphs for one.
+ * Three lookup types, and they are the ones a font being drawn actually uses:
+ * one glyph for another, a run of glyphs for one, and either of those again
+ * conditioned on what surrounds it.
  */
 
 export type SingleSub = {
@@ -115,11 +116,71 @@ export function ligatureSubst(ligatures: readonly LigatureSub[]): Uint8Array {
   return w.finish();
 }
 
-/** One lookup: a type, and the subtable it holds. */
+/**
+ * A chaining contextual substitution, in the format that matches by coverage.
+ *
+ * Format 3 rather than 1 or 2. The other two hold rule sets hung off the first
+ * glyph or off a class definition, which is smaller for a feature with hundreds
+ * of rules and is a second index to keep in step for a feature with three.
+ * Format 3 is one rule per subtable, each position a coverage of its own.
+ *
+ * The table stores the backtrack backwards — the position nearest the match
+ * first — because that is the order a shaper walks it in, stepping away from the
+ * match one glyph at a time. Callers pass reading order and this reverses it,
+ * since reading order is what the rule was written in.
+ *
+ * A rule with no actions matches and does nothing, which is what `ignore` is:
+ * the subtables of a lookup are tried in order and the first to match wins, so
+ * an ignore rule placed before another stops it.
+ */
+export type ChainRule = {
+  readonly backtrack: readonly (readonly number[])[];
+  readonly input: readonly (readonly number[])[];
+  readonly lookahead: readonly (readonly number[])[];
+  /** Which lookup runs at which position of the input. */
+  readonly actions: readonly { readonly at: number; readonly lookup: number }[];
+};
+
+export function chainContextSubst(rule: ChainRule): Uint8Array {
+  const back = [...rule.backtrack].reverse();
+  const runs = [back, rule.input, rule.lookahead];
+  const covers = runs.flat().map((ids) => coverage(ids));
+
+  const header =
+    2 + // format
+    runs.reduce((n, run) => n + 2 + run.length * 2, 0) +
+    2 + // the count of lookup records
+    rule.actions.length * 4;
+
+  let at = header;
+  const offsets = covers.map((cover) => {
+    const here = at;
+    at += cover.length;
+    return here;
+  });
+
+  const w = new Writer();
+  w.u16(3);
+  let taken = 0;
+  for (const run of runs) {
+    w.u16(run.length);
+    for (let i = 0; i < run.length; i++) w.u16(offsets[taken + i]!);
+    taken += run.length;
+  }
+  w.u16(rule.actions.length);
+  for (const action of rule.actions) {
+    w.u16(action.at);
+    w.u16(action.lookup);
+  }
+  for (const cover of covers) w.bytesOf(cover);
+  return w.finish();
+}
+
+/** One lookup: a type, and the subtables it holds, tried in order. */
 export type Lookup = {
-  /** 1 for single substitution, 4 for ligature. */
+  /** 1 for single substitution, 4 for ligature, 6 for chaining contextual. */
   readonly type: number;
-  readonly subtable: Uint8Array;
+  readonly subtables: readonly Uint8Array[];
 };
 
 /** A feature, and which of the lookups it uses. */
@@ -141,15 +202,25 @@ export function gsubTable(
 ): Uint8Array {
   const usable = features.filter((f) => f.lookups.length > 0);
   if (lookups.length === 0 || usable.length === 0) return new Uint8Array(0);
+  if (lookups.some((l) => l.subtables.length === 0)) return new Uint8Array(0);
 
   const lookupTables = lookups.map((lookup) => {
+    // Tried in the order they are written, first match winning — which is what
+    // makes an `ignore` rule work, and why the caller's order is kept.
+    const head = 6 + lookup.subtables.length * 2;
+    let at = head;
+    const offsets = lookup.subtables.map((sub) => {
+      const here = at;
+      at += sub.length;
+      return here;
+    });
+
     const w = new Writer();
     w.u16(lookup.type);
     w.u16(0); // no flags
-    w.u16(1); // one subtable
-    // From the start of the Lookup: type, flag, count and one offset is eight.
-    w.u16(8);
-    w.bytesOf(lookup.subtable);
+    w.u16(lookup.subtables.length);
+    for (const off of offsets) w.u16(off);
+    for (const sub of lookup.subtables) w.bytesOf(sub);
     return w.finish();
   });
 

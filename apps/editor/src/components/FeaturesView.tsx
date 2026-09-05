@@ -100,11 +100,16 @@ export function FeaturesView(): React.JSX.Element {
             <li>
               class substitution — <code>sub @LOWER by @SMALL;</code>
             </li>
+            <li>
+              in context — <code>sub a b&apos; c by b.alt;</code>
+            </li>
+            <li>
+              exceptions to it — <code>ignore sub f a&apos;;</code>
+            </li>
           </ul>
           <p className={styles.note}>
-            Contextual rules, alternates and positioning are kept in the file and written to the
-            UFO, but are not compiled into the exported OTF. Kerning has its own workspace and is
-            written from there.
+            Alternates and positioning are kept in the file and written to the UFO, but are not
+            compiled into the exported OTF. Kerning has its own workspace and is written from there.
           </p>
         </aside>
       </div>

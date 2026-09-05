@@ -112,6 +112,109 @@ describe("reading feature source", () => {
   });
 });
 
+describe("reading a rule with a context", () => {
+  const rule = (source: string) => parseFea(source).features[0]?.rules[0];
+
+  it("splits a rule into what comes before, what is replaced, and what follows", () => {
+    const parsed = parseFea("feature calt { sub a b' c by b.alt; } calt;");
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.features[0]?.rules[0]).toMatchObject({
+      kind: "chain",
+      backtrack: [["a"]],
+      input: [["b"]],
+      lookahead: [["c"]],
+      to: ["b.alt"],
+    });
+  });
+
+  it("takes classes anywhere in the context", () => {
+    const parsed = parseFea(`
+      @V = [a b];
+      feature calt { sub @V f' @V by f.alt; } calt;
+    `);
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.features[0]?.rules[0]).toMatchObject({
+      kind: "chain",
+      backtrack: [["a", "b"]],
+      input: [["f"]],
+      lookahead: [["a", "b"]],
+    });
+  });
+
+  it("pairs a marked class off with its replacements", () => {
+    const parsed = parseFea(
+      "@A = [a b]; @B = [a.sc b.sc]; feature calt { sub @A' f by @B; } calt;",
+    );
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.features[0]?.rules[0]).toMatchObject({
+      kind: "chain",
+      input: [["a", "b"]],
+      to: ["a.sc", "b.sc"],
+    });
+  });
+
+  it("reads several marked glyphs as a ligature that only happens in context", () => {
+    expect(rule("feature calt { sub a f' i' by fi; } calt;")).toMatchObject({
+      kind: "chain",
+      backtrack: [["a"]],
+      input: [["f"], ["i"]],
+      to: ["fi"],
+    });
+  });
+
+  it("reads an ignore rule as a match that replaces nothing", () => {
+    expect(rule("feature calt { ignore sub a b'; } calt;")).toMatchObject({
+      kind: "chain",
+      backtrack: [["a"]],
+      input: [["b"]],
+      to: null,
+    });
+  });
+
+  it("keeps a context with nothing before it", () => {
+    expect(rule("feature calt { sub b' c by b.alt; } calt;")).toMatchObject({
+      backtrack: [],
+      input: [["b"]],
+      lookahead: [["c"]],
+    });
+  });
+
+  it("refuses marked glyphs with a gap between them", () => {
+    // The language allows several separate matches, each with its own lookup.
+    // Reading this as one run would replace the wrong glyphs.
+    const parsed = parseFea("feature calt { sub a' b c' by x; } calt;");
+    expect(parsed.problems.some((p) => p.message.includes("next to each other"))).toBe(true);
+  });
+
+  it("refuses an ignore rule with nothing marked", () => {
+    const parsed = parseFea("feature calt { ignore sub a b; } calt;");
+    expect(parsed.problems.some((p) => p.message.includes("marked"))).toBe(true);
+  });
+
+  it("refuses an ignore rule that tries to replace something", () => {
+    const parsed = parseFea("feature calt { ignore sub a b' by c; } calt;");
+    expect(parsed.problems.some((p) => p.message.includes("replaces nothing"))).toBe(true);
+  });
+
+  it("refuses a rule that calls a lookup by name", () => {
+    const parsed = parseFea("feature calt { sub a b' lookup SOMETHING; } calt;");
+    expect(parsed.problems.some((p) => p.message.includes("named lookup"))).toBe(true);
+  });
+
+  it("refuses ignore of anything but a substitution", () => {
+    const parsed = parseFea("feature calt { ignore pos a b'; } calt;");
+    expect(parsed.problems.some((p) => p.message.includes("ignore sub"))).toBe(true);
+  });
+
+  it("still reads a plain rule the same way", () => {
+    expect(rule("feature liga { sub f i by fi; } liga;")).toMatchObject({
+      kind: "ligature",
+      from: ["f", "i"],
+      to: "fi",
+    });
+  });
+});
+
 describe("compiling against a font", () => {
   it("reports a rule about a glyph the font has not got", () => {
     // Compiling it anyway would put a lookup in the font that substitutes
@@ -134,6 +237,33 @@ describe("compiling against a font", () => {
     );
     expect(compiled.rules).toBe(2);
     expect(compiled.tags).toEqual(["smcp"]);
+  });
+});
+
+describe("compiling a rule with a context", () => {
+  const compile = (source: string) =>
+    compileFeatures(source, (n) => (NAMES.includes(n) ? NAMES.indexOf(n) : undefined));
+
+  it("counts a contextual rule as a rule", () => {
+    const compiled = compile("feature calt { sub a b' by b.sc; } calt;");
+    expect(compiled.problems).toEqual([]);
+    expect(compiled.rules).toBe(1);
+    expect(compiled.tags).toEqual(["calt"]);
+    expect(compiled.table.length).toBeGreaterThan(0);
+  });
+
+  it("drops a rule whose context names a glyph the font has not got", () => {
+    // The context is a condition, not a decoration: a rule that can never match
+    // is a rule the file claims and the font does not have.
+    const compiled = compile("feature calt { sub q b' by b.sc; } calt;");
+    expect(compiled.problems.some((p) => p.message.includes("no glyph called q"))).toBe(true);
+    expect(compiled.rules).toBe(0);
+  });
+
+  it("compiles an ignore rule beside the rule it excepts", () => {
+    const compiled = compile("feature calt { ignore sub f b'; sub b' by b.sc; } calt;");
+    expect(compiled.problems).toEqual([]);
+    expect(compiled.rules).toBe(2);
   });
 });
 
@@ -181,5 +311,49 @@ describe("the exported font substitutes", () => {
     const f = reread("feature liga { sub f i by fi; } liga;");
     expect(f.unitsPerEm).toBe(1000);
     expect(f.glyphs.length).toBe(NAMES.length);
+  });
+});
+
+describe("the exported font substitutes in context", () => {
+  it("writes a contextual rule as its own lookup type", () => {
+    const f = reread("feature calt { sub a b' by b.sc; } calt;");
+    const lookups = f.tables.gsub!.lookups;
+    expect(lookups.some((l) => l.lookupType === 6)).toBe(true);
+  });
+
+  it("writes the substitution it points at as an ordinary lookup", () => {
+    // The table has no way to write a replacement into a contextual rule; the
+    // rule is a condition and a pointer at a lookup somewhere else in the list.
+    const f = reread("feature calt { sub a b' by b.sc; } calt;");
+    const lookups = f.tables.gsub!.lookups;
+    expect(lookups.some((l) => l.lookupType === 1)).toBe(true);
+  });
+
+  it("declares the feature that holds it", () => {
+    const f = reread("feature calt { sub a b' by b.sc; } calt;");
+    expect(f.tables.gsub!.features.map((x) => x.tag)).toContain("calt");
+  });
+
+  it("keeps several contextual rules in the order they were written", () => {
+    // They are one lookup with a subtable each, tried in order — which is the
+    // whole of what an ignore rule does.
+    const f = reread("feature calt { ignore sub f b'; sub b' by b.sc; } calt;");
+    const chain = f.tables.gsub!.lookups.find((l) => l.lookupType === 6);
+    expect(chain).toBeDefined();
+    expect(chain!.subtables.length).toBe(2);
+  });
+
+  it("points the rule at a lookup that is really in the list", () => {
+    const f = reread("feature calt { sub a b' by b.sc; } calt;");
+    const gsub = f.tables.gsub!;
+    const chain = gsub.lookups.find((l) => l.lookupType === 6)!;
+    const table = chain.subtables[0] as {
+      lookupRecords?: { lookupListIndex: number; sequenceIndex: number }[];
+    };
+    const records = table.lookupRecords ?? [];
+    expect(records.length).toBe(1);
+    expect(records[0]!.sequenceIndex).toBe(0);
+    expect(gsub.lookups[records[0]!.lookupListIndex]).toBeDefined();
+    expect(gsub.lookups[records[0]!.lookupListIndex]!.lookupType).toBe(1);
   });
 });

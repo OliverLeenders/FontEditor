@@ -10,11 +10,11 @@ import { type FeaRule, type FeaSource, parseFea } from "./fea.js";
  * ligature is exactly what a proof is for.
  *
  * This is not a shaping engine. It applies what this editor's `.fea` subset can
- * express — ligatures and single substitutions — in the order the file lists
- * them, over a run that is already in visual order because the editor is
- * left-to-right only. There is no contextual matching, no mark attachment and no
- * bidi, and nothing here pretends otherwise. What it buys is that the thing you
- * wrote is the thing you see.
+ * express — single substitutions, ligatures, and either of those conditioned on
+ * what surrounds them — in the order the file lists them, over a run that is
+ * already in visual order because the editor is left-to-right only. There is no
+ * mark attachment and no bidi, and nothing here pretends otherwise. What it buys
+ * is that the thing you wrote is the thing you see.
  */
 
 /**
@@ -71,13 +71,107 @@ export function featureTags(source: string): string[] {
   return [...seen];
 }
 
+type Chain = Extract<FeaRule, { kind: "chain" }>;
+
 function applyRules(names: readonly string[], rules: readonly FeaRule[]): string[] {
   let run = [...names];
-  for (const rule of rules) {
+  let at = 0;
+
+  while (at < rules.length) {
+    const rule = rules[at]!;
+
+    // Contextual rules go in batches rather than one at a time. Consecutive
+    // ones are a single lookup, and within a lookup the first rule to match a
+    // position wins — which is the whole of what `ignore` does.
+    if (rule.kind === "chain") {
+      const batch: Chain[] = [];
+      while (at < rules.length && rules[at]!.kind === "chain") {
+        batch.push(rules[at] as Chain);
+        at += 1;
+      }
+      run = applyChains(run, batch);
+      continue;
+    }
+
     run =
       rule.kind === "ligature" ? applyLigature(run, rule.from, rule.to) : applySingle(run, rule);
+    at += 1;
   }
   return run;
+}
+
+/**
+ * One pass over the run, trying each rule at each position.
+ *
+ * Left to right, taking the first rule that matches and stepping past what it
+ * matched — including when it matched in order to do nothing. A rule cannot see
+ * a glyph it has already passed except as it now stands, which is why the
+ * backtrack is checked against what has been produced rather than against the
+ * text that was there before.
+ */
+function applyChains(names: readonly string[], rules: readonly Chain[]): string[] {
+  const out: string[] = [];
+  let at = 0;
+
+  while (at < names.length) {
+    const hit = rules.find((rule) => chainMatches(names, out, at, rule));
+    if (hit === undefined) {
+      out.push(names[at]!);
+      at += 1;
+      continue;
+    }
+
+    const width = hit.input.length;
+    if (hit.to === null) {
+      // An ignore rule leaves the glyphs it matched exactly as they were; what
+      // it accomplishes is that the rules after it never see them.
+      for (let i = 0; i < width; i++) out.push(names[at + i]!);
+    } else {
+      out.push(...replacement(names[at]!, hit));
+    }
+    at += width;
+  }
+  return out;
+}
+
+function chainMatches(
+  names: readonly string[],
+  out: readonly string[],
+  at: number,
+  rule: Chain,
+): boolean {
+  // Written in reading order, so the last of the backtrack is the glyph just
+  // before the match.
+  if (rule.backtrack.length > out.length) return false;
+  const start = out.length - rule.backtrack.length;
+  for (const [i, set] of rule.backtrack.entries()) {
+    const glyph = out[start + i];
+    if (glyph === undefined || !set.includes(glyph)) return false;
+  }
+
+  for (const [i, set] of rule.input.entries()) {
+    const glyph = names[at + i];
+    if (glyph === undefined || !set.includes(glyph)) return false;
+  }
+
+  const after = at + rule.input.length;
+  for (const [i, set] of rule.lookahead.entries()) {
+    const glyph = names[after + i];
+    if (glyph === undefined || !set.includes(glyph)) return false;
+  }
+  return true;
+}
+
+/** What the matched run becomes: one glyph, whichever way the rule was written. */
+function replacement(first: string, rule: Chain): string[] {
+  const to = rule.to ?? [];
+  if (to.length === 0) return [first];
+  if (rule.input.length > 1 || to.length === 1) return [to[0]!];
+
+  // A class paired off with another: each glyph of the marked position becomes
+  // the one written opposite it.
+  const index = rule.input[0]!.indexOf(first);
+  return [to[index] ?? to[0]!];
 }
 
 /**
