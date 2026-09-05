@@ -1,5 +1,6 @@
 import { isTranslation } from "@fonteditor/geometry";
 import {
+  type NodeType,
   randomIds,
   setAdvance,
   setLeftSidebearing,
@@ -18,6 +19,7 @@ import {
   renameCurrentGlyph,
   renameRefusal,
   result,
+  selectedCanBeTangent,
   selectedCoordinate,
 } from "@fonteditor/tools";
 import { useEffect, useRef, useState } from "react";
@@ -52,6 +54,7 @@ export function Inspector(): React.JSX.Element | null {
     (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
   );
   const pointType = useStoreValue(selectedPointType);
+  const canTangent = useStoreValue((s) => selectedCanBeTangent(s.session.editor));
   // Two selectors rather than one returning an object: a fresh object every time
   // would compare unequal and re-render the panel on every store notification.
   const leftBearing = useStoreValue(
@@ -158,7 +161,7 @@ export function Inspector(): React.JSX.Element | null {
     );
   };
 
-  const applyPointType = (type: "corner" | "smooth"): void => {
+  const applyPointType = (type: NodeType): void => {
     let editor = store.editor;
     // Every selected on-curve point, one contour operation at a time.
     for (const item of editor.selection) {
@@ -375,6 +378,23 @@ export function Inspector(): React.JSX.Element | null {
               onClick={() => applyPointType("smooth")}
             >
               Smooth
+            </button>
+            {/* Only where it would be true: a tangent node says the curve on one
+                side leaves along the straight segment on the other, and a point
+                with two curves or two lines has no such arrangement. Disabled
+                rather than hidden, so the third choice is visibly a choice. */}
+            <button
+              type="button"
+              aria-pressed={pointType === "tangent"}
+              disabled={pointCount === 0 || !canTangent}
+              title={
+                canTangent
+                  ? "The curve leaves along the straight side"
+                  : "Needs a straight segment on one side and a curve on the other"
+              }
+              onClick={() => applyPointType("tangent")}
+            >
+              Tangent
             </button>
           </div>
         </Field>

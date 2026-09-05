@@ -61,6 +61,8 @@ export {
   nodeIndex,
   removeNode,
   reverseContour,
+  canBeTangent,
+  enforceTangents,
   segmentAt,
   segmentCount,
   segmentCubic,

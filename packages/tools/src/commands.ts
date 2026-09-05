@@ -17,6 +17,7 @@ import {
   addGlyphComponent,
   addToKernGroup,
   balanceSegment,
+  canBeTangent,
   centreGlyph,
   component,
   contourById,
@@ -34,6 +35,7 @@ import {
   glyph,
   groupKey,
   nodeById,
+  nodeIndex,
   putGlyph,
   removeGlyph,
   removeFromKernGroup,
@@ -116,11 +118,32 @@ export function setPointType(
     );
     if (document !== null) editor = { ...editor, document };
   }
-  return done(
-    state,
-    editor === state ? null : editor,
-    type === "corner" ? "Make corner" : "Make smooth",
-  );
+  return done(state, editor === state ? null : editor, `Make ${type}`);
+}
+
+/**
+ * Whether a node could truthfully be tangent.
+ *
+ * Asked before the type is offered rather than after it is refused: a button
+ * that does nothing when pressed teaches nothing about why.
+ */
+export function nodeCanBeTangent(
+  state: EditorState,
+  contourId: ContourId,
+  nodeId: NodeId,
+): boolean {
+  const glyph = currentGlyph(state);
+  const c = glyph === null ? null : contourById(glyph, contourId);
+  if (c === null) return false;
+  const index = nodeIndex(c, nodeId);
+  return index >= 0 && canBeTangent(c, index);
+}
+
+/** Whether every selected point could be tangent, for the inspector's button. */
+export function selectedCanBeTangent(state: EditorState): boolean {
+  const points = state.selection.filter((item) => item.part === "point");
+  if (points.length === 0) return false;
+  return points.every((item) => nodeCanBeTangent(state, item.contourId, item.nodeId));
 }
 
 /**

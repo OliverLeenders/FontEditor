@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   balanceSegment,
+  canBeTangent,
   contour,
+  enforceTangents,
   contourBounds,
   insertNodeOnSegment,
   makeSegmentLine,
@@ -623,5 +625,150 @@ describe("locking one handle at a time", () => {
     const unlocked = setHvLock(locked, c.nodes[0]!.id, "out", false)!;
 
     expect(unlocked.nodes[0]!.out).toEqual(locked.nodes[0]!.out);
+  });
+});
+
+describe("tangent nodes", () => {
+  /**
+   * The top of an "n": a stem going straight up to the corner, and a shoulder
+   * curving away from it. Node 1 is the join.
+   */
+  const stem = () =>
+    contour(
+      "t",
+      [
+        node("a", vec(100, 0)),
+        node("b", vec(100, 500), { type: "tangent", out: vec(100, 620) }),
+        node("c", vec(300, 700), { in: vec(200, 700) }),
+        node("d", vec(300, 0)),
+      ],
+      true,
+    );
+
+  const handleOut = (c: ReturnType<typeof stem>, id: string) => nodeById(c, id)?.out ?? null;
+
+  it("knows where the type can truthfully be used", () => {
+    const c = stem();
+    expect(canBeTangent(c, 1)).toBe(true);
+    // Node 2 has a curve on one side and a line on the other as well.
+    expect(canBeTangent(c, 2)).toBe(true);
+    // Node 0 sits between two straight segments: no curve to continue.
+    expect(canBeTangent(c, 0)).toBe(false);
+  });
+
+  it("refuses the type where it would not be true", () => {
+    expect(setNodeType(stem(), "a", "tangent")).toBeNull();
+  });
+
+  it("refuses it at the end of an open contour, which has only one side", () => {
+    const open = contour(
+      "o",
+      [node("a", vec(0, 0)), node("b", vec(100, 0), { in: vec(50, 40) })],
+      false,
+    );
+    expect(canBeTangent(open, 0)).toBe(false);
+    expect(canBeTangent(open, 1)).toBe(false);
+  });
+
+  it("swings the handle onto the line when the type is adopted", () => {
+    // The handle starts off the line and is corrected at once, not on the next
+    // drag: a type that visibly changed nothing would read as broken.
+    const crooked = contour(
+      "t",
+      [
+        node("a", vec(100, 0)),
+        node("b", vec(100, 500), { out: vec(160, 560) }),
+        node("c", vec(300, 700), { in: vec(200, 700) }),
+        node("d", vec(300, 0)),
+      ],
+      true,
+    );
+    const fixed = setNodeType(crooked, "b", "tangent")!;
+    const out = handleOut(fixed, "b")!;
+    // Straight up from the node, which is where the stem points.
+    expect(out.x).toBeCloseTo(100, 6);
+    expect(out.y).toBeGreaterThan(500);
+  });
+
+  it("keeps the length the handle already had", () => {
+    const crooked = contour(
+      "t",
+      [
+        node("a", vec(100, 0)),
+        node("b", vec(100, 500), { out: vec(160, 560) }),
+        node("c", vec(300, 700), { in: vec(200, 700) }),
+        node("d", vec(300, 0)),
+      ],
+      true,
+    );
+    const before = distance(vec(100, 500), vec(160, 560));
+    const after = distance(vec(100, 500), handleOut(setNodeType(crooked, "b", "tangent")!, "b")!);
+    expect(after).toBeCloseTo(before, 6);
+  });
+
+  it("swings the handle again when the straight side moves", () => {
+    // The line now leans, and the handle has to lean with it or the join is a
+    // kink the node claims is not there.
+    const leaned = translateNodeBy(stem(), "a", vec(-100, 0))!;
+    const out = handleOut(leaned, "b")!;
+    const along = { x: 100 - 0, y: 500 - 0 };
+    // Same direction as the stem, which now runs from (0,0) to (100,500).
+    expect(out.x - 100).toBeCloseTo((along.x * 120) / Math.hypot(along.x, along.y), 4);
+    expect(out.y - 500).toBeCloseTo((along.y * 120) / Math.hypot(along.x, along.y), 4);
+  });
+
+  it("swings it when the node itself moves", () => {
+    const moved = setNodePoint(stem(), "b", vec(200, 500))!;
+    const out = handleOut(moved, "b")!;
+    const along = { x: 200 - 100, y: 500 - 0 };
+    const reach = Math.hypot(along.x, along.y);
+    expect(out.x - 200).toBeCloseTo((along.x * 120) / reach, 4);
+    expect(out.y - 500).toBeCloseTo((along.y * 120) / reach, 4);
+  });
+
+  it("takes the cursor's distance along the line and not its direction", () => {
+    // Dragging sideways off a tangent handle should not lengthen it; only the
+    // part of the drag that runs along the line counts.
+    const dragged = setHandle(stem(), "b", "out", vec(400, 600))!;
+    const out = handleOut(dragged, "b")!;
+    expect(out.x).toBeCloseTo(100, 6);
+    expect(out.y).toBeCloseTo(600, 6);
+  });
+
+  it("will not put the handle behind the node", () => {
+    const dragged = setHandle(stem(), "b", "out", vec(100, 100))!;
+    const out = handleOut(dragged, "b")!;
+    expect(out.y).toBeCloseTo(500, 6);
+  });
+
+  it("gives up the type when the handle is pulled off the line with alt", () => {
+    // Otherwise the node would be called tangent while its geometry said
+    // otherwise, and the next edit would silently swing it back.
+    const broken = setHandle(stem(), "b", "out", vec(400, 600), true)!;
+    expect(nodeById(broken, "b")?.type).toBe("corner");
+    expect(handleOut(broken, "b")).toEqual(vec(400, 600));
+  });
+
+  it("stops constraining when the straight side stops being straight", () => {
+    // Node 1's other side is a curve now, so there is no line for it to follow
+    // and nothing to enforce. The handle is left exactly where it was.
+    const curved = makeSegmentCurve(stem(), 0)!;
+    expect(canBeTangent(curved, 1)).toBe(false);
+    const before = handleOut(stem(), "b")!;
+    expect(handleOut(curved, "b")).toEqual(before);
+  });
+
+  it("leaves a contour with no tangent nodes exactly as it was", () => {
+    const plain = contour(
+      "p",
+      [node("a", vec(0, 0)), node("b", vec(100, 0)), node("c", vec(100, 100))],
+      true,
+    );
+    expect(enforceTangents(plain)).toBe(plain);
+  });
+
+  it("hands back the same contour when everything is already true", () => {
+    const c = stem();
+    expect(enforceTangents(c)).toBe(c);
   });
 });

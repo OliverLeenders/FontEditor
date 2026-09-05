@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1366 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1379 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -86,7 +86,10 @@ finish open, Backspace to take a point back.
 With the select tool: drag nodes, handles, the blue Tunni line and the amber Tunni
 point. Double-click a Tunni point to balance the segment. Shift extends the selection,
 Alt breaks a smooth node's handle link, arrow keys nudge, Backspace deletes selected
-points, `R` reverses the contour, and Escape cancels a drag. Ctrl-Z undoes and
+points, `R` reverses the contour, and Escape cancels a drag. A point with a straight
+segment on one side and a curve on the other can be made **tangent**, from the inspector
+or the right-click menu: the curve then leaves along the line, and stays that way when
+either end of the line moves. Ctrl-Z undoes and
 Ctrl-Shift-Z redoes.
 
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,

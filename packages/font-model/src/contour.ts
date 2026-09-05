@@ -4,13 +4,17 @@ import {
   type TunniStatus,
   type Vec2,
   balance,
+  addScaled,
   bounds,
   distance,
+  dot,
+  length,
   lerp,
   lineAsCubic,
   moveTunniLine,
   setTunniPoint,
   split,
+  sub,
   tunniPoint,
   tunniStatus,
 } from "@fonteditor/geometry";
@@ -186,16 +190,114 @@ function replaceNode(c: Contour, index: number, next: Node): Contour {
   return { ...c, nodes };
 }
 
+// ---------------------------------------------------------------------------
+// tangent nodes
+//
+// A tangent node has a straight segment on one side and a curve on the other,
+// and the curve leaves along the line rather than at an angle to it. It is what
+// the top of an "n" is: a stem going straight up, and the shoulder starting off
+// vertically before it turns.
+//
+// Which handle is constrained cannot be read off the node — a node knows its
+// two handles and nothing about its neighbours, and whether a side is straight
+// is a fact about the segment. So this lives here, where the neighbours are.
+// ---------------------------------------------------------------------------
+
+/** The segment arriving at a node, wrapping round a closed contour. */
+function arrivingAt(c: Contour, index: number): Segment | null {
+  if (index !== 0) return segmentAt(c, index - 1);
+  return c.closed ? segmentAt(c, segmentCount(c) - 1) : null;
+}
+
+/**
+ * The far end of the straight side, and which handle has to face away from it.
+ *
+ * `null` when the node is not in a position to be tangent: an end of an open
+ * contour has only one side, and a node with two straight sides or two curved
+ * ones has no line for a curve to continue.
+ */
+function tangentSides(c: Contour, index: number): { away: Vec2; curved: "in" | "out" } | null {
+  const arriving = arrivingAt(c, index);
+  const leaving = segmentAt(c, index);
+  if (arriving === null || leaving === null) return null;
+  if (arriving.kind === leaving.kind) return null;
+
+  // The handle continues the line's own direction, so it points away from the
+  // straight segment's other end — which is the same rule read from either side.
+  return arriving.kind === "line"
+    ? { away: arriving.a, curved: "out" }
+    : { away: leaving.b, curved: "in" };
+}
+
+/** Whether `tangent` is a type this node could truthfully have. */
+export function canBeTangent(c: Contour, index: number): boolean {
+  return tangentSides(c, index) !== null;
+}
+
+/**
+ * The one node, with its curved handle swung onto the line.
+ *
+ * The handle keeps the length it had and only its direction is corrected, for
+ * the reason `enforceSmooth` keeps lengths: the two sides of a node are
+ * routinely asymmetric, and rewriting a length nobody asked to change would
+ * reshape the curve every time the straight side was touched.
+ */
+function tangentNode(c: Contour, index: number): Node | null {
+  const n = c.nodes[index];
+  if (n === undefined || n.type !== "tangent") return null;
+
+  const sides = tangentSides(c, index);
+  if (sides === null) return null;
+
+  const handle = handleOf(n, sides.curved);
+  if (handle === null) return null;
+
+  const along = sub(n.pt, sides.away);
+  const reach = length(along);
+  const held = distance(n.pt, handle);
+  if (reach === 0 || held === 0) return null;
+
+  const placed = addScaled(n.pt, along, held / reach);
+  if (placed.x === handle.x && placed.y === handle.y) return null;
+  return withHandleRaw(n, sides.curved, placed);
+}
+
+/**
+ * Make every tangent node in the contour true again.
+ *
+ * Every edit ends here rather than each one remembering which nodes it might
+ * have disturbed: moving a node swings the tangents on both sides of it,
+ * turning a segment into a line makes a node tangent that could not have been,
+ * and a rule applied in one place is a rule that cannot be forgotten in
+ * another. A contour is a handful of nodes, so the pass is free.
+ *
+ * Returns the same contour when nothing moved, which is what the rest of the
+ * model relies on to tell an edit from a no-op.
+ */
+export function enforceTangents(c: Contour): Contour {
+  let nodes: Node[] | null = null;
+  for (let i = 0; i < c.nodes.length; i++) {
+    const fixed = tangentNode(c, i);
+    if (fixed === null) continue;
+    nodes ??= c.nodes.slice();
+    nodes[i] = fixed;
+  }
+  return nodes === null ? c : { ...c, nodes };
+}
+
+/** What every edit hands back: the contour with its tangent nodes settled. */
+const settled = (c: Contour | null): Contour | null => (c === null ? null : enforceTangents(c));
+
 export function translateNodeBy(c: Contour, id: NodeId, delta: Vec2): Contour | null {
   const i = nodeIndex(c, id);
   if (i < 0) return null;
-  return replaceNode(c, i, translateNode(c.nodes[i]!, delta));
+  return settled(replaceNode(c, i, translateNode(c.nodes[i]!, delta)));
 }
 
 export function setNodePoint(c: Contour, id: NodeId, pt: Vec2): Contour | null {
   const i = nodeIndex(c, id);
   if (i < 0) return null;
-  return replaceNode(c, i, moveNodeTo(c.nodes[i]!, pt));
+  return settled(replaceNode(c, i, moveNodeTo(c.nodes[i]!, pt)));
 }
 
 /**
@@ -224,7 +326,26 @@ export function setHandle(
   if (i < 0) return null;
   const base = c.nodes[i]!;
 
-  if (pt === null) return replaceNode(c, i, withHandleRaw(base, which, null));
+  if (pt === null) return settled(replaceNode(c, i, withHandleRaw(base, which, null)));
+
+  // A tangent node's curved handle runs along the straight side, so the cursor
+  // says how far and not which way: it is projected onto the line rather than
+  // followed. Alt gives up the constraint, and gives up the type with it — a
+  // node called tangent whose handle has just been swung off the line would be
+  // recording something the geometry contradicts.
+  const tangent = base.type === "tangent" ? tangentSides(c, i) : null;
+  if (tangent !== null && tangent.curved === which) {
+    if (breakSmooth) return settled(replaceNode(c, i, { ...base, type: "corner", [which]: pt }));
+
+    const along = sub(base.pt, tangent.away);
+    const reach = length(along);
+    if (reach > 0) {
+      // Never behind the node: a negative reach would put the handle on the
+      // wrong side of the line and turn the join into a cusp.
+      const far = Math.max(0, dot(sub(pt, base.pt), along) / (reach * reach));
+      return settled(replaceNode(c, i, withHandleRaw(base, which, addScaled(base.pt, along, far))));
+    }
+  }
 
   // A smooth node's two handles are one straight line, so a lock on the far side
   // holds this side too: swinging this handle off the axis would drag the locked
@@ -235,16 +356,27 @@ export function setHandle(
 
   const constrained = held ? applyHvLock(base.pt, pt) : pt;
   const moved = withHandleRaw(base, which, constrained);
-  return replaceNode(c, i, breakSmooth ? moved : enforceSmooth(moved, which));
+  return settled(replaceNode(c, i, breakSmooth ? moved : enforceSmooth(moved, which)));
 }
 
+/**
+ * Give a node a type.
+ *
+ * `tangent` is refused where it would not be true: it says the curve on one
+ * side leaves along the straight segment on the other, and a node with two
+ * curves, two lines, or only one side has no such arrangement to describe. The
+ * other two types make sense anywhere, and are enforced where they can be —
+ * `smooth` on a node with one handle does nothing, and says nothing false.
+ */
 export function setNodeType(c: Contour, id: NodeId, type: Node["type"]): Contour | null {
   const i = nodeIndex(c, id);
   if (i < 0) return null;
+  if (type === "tangent" && !canBeTangent(c, i)) return null;
+
   const next: Node = { ...c.nodes[i]!, type };
-  // Adopting `smooth` should make the node smooth immediately, not merely on the
-  // next handle drag.
-  return replaceNode(c, i, type === "smooth" ? enforceSmooth(next, "out") : next);
+  // Adopting a type should take effect immediately rather than on the next
+  // handle drag: `smooth` here, and `tangent` in the pass every edit ends with.
+  return settled(replaceNode(c, i, type === "smooth" ? enforceSmooth(next, "out") : next));
 }
 
 /**
@@ -277,7 +409,7 @@ export function setHvLock(
     which === "both" ? { in: locked, out: locked } : { ...base.hvLock, [which]: locked };
 
   const next: Node = { ...base, hvLock };
-  if (!locked) return replaceNode(c, i, next);
+  if (!locked) return settled(replaceNode(c, i, next));
 
   const smooth = base.type === "smooth" && base.in !== null && base.out !== null;
   if (smooth) {
@@ -289,7 +421,7 @@ export function setHvLock(
         : which;
     const handle = leading === "out" ? base.out : base.in;
     const swung = withHandleRaw(next, leading, snapToAxis(base.pt, handle));
-    return replaceNode(c, i, enforceSmooth(swung, leading));
+    return settled(replaceNode(c, i, enforceSmooth(swung, leading)));
   }
 
   let snapped = next;
@@ -298,7 +430,7 @@ export function setHvLock(
     const handle = side === "in" ? snapped.in : snapped.out;
     if (handle !== null) snapped = withHandleRaw(snapped, side, snapToAxis(base.pt, handle));
   }
-  return replaceNode(c, i, snapped);
+  return settled(replaceNode(c, i, snapped));
 }
 
 /**
@@ -322,7 +454,7 @@ export function setSegmentCubic(c: Contour, index: number, geometry: Cubic): Con
   const nodes = c.nodes.slice();
   nodes[index] = { ...from, pt: geometry.a, out: geometry.c1 };
   nodes[j] = { ...to, pt: geometry.b, in: geometry.c2 };
-  return { ...c, nodes };
+  return settled({ ...c, nodes });
 }
 
 /**
@@ -374,7 +506,7 @@ export function extendHandle(c: Contour, id: NodeId, which: "in" | "out"): Conto
 
   const at = lerp(n.pt, other.pt, 1 / 3);
   const placed = n.hvLock[which] ? applyHvLock(n.pt, at) : at;
-  return replaceNode(c, i, enforceSmooth(withHandleRaw(n, which, placed), which));
+  return settled(replaceNode(c, i, enforceSmooth(withHandleRaw(n, which, placed), which)));
 }
 
 /**
@@ -411,7 +543,7 @@ export function makeSegmentLine(c: Contour, index: number): Contour | null {
   const nodes = c.nodes.slice();
   nodes[index] = { ...from, out: null };
   nodes[j] = { ...to, in: null };
-  return { ...c, nodes };
+  return settled({ ...c, nodes });
 }
 
 /**
@@ -450,7 +582,7 @@ export function insertNodeOnSegment(
   }
 
   nodes.splice(index + 1, 0, inserted);
-  return { ...c, nodes };
+  return settled({ ...c, nodes });
 }
 
 /**
@@ -463,7 +595,7 @@ export function removeNode(c: Contour, id: NodeId): Contour | null {
   if (i < 0) return null;
   const nodes = c.nodes.slice();
   nodes.splice(i, 1);
-  return { ...c, nodes };
+  return settled({ ...c, nodes });
 }
 
 export function appendNode(c: Contour, n: Node): Contour {

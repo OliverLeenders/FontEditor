@@ -7,6 +7,7 @@ import {
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
+  nodeCanBeTangent,
   nodeHasMissingHandle,
   nodeHvLocked,
   retractHandle,
@@ -106,6 +107,17 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         label: "Smooth",
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
+      // Offered only where it would be true, which is the same rule the model
+      // refuses on. A menu item that did nothing would teach nothing.
+      ...(nodeCanBeTangent(editor, contourId, nodeId)
+        ? [
+            {
+              kind: "item" as const,
+              label: "Tangent",
+              run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
+            },
+          ]
+        : []),
       { kind: "separator" },
     );
 
@@ -179,6 +191,15 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         label: "Smooth",
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
+      ...(nodeCanBeTangent(editor, contourId, nodeId)
+        ? [
+            {
+              kind: "item" as const,
+              label: "Tangent",
+              run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
+            },
+          ]
+        : []),
       { kind: "separator" },
       {
         kind: "item",
