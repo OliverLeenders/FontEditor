@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Rect, Vec2 } from "@fonteditor/geometry";
 import { balanceSegment, setNodeType, updateContour } from "@fonteditor/font-model";
 import {
   type HandleVisibility,
@@ -6,7 +6,9 @@ import {
   buildHitIndex,
   hoveredSegment,
   pick,
+  pickBoxHandle,
   screenTolerance,
+  selectionBounds,
 } from "@fonteditor/view";
 
 import { deleteSelectedPoints, reverseSelectedContour } from "./commands.js";
@@ -18,6 +20,7 @@ import {
   selectSegmentEnds,
   startItemDrag,
   startMarginDrag,
+  startBoxTransform,
   startMarquee,
   startTunniDrag,
   translateSelection,
@@ -85,14 +88,58 @@ export { translateSelection };
 // pointer
 // ---------------------------------------------------------------------------
 
+/** How near a box handle counts as on it, in screen pixels. */
+export const BOX_HANDLE_PIXELS = 6;
+
+/**
+ * How far outside the selection the box is drawn, in screen pixels.
+ *
+ * Not decoration. A selection's corner point sits exactly on the corner of its
+ * own bounding box, so a box drawn tight against it would put a handle on top of
+ * a point and there would be no way to drag that point again. Standing the box
+ * off by more than the handles' own reach keeps the two apart at every zoom.
+ */
+export const BOX_OUTSET_PIXELS = 10;
+
+/**
+ * The box round the selection, or `null` when there is nothing to draw one on.
+ *
+ * Two points at least. One point has no box worth the name — every handle would
+ * be the same distance from it, and there is no shape there to scale.
+ */
+export function selectionBox(state: EditorState): Rect | null {
+  const points = state.selection.filter((item) => item.part === "point");
+  if (points.length < 2) return null;
+
+  const box = selectionBounds(currentGlyph(state) ?? EMPTY_GLYPH, state.selection);
+  if (box === null) return null;
+
+  const out = screenTolerance(state.view, BOX_OUTSET_PIXELS);
+  return {
+    minX: box.minX - out,
+    minY: box.minY - out,
+    maxX: box.maxX + out,
+    maxY: box.maxY + out,
+  };
+}
+
 export function pointerDown(
   state: EditorState,
   input: PointerInput,
   options: SelectOptions = {},
 ): ToolResult {
-  const target = pickAt(state, input.point, options);
   const base: EditorState = { ...state, cursor: input.point };
 
+  // The box first. Its handles sit on top of whatever the outline is doing
+  // underneath them, and a grab that fell through to a node would move one
+  // point where the whole selection was meant to move.
+  const box = selectionBox(state);
+  if (box !== null) {
+    const handle = pickBoxHandle(box, input.point, screenTolerance(state.view, BOX_HANDLE_PIXELS));
+    if (handle !== null) return startBoxTransform(base, input, handle, box);
+  }
+
+  const target = pickAt(state, input.point, options);
   if (target === null) return startMarquee(base, input);
 
   switch (target.kind) {

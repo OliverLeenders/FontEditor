@@ -108,7 +108,14 @@ export {
 } from "./clipboard.js";
 
 export type { SelectOptions } from "./select.js";
-export { cancel, handleVisibility, translateSelection } from "./select.js";
+export {
+  BOX_HANDLE_PIXELS,
+  BOX_OUTSET_PIXELS,
+  cancel,
+  handleVisibility,
+  selectionBox,
+  translateSelection,
+} from "./select.js";
 
 export type { PenOptions } from "./pen.js";
 export { penPreview } from "./pen.js";

@@ -19,6 +19,7 @@ import {
   type EditorState,
   knifeStroke,
   marqueeRect,
+  selectionBox,
   shownMeasurement,
   penPreview,
   shapePreview,
@@ -143,6 +144,9 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
     tunniSegments: tunniSegments(editor),
     selection: editor.selection,
     marquee: marqueeRect(editor),
+    // Only under the select tool. The box moves what is selected, and every
+    // other tool is in the middle of making something rather than moving it.
+    transformBox: editor.activeTool === "select" ? selectionBox(editor) : null,
     penPreview: penPreview(editor),
     shapePreview: shapePreview(editor, outlineIds),
     knifeStroke: knifeStroke(editor),

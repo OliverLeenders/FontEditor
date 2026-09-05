@@ -1,4 +1,13 @@
-import { type Vec2, add, sub } from "@fonteditor/geometry";
+import {
+  type Rect,
+  type Vec2,
+  about,
+  add,
+  keepsAxes,
+  rotation,
+  scaling,
+  sub,
+} from "@fonteditor/geometry";
 import {
   type Glyph,
   contourById,
@@ -16,6 +25,7 @@ import {
   updateGlyph,
 } from "@fonteditor/font-model";
 import {
+  type BoxHandle,
   type HitTarget,
   type SegmentRef,
   type Selection,
@@ -38,11 +48,15 @@ import {
   snapPoint,
   toGrid,
   toggleItem,
+  boxPivot,
+  boxScale,
+  boxTurn,
 } from "@fonteditor/view";
 
 import { type ToolResult, begin, result } from "./effects.js";
 import type { PointerInput } from "./input.js";
 import { type EditorState, type Gesture, currentGlyph } from "./state.js";
+import { transformedDocument } from "./transform.js";
 
 /**
  * Beginning and continuing a drag.
@@ -152,6 +166,36 @@ export function startItemDrag(
         };
 
   return result({ ...state, selection, focusedSegment, gesture }, [begin(label)]);
+}
+
+/**
+ * Begin dragging one handle of the box round the selection.
+ *
+ * The selection is left exactly as it is: the box is a way of moving what is
+ * already chosen, and a grab that changed the choice would move something other
+ * than what the box was drawn around.
+ */
+export function startBoxTransform(
+  state: EditorState,
+  input: PointerInput,
+  handle: BoxHandle,
+  box: Rect,
+): ToolResult {
+  return result(
+    {
+      ...state,
+      gesture: {
+        kind: "transformBox",
+        origin: input.point,
+        handle,
+        box,
+        items: state.selection,
+        before: state.document,
+        moved: false,
+      },
+    },
+    [begin(handle.action === "rotate" ? "Rotate" : "Scale", false)],
+  );
 }
 
 export function startTunniDrag(
@@ -492,6 +536,38 @@ const CONTINUE: Continuations = {
           : updateGlyph(gesture.before, state.currentGlyph, (g) =>
               setLeftSidebearing(g, toGrid((gesture.startLeft ?? 0) + delta.x, snapping)),
             );
+
+    return {
+      ...state,
+      document: document ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+    };
+  },
+
+  transformBox: (state, gesture, input, delta) => {
+    const { shift, alt } = input.modifiers;
+    const pivot = boxPivot(gesture.box, gesture.handle, alt);
+
+    // Shift means "hold the shape" on a scale and "hold the angle" on a turn,
+    // which are the same instruction read against what is being changed.
+    let transform;
+    if (gesture.handle.action === "rotate") {
+      transform = rotation(boxTurn(gesture.box, gesture.handle, pivot, input.point, shift));
+    } else {
+      const by = boxScale(gesture.box, gesture.handle, pivot, input.point, shift);
+      if (!Number.isFinite(by.x) || !Number.isFinite(by.y)) return state;
+      transform = scaling(by.x, by.y);
+    }
+
+    // From the document as it was when the drag began, so the answer depends on
+    // where the pointer is rather than on the path it took to get there.
+    const document = transformedDocument(
+      gesture.before,
+      state.currentGlyph,
+      gesture.items,
+      about(transform, pivot),
+      !keepsAxes(transform),
+    );
 
     return {
       ...state,

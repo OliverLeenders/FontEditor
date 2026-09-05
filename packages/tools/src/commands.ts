@@ -2,7 +2,6 @@ import {
   type Affine,
   type Vec2,
   about,
-  applyAffine,
   isTranslation,
   keepsAxes,
   project,
@@ -27,7 +26,6 @@ import {
   balanceSegment,
   canBeTangent,
   centreGlyph,
-  enforceTangents,
   component,
   contourById,
   deleteProblem,
@@ -86,6 +84,7 @@ import {
 
 import { type ToolResult, begin, commit, result } from "./effects.js";
 import { translateSelection } from "./gestures.js";
+import { transformedDocument } from "./transform.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "./state.js";
 
 /**
@@ -1099,38 +1098,12 @@ export function transformSelection(
   const centre = transformOriginPoint(state, origin);
   if (centre === null) return result(state);
 
-  const full = about(transform, centre);
-  const loosen = !keepsAxes(transform);
-
-  const wanted = new Map<ContourId, Set<NodeId>>();
-  for (const item of chosen) {
-    const ids = wanted.get(item.contourId) ?? new Set<NodeId>();
-    ids.add(item.nodeId);
-    wanted.set(item.contourId, ids);
-  }
-
-  let editor = state;
-  for (const [contourId, ids] of wanted) {
-    const document = editCurrentGlyph(editor, (g) =>
-      updateContour(g, contourId, (c) => {
-        const nodes = c.nodes.map((n) =>
-          ids.has(n.id)
-            ? {
-                ...n,
-                pt: applyAffine(full, n.pt),
-                in: n.in === null ? null : applyAffine(full, n.in),
-                out: n.out === null ? null : applyAffine(full, n.out),
-                hvLock: loosen ? NO_LOCK : n.hvLock,
-              }
-            : n,
-        );
-        // A tangent node whose straight side was left behind now has a line
-        // pointing somewhere else, and its handle has to follow.
-        return enforceTangents({ ...c, nodes });
-      }),
-    );
-    if (document !== null) editor = { ...editor, document };
-  }
-
-  return done(state, editor === state ? null : editor, label);
+  const document = transformedDocument(
+    state.document,
+    state.currentGlyph,
+    chosen,
+    about(transform, centre),
+    !keepsAxes(transform),
+  );
+  return done(state, document === null ? null : { ...state, document }, label);
 }

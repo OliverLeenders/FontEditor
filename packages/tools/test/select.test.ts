@@ -21,6 +21,7 @@ import { pointerInput, keyInput } from "../src/input.js";
 import {
   cancel,
   doubleClick,
+  selectionBox,
   keyDown,
   pointerDown,
   pointerLeave,
@@ -866,5 +867,135 @@ describe("point-to-point snapping", () => {
     const moved = dragTo(state, { x: 300, y: 300 }, { x: 300, y: 3 }, { snapExtremes: true });
     const n = nodeById(firstGlyph(moved.document).contours[1]!, loose.nodes[0]!.id)!;
     expect(n.pt.y).toBe(0);
+  });
+});
+
+describe("the box round a selection", () => {
+  /** A square of four corners, and every one of them selected. */
+  const chosen = (): EditorState => {
+    const ids = counterIds("bx");
+    const c = contour(
+      ids.contour(),
+      [
+        node("p0", vec(0, 0)),
+        node("p1", vec(100, 0)),
+        node("p2", vec(100, 100)),
+        node("p3", vec(0, 100)),
+      ],
+      true,
+    );
+    const document = fontDocument([glyph("a", { advance: 200, contours: [c] })]);
+    const state = editorState({ document, view: VIEW, currentGlyph: "a" });
+    return {
+      ...state,
+      selection: ["p0", "p1", "p2", "p3"].map((nodeId) => ({
+        contourId: c.id,
+        nodeId,
+        part: "point" as const,
+      })),
+    };
+  };
+
+  const where = (s: EditorState, id: string) =>
+    firstGlyph(s.document).contours[0]!.nodes.find((n) => n.id === id)!.pt;
+
+  it("stands off from the selection so its handles miss the points", () => {
+    // A corner point sits exactly on the corner of its own bounds, and a box
+    // drawn tight against it would put a handle where the point is.
+    const box = selectionBox(chosen())!;
+    expect(box.minX).toBeLessThan(0);
+    expect(box.maxY).toBeGreaterThan(100);
+  });
+
+  it("is absent for one point, which has no shape to scale", () => {
+    const one = chosen();
+    expect(selectionBox({ ...one, selection: [one.selection[0]!] })).toBeNull();
+  });
+
+  it("is absent when nothing is selected", () => {
+    expect(selectionBox({ ...chosen(), selection: [] })).toBeNull();
+  });
+
+  it("still drags a point that sits under the box", () => {
+    // The whole reason the box stands off: pressing on a selected corner has to
+    // go on meaning that corner.
+    const out = pointerDown(chosen(), pointerInput(vec(0, 0)));
+    expect(out.state.gesture?.kind).toBe("dragSelection");
+  });
+
+  it("takes a handle and scales what is selected", () => {
+    const start = chosen();
+    const box = selectionBox(start)!;
+    const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY)));
+    expect(grabbed.state.gesture?.kind).toBe("transformBox");
+
+    // Twice as far from the opposite corner in both directions.
+    const span = { x: box.maxX - box.minX, y: box.maxY - box.minY };
+    const moved = pointerMove(
+      grabbed.state,
+      pointerInput(vec(box.minX + span.x * 2, box.minY + span.y * 2)),
+    );
+
+    expect(where(moved.state, "p0").x).toBeCloseTo(box.minX + (0 - box.minX) * 2, 6);
+    expect(where(moved.state, "p2").x).toBeCloseTo(box.minX + (100 - box.minX) * 2, 6);
+  });
+
+  it("measures from where the drag began, not from where it has got to", () => {
+    // Two moves to the same place as one: a drag that compounded would land
+    // somewhere else entirely.
+    const start = chosen();
+    const box = selectionBox(start)!;
+    const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY))).state;
+
+    const once = pointerMove(grabbed, pointerInput(vec(300, 300))).state;
+    const twice = pointerMove(
+      pointerMove(grabbed, pointerInput(vec(180, 180))).state,
+      pointerInput(vec(300, 300)),
+    ).state;
+
+    expect(where(twice, "p2")).toEqual(where(once, "p2"));
+  });
+
+  it("holds the middle still when alt is down", () => {
+    const start = chosen();
+    const box = selectionBox(start)!;
+    const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY), { alt: true })).state;
+    const moved = pointerMove(
+      grabbed,
+      pointerInput(vec(box.maxX + 50, box.maxY + 50), { alt: true }),
+    ).state;
+
+    // The box's middle is the square's middle, so the two ends move apart by
+    // the same amount in opposite directions.
+    expect(where(moved, "p0").x + where(moved, "p2").x).toBeCloseTo(100, 6);
+  });
+
+  it("turns from just outside a corner", () => {
+    const start = chosen();
+    const box = selectionBox(start)!;
+    const grabbed = pointerDown(start, pointerInput(vec(box.maxX + 9, box.maxY + 9)));
+    expect(grabbed.state.gesture).toMatchObject({
+      kind: "transformBox",
+      handle: { at: "topRight", action: "rotate" },
+    });
+  });
+
+  it("puts one entry on the undo stack for the whole drag", () => {
+    const start = chosen();
+    const box = selectionBox(start)!;
+    const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY)));
+    expect(grabbed.effects.map((e) => e.kind)).toEqual(["beginTransaction"]);
+
+    const moved = pointerMove(grabbed.state, pointerInput(vec(300, 300))).state;
+    expect(pointerUp(moved, pointerInput(vec(300, 300))).effects.map((e) => e.kind)).toEqual([
+      "commitTransaction",
+    ]);
+  });
+
+  it("leaves the selection alone: the box moves what was already chosen", () => {
+    const start = chosen();
+    const box = selectionBox(start)!;
+    const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY))).state;
+    expect(grabbed.selection).toEqual(start.selection);
   });
 });

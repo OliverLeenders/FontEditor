@@ -1,6 +1,7 @@
 import { CanvasSurface, drawScene } from "@fonteditor/render";
 import {
   type ToolOptions,
+  BOX_HANDLE_PIXELS,
   doubleClick,
   handleVisibility,
   keyDown,
@@ -8,15 +9,18 @@ import {
   pointerLeave,
   pointerMove,
   pointerUp,
+  selectionBox,
   tunniSegments,
 } from "@fonteditor/tools";
 import {
+  type BoxHandle,
   PICK_TOLERANCE_SCALE,
   buildHitIndex,
   itemForTarget,
   hasItem,
   panBy,
   pick,
+  pickBoxHandle,
   screenTolerance,
   toDesign,
   wheelIntent,
@@ -169,6 +173,23 @@ export function GlyphCanvas({
       canvas.style.cursor = "ew-resize";
       return;
     }
+    if (editor.gesture?.kind === "transformBox") {
+      canvas.style.cursor = cursorForHandle(editor.gesture.handle);
+      return;
+    }
+
+    const point = toDesign(editor.view, surface.toCanvasPoint(event));
+
+    // The box before the margins, in the same order the tool takes them: its
+    // handles sit over everything else, so the cursor has to say so.
+    const box = selectionBox(editor);
+    if (box !== null) {
+      const handle = pickBoxHandle(box, point, screenTolerance(editor.view, BOX_HANDLE_PIXELS));
+      if (handle !== null) {
+        canvas.style.cursor = cursorForHandle(handle);
+        return;
+      }
+    }
 
     const glyph = editor.document.glyphs[editor.currentGlyph];
     if (glyph === undefined) {
@@ -176,7 +197,6 @@ export function GlyphCanvas({
       return;
     }
 
-    const point = toDesign(editor.view, surface.toCanvasPoint(event));
     const reach = screenTolerance(editor.view, HIT_PIXELS) * (PICK_TOLERANCE_SCALE.originLine ?? 1);
     const near = Math.abs(point.x) <= reach || Math.abs(point.x - glyph.advance) <= reach;
     if (!near) {
@@ -300,4 +320,31 @@ export function GlyphCanvas({
       }}
     />
   );
+}
+
+/**
+ * What the pointer looks like over a box handle.
+ *
+ * The four diagonals and the two axes are what CSS offers and what everyone
+ * recognises. Turning has no cursor of its own anywhere in CSS, so it borrows
+ * the crosshair: not a picture of what it does, but distinct from the eight
+ * beside it, which is the job.
+ */
+function cursorForHandle(handle: BoxHandle): string {
+  if (handle.action === "rotate") return "crosshair";
+
+  switch (handle.at) {
+    case "topLeft":
+    case "bottomRight":
+      return "nwse-resize";
+    case "topRight":
+    case "bottomLeft":
+      return "nesw-resize";
+    case "top":
+    case "bottom":
+      return "ns-resize";
+    case "left":
+    case "right":
+      return "ew-resize";
+  }
 }

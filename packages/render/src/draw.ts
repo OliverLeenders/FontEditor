@@ -13,6 +13,8 @@ import {
   type HandleVisibility,
   type SegmentRef,
   type ViewTransform,
+  BOX_ANCHORS,
+  boxHandlePoint,
   handleIsVisible,
   sameSegment,
   selectionKey,
@@ -62,6 +64,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawShapePreview(ctx, s);
     drawKnifeStroke(ctx, s);
     drawMeasurement(ctx, s);
+    drawTransformBox(ctx, s);
     drawMarquee(ctx, s);
   }
 
@@ -780,4 +783,47 @@ export function drawComponents(ctx: Canvas2D, s: Scene): void {
   for (const c of drawable) traceContour(ctx, s.view, c);
   ctx.fill();
   ctx.restore();
+}
+
+/**
+ * The box round the selection, and the eight handles that transform it.
+ *
+ * Drawn after the outline and its points, because it is a control surface laid
+ * over the drawing rather than part of it. The handles are squares in screen
+ * pixels, not design units — they are things to grab, and a thing to grab is the
+ * same size however far you have zoomed in.
+ */
+export function drawTransformBox(ctx: Canvas2D, s: Scene): void {
+  if (s.transformBox === null) return;
+
+  const a = toScreen(s.view, { x: s.transformBox.minX, y: s.transformBox.minY });
+  const b = toScreen(s.view, { x: s.transformBox.maxX, y: s.transformBox.maxY });
+  const left = Math.min(a.x, b.x);
+  const top = Math.min(a.y, b.y);
+  const width = Math.abs(b.x - a.x);
+  const height = Math.abs(b.y - a.y);
+
+  // Dashed, so it is never mistaken for something the font contains.
+  ctx.save();
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = s.palette.marqueeStroke;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.rect(left + 0.5, top + 0.5, width, height);
+  ctx.stroke();
+  ctx.restore();
+
+  const size = 3;
+  // Filled with the canvas ground rather than left hollow, so a handle over a
+  // dark outline is still a handle.
+  ctx.fillStyle = s.palette.background;
+  ctx.strokeStyle = s.palette.marqueeStroke;
+  ctx.lineWidth = 1;
+  for (const at of BOX_ANCHORS) {
+    const p = toScreen(s.view, boxHandlePoint(s.transformBox, at));
+    ctx.beginPath();
+    ctx.rect(Math.round(p.x) - size + 0.5, Math.round(p.y) - size + 0.5, size * 2, size * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
 }

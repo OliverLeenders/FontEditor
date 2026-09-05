@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1396 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1424 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -95,7 +95,13 @@ The inspector transforms whatever is selected by a number rather than by draggin
 scale, rotate, slant, flip. It turns about any of the nine points of the selection's box,
 or about the glyph's own origin — which is what slanting an italic has to use, since
 turning about the selection would shift every glyph sideways by a different amount — or
-about the baseline under the selection. A box with handles to drag is a later step. Ctrl-Z undoes and
+about the baseline under the selection.
+
+Select two points or more and a dashed box appears round them with eight handles: a
+corner scales both axes, an edge scales one, and just outside a corner turns. Shift holds
+the shape on a scale and the angle on a turn, and alt works about the middle instead of
+the opposite corner. The box stands a little away from the selection, so its handles
+never sit on top of the points they are there to move. Ctrl-Z undoes and
 Ctrl-Shift-Z redoes.
 
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,

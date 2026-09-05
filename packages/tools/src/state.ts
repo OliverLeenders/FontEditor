@@ -12,6 +12,7 @@ import {
 
 export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure";
 import {
+  type BoxHandle,
   type Selection,
   type SegmentRef,
   type SnapHold,
@@ -88,6 +89,22 @@ export type Gesture =
       readonly side: "origin" | "advance";
       readonly startAdvance: number;
       readonly startLeft: number | null;
+      readonly before: FontDocument;
+      readonly moved: boolean;
+    }
+  | {
+      /**
+       * Dragging one handle of the box round the selection.
+       *
+       * The box is remembered from when the drag began rather than recomputed
+       * as it goes: the box follows the points, the points follow the box, and
+       * measuring against a box that is itself moving would compound.
+       */
+      readonly kind: "transformBox";
+      readonly origin: Vec2;
+      readonly handle: BoxHandle;
+      readonly box: Rect;
+      readonly items: Selection;
       readonly before: FontDocument;
       readonly moved: boolean;
     }

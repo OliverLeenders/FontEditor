@@ -106,3 +106,14 @@ export {
 
 export type { AlignmentLines, AlignmentOptions } from "./alignment.js";
 export { alignmentLines } from "./alignment.js";
+
+export type { BoxAnchor, BoxHandle } from "./transformbox.js";
+export {
+  BOX_ANCHORS,
+  TURN_STEP,
+  boxHandlePoint,
+  boxPivot,
+  boxScale,
+  boxTurn,
+  pickBoxHandle,
+} from "./transformbox.js";
