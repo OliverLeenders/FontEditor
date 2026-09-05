@@ -5,8 +5,14 @@
  * rules, variable-font conditions — and most of it needs a shaper's worth of
  * machinery behind it to mean anything. What is here is the part that earns its
  * keep in a font being drawn: glyph classes, the two substitutions that `liga`,
- * `smcp`, `ss01` and friends are made of, and those same two again written to
- * apply only in a context, which is what `calt` is.
+ * `smcp`, `ss01` and friends are made of, those same two again written to apply
+ * only in a context, which is what `calt` is, and the single adjustment that
+ * moves a glyph or changes its advance.
+ *
+ * Kerning is the deliberate omission. It is a pair adjustment, it has a
+ * workspace of its own and a place in the model, and a second way to write it
+ * here would be a second source for the same bytes with no way to say which
+ * won.
  *
  * Anything outside that is refused *by name*, with the line it was on, rather
  * than skipped. A feature file that silently compiled to less than it says is
@@ -51,7 +57,29 @@ export type FeaRule =
        */
       readonly to: readonly string[] | null;
       readonly line: number;
+    }
+  | {
+      /**
+       * A single adjustment: `pos @caps <10 0 20 0>;`.
+       *
+       * Moves the glyph, or changes what follows it, or both. The four numbers
+       * are the format's own order — where the glyph is drawn, then how far the
+       * pen moves afterwards — and a bare number is the third of them, which is
+       * what `pos a 40;` means.
+       */
+      readonly kind: "position";
+      readonly glyphs: readonly string[];
+      readonly value: ValueRecord;
+      readonly line: number;
     };
+
+/** Where a glyph is drawn and how far the pen moves after it, in design units. */
+export type ValueRecord = {
+  readonly x: number;
+  readonly y: number;
+  readonly xAdvance: number;
+  readonly yAdvance: number;
+};
 
 export type FeaFeature = {
   /** The four-character tag, such as `liga`. */
@@ -78,7 +106,7 @@ type Token = {
 };
 
 /** Everything that is a token boundary or a token in its own right. */
-const PUNCTUATION = new Set(["[", "]", ";", "=", "{", "}", "'", ","]);
+const PUNCTUATION = new Set(["[", "]", ";", "=", "{", "}", "'", ",", "<", ">"]);
 
 function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
@@ -320,6 +348,12 @@ function readFeature(
       continue;
     }
 
+    if (token.text === "pos" || token.text === "position") {
+      const rule = readPosition(token, take, peek, classes, complain);
+      if (rule !== null) rules.push(rule);
+      continue;
+    }
+
     // `ignore sub` matches in order to stop the rules after it matching. It is
     // half of how a contextual feature is written: the exceptions first, then
     // the rule they are exceptions to.
@@ -342,6 +376,128 @@ function readFeature(
   }
 
   return { tag: tag.text, rules, line: keyword.line };
+}
+
+/** The attachment rules, each refused by its own name rather than as "not a sub". */
+const ATTACHMENT = new Set(["cursive", "base", "mark", "ligature"]);
+
+const NUMBER = /^-?[0-9]+$/;
+
+/**
+ * A positioning rule.
+ *
+ * One glyph or class and one value. Everything else the keyword can introduce is
+ * refused by name: a pair belongs in the kerning the editor already keeps, and
+ * attachment and context need machinery this does not have.
+ */
+function readPosition(
+  keyword: Token,
+  take: () => Token | undefined,
+  peek: () => Token | undefined,
+  classes: ReadonlyMap<string, readonly string[]>,
+  complain: (line: number, message: string) => void,
+): FeaRule | null {
+  const escape = (): null => {
+    while (peek() !== undefined && peek()!.text !== ";" && peek()!.text !== "}") take();
+    if (peek()?.text === ";") take();
+    return null;
+  };
+
+  const first = peek();
+  if (first !== undefined && ATTACHMENT.has(first.text)) {
+    complain(first.line, `${first.text} attachment is not compiled by this editor`);
+    return escape();
+  }
+
+  const positions: GlyphList[] = [];
+  let value: ValueRecord | null = null;
+
+  for (;;) {
+    const next = peek();
+    if (next === undefined) {
+      complain(keyword.line, "the file ends in the middle of a rule");
+      return null;
+    }
+    if (next.text === ";" || next.text === "}") break;
+
+    if (next.text === "'") {
+      complain(next.line, "positioning in a context is not compiled by this editor");
+      return escape();
+    }
+
+    if (next.text === "<") {
+      const read = readValueRecord(take, complain);
+      if (read === null) return escape();
+      value = read;
+      continue;
+    }
+
+    if (NUMBER.test(next.text)) {
+      take();
+      // A bare number is an advance adjustment, which is what the shorthand
+      // exists for: `pos @caps 20;` puts twenty units after every capital.
+      value = { x: 0, y: 0, xAdvance: Number(next.text), yAdvance: 0 };
+      continue;
+    }
+
+    const list = readGlyphList(keyword.line, take, peek, classes, complain);
+    if (list === null) return null;
+    positions.push(list);
+  }
+
+  if (peek()?.text === ";") take();
+
+  if (positions.length === 0) {
+    complain(keyword.line, "a positioning rule names no glyph");
+    return null;
+  }
+  if (positions.length > 1) {
+    // Two glyphs and a value is kerning, and this font already has kerning:
+    // it is edited in the Spacing workspace and written from the model.
+    complain(
+      keyword.line,
+      "a pair adjustment is kerning, which is edited in the Spacing workspace rather than here",
+    );
+    return null;
+  }
+  if (value === null) {
+    complain(keyword.line, "a positioning rule needs a value");
+    return null;
+  }
+
+  return { kind: "position", glyphs: positions[0]!.glyphs, value, line: keyword.line };
+}
+
+/** `<x y xAdvance yAdvance>`, the long form of a value. */
+function readValueRecord(
+  take: () => Token | undefined,
+  complain: (line: number, message: string) => void,
+): ValueRecord | null {
+  const open = take();
+  if (open === undefined) return null;
+
+  const numbers: number[] = [];
+  for (;;) {
+    const token = take();
+    if (token === undefined) {
+      complain(open.line, "a value is never closed");
+      return null;
+    }
+    if (token.text === ">") break;
+    if (!NUMBER.test(token.text)) {
+      // A device table or a variable-font value, both of which need more than
+      // four numbers to mean anything.
+      complain(open.line, `a value takes four numbers, and "${token.text}" is not one`);
+      return null;
+    }
+    numbers.push(Number(token.text));
+  }
+
+  if (numbers.length !== 4) {
+    complain(open.line, `a value takes four numbers, not ${String(numbers.length)}`);
+    return null;
+  }
+  return { x: numbers[0]!, y: numbers[1]!, xAdvance: numbers[2]!, yAdvance: numbers[3]! };
 }
 
 /** One position in a rule: the glyphs allowed there, and whether it is marked. */

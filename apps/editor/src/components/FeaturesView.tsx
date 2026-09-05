@@ -106,10 +106,15 @@ export function FeaturesView(): React.JSX.Element {
             <li>
               exceptions to it — <code>ignore sub f a&apos;;</code>
             </li>
+            <li>
+              single adjustment — <code>pos @caps &lt;10 0 20 0&gt;;</code>
+            </li>
           </ul>
           <p className={styles.note}>
-            Alternates and positioning are kept in the file and written to the UFO, but are not
-            compiled into the exported OTF. Kerning has its own workspace and is written from there.
+            A pair adjustment is kerning, which has a workspace of its own and is written from
+            there; two ways to write the same rule would be two answers with no way to say which
+            won. Alternates, attachment and positioning in a context are kept in the file and
+            written to the UFO, but are not compiled into the exported OTF.
           </p>
         </aside>
       </div>

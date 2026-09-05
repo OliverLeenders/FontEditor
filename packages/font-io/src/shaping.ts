@@ -15,6 +15,11 @@ import { type FeaRule, type FeaSource, parseFea } from "./fea.js";
  * already in visual order because the editor is left-to-right only. There is no
  * mark attachment and no bidi, and nothing here pretends otherwise. What it buys
  * is that the thing you wrote is the thing you see.
+ *
+ * Substitution only. A run is a list of names, so a positioning rule passes
+ * through untouched: it reaches the exported font and not the preview. Kerning
+ * is the exception, and only because the line that draws the run looks it up
+ * itself rather than asking for it here.
  */
 
 /**
@@ -90,6 +95,14 @@ function applyRules(names: readonly string[], rules: readonly FeaRule[]): string
         at += 1;
       }
       run = applyChains(run, batch);
+      continue;
+    }
+
+    // Positioning moves a glyph without changing which glyph it is, and this
+    // returns names. Such a rule reaches the exported font and not the preview,
+    // which is a gap worth knowing about rather than one worth pretending away.
+    if (rule.kind === "position") {
+      at += 1;
       continue;
     }
 

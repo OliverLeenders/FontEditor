@@ -14,29 +14,36 @@ Spacing, Features, Proof — around a canvas with select, pen, knife, rectangle,
 and measure tools, snapping, boolean union, components, kerning, a `.fea` subset, and
 OTF and UFO in both directions. Everything autosaves.
 
-| Phase |                                     | Status                                                                     |
-| ----- | ----------------------------------- | -------------------------------------------------------------------------- |
-| 0     | Foundations and the geometry kernel | done                                                                       |
-| 1     | The editing surface                 | done                                                                       |
-| 2     | Undo, redo, persistence             | done                                                                       |
-| 3     | From paths to a glyph               | done                                                                       |
-| 4     | From a glyph to a font              | done                                                                       |
-| 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools          |
-| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                           |
-| 7     | Spacing and kerning                 | done                                                                       |
-| 8     | OpenType features                   | a `.fea` subset compiles to GSUB, contextual rules and all; no positioning |
-| 9     | Variable fonts                      | not started                                                                |
-| 10    | Production polish                   | lint, format and 1322 tests, run on CI; preferences persist                |
+| Phase |                                     | Status                                                            |
+| ----- | ----------------------------------- | ----------------------------------------------------------------- |
+| 0     | Foundations and the geometry kernel | done                                                              |
+| 1     | The editing surface                 | done                                                              |
+| 2     | Undo, redo, persistence             | done                                                              |
+| 3     | From paths to a glyph               | done                                                              |
+| 4     | From a glyph to a font              | done                                                              |
+| 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools |
+| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                  |
+| 7     | Spacing and kerning                 | done                                                              |
+| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
+| 9     | Variable fonts                      | not started                                                       |
+| 10    | Production polish                   | lint, format and 1347 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
 The gaps worth naming, in the order they would bite someone using this:
 
+- **Positioning in `.fea` is the single adjustment only.** `pos @caps <10 0 20 0>;`
+  compiles and merges into the same GPOS the kerning is written to. A pair adjustment is
+  refused by name and pointed at the Spacing workspace, which is where this editor keeps
+  kerning — two ways to write the same rule would be two answers with no way to say which
+  won. Attachment and positioning in a context are refused too, and kept in the file.
 - **Shaping is this editor's `.fea` subset, not a shaping engine.** Single substitutions,
   ligatures, and both of those conditioned on their context, are applied to the Spacing
   line and the Proof in the order the file lists them. There is no mark attachment and no
   bidi — and the glyph strip under the canvas is deliberately left unshaped, since it is
-  there to show the letter you are drawing beside its neighbours.
+  there to show the letter you are drawing beside its neighbours. Positioning rules pass
+  through untouched: a run is a list of names, so what a `pos` rule does reaches the
+  exported font and not the preview.
 - **Overlap removal declines edges that lie along each other.** Two shapes sharing a
   whole edge have no crossing points to split at, so it refuses rather than guesses,
   which is the right failure for a shape a designer will really draw. A contour that

@@ -9,6 +9,7 @@ import {
   kernIndex,
   kernValue,
   node,
+  setFeatures,
   setKern,
   setKernGroup,
   setKerning,
@@ -300,5 +301,42 @@ describe("kerning survives a round trip", () => {
       Object.keys(once.kerning.firstGroups).length,
     );
     expect(kernValue(kernIndex(twice.kerning), "O", "A")).toBe(-40);
+  });
+});
+
+describe("kerning and positioning in one table", () => {
+  // A font cannot have two GPOS tables, and a second `kern` feature is one a
+  // shaper ignores — so the kerning the editor keeps in its model and whatever
+  // the feature file asks for have to end up in the same place.
+  const both = () => setFeatures(document(), "feature cpsp { pos A 20; } cpsp;");
+
+  it("declares both features", () => {
+    const font = opentype.parse(exportFont(both()).bytes);
+    const tags = font.tables.gpos!.features.map((x) => x.tag);
+    expect(tags).toContain("kern");
+    expect(tags).toContain("cpsp");
+  });
+
+  it("keeps the kerning working beside it", () => {
+    const font = opentype.parse(exportFont(both()).bytes);
+    font.position.init();
+    expect(font.getKerningValue(idOf(font, "O"), idOf(font, "A"))).toBe(-40);
+    expect(font.getKerningValue(idOf(font, "T"), idOf(font, "A"))).toBe(-95);
+  });
+
+  it("holds both kinds of lookup", () => {
+    const font = opentype.parse(exportFont(both()).bytes);
+    const types = font.tables.gpos!.lookups.map((l) => l.lookupType);
+    expect(types).toContain(1); // the adjustment
+    expect(types).toContain(2); // the kerning
+  });
+
+  it("writes the positioning even when there is no kerning to go with it", () => {
+    const plain = setFeatures(
+      fontDocument([glyph(".notdef", { advance: 500 }), box("A", 0x41)], INFO),
+      "feature cpsp { pos A 20; } cpsp;",
+    );
+    const font = opentype.parse(exportFont(plain).bytes);
+    expect(font.tables.gpos!.features.map((x) => x.tag)).toEqual(["cpsp"]);
   });
 });

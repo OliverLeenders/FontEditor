@@ -84,7 +84,14 @@ declare module "opentype.js" {
     readonly outlinesFormat: string;
     readonly tables: {
       readonly os2?: { readonly sxHeight?: number; readonly sCapHeight?: number };
-      readonly gpos?: unknown;
+      /** Parsed GPOS, typed as loosely and for the same reason as GSUB below. */
+      readonly gpos?: {
+        readonly features: readonly { readonly tag: string }[];
+        readonly lookups: readonly {
+          readonly lookupType: number;
+          readonly subtables: readonly unknown[];
+        }[];
+      };
       /**
        * Parsed GSUB, when the font has one. Typed loosely on purpose: what the
        * tests ask of it is that the lookups our writer produced come back with the

@@ -1,3 +1,5 @@
+import type { ValueRecord } from "./fea.js";
+import { type Lookup, layoutTable } from "./layout.js";
 import {
   type GlyphName,
   type KernIndex,
@@ -233,82 +235,25 @@ export function pairPosGlyphs(pairs: ReadonlyMap<number, ReadonlyMap<number, num
  * language-specific behaviour declares, and shapers fall back to it for
  * everything.
  */
+/**
+ * The kerning lookups, one per subtable.
+ *
+ * A lookup each rather than one lookup of several subtables, because the order
+ * they are tried in is the order they are given — and the exceptions have to be
+ * tried before the classes they are exceptions to.
+ *
+ * `IgnoreMarks` on every one of them, so an accent standing between two letters
+ * does not stop them kerning.
+ */
+export function kerningLookups(subtables: readonly Uint8Array[]): Lookup[] {
+  return subtables.map((sub) => ({ type: 2, flags: 0x0008, subtables: [sub] }));
+}
+
 export function gposTable(subtables: readonly Uint8Array[]): Uint8Array {
-  if (subtables.length === 0) return new Uint8Array(0);
-
-  // Each subtable becomes its own lookup, so the order they are given in is the
-  // order they are tried — which is how the exceptions come first.
-  const lookups = subtables.map((sub) => {
-    const w = new Writer();
-    w.u16(2); // LookupType 2: pair adjustment
-    w.u16(0x0008); // IgnoreMarks, so accents do not break a kern pair
-    w.u16(1); // one subtable
-    // Offsets are measured from the start of the Lookup table, whose header is
-    // type, flag, count and one offset — eight bytes, not six.
-    w.u16(8);
-    w.bytesOf(sub);
-    return w.finish();
-  });
-
-  const lookupListHeader = 2 + lookups.length * 2;
-  let at = lookupListHeader;
-  const lookupOffsets = lookups.map((l) => {
-    const here = at;
-    at += l.length;
-    return here;
-  });
-
-  const lookupList = new Writer();
-  lookupList.u16(lookups.length);
-  for (const off of lookupOffsets) lookupList.u16(off);
-  for (const l of lookups) lookupList.bytesOf(l);
-  const lookupBytes = lookupList.finish();
-
-  // One feature, listing every lookup.
-  const feature = new Writer();
-  feature.u16(0); // no feature params
-  feature.u16(lookups.length);
-  for (let i = 0; i < lookups.length; i++) feature.u16(i);
-  const featureBytes = feature.finish();
-
-  const featureList = new Writer();
-  featureList.u16(1);
-  featureList.tag("kern");
-  featureList.u16(2 + 6); // offset to the feature record
-  featureList.bytesOf(featureBytes);
-  const featureListBytes = featureList.finish();
-
-  // DFLT script, dflt language, using feature 0.
-  const langSys = new Writer();
-  langSys.u16(0); // lookup order, always null
-  langSys.u16(0xffff); // no required feature
-  langSys.u16(1);
-  langSys.u16(0);
-  const langSysBytes = langSys.finish();
-
-  const script = new Writer();
-  script.u16(4); // offset to the default LangSys
-  script.u16(0); // no named languages
-  script.bytesOf(langSysBytes);
-  const scriptBytes = script.finish();
-
-  const scriptList = new Writer();
-  scriptList.u16(1);
-  scriptList.tag("DFLT");
-  scriptList.u16(2 + 6);
-  scriptList.bytesOf(scriptBytes);
-  const scriptListBytes = scriptList.finish();
-
-  const headerSize = 10;
-  const w = new Writer();
-  w.u32(0x00010000); // version 1.0
-  w.u16(headerSize);
-  w.u16(headerSize + scriptListBytes.length);
-  w.u16(headerSize + scriptListBytes.length + featureListBytes.length);
-  w.bytesOf(scriptListBytes);
-  w.bytesOf(featureListBytes);
-  w.bytesOf(lookupBytes);
-  return w.finish();
+  return layoutTable(
+    [{ tag: "kern", lookups: subtables.map((_, i) => i) }],
+    kerningLookups(subtables),
+  );
 }
 
 /**
@@ -322,9 +267,23 @@ export function buildKerningGpos(
   index: KernIndex,
   glyphIdOf: (name: GlyphName) => number | undefined,
 ): Uint8Array {
+  return gposTable(kerningSubtables(index, glyphIdOf));
+}
+
+/**
+ * The kerning as subtables, for a caller putting a GPOS together from more than
+ * one source.
+ *
+ * The font's kerning and whatever positioning its feature file asks for both
+ * belong in one table, and only whoever writes the file can see both.
+ */
+export function kerningSubtables(
+  index: KernIndex,
+  glyphIdOf: (name: GlyphName) => number | undefined,
+): Uint8Array[] {
   const { kerning } = index;
   const all = kernPairs(kerning);
-  if (all.length === 0) return new Uint8Array(0);
+  if (all.length === 0) return [];
 
   // Class zero means "everything not otherwise mentioned", so real groups start
   // at one — a rule against class zero would apply to the whole font.
@@ -409,5 +368,40 @@ export function buildKerningGpos(
     );
   }
 
-  return gposTable(subtables);
+  return subtables;
+}
+
+/**
+ * A single adjustment, applied to every glyph it covers.
+ *
+ * Format 1 rather than 2: one value for the whole coverage is exactly what a
+ * rule naming a class and a value says, and format 2's one-value-per-glyph
+ * would be the same number written out as many times as the class is long.
+ *
+ * The value format names only the fields that are not zero, which is what keeps
+ * `pos @caps 20;` to two bytes of value rather than eight. All four zero is a
+ * rule that does nothing; it is still written, because refusing it here would
+ * report a problem about a rule the file is entitled to contain.
+ */
+export function singlePos(glyphIds: readonly number[], value: ValueRecord): Uint8Array {
+  if (glyphIds.length === 0) return new Uint8Array(0);
+
+  const fields = [
+    { bit: 0x0001, at: value.x },
+    { bit: 0x0002, at: value.y },
+    { bit: 0x0004, at: value.xAdvance },
+    { bit: 0x0008, at: value.yAdvance },
+  ].filter((f) => f.at !== 0);
+
+  const used = fields.length > 0 ? fields : [{ bit: 0x0004, at: 0 }];
+  const format = used.reduce((mask, f) => mask | f.bit, 0);
+
+  const cover = coverage(glyphIds);
+  const w = new Writer();
+  w.u16(1); // format 1: one value for everything covered
+  w.u16(6 + used.length * 2); // the coverage follows the value
+  w.u16(format);
+  for (const field of used) w.i16(field.at);
+  w.bytesOf(cover);
+  return w.finish();
 }

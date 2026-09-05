@@ -10,7 +10,8 @@ import {
   segments,
 } from "@fonteditor/font-model";
 
-import { buildKerningGpos } from "./gpos.js";
+import { kerningLookups, kerningSubtables } from "./gpos.js";
+import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
 import { compileFeatures } from "./features.js";
 import { withTable } from "./sfnt.js";
@@ -193,8 +194,20 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
     if (g.name !== undefined) order.set(g.name, i);
   });
 
-  const gpos = buildKerningGpos(kernIndex(document.kerning), (name) => order.get(name));
   const features = compileFeatures(document.features, (name) => order.get(name));
+
+  // One GPOS from two sources: the kerning the editor keeps in its own model,
+  // and whatever positioning the feature file asks for. A second table is not a
+  // thing a font can have, and a second `kern` feature is one a shaper ignores.
+  const kernSubtables = kerningSubtables(kernIndex(document.kerning), (name) => order.get(name));
+  const kernLookups = kerningLookups(kernSubtables);
+  const gpos = layoutTable(
+    mergeFeatures(
+      kernLookups.length === 0 ? [] : [{ tag: "kern", lookups: kernLookups.map((_, i) => i) }],
+      shiftFeatures(features.positioning.entries, kernLookups.length),
+    ),
+    [...kernLookups, ...features.positioning.lookups],
+  );
   for (const problem of features.problems) {
     warnings.push(`features, line ${String(problem.line)}: ${problem.message}`);
   }

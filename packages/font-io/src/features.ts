@@ -1,12 +1,7 @@
 import { type FeaProblem, parseFea } from "./fea.js";
-import {
-  type FeatureEntry,
-  type Lookup,
-  chainContextSubst,
-  gsubTable,
-  ligatureSubst,
-  singleSubst,
-} from "./gsub.js";
+import { singlePos } from "./gpos.js";
+import { chainContextSubst, ligatureSubst, singleSubst } from "./gsub.js";
+import { type FeatureEntry, type Lookup, layoutTable, mergeFeatures } from "./layout.js";
 
 /**
  * Turning feature source into a GSUB table.
@@ -18,8 +13,19 @@ import {
  */
 
 export type CompiledFeatures = {
-  /** Empty when nothing compiled, so a caller writes no table rather than an empty one. */
+  /** GSUB. Empty when nothing compiled, so a caller writes no table rather than an empty one. */
   readonly table: Uint8Array;
+  /**
+   * The positioning half, unwrapped.
+   *
+   * Not a table of its own, because the font's kerning is positioning too and
+   * the two have to end up in one GPOS. Whoever writes the file puts them
+   * together.
+   */
+  readonly positioning: {
+    readonly entries: readonly FeatureEntry[];
+    readonly lookups: readonly Lookup[];
+  };
   /** Tags that produced at least one working rule, in the order they appeared. */
   readonly tags: readonly string[];
   readonly rules: number;
@@ -28,6 +34,7 @@ export type CompiledFeatures = {
 
 export const NO_FEATURES: CompiledFeatures = {
   table: new Uint8Array(0),
+  positioning: { entries: [], lookups: [] },
   tags: [],
   rules: 0,
   problems: [],
@@ -65,6 +72,8 @@ export function compileFeatures(
 
   const lookups: Lookup[] = [];
   const entries: FeatureEntry[] = [];
+  const posLookups: Lookup[] = [];
+  const posEntries: FeatureEntry[] = [];
   const tags: string[] = [];
   let rules = 0;
 
@@ -73,6 +82,7 @@ export function compileFeatures(
     const singleTo: number[] = [];
     const ligatures: { from: number[]; to: number }[] = [];
     const chains: Uint8Array[] = [];
+    const adjustments: Uint8Array[] = [];
 
     for (const rule of feature.rules) {
       const missing = (name: string): boolean => {
@@ -100,6 +110,21 @@ export function compileFeatures(
           singleTo.push(glyphId(to)!);
           rules += 1;
         }
+        continue;
+      }
+
+      if (rule.kind === "position") {
+        if (rule.glyphs.some(missing)) continue;
+        // One subtable per rule rather than one for the feature: two rules can
+        // name the same glyph with different values, and a subtable can hold
+        // only one answer. Tried in order, so the first one written wins.
+        adjustments.push(
+          singlePos(
+            rule.glyphs.map((name) => glyphId(name)!),
+            rule.value,
+          ),
+        );
+        rules += 1;
         continue;
       }
 
@@ -166,6 +191,14 @@ export function compileFeatures(
       lookups.push({ type: 6, subtables: chains });
     }
 
+    // Positioning goes in its own list. It ends up in a different table, and
+    // the lookup indices a feature names are indices into that table's list.
+    if (adjustments.length > 0) {
+      posEntries.push({ tag: feature.tag, lookups: [posLookups.length] });
+      posLookups.push({ type: 1, subtables: adjustments });
+      if (!tags.includes(feature.tag)) tags.push(feature.tag);
+    }
+
     if (used.length === 0) continue;
     // A tag written twice adds to the feature that is already there rather than
     // making a second one, which is what a shaper would ignore.
@@ -181,7 +214,13 @@ export function compileFeatures(
     }
   }
 
-  return { table: gsubTable(entries, lookups), tags, rules, problems };
+  return {
+    table: layoutTable(entries, lookups),
+    positioning: { entries: mergeFeatures(posEntries, []), lookups: posLookups },
+    tags,
+    rules,
+    problems,
+  };
 }
 
 /**

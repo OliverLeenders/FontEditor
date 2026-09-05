@@ -89,9 +89,17 @@ describe("reading feature source", () => {
 
   it("refuses a construct it cannot compile, by name and line", () => {
     // Silence here would ship a font that does not do what its source says.
+    const parsed = parseFea("feature curs {\n  pos cursive a <anchor 1 2>;\n} curs;");
+    expect(parsed.problems[0]?.line).toBe(2);
+    expect(parsed.problems[0]?.message).toContain("cursive");
+  });
+
+  it("sends a pair adjustment to the workspace that owns it", () => {
+    // It is kerning, the editor keeps kerning in its model, and two ways to
+    // write the same bytes is two answers with no way to say which won.
     const parsed = parseFea("feature kern {\n  pos a b -40;\n} kern;");
     expect(parsed.problems[0]?.line).toBe(2);
-    expect(parsed.problems[0]?.message).toContain("pos");
+    expect(parsed.problems[0]?.message).toContain("Spacing");
   });
 
   it("complains when the two sides of a class rule differ in length", () => {
@@ -267,6 +275,118 @@ describe("compiling a rule with a context", () => {
   });
 });
 
+describe("reading a positioning rule", () => {
+  const rule = (source: string) => parseFea(source).features[0]?.rules[0];
+
+  it("reads a bare number as an advance adjustment", () => {
+    // The shorthand exists for exactly this: twenty units after every capital.
+    expect(rule("feature cpsp { pos a 20; } cpsp;")).toMatchObject({
+      kind: "position",
+      glyphs: ["a"],
+      value: { x: 0, y: 0, xAdvance: 20, yAdvance: 0 },
+    });
+  });
+
+  it("reads the long form as four numbers in the format's own order", () => {
+    expect(rule("feature test { pos a <10 -5 20 0>; } test;")).toMatchObject({
+      kind: "position",
+      value: { x: 10, y: -5, xAdvance: 20, yAdvance: 0 },
+    });
+  });
+
+  it("applies one value to a whole class", () => {
+    const parsed = parseFea("@caps = [a b]; feature cpsp { pos @caps 20; } cpsp;");
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.features[0]?.rules[0]).toMatchObject({
+      kind: "position",
+      glyphs: ["a", "b"],
+    });
+  });
+
+  it("takes a negative adjustment", () => {
+    expect(rule("feature test { pos a -30; } test;")).toMatchObject({
+      value: { xAdvance: -30 },
+    });
+  });
+
+  it("complains about a value that is not four numbers", () => {
+    const parsed = parseFea("feature test { pos a <10 20>; } test;");
+    expect(parsed.problems.some((p) => p.message.includes("four numbers"))).toBe(true);
+  });
+
+  it("complains about a value it cannot read at all", () => {
+    // A device table or a variable value; both need more than four numbers.
+    const parsed = parseFea("feature test { pos a <10 0 20 0 <device 11 -1>>; } test;");
+    expect(parsed.problems.some((p) => p.message.includes("four numbers"))).toBe(true);
+  });
+
+  it("complains about a rule with no value", () => {
+    const parsed = parseFea("feature test { pos a; } test;");
+    expect(parsed.problems.some((p) => p.message.includes("needs a value"))).toBe(true);
+  });
+
+  it("refuses positioning in a context", () => {
+    const parsed = parseFea("feature test { pos a b' 20; } test;");
+    expect(parsed.problems.some((p) => p.message.includes("in a context"))).toBe(true);
+  });
+
+  it("refuses every kind of attachment by its own name", () => {
+    for (const kind of ["cursive", "base", "mark", "ligature"]) {
+      const parsed = parseFea(`feature test { pos ${kind} a <anchor 0 0>; } test;`);
+      expect(parsed.problems.some((p) => p.message.includes(kind))).toBe(true);
+    }
+  });
+
+  it("keeps reading the file after a rule it refused", () => {
+    const parsed = parseFea(`
+      feature test { pos a b -40; } test;
+      feature liga { sub f i by fi; } liga;
+    `);
+    expect(parsed.features.some((f) => f.tag === "liga" && f.rules.length === 1)).toBe(true);
+  });
+});
+
+describe("compiling a positioning rule", () => {
+  const compile = (source: string) =>
+    compileFeatures(source, (n) => (NAMES.includes(n) ? NAMES.indexOf(n) : undefined));
+
+  it("puts it in the positioning half, not in GSUB", () => {
+    const compiled = compile("feature cpsp { pos a 20; } cpsp;");
+    expect(compiled.problems).toEqual([]);
+    expect(compiled.rules).toBe(1);
+    expect(compiled.positioning.lookups).toHaveLength(1);
+    expect(compiled.positioning.entries).toEqual([{ tag: "cpsp", lookups: [0] }]);
+    // Nothing was substituted, so there is nothing for GSUB to say.
+    expect(compiled.table).toHaveLength(0);
+  });
+
+  it("names the feature among the tags that did something", () => {
+    expect(compile("feature cpsp { pos a 20; } cpsp;").tags).toEqual(["cpsp"]);
+  });
+
+  it("drops a rule about a glyph the font has not got", () => {
+    const compiled = compile("feature cpsp { pos q 20; } cpsp;");
+    expect(compiled.problems.some((p) => p.message.includes("no glyph called q"))).toBe(true);
+    expect(compiled.positioning.lookups).toHaveLength(0);
+  });
+
+  it("keeps two rules of one feature as two subtables in order", () => {
+    // Two rules can name the same glyph with different values, and a subtable
+    // holds one answer; the first written is the one that applies.
+    const compiled = compile("feature cpsp { pos a 20; pos a 40; } cpsp;");
+    expect(compiled.rules).toBe(2);
+    expect(compiled.positioning.lookups[0]?.subtables).toHaveLength(2);
+  });
+
+  it("carries substitution and positioning from one feature file", () => {
+    const compiled = compile(
+      "feature liga { sub f i by fi; } liga; feature cpsp { pos a 20; } cpsp;",
+    );
+    expect(compiled.table.length).toBeGreaterThan(0);
+    expect(compiled.positioning.lookups).toHaveLength(1);
+  });
+});
+
 /**
  * Read back with opentype.js, whose GSUB parser is an implementation of the
  * specification that is not ours — the only kind of check worth much on a
@@ -355,5 +475,35 @@ describe("the exported font substitutes in context", () => {
     expect(records[0]!.sequenceIndex).toBe(0);
     expect(gsub.lookups[records[0]!.lookupListIndex]).toBeDefined();
     expect(gsub.lookups[records[0]!.lookupListIndex]!.lookupType).toBe(1);
+  });
+});
+
+describe("the exported font positions", () => {
+  it("writes a positioning rule into GPOS, where a reader that is not ours finds it", () => {
+    const f = reread("feature cpsp { pos a 20; } cpsp;");
+    expect(f.tables.gpos).toBeDefined();
+    expect(f.tables.gpos!.features.map((x) => x.tag)).toContain("cpsp");
+  });
+
+  it("writes it as a single adjustment", () => {
+    const f = reread("feature cpsp { pos a 20; } cpsp;");
+    expect(f.tables.gpos!.lookups.some((l) => l.lookupType === 1)).toBe(true);
+  });
+
+  it("keeps two rules of one feature as two subtables", () => {
+    const f = reread("feature cpsp { pos a 20; pos b 40; } cpsp;");
+    const lookup = f.tables.gpos!.lookups.find((l) => l.lookupType === 1)!;
+    expect(lookup.subtables).toHaveLength(2);
+  });
+
+  it("writes no GPOS for a font with neither kerning nor positioning", () => {
+    // A feature list matching nothing stops a shaper falling back.
+    expect(reread("feature liga { sub f i by fi; } liga;").tables.gpos).toBeUndefined();
+  });
+
+  it("leaves the substitutions where they were", () => {
+    const f = reread("feature liga { sub f i by fi; } liga; feature cpsp { pos a 20; } cpsp;");
+    expect(f.tables.gsub!.features.map((x) => x.tag)).toEqual(["liga"]);
+    expect(f.tables.gpos!.features.map((x) => x.tag)).toEqual(["cpsp"]);
   });
 });
