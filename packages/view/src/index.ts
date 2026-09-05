@@ -40,6 +40,7 @@ export {
   removeItems,
   sameItem,
   selectionKey,
+  selectionBounds,
   selectionPoints,
   toggleItem,
 } from "./selection.js";

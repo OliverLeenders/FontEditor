@@ -1,0 +1,121 @@
+.panel {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.63rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* The anchor picker beside the two places only a font cares about. */
+.about {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 0.7rem);
+  grid-template-rows: repeat(3, 0.7rem);
+  gap: 2px;
+  flex: none;
+}
+
+.anchor {
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: var(--ground);
+  cursor: pointer;
+}
+.anchor:hover:not(:disabled) {
+  border-color: var(--ink-3);
+}
+.anchor[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.anchor:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.places {
+  display: grid;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.places button,
+.buttons button {
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+}
+.places button:hover:not(:disabled),
+.buttons button:hover:not(:disabled) {
+  color: var(--ink);
+}
+.places button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--surface);
+}
+.places button:disabled,
+.buttons button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.small {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.input {
+  width: 100%;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+.input:disabled {
+  opacity: 0.38;
+}
+
+.buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.25rem;
+}

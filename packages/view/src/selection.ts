@@ -139,3 +139,36 @@ export function selectionPoints(g: Glyph, selection: Selection): Vec2[] {
   }
   return points;
 }
+
+/**
+ * The box round the selected on-curve points.
+ *
+ * The points and not their handles. A handle moves with the point that owns it,
+ * so the box would grow to enclose control points that are not themselves being
+ * positioned — and a single selected point would then have a box whose centre is
+ * not the point, which is exactly where rotating a handle pair wants to pivot.
+ *
+ * `null` when nothing is selected, or when what is selected is only handles.
+ */
+export function selectionBounds(g: Glyph, selection: Selection): Rect | null {
+  let box: Rect | null = null;
+
+  for (const item of selection) {
+    if (item.part !== "point") continue;
+    const c = contourById(g, item.contourId);
+    const n = c === null ? null : nodeById(c, item.nodeId);
+    if (n === null) continue;
+
+    box =
+      box === null
+        ? { minX: n.pt.x, minY: n.pt.y, maxX: n.pt.x, maxY: n.pt.y }
+        : {
+            minX: Math.min(box.minX, n.pt.x),
+            minY: Math.min(box.minY, n.pt.y),
+            maxX: Math.max(box.maxX, n.pt.x),
+            maxY: Math.max(box.maxY, n.pt.y),
+          };
+  }
+
+  return box;
+}

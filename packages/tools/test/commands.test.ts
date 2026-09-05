@@ -1,4 +1,13 @@
-import { cross, distance, vec } from "@fonteditor/geometry";
+import {
+  IDENTITY_AFFINE,
+  cross,
+  distance,
+  rotation,
+  scaling,
+  skewing,
+  translation,
+  vec,
+} from "@fonteditor/geometry";
 import {
   type Contour,
   type FontDocument,
@@ -27,6 +36,7 @@ import type { ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import {
+  BOX_CENTRE,
   addKernGroup,
   breakOutKern,
   nudgeKern,
@@ -65,6 +75,7 @@ import {
   selectedCoordinate,
   setNodeHvLock,
   setPointType,
+  transformSelection,
   unroundedCount,
 } from "../src/commands.js";
 import { keyInput } from "../src/input.js";
@@ -1156,5 +1167,176 @@ describe("nudging a pair once there are classes", () => {
     state = nudgeKern(state, "Q", "A", -5).state;
     expect(kerningFor(state, "Q", "A")?.value).toBe(-15);
     expect(kerningFor(state, "O", "A")?.value).toBe(-10);
+  });
+});
+
+describe("transforming a selection", () => {
+  /** A square of four corners, so every coordinate is easy to read. */
+  const square = () => {
+    const ids = counterIds("tf");
+    const c = contour(
+      ids.contour(),
+      [
+        node("p0", vec(0, 0)),
+        node("p1", vec(100, 0)),
+        node("p2", vec(100, 100), { out: vec(120, 100) }),
+        node("p3", vec(0, 100)),
+      ],
+      true,
+    );
+    const document = fontDocument([glyph("a", { advance: 200, contours: [c] })]);
+    return editorState({ document, view: VIEW, currentGlyph: "a" });
+  };
+
+  const pick = (s: EditorState, ...ids: string[]): EditorState => ({
+    ...s,
+    selection: ids.map((nodeId) => ({
+      contourId: s.document.glyphs["a"]!.contours[0]!.id,
+      nodeId,
+      part: "point" as const,
+    })),
+  });
+
+  const at = (s: EditorState, id: string) =>
+    s.document.glyphs["a"]!.contours[0]!.nodes.find((n) => n.id === id)!;
+
+  it("moves the selected points and leaves the rest", () => {
+    const before = pick(square(), "p0", "p1");
+    const after = transformSelection(before, translation(10, 20), BOX_CENTRE, "Move").state;
+
+    expect(at(after, "p0").pt).toEqual(vec(10, 20));
+    expect(at(after, "p1").pt).toEqual(vec(110, 20));
+    expect(at(after, "p2").pt).toEqual(vec(100, 100));
+  });
+
+  it("carries a selected point's handles with it", () => {
+    // A handle belongs to the point that owns it, which is the same rule the
+    // arrow keys follow.
+    const after = transformSelection(
+      pick(square(), "p2"),
+      translation(10, 0),
+      BOX_CENTRE,
+      "Move",
+    ).state;
+    expect(at(after, "p2").out).toEqual(vec(130, 100));
+  });
+
+  it("does nothing for a selection of handles alone", () => {
+    const s = square();
+    const handles: EditorState = {
+      ...s,
+      selection: [
+        { contourId: s.document.glyphs["a"]!.contours[0]!.id, nodeId: "p2", part: "out" },
+      ],
+    };
+    expect(transformSelection(handles, translation(10, 0), BOX_CENTRE, "Move").state).toBe(handles);
+  });
+
+  it("costs no undo entry for a transform that changes nothing", () => {
+    const s = pick(square(), "p0");
+    expect(transformSelection(s, IDENTITY_AFFINE, BOX_CENTRE, "Move").state).toBe(s);
+  });
+
+  it("scales about the middle of what is selected", () => {
+    const after = transformSelection(
+      pick(square(), "p0", "p1", "p2", "p3"),
+      scaling(2, 2),
+      BOX_CENTRE,
+      "Scale",
+    ).state;
+    expect(at(after, "p0").pt).toEqual(vec(-50, -50));
+    expect(at(after, "p2").pt).toEqual(vec(150, 150));
+  });
+
+  it("scales about a corner of the box when asked", () => {
+    const after = transformSelection(
+      pick(square(), "p0", "p1", "p2", "p3"),
+      scaling(2, 2),
+      { kind: "box", x: "left", y: "bottom" },
+      "Scale",
+    ).state;
+    expect(at(after, "p0").pt).toEqual(vec(0, 0));
+    expect(at(after, "p2").pt).toEqual(vec(200, 200));
+  });
+
+  it("leans about the glyph's own origin, which is what an italic needs", () => {
+    // Turning about the selection instead would shift every glyph sideways by a
+    // different amount and the spacing would be gone.
+    const after = transformSelection(
+      pick(square(), "p0", "p1", "p2", "p3"),
+      skewing(Math.atan(0.25), 0),
+      { kind: "origin" },
+      "Slant",
+    ).state;
+    expect(at(after, "p0").pt.x).toBeCloseTo(0, 6);
+    expect(at(after, "p3").pt.x).toBeCloseTo(25, 6);
+  });
+
+  it("grows from the baseline under the selection without moving it along", () => {
+    const after = transformSelection(
+      pick(square(), "p0", "p1", "p2", "p3"),
+      scaling(1, 2),
+      { kind: "baseline" },
+      "Scale",
+    ).state;
+    expect(at(after, "p0").pt).toEqual(vec(0, 0));
+    expect(at(after, "p3").pt).toEqual(vec(0, 200));
+  });
+
+  it("keeps a smooth node smooth, because a straight line stays straight", () => {
+    const ids = counterIds("sm");
+    const c = contour(
+      ids.contour(),
+      [
+        node("a", vec(0, 0), { out: vec(40, 0) }),
+        node("b", vec(100, 0), { type: "smooth", in: vec(60, 0), out: vec(140, 0) }),
+        node("c", vec(200, 0), { in: vec(160, 0) }),
+      ],
+      false,
+    );
+    const document = fontDocument([glyph("a", { advance: 200, contours: [c] })]);
+    const s = editorState({ document, view: VIEW, currentGlyph: "a" });
+    const chosen: EditorState = {
+      ...s,
+      selection: ["a", "b", "c"].map((nodeId) => ({ contourId: c.id, nodeId, part: "point" })),
+    };
+
+    const after = transformSelection(chosen, rotation(0.4), BOX_CENTRE, "Rotate").state;
+    const n = after.document.glyphs["a"]!.contours[0]!.nodes[1]!;
+    expect(n.type).toBe("smooth");
+    // Still one straight line through the node: the cross product vanishes.
+    const left = { x: n.in!.x - n.pt.x, y: n.in!.y - n.pt.y };
+    const right = { x: n.out!.x - n.pt.x, y: n.out!.y - n.pt.y };
+    expect(left.x * right.y - left.y * right.x).toBeCloseTo(0, 6);
+  });
+
+  it("lets an axis lock go when the transform stops it holding", () => {
+    const ids = counterIds("lk");
+    const c = contour(
+      ids.contour(),
+      [node("a", vec(0, 0), { out: vec(40, 0), hvLock: true }), node("b", vec(100, 0))],
+      false,
+    );
+    const document = fontDocument([glyph("a", { advance: 200, contours: [c] })]);
+    const s = editorState({ document, view: VIEW, currentGlyph: "a" });
+    const chosen: EditorState = {
+      ...s,
+      selection: [{ contourId: c.id, nodeId: "a", part: "point" }],
+    };
+
+    const turned = transformSelection(chosen, rotation(0.4), BOX_CENTRE, "Rotate").state;
+    expect(turned.document.glyphs["a"]!.contours[0]!.nodes[0]!.hvLock).toEqual({
+      in: false,
+      out: false,
+    });
+
+    // A scale keeps level level, so the lock still holds and is kept.
+    const scaled = transformSelection(chosen, scaling(2, 3), BOX_CENTRE, "Scale").state;
+    expect(scaled.document.glyphs["a"]!.contours[0]!.nodes[0]!.hvLock.out).toBe(true);
+  });
+
+  it("names the entry it puts on the undo stack", () => {
+    const out = transformSelection(pick(square(), "p0"), translation(1, 0), BOX_CENTRE, "Move");
+    expect(out.effects.map((e) => e.kind)).toEqual(["beginTransaction", "commitTransaction"]);
   });
 });

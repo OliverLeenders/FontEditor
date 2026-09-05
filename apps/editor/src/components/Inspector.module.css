@@ -51,6 +51,12 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.55rem 0.6rem 0.65rem;
+  /* The panel floats and is dragged about, so it cannot rely on the window
+     being tall enough for everything it holds. Scrolling the contents keeps the
+     last field reachable on a short window; dragging the panel off the top to
+     reach it is not a way to use a tool. */
+  max-height: calc(100vh - 7rem);
+  overflow-y: auto;
 }
 
 .field {

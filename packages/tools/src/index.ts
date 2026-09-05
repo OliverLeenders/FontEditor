@@ -42,6 +42,8 @@ export {
 
 export {
   type KernSide,
+  type TransformOrigin,
+  BOX_CENTRE,
   addComponent,
   addKernGroup,
   breakOutKern,
@@ -84,6 +86,8 @@ export {
   nodeCanBeTangent,
   nodeHasMissingHandle,
   selectedCanBeTangent,
+  transformOriginPoint,
+  transformSelection,
   nodeHvLocked,
   segmentHasMissingHandle,
   retractHandle,

@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { Stepper } from "./Stepper.js";
+import { TransformPanel } from "./TransformPanel.js";
 import styles from "./Inspector.module.css";
 
 /**
@@ -439,6 +440,10 @@ export function Inspector(): React.JSX.Element | null {
             </Stepper>
           </div>
         </Field>
+
+        <div className={styles.rule} />
+
+        <TransformPanel />
       </div>
     </aside>
   );

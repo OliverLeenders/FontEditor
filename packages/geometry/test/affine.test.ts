@@ -2,10 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import {
   IDENTITY_AFFINE,
+  about,
   affineDeterminant,
   applyAffine,
   composeAffine,
   isTranslation,
+  keepsAxes,
+  rotation,
+  scaling,
+  skewing,
   translation,
 } from "../src/affine.js";
 
@@ -97,5 +102,49 @@ describe("affineDeterminant", () => {
     expect(affineDeterminant(translation(9, 9))).toBe(1);
     expect(affineDeterminant({ ...IDENTITY_AFFINE, xScale: -1 })).toBe(-1);
     expect(affineDeterminant({ ...IDENTITY_AFFINE, xScale: 2, yScale: 3 })).toBe(6);
+  });
+});
+
+describe("building a transform", () => {
+  const at = (x: number, y: number) => ({ x, y });
+  const near = (p: { x: number; y: number }, x: number, y: number) => {
+    expect(p.x).toBeCloseTo(x, 6);
+    expect(p.y).toBeCloseTo(y, 6);
+  };
+
+  it("scales about the origin", () => {
+    near(applyAffine(scaling(2, 3), at(10, 10)), 20, 30);
+  });
+
+  it("takes a negative factor as a flip, which is the same operation", () => {
+    near(applyAffine(scaling(-1, 1), at(10, 20)), -10, 20);
+    expect(affineDeterminant(scaling(-1, 1))).toBeLessThan(0);
+  });
+
+  it("turns anticlockwise, which is the direction design units run in", () => {
+    near(applyAffine(rotation(Math.PI / 2), at(100, 0)), 0, 100);
+  });
+
+  it("leans the verticals by the tangent of the angle", () => {
+    // An italic: a point rises by its own height times the tangent.
+    const italic = skewing(Math.atan(0.2), 0);
+    near(applyAffine(italic, at(0, 100)), 20, 100);
+    near(applyAffine(italic, at(0, 0)), 0, 0);
+  });
+
+  it("turns about a point rather than about the origin", () => {
+    const half = about(rotation(Math.PI), at(50, 50));
+    near(applyAffine(half, at(50, 50)), 50, 50);
+    near(applyAffine(half, at(60, 50)), 40, 50);
+  });
+
+  it("knows which transforms leave an axis an axis", () => {
+    // What the HV-lock means is "held level or upright", and only these keep it.
+    expect(keepsAxes(scaling(2, 3))).toBe(true);
+    expect(keepsAxes(scaling(-1, 1))).toBe(true);
+    expect(keepsAxes(translation(10, 20))).toBe(true);
+    expect(keepsAxes(rotation(Math.PI / 2))).toBe(true);
+    expect(keepsAxes(rotation(0.3))).toBe(false);
+    expect(keepsAxes(skewing(0.2, 0))).toBe(false);
   });
 });

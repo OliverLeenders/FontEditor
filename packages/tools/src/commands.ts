@@ -1,4 +1,12 @@
-import { type Vec2, project } from "@fonteditor/geometry";
+import {
+  type Affine,
+  type Vec2,
+  about,
+  applyAffine,
+  isTranslation,
+  keepsAxes,
+  project,
+} from "@fonteditor/geometry";
 import {
   type ComponentId,
   type ComponentSource,
@@ -19,6 +27,7 @@ import {
   balanceSegment,
   canBeTangent,
   centreGlyph,
+  enforceTangents,
   component,
   contourById,
   deleteProblem,
@@ -67,7 +76,13 @@ import {
   updateGlyph,
   wouldRecurse,
 } from "@fonteditor/font-model";
-import { type SegmentRef, type Selection, type SelectionItem, itemPoint } from "@fonteditor/view";
+import {
+  type SegmentRef,
+  type Selection,
+  type SelectionItem,
+  itemPoint,
+  selectionBounds,
+} from "@fonteditor/view";
 
 import { type ToolResult, begin, commit, result } from "./effects.js";
 import { translateSelection } from "./gestures.js";
@@ -1003,4 +1018,119 @@ export function segmentParameterAt(
 
   const { t } = project(segmentCubic(found), p);
   return t > 0.001 && t < 0.999 ? t : null;
+}
+
+// ---------------------------------------------------------------------------
+// transforming a selection
+// ---------------------------------------------------------------------------
+
+/**
+ * What a transform turns about.
+ *
+ * The nine points of the selection's own box, which is what every drawing
+ * program offers, and two that only a font needs. `origin` is the glyph's own
+ * origin at (0, 0): slanting an italic has to turn about it, or every glyph
+ * shifts sideways by a different amount and the spacing is gone. `baseline` is
+ * the baseline under the middle of the selection, for growing a shape upward
+ * without moving it along.
+ */
+export type TransformOrigin =
+  | {
+      readonly kind: "box";
+      readonly x: "left" | "centre" | "right";
+      readonly y: "top" | "middle" | "bottom";
+    }
+  | { readonly kind: "origin" }
+  | { readonly kind: "baseline" };
+
+export const BOX_CENTRE: TransformOrigin = { kind: "box", x: "centre", y: "middle" };
+
+/** Where a transform will turn, in design units, or `null` with nothing to turn. */
+export function transformOriginPoint(state: EditorState, origin: TransformOrigin): Vec2 | null {
+  if (origin.kind === "origin") return { x: 0, y: 0 };
+
+  const glyph = currentGlyph(state);
+  const box = glyph === null ? null : selectionBounds(glyph, state.selection);
+  if (box === null) return null;
+
+  const middleX = (box.minX + box.maxX) / 2;
+  if (origin.kind === "baseline") return { x: middleX, y: 0 };
+
+  return {
+    x: origin.x === "left" ? box.minX : origin.x === "right" ? box.maxX : middleX,
+    // Design units are y-up, so the top of the box is its maximum.
+    y: origin.y === "bottom" ? box.minY : origin.y === "top" ? box.maxY : (box.minY + box.maxY) / 2,
+  };
+}
+
+/**
+ * Move, scale, turn or lean the selected points.
+ *
+ * The points, and the handles they own — a handle selected by itself is not a
+ * thing to transform, it is a thing to drag. Which is the same rule the arrow
+ * keys already follow.
+ *
+ * Point types survive untouched, and that is not luck: an affine map takes a
+ * straight line to a straight line, so handles that were collinear through a
+ * node still are, and a smooth or tangent node is still smooth or tangent
+ * afterwards. The HV-lock is the one thing that cannot survive — a handle held
+ * level is not level after a lean — so a transform that does not send each axis
+ * to an axis lets those flags go rather than leaving a lock that does not hold.
+ *
+ * The results are left fractional. This model carries fractional coordinates
+ * and the formats write them; rounding here would compound the error across a
+ * run of transforms, and rounding is already a deliberate act of its own.
+ */
+export function transformSelection(
+  state: EditorState,
+  transform: Affine,
+  origin: TransformOrigin,
+  label: string,
+): ToolResult {
+  // A transform that changes nothing should not cost an undo entry, and every
+  // point would otherwise be rewritten to an equal but distinct value.
+  if (isTranslation(transform) && transform.xOffset === 0 && transform.yOffset === 0) {
+    return result(state);
+  }
+
+  const chosen = state.selection.filter((item) => item.part === "point");
+  if (chosen.length === 0) return result(state);
+
+  const centre = transformOriginPoint(state, origin);
+  if (centre === null) return result(state);
+
+  const full = about(transform, centre);
+  const loosen = !keepsAxes(transform);
+
+  const wanted = new Map<ContourId, Set<NodeId>>();
+  for (const item of chosen) {
+    const ids = wanted.get(item.contourId) ?? new Set<NodeId>();
+    ids.add(item.nodeId);
+    wanted.set(item.contourId, ids);
+  }
+
+  let editor = state;
+  for (const [contourId, ids] of wanted) {
+    const document = editCurrentGlyph(editor, (g) =>
+      updateContour(g, contourId, (c) => {
+        const nodes = c.nodes.map((n) =>
+          ids.has(n.id)
+            ? {
+                ...n,
+                pt: applyAffine(full, n.pt),
+                in: n.in === null ? null : applyAffine(full, n.in),
+                out: n.out === null ? null : applyAffine(full, n.out),
+                hvLock: loosen ? NO_LOCK : n.hvLock,
+              }
+            : n,
+        );
+        // A tangent node whose straight side was left behind now has a line
+        // pointing somewhere else, and its handle has to follow.
+        return enforceTangents({ ...c, nodes });
+      }),
+    );
+    if (document !== null) editor = { ...editor, document };
+  }
+
+  return done(state, editor === state ? null : editor, label);
 }

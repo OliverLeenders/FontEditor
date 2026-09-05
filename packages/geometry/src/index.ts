@@ -21,10 +21,15 @@ export {
 export type { Affine } from "./affine.js";
 export {
   IDENTITY_AFFINE,
+  about,
   affineDeterminant,
   applyAffine,
   composeAffine,
   isTranslation,
+  keepsAxes,
+  rotation,
+  scaling,
+  skewing,
   translation,
 } from "./affine.js";
 
