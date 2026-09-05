@@ -47,6 +47,12 @@
   border-color: var(--accent);
   color: var(--surface);
 }
+.tool[aria-pressed="true"]:hover {
+  background: var(--accent-ink);
+  border-color: var(--accent-ink);
+  color: var(--surface);
+}
+
 .tool:disabled {
   opacity: 0.3;
   cursor: default;
@@ -77,7 +83,7 @@
    the colour — so the tool fills with the accent and the toggle only tints. */
 .tool.toggle[aria-pressed="true"] {
   background: var(--accent-soft);
-  border-color: var(--accent);
+  border-color: var(--accent-soft);
   color: var(--accent-ink);
 }
 
