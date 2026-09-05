@@ -1,8 +1,17 @@
-import { contour, fontDocument, glyph, node, setKerning } from "@fonteditor/font-model";
+import {
+  EMPTY_KERNING,
+  contour,
+  fontDocument,
+  glyph,
+  node,
+  setKern,
+  setKerning,
+} from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
 import {
   EMPTY_RUN,
+  type Positioner,
   type Shaper,
   glyphAtX,
   layoutParagraph,
@@ -184,5 +193,64 @@ describe("placedAt", () => {
     expect(placedAt(run, 1)?.name).toBe("o");
     expect(placedAt(run, 2)).toBeNull();
     expect(placedAt(run, -1)).toBeNull();
+  });
+});
+
+/** Stands in for the real one: twenty units after every o, drawn five up. */
+const nudgeO: Positioner = (names) =>
+  names.map((name) => (name === "o" ? { x: 3, y: 5, xAdvance: 20, yAdvance: 0 } : null));
+
+describe("positioned layout", () => {
+  it("leaves the run alone without a positioner", () => {
+    const run = layoutRun(doc, "no");
+    expect(run.glyphs.map((p) => [p.dx, p.dy])).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
+    expect(run.glyphs.map((p) => p.advance)).toEqual([500, 600]);
+  });
+
+  it("records the offset without moving the pen", () => {
+    // The two are different facts: where the glyph is drawn, and where the line
+    // has got to. Only the second decides where the next glyph starts.
+    const run = layoutRun(doc, "no", undefined, nudgeO);
+    expect(run.glyphs[1]).toMatchObject({ name: "o", x: 500, dx: 3, dy: 5 });
+  });
+
+  it("lets an advance adjustment move everything after it", () => {
+    const run = layoutRun(doc, "ono", undefined, nudgeO);
+    expect(run.glyphs.map((p) => p.x)).toEqual([0, 620, 1120]);
+    expect(run.width).toBe(1740);
+  });
+
+  it("measures the line by what was drawn", () => {
+    const run = layoutRun(doc, "o", undefined, nudgeO);
+    expect(run.glyphs[0]?.advance).toBe(620);
+    expect(run.width).toBe(620);
+  });
+
+  it("hit tests against the advance the glyph actually took", () => {
+    // Clicking the gap a rule opened up has to select the letter that owns it.
+    const run = layoutRun(doc, "on", undefined, nudgeO);
+    expect(glyphAtX(run, 610)?.name).toBe("o");
+    expect(glyphAtX(run, 625)?.name).toBe("n");
+  });
+
+  it("positions the glyphs a substitution left behind, not the ones it took", () => {
+    // The rule is about the "n_o" that is there, and there is no o any more.
+    const run = layoutRun(ligatured, "no", joinNO, nudgeO);
+    expect(run.glyphs).toHaveLength(1);
+    expect(run.glyphs[0]).toMatchObject({ name: "n_o", dx: 0, advance: 800 });
+  });
+
+  it("adds the adjustment on top of the kern rather than instead of it", () => {
+    const kerned = setKerning(doc, setKern(EMPTY_KERNING, "o", "n", -30));
+    const run = layoutRun(kerned, "on", undefined, nudgeO);
+    expect(run.glyphs[1]).toMatchObject({ name: "n", kern: -30, x: 590 });
+  });
+
+  it("carries positioning into a paragraph", () => {
+    const lines = layoutParagraph(doc, "oo", 100000, 1200, undefined, nudgeO);
+    expect(lines[0]?.run.width).toBe(1240);
   });
 });

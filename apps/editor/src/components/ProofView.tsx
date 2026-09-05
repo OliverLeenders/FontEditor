@@ -3,7 +3,7 @@ import { layoutParagraph, wheelIntent } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
-import { shaperFrom } from "../shaping.js";
+import { positionerFrom, shaperFrom } from "../shaping.js";
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -66,6 +66,10 @@ export function ProofView(): React.JSX.Element {
     () => shaperFrom(document.features, applyFeatures),
     [document.features, applyFeatures],
   );
+  const position = useMemo(
+    () => positionerFrom(document.features, applyFeatures),
+    [document.features, applyFeatures],
+  );
   const hasFeatures = document.features.trim() !== "";
   const lines = useMemo(() => {
     const scale = size / unitsPerEm;
@@ -76,8 +80,9 @@ export function ProofView(): React.JSX.Element {
       Math.max(measure, unitsPerEm),
       leading * unitsPerEm,
       shape,
+      position,
     );
-  }, [document, text, size, leading, unitsPerEm, width, shape]);
+  }, [document, text, size, leading, unitsPerEm, width, shape, position]);
 
   /**
    * How tall the set text is, so the page can be scrolled through.
@@ -114,7 +119,13 @@ export function ProofView(): React.JSX.Element {
 
       const scene: ProofScene = {
         lines: state.lines.map((line) => ({
-          glyphs: line.run.glyphs.map((p) => ({ glyph: p.glyph, x: p.x })),
+          glyphs: line.run.glyphs.map((p) => ({
+            glyph: p.glyph,
+            x: p.x,
+            advance: p.advance,
+            dx: p.dx,
+            dy: p.dy,
+          })),
           y: line.y,
         })),
         // The first baseline sits a line below the top margin, so the ascenders

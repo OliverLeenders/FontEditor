@@ -17,6 +17,22 @@ export type PlacedGlyph = {
   readonly x: number;
   /** The kern applied before this glyph. Zero for the first, and for no pair. */
   readonly kern: number;
+  /**
+   * Where the glyph is drawn relative to the pen, from a positioning rule.
+   *
+   * Separate from `x` because the two are different facts: the pen is where the
+   * line has got to, and this is a rule saying draw it somewhere else. Only the
+   * pen decides where the next glyph starts.
+   */
+  readonly dx: number;
+  readonly dy: number;
+  /**
+   * The advance this glyph actually took, which a positioning rule can change.
+   *
+   * Kept here rather than read off the glyph, so that everything measuring the
+   * line — hit testing, margins, the width — agrees with what was drawn.
+   */
+  readonly advance: number;
 };
 
 export type GlyphRun = {
@@ -34,6 +50,23 @@ export const EMPTY_RUN: GlyphRun = { glyphs: [], width: 0 };
  * depend on where those rules were written down.
  */
 export type Shaper = (names: readonly string[]) => readonly string[];
+
+/** What a positioning rule does to one glyph, in design units. */
+export type Adjustment = {
+  readonly x: number;
+  readonly y: number;
+  readonly xAdvance: number;
+  readonly yAdvance: number;
+};
+
+/**
+ * The font's positioning rules, as a function over the glyphs being set.
+ *
+ * One entry per glyph of the run, `null` where no rule applies. Passed in for
+ * the same reason the shaper is: the rules are written in a file format, and
+ * this package knows nothing about files.
+ */
+export type Positioner = (names: readonly string[]) => readonly (Adjustment | null)[];
 
 /**
  * The glyphs to set, after the font's own substitutions have had their say.
@@ -74,23 +107,48 @@ function shapedGlyphs(
  * a file format, and this package knows nothing about files. Kerning is looked
  * up *after* it runs, on the glyphs that survived: an "fi" ligature kerns as an
  * "fi", not as the f and i it was made from.
+ *
+ * `position` runs later still, on the same surviving glyphs, because a rule
+ * about a glyph is a rule about the glyph that is there — not about the ones a
+ * ligature was made from.
  */
-export function layoutRun(document: FontDocument, text: string, shape?: Shaper): GlyphRun {
+export function layoutRun(
+  document: FontDocument,
+  text: string,
+  shape?: Shaper,
+  position?: Positioner,
+): GlyphRun {
+  const shaped = shapedGlyphs(document, text, shape).filter((g): g is Glyph => g !== null);
+  const values = position === undefined ? [] : position(shaped.map((g) => g.name));
+
   const glyphs: PlacedGlyph[] = [];
   const index = kernIndex(document.kerning);
   let x = 0;
   let previous: string | null = null;
 
-  for (const glyph of shapedGlyphs(document, text, shape)) {
-    if (glyph === null) continue;
-
+  for (const [at, glyph] of shaped.entries()) {
     // The kern goes before the glyph it precedes, so a pair moves the second
     // letter rather than stretching the first one's advance.
     const kern = previous === null ? 0 : kernValue(index, previous, glyph.name);
     x += kern;
 
-    glyphs.push({ glyph, name: glyph.name, index: glyphs.length, x, kern });
-    x += glyph.advance;
+    const value = values[at] ?? null;
+    // The vertical advance is read and not used: this lays out a line that runs
+    // across the page, and a font that moved the pen downward between letters
+    // would be describing a different kind of writing.
+    const advance = glyph.advance + (value?.xAdvance ?? 0);
+
+    glyphs.push({
+      glyph,
+      name: glyph.name,
+      index: glyphs.length,
+      x,
+      kern,
+      dx: value?.x ?? 0,
+      dy: value?.y ?? 0,
+      advance,
+    });
+    x += advance;
     previous = glyph.name;
   }
 
@@ -106,7 +164,7 @@ export function layoutRun(document: FontDocument, text: string, shape?: Shaper):
  */
 export function glyphAtX(run: GlyphRun, x: number): PlacedGlyph | null {
   for (const placed of run.glyphs) {
-    if (x >= placed.x && x < placed.x + placed.glyph.advance) return placed;
+    if (x >= placed.x && x < placed.x + placed.advance) return placed;
   }
   return null;
 }
@@ -158,6 +216,7 @@ export function layoutParagraph(
   measure: number,
   leading: number,
   shape?: Shaper,
+  position?: Positioner,
 ): ProofLine[] {
   const lines: ProofLine[] = [];
   let y = 0;
@@ -173,15 +232,15 @@ export function layoutParagraph(
     let current = "";
     for (const word of paragraph.split(" ").filter((w) => w !== "")) {
       const candidate = current === "" ? word : `${current} ${word}`;
-      if (current !== "" && layoutRun(document, candidate, shape).width > measure) {
-        lines.push({ run: layoutRun(document, current, shape), y });
+      if (current !== "" && layoutRun(document, candidate, shape, position).width > measure) {
+        lines.push({ run: layoutRun(document, current, shape, position), y });
         y += leading;
         current = word;
       } else {
         current = candidate;
       }
     }
-    lines.push({ run: layoutRun(document, current, shape), y });
+    lines.push({ run: layoutRun(document, current, shape, position), y });
     y += leading;
   }
 

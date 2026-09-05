@@ -218,3 +218,58 @@ describe("drawProof", () => {
     expect(ctx.filledIn(LIGHT_PALETTE.background)).toHaveLength(1);
   });
 });
+
+describe("drawing what a positioning rule asked for", () => {
+  /**
+   * The points of the outline path, and only those.
+   *
+   * Collected between a `beginPath` and the `fill` that closes it, because the
+   * baseline and the margins are drawn with the same two calls and would
+   * otherwise be counted as part of the letter.
+   */
+  const points = (scene: Partial<RunScene>): number[][] => {
+    const ctx = render(scene);
+    let current: number[][] = [];
+    for (const op of ctx.ops) {
+      if (op.op === "beginPath") current = [];
+      if (op.op === "moveTo" || op.op === "lineTo") current.push([op.args[0]!, op.args[1]!]);
+      if (op.op === "fill" && op.fillStyle === LIGHT_PALETTE.outline) return current;
+    }
+    throw new Error("nothing was filled in the outline colour");
+  };
+
+  const one = (extra: Record<string, number>) => ({
+    glyphs: [{ glyph: box("n", 500), x: 100, ...extra }],
+  });
+
+  it("moves the drawing sideways", () => {
+    const plain = points(one({}));
+    const moved = points(one({ dx: 25 }));
+    expect(moved.map((p) => p[0])).toEqual(plain.map((p) => p[0]! + 25));
+    expect(moved.map((p) => p[1])).toEqual(plain.map((p) => p[1]));
+  });
+
+  it("moves it up the page for a positive y, since screen y grows downward", () => {
+    const plain = points(one({}));
+    const moved = points(one({ dy: 30 }));
+    expect(moved.map((p) => p[1])).toEqual(plain.map((p) => p[1]! - 30));
+    expect(moved.map((p) => p[0])).toEqual(plain.map((p) => p[0]));
+  });
+
+  it("draws the glyph where the rule says and leaves the margins where the pen is", () => {
+    // The offset moves the drawing; the advance moves the line. A margin marks
+    // the pen, so it belongs to the second and not the first.
+    const scene = {
+      glyphs: [{ glyph: box("n", 500), x: 0, advance: 560, dx: 40 }],
+      allMargins: true,
+    };
+    // The half-pixel is what puts a one-pixel line on a pixel rather than
+    // across two of them; every margin in this file carries it.
+    expect(strokedLineXs(render(scene), LIGHT_PALETTE.margin)).toEqual([0.5, 560.5]);
+  });
+
+  it("falls back to the glyph's own advance when the scene says nothing", () => {
+    const scene = { glyphs: [{ glyph: box("n", 500), x: 0 }], allMargins: true };
+    expect(strokedLineXs(render(scene), LIGHT_PALETTE.margin)).toEqual([0.5, 500.5]);
+  });
+});

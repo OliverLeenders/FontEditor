@@ -1,4 +1,4 @@
-import { type FeaRule, type FeaSource, parseFea } from "./fea.js";
+import { type FeaRule, type FeaSource, type ValueRecord, parseFea } from "./fea.js";
 
 /**
  * Applying a font's own substitutions to a run of glyphs, for previewing.
@@ -236,3 +236,60 @@ function applySingle(
   }
   return names.map((name) => map.get(name) ?? name);
 }
+
+/**
+ * The font's positioning rules, as a function over the glyphs being set.
+ *
+ * One entry per glyph, `null` where nothing applies. Built the way the table is:
+ * within a feature the first rule naming a glyph is the one that applies, and
+ * across features the adjustments add up — which is what separate lookups do.
+ */
+export type Positioner = (names: readonly string[]) => (ValueRecord | null)[];
+
+/** A positioner that moves nothing, for a font with no rules and for tests. */
+export const NO_POSITIONING: Positioner = (names) => names.map(() => null);
+
+export function positionerFor(
+  source: string,
+  tags: readonly string[] = DEFAULT_FEATURES,
+): Positioner {
+  return positionerForParsed(parseFea(source), tags);
+}
+
+export function positionerForParsed(
+  parsed: FeaSource,
+  tags: readonly string[] = DEFAULT_FEATURES,
+): Positioner {
+  const wanted = new Set(tags);
+  // Grouped by feature and kept that way, unlike the substitutions: two
+  // features adjusting the same glyph both apply, and two rules within one
+  // feature do not.
+  const byFeature = parsed.features
+    .filter((feature) => wanted.has(feature.tag))
+    .map((feature) => feature.rules.filter(isPosition))
+    .filter((rules) => rules.length > 0);
+
+  if (byFeature.length === 0) return NO_POSITIONING;
+
+  return (names) =>
+    names.map((name) => {
+      let total: ValueRecord | null = null;
+      for (const rules of byFeature) {
+        const hit = rules.find((rule) => rule.glyphs.includes(name));
+        if (hit === undefined) continue;
+        total =
+          total === null
+            ? hit.value
+            : {
+                x: total.x + hit.value.x,
+                y: total.y + hit.value.y,
+                xAdvance: total.xAdvance + hit.value.xAdvance,
+                yAdvance: total.yAdvance + hit.value.yAdvance,
+              };
+      }
+      return total;
+    });
+}
+
+const isPosition = (rule: FeaRule): rule is Extract<FeaRule, { kind: "position" }> =>
+  rule.kind === "position";

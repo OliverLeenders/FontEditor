@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1347 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1366 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -41,9 +41,9 @@ The gaps worth naming, in the order they would bite someone using this:
   ligatures, and both of those conditioned on their context, are applied to the Spacing
   line and the Proof in the order the file lists them. There is no mark attachment and no
   bidi — and the glyph strip under the canvas is deliberately left unshaped, since it is
-  there to show the letter you are drawing beside its neighbours. Positioning rules pass
-  through untouched: a run is a list of names, so what a `pos` rule does reaches the
-  exported font and not the preview.
+  there to show the letter you are drawing beside its neighbours. Positioning rules are
+  applied to both as well — a glyph moves where the rule says and the pen moves by the
+  advance the rule gave it.
 - **Overlap removal declines edges that lie along each other.** Two shapes sharing a
   whole edge have no crossing points to split at, so it refuses rather than guesses,
   which is the right failure for a shape a designer will really draw. A contour that

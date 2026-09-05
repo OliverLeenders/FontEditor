@@ -1,5 +1,5 @@
-import { NO_SHAPING, shaperFor } from "@fonteditor/font-io";
-import type { Shaper } from "@fonteditor/view";
+import { NO_POSITIONING, NO_SHAPING, positionerFor, shaperFor } from "@fonteditor/font-io";
+import type { Positioner, Shaper } from "@fonteditor/view";
 
 /**
  * The shaper the spacing line and the proof set with.
@@ -16,4 +16,18 @@ import type { Shaper } from "@fonteditor/view";
 export function shaperFrom(features: string, applyFeatures: boolean): Shaper {
   if (!applyFeatures || features.trim() === "") return NO_SHAPING;
   return shaperFor(features);
+}
+
+/**
+ * The positioning half, from the same source and under the same switch.
+ *
+ * Separate from the shaper because the two answer different questions — which
+ * glyphs, and where — and the line that sets them wants both. Turning features
+ * off turns this off with them: the button says what the font does, and a rule
+ * that moved a letter while its substitutions were switched off would be half a
+ * font.
+ */
+export function positionerFrom(features: string, applyFeatures: boolean): Positioner {
+  if (!applyFeatures || features.trim() === "") return NO_POSITIONING;
+  return positionerFor(features);
 }

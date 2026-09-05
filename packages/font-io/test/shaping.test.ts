@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_FEATURES, NO_SHAPING, featureTags, shaperFor } from "../src/shaping.js";
+import {
+  DEFAULT_FEATURES,
+  NO_POSITIONING,
+  NO_SHAPING,
+  featureTags,
+  positionerFor,
+  shaperFor,
+} from "../src/shaping.js";
 
 const LIGA = `
 feature liga {
@@ -211,5 +218,64 @@ describe("shaping a run in context", () => {
 
   it("leaves a run alone when the feature is not asked for", () => {
     expect(shaperFor(CALT, ["liga"])(["a", "b", "c"])).toEqual(["a", "b", "c"]);
+  });
+});
+
+const CPSP = `
+@caps = [a b];
+feature cpsp {
+  pos @caps <10 -5 20 0>;
+} cpsp;
+`;
+
+describe("positioning a run", () => {
+  it("gives an entry per glyph and null where nothing applies", () => {
+    expect(positionerFor(CPSP, ["cpsp"])(["a", "n"])).toEqual([
+      { x: 10, y: -5, xAdvance: 20, yAdvance: 0 },
+      null,
+    ]);
+  });
+
+  it("applies one value to every member of a class", () => {
+    const values = positionerFor(CPSP, ["cpsp"])(["a", "b"]);
+    expect(values[0]).toEqual(values[1]);
+  });
+
+  it("reads a bare number as an advance", () => {
+    expect(positionerFor("feature cpsp { pos a 20; } cpsp;", ["cpsp"])(["a"])).toEqual([
+      { x: 0, y: 0, xAdvance: 20, yAdvance: 0 },
+    ]);
+  });
+
+  it("takes the first rule of a feature and not the second", () => {
+    // One subtable holds one answer for a glyph, and the subtables are tried in
+    // the order they were written.
+    const source = "feature cpsp { pos a 20; pos a 40; } cpsp;";
+    expect(positionerFor(source, ["cpsp"])(["a"])[0]?.xAdvance).toBe(20);
+  });
+
+  it("adds up what two features each ask for", () => {
+    // Two lookups both apply, which is what makes them two lookups.
+    const source = `
+      feature cpsp { pos a 20; } cpsp;
+      feature test { pos a <5 0 5 0>; } test;
+    `;
+    expect(positionerFor(source, ["cpsp", "test"])(["a"])).toEqual([
+      { x: 5, y: 0, xAdvance: 25, yAdvance: 0 },
+    ]);
+  });
+
+  it("leaves out a feature that was not asked for", () => {
+    expect(positionerFor(CPSP, ["liga"])(["a"])).toEqual([null]);
+    // cpsp is not one a text renderer turns on by itself.
+    expect(positionerFor(CPSP)(["a"])).toEqual([null]);
+  });
+
+  it("moves nothing for a font with no positioning", () => {
+    expect(positionerFor("feature liga { sub f i by fi; } liga;")(["f", "i"])).toEqual([
+      null,
+      null,
+    ]);
+    expect(NO_POSITIONING(["a", "b"])).toEqual([null, null]);
   });
 });

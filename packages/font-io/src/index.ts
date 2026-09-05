@@ -49,11 +49,14 @@ export { parseFea } from "./fea.js";
 export type { CompiledFeatures } from "./features.js";
 export { NO_FEATURES, compileFeatures } from "./features.js";
 
-export type { Shaper } from "./shaping.js";
+export type { Positioner, Shaper } from "./shaping.js";
 export {
   DEFAULT_FEATURES,
+  NO_POSITIONING,
   NO_SHAPING,
   featureTags,
+  positionerFor,
+  positionerForParsed,
   shaperFor,
   shaperForParsed,
 } from "./shaping.js";

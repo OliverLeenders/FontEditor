@@ -14,7 +14,21 @@ import { traceContour } from "./draw.js";
  * a pile of fields the other ignores.
  */
 export type RunScene = {
-  readonly glyphs: readonly { readonly glyph: Glyph; readonly x: number }[];
+  /**
+   * What to draw and where.
+   *
+   * Only the fields this scene uses, so a caller can hand over a laid-out run or
+   * build one by hand. The last three are what a positioning rule changed, and
+   * are optional because a scene assembled without one has nothing to say about
+   * them: the advance is then the glyph's own and the offsets are none.
+   */
+  readonly glyphs: readonly {
+    readonly glyph: Glyph;
+    readonly x: number;
+    readonly advance?: number;
+    readonly dx?: number;
+    readonly dy?: number;
+  }[];
   readonly view: ViewTransform;
   readonly viewport: { readonly width: number; readonly height: number };
   readonly palette: RenderPalette;
@@ -85,7 +99,7 @@ export function drawSelectionBands(ctx: Canvas2D, s: RunScene): void {
     const placed = s.glyphs[index];
     if (placed === undefined) continue;
     const left = toScreen(s.view, { x: placed.x, y: 0 }).x;
-    const right = toScreen(s.view, { x: placed.x + placed.glyph.advance, y: 0 }).x;
+    const right = toScreen(s.view, { x: placed.x + advanceOf(placed), y: 0 }).x;
     ctx.beginPath();
     ctx.rect(left, top, right - left, bottom - top);
     ctx.fill();
@@ -108,7 +122,7 @@ export function drawRunMargins(ctx: Canvas2D, s: RunScene): void {
     const placed = s.glyphs[index];
     if (placed === undefined) continue;
     boundaries.add(Math.round(toScreen(s.view, { x: placed.x, y: 0 }).x));
-    boundaries.add(Math.round(toScreen(s.view, { x: placed.x + placed.glyph.advance, y: 0 }).x));
+    boundaries.add(Math.round(toScreen(s.view, { x: placed.x + advanceOf(placed), y: 0 }).x));
   }
 
   ctx.strokeStyle = s.palette.margin;
@@ -121,6 +135,10 @@ export function drawRunMargins(ctx: Canvas2D, s: RunScene): void {
   }
 }
 
+/** What the glyph took, which a positioning rule may have changed. */
+const advanceOf = (placed: RunScene["glyphs"][number]): number =>
+  placed.advance ?? placed.glyph.advance;
+
 export function drawGlyphs(ctx: Canvas2D, s: RunScene): void {
   ctx.fillStyle = s.palette.outline;
 
@@ -129,8 +147,14 @@ export function drawGlyphs(ctx: Canvas2D, s: RunScene): void {
     if (drawable.length === 0) continue;
 
     // Shift the view rather than the glyph: the outline is model data and has no
-    // business being copied and moved in order to be previewed.
-    const shifted: ViewTransform = { ...s.view, tx: s.view.tx + placed.x * s.view.scale };
+    // business being copied and moved in order to be previewed. A positioning
+    // rule moves the drawing and not the pen, so its offset goes here and
+    // nowhere else — screen y grows downward, which is why it is subtracted.
+    const shifted: ViewTransform = {
+      ...s.view,
+      tx: s.view.tx + (placed.x + (placed.dx ?? 0)) * s.view.scale,
+      ty: s.view.ty - (placed.dy ?? 0) * s.view.scale,
+    };
     ctx.beginPath();
     for (const c of drawable) traceContour(ctx, shifted, c);
     ctx.fill();

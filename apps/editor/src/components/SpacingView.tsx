@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { KernGroups } from "./KernGroups.js";
 import { palette } from "../scene.js";
-import { shaperFrom } from "../shaping.js";
+import { positionerFrom, shaperFrom } from "../shaping.js";
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -93,8 +93,15 @@ export function SpacingView({
     () => shaperFrom(document.features, applyFeatures),
     [document.features, applyFeatures],
   );
+  const position = useMemo(
+    () => positionerFrom(document.features, applyFeatures),
+    [document.features, applyFeatures],
+  );
   const hasFeatures = document.features.trim() !== "";
-  const run = useMemo(() => layoutRun(document, text, shape), [document, text, shape]);
+  const run = useMemo(
+    () => layoutRun(document, text, shape, position),
+    [document, text, shape, position],
+  );
 
   const selectedName = selected === null ? null : (run.glyphs[selected]?.name ?? null);
   const bands = useMemo(
@@ -114,7 +121,13 @@ export function SpacingView({
       const { info } = state.document;
 
       const scene: RunScene = {
-        glyphs: state.run.glyphs.map((p) => ({ glyph: p.glyph, x: p.x })),
+        glyphs: state.run.glyphs.map((p) => ({
+          glyph: p.glyph,
+          x: p.x,
+          advance: p.advance,
+          dx: p.dx,
+          dy: p.dy,
+        })),
         view: runView(state.run.width, state.size, info.unitsPerEm, viewport, state.panX),
         viewport,
         palette: palette(),
