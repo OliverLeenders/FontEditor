@@ -63,6 +63,31 @@
   font: inherit;
   font-size: 0.7rem;
 }
+
+/*
+ * Laid out rather than left to the text baseline.
+ *
+ * An svg is an inline element, so a button that simply contains one sits it on
+ * the baseline and leaves the room under it that a descender would have taken —
+ * which reads as an icon riding high in its own button. Making the button a
+ * grid or a flex line blockifies what is inside it, and then centring means
+ * what it says. The toolbar's buttons have always done this; these did not.
+ */
+.places button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.buttons button {
+  display: grid;
+  place-items: center;
+  /* No text to make a line box, so the height is stated rather than inherited
+     from one. Level with the fields beside them. */
+  padding: 0;
+  min-height: 1.45rem;
+}
 .places button:hover:not(:disabled),
 .buttons button:hover:not(:disabled) {
   color: var(--ink);
