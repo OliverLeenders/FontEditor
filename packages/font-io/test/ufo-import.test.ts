@@ -243,6 +243,84 @@ describe("a half-handled segment that closes a contour", () => {
   });
 });
 
+describe("the order the glyphs are in", () => {
+  const bytes = (entries: Array<{ path: string; text: string }>) =>
+    zip(entries).buffer as ArrayBuffer;
+
+  /** Three glyphs, listed in contents.plist in an order nobody chose. */
+  const parts = (lib: string | null) => {
+    const outline = (name: string) =>
+      `<glyph name="${name}" format="2"><advance width="500"/><outline><contour>` +
+      `<point x="0" y="0" type="line"/><point x="100" y="0" type="line"/>` +
+      `<point x="50" y="200" type="line"/></contour></outline></glyph>`;
+
+    const entries = [
+      { path: "x.ufo/metainfo.plist", text: "<plist><dict/></plist>" },
+      {
+        path: "x.ufo/glyphs/contents.plist",
+        text:
+          "<plist><dict>" +
+          "<key>a</key><string>a.glif</string>" +
+          "<key>b</key><string>b.glif</string>" +
+          "<key>c</key><string>c.glif</string>" +
+          "</dict></plist>",
+      },
+      { path: "x.ufo/glyphs/a.glif", text: outline("a") },
+      { path: "x.ufo/glyphs/b.glif", text: outline("b") },
+      { path: "x.ufo/glyphs/c.glif", text: outline("c") },
+    ];
+    if (lib !== null) entries.push({ path: "x.ufo/lib.plist", text: lib });
+    return bytes(entries);
+  };
+
+  const orderOf = (names: readonly string[]) =>
+    "<plist><dict><key>public.glyphOrder</key><array>" +
+    names.map((n) => `<string>${n}</string>`).join("") +
+    "</array></dict></plist>";
+
+  const orderIn = async (source: ArrayBuffer, seed: string): Promise<readonly string[]> => {
+    const out = await importUfo(source, counterIds(seed));
+    if ("reason" in out) throw new Error(out.reason);
+    return out.document.glyphOrder;
+  };
+
+  it("takes it from public.glyphOrder, not from contents.plist", async () => {
+    // Most tools write contents.plist alphabetically and keep the real order in
+    // the lib. Reading the wrong one silently reorders somebody's font.
+    expect(await orderIn(parts(orderOf(["c", "a", "b"])), "o1")).toEqual(["c", "a", "b"]);
+  });
+
+  it("falls back to the order they were listed in when there is no lib", async () => {
+    expect(await orderIn(parts(null), "o2")).toEqual(["a", "b", "c"]);
+  });
+
+  it("ignores names the lib mentions that are not here", async () => {
+    expect(await orderIn(parts(orderOf(["c", "ghost", "a", "b"])), "o3")).toEqual(["c", "a", "b"]);
+  });
+
+  it("puts glyphs the lib forgot after the ones it named", async () => {
+    // A lib that has drifted from the glyphs beside it costs the drift, not the
+    // whole order.
+    expect(await orderIn(parts(orderOf(["c"])), "o4")).toEqual(["c", "a", "b"]);
+  });
+
+  it("keeps the order through a round trip of our own", async () => {
+    const source = fontDocument(
+      [
+        glyph("zebra", { advance: 400 }),
+        glyph("apple", { advance: 400 }),
+        glyph("mango", { advance: 400 }),
+      ],
+      INFO,
+    );
+    expect(await orderIn(exportUfo(source).bytes.buffer as ArrayBuffer, "o5")).toEqual([
+      "zebra",
+      "apple",
+      "mango",
+    ]);
+  });
+});
+
 describe("refusing what is not a UFO", () => {
   const bytes = (entries: Array<{ path: string; text: string }>) =>
     zip(entries).buffer as ArrayBuffer;

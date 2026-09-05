@@ -15,7 +15,14 @@ import {
 } from "@fonteditor/font-model";
 
 import { parseGlif } from "./glif.js";
-import { isDict, parsePlistDict, plistNumber, plistString, stringEntries } from "./plist.js";
+import {
+  isDict,
+  parsePlistDict,
+  plistNumber,
+  plistString,
+  plistStrings,
+  stringEntries,
+} from "./plist.js";
 import { type ZipFile, fileText, unzip } from "./unzip.js";
 
 /**
@@ -107,6 +114,8 @@ export async function importUfo(
 
   if (glyphs.length === 0) return { reason: "the archive contains no readable glyphs" };
 
+  const ordered = inLibOrder(glyphs, at("lib.plist"));
+
   const kerning = readKerning(at("groups.plist"), at("kerning.plist"), warn);
   // Taken as it is, not parsed. What could not be compiled is still somebody's
   // source, and dropping the parts this editor does not understand would make
@@ -114,9 +123,39 @@ export async function importUfo(
   const features = at("features.fea") ?? "";
 
   return {
-    document: setFeatures(setKerning(fontDocument(glyphs, info), kerning), features),
+    document: setFeatures(setKerning(fontDocument(ordered, info), kerning), features),
     warnings,
   };
+}
+
+/**
+ * Put the glyphs in the order the font asks for.
+ *
+ * `contents.plist` is a dictionary and a dictionary has no order, so the order
+ * glyphs happen to be listed in is not the font's — most tools write it
+ * alphabetically. `public.glyphOrder` in `lib.plist` is where the order is
+ * actually kept.
+ *
+ * Names it lists that are not here are skipped, and glyphs it does not mention
+ * follow in the order they were read: a lib that has drifted from the glyphs
+ * beside it should cost the drift, not the whole order.
+ */
+function inLibOrder(glyphs: readonly Glyph[], lib: string | null): Glyph[] {
+  if (lib === null) return [...glyphs];
+
+  const wanted = plistStrings(parsePlistDict(lib), "public.glyphOrder");
+  if (wanted.length === 0) return [...glyphs];
+
+  const byName = new Map(glyphs.map((g) => [g.name, g]));
+  const out: Glyph[] = [];
+  for (const name of wanted) {
+    const g = byName.get(name);
+    if (g === undefined) continue;
+    byName.delete(name);
+    out.push(g);
+  }
+  for (const g of glyphs) if (byName.has(g.name)) out.push(g);
+  return out;
 }
 
 /**

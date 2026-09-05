@@ -341,6 +341,17 @@ export function ufoFiles(document: FontDocument): ZipEntry[] {
     text: plist(dict(contents.map(([name, file]) => [name, str(file)] as const))),
   });
 
+  // The order the glyphs are in. `contents.plist` is a dictionary, and a
+  // dictionary has no order the format promises to keep — so a reader that took
+  // its order from there would be reading ours by luck. `public.glyphOrder` is
+  // where the format actually writes it down, and where every other tool looks.
+  if (contents.length > 0) {
+    entries.push({
+      path: "lib.plist",
+      text: plist(dict([["public.glyphOrder", array(contents.map(([name]) => str(name)))]])),
+    });
+  }
+
   return entries;
 }
 

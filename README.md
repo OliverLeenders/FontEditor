@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                                  |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB; no positioning rules, no contextual |
 | 9     | Variable fonts                      | not started                                                           |
-| 10    | Production polish                   | lint, format and 1283 tests, run on CI; preferences persist           |
+| 10    | Production polish                   | lint, format and 1289 tests, run on CI; preferences persist           |
 
 ### What the table is hiding
 
@@ -41,8 +41,12 @@ The gaps worth naming, in the order they would bite someone using this:
   whole edge have no crossing points to split at, so it refuses rather than guesses,
   which is the right failure for a shape a designer will really draw. A contour that
   crosses itself is handled, including a single curve that loops.
-- **The UFO writer has never been read by anything but itself.** The importer round-trips
-  it, which proves consistency, not correctness.
+- **The UFO is checked against fontTools, but by hand rather than on CI.** A proof font
+  covering curves, components, composites, case-colliding names, groups, class kerning
+  and features is exported, read by `fontTools.ufoLib` with validation on, compiled by
+  `feaLib`, written back out by fontTools and imported again — clean in both directions.
+  Nothing runs that automatically, so it is a check that has passed rather than a check
+  that keeps passing.
 
 ## Getting started
 

@@ -165,6 +165,16 @@ describe("ufoFiles", () => {
     expect([...map.keys()].filter((p) => p.endsWith(".glif"))).toHaveLength(4);
   });
 
+  it("writes the glyph order down, since contents.plist has none", () => {
+    // A plist dictionary has no order the format promises to keep, so a reader
+    // taking its order from contents.plist would be reading ours by luck.
+    const lib = files().get("lib.plist")!;
+    expect(lib).toContain("<key>public.glyphOrder</key>");
+
+    const order = [...lib.matchAll(new RegExp("<string>([^<]*)</string>", "g"))].map((m) => m[1]);
+    expect(order).toEqual(["o", "A", "a", "space"]);
+  });
+
   it("declares format 3", () => {
     expect(files().get("metainfo.plist")).toContain("<integer>3</integer>");
   });
@@ -217,8 +227,8 @@ describe("exportUfo", () => {
   });
 
   it("counts what it wrote", () => {
-    // Four glyphs plus metainfo, fontinfo, layercontents and contents.
-    expect(exportUfo(sample()).files).toBe(8);
+    // Four glyphs plus metainfo, fontinfo, layercontents, contents and lib.
+    expect(exportUfo(sample()).files).toBe(9);
   });
 
   it("falls back where the font is unnamed", () => {
