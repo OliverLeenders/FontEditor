@@ -1,8 +1,9 @@
 /**
- * The toolbar icons.
+ * The icons: the toolbar's, and the transform panel's.
  *
- * Copied from Lucide (ISC licence, lucide-static v1.40.0) rather than depended
- * on: twelve drawings is not worth a package, and copying them means there is
+ * Copied from Lucide (ISC licence) rather than depended on: the toolbar set
+ * came from lucide-static v1.40.0 and the transform panel's from v1.41.0, and
+ * two dozen drawings is not worth a package, and copying them means there is
  * nothing to fetch at runtime, nothing to shift while a font loads, and no
  * difference between these and the ones we draw ourselves later. The editor is
  * a tool that should open offline.
@@ -163,5 +164,80 @@ export const FitIcon: IconComponent = () => (
     <path d="m3 21 6-6" />
     <path d="M3 8V3h5" />
     <path d="M9 9 3 3" />
+  </Glyph>
+);
+
+/**
+ * The transform panel's own.
+ *
+ * `Baseline` is the one drawn for exactly our meaning rather than borrowed
+ * toward it: an A sitting on a line is a letterform on its baseline. `Slant` is
+ * Lucide's *italic*, because an italic is a slant and in a font editor that
+ * reads with no decoding step. There is nothing that shears the other way, so
+ * the panel's Lean keeps its words.
+ */
+export const FlipHorizontalIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M8 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h3" />
+    <path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" />
+    <path d="M12 20v2" />
+    <path d="M12 14v2" />
+    <path d="M12 8v2" />
+    <path d="M12 2v2" />
+  </Glyph>
+);
+
+export const FlipVerticalIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M21 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v3" />
+    <path d="M21 16v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3" />
+    <path d="M4 12H2" />
+    <path d="M10 12H8" />
+    <path d="M16 12h-2" />
+    <path d="M22 12h-2" />
+  </Glyph>
+);
+
+/** A turn anticlockwise: nearly a whole circle, so the direction reads small. */
+export const RotateLeftIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" />
+  </Glyph>
+);
+
+export const RotateRightIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+  </Glyph>
+);
+
+/** Baseline: an A standing on its line. */
+export const BaselineIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M4 20h16" />
+    <path d="m6 16 6-12 6 12" />
+    <path d="M8 12h8" />
+  </Glyph>
+);
+
+/** The glyph's origin: a point, with the cross-hairs that say which point. */
+export const OriginIcon: IconComponent = () => (
+  <Glyph>
+    <circle cx="12" cy="12" r="10" />
+    <line x1="22" x2="18" y1="12" y2="12" />
+    <line x1="6" x2="2" y1="12" y2="12" />
+    <line x1="12" x2="12" y1="6" y2="2" />
+    <line x1="12" x2="12" y1="22" y2="18" />
+  </Glyph>
+);
+
+/** Slant: Lucide's italic, which is a slant drawn as the thing it makes. */
+export const SlantIcon: IconComponent = () => (
+  <Glyph>
+    <line x1="19" x2="10" y1="4" y2="4" />
+    <line x1="14" x2="5" y1="20" y2="20" />
+    <line x1="15" x2="9" y1="4" y2="20" />
   </Glyph>
 );

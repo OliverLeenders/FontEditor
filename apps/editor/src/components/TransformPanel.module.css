@@ -92,11 +92,33 @@
 }
 
 .small {
+  display: flex;
+  align-items: center;
+  gap: 0.22rem;
   font-family: var(--font-mono);
   font-size: 0.58rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
+}
+
+/* A drawing standing in front of a label, at about the label's own size. */
+.mark {
+  display: inline-flex;
+  flex: none;
+}
+.mark svg {
+  width: 0.72rem;
+  height: 0.72rem;
+}
+
+/* The icons in the buttons. Sized in rem beside the text they stand with, so
+   they follow the panel rather than a pixel count that would drift from it. */
+.places button svg,
+.buttons button svg {
+  width: 0.78rem;
+  height: 0.78rem;
+  flex: none;
 }
 
 .input {

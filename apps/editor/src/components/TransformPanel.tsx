@@ -4,6 +4,15 @@ import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./TransformPanel.module.css";
+import {
+  BaselineIcon,
+  FlipHorizontalIcon,
+  FlipVerticalIcon,
+  OriginIcon,
+  RotateLeftIcon,
+  RotateRightIcon,
+  SlantIcon,
+} from "./icons.js";
 
 /**
  * Move, scale, turn and lean the selected points, by typing a number.
@@ -74,6 +83,8 @@ export function TransformPanel(): React.JSX.Element {
         </div>
 
         <div className={styles.places}>
+          {/* Icon and word both: these two are places rather than actions, and
+              a place wants naming. */}
           <button
             type="button"
             aria-pressed={origin.kind === "origin"}
@@ -81,6 +92,7 @@ export function TransformPanel(): React.JSX.Element {
             title="The glyph's own origin, which is what slanting an italic turns about"
             onClick={() => setOrigin({ kind: "origin" })}
           >
+            <OriginIcon />
             Origin
           </button>
           <button
@@ -90,6 +102,7 @@ export function TransformPanel(): React.JSX.Element {
             title="The baseline under the middle of the selection"
             onClick={() => setOrigin({ kind: "baseline" })}
           >
+            <BaselineIcon />
             Baseline
           </button>
         </div>
@@ -146,6 +159,10 @@ export function TransformPanel(): React.JSX.Element {
           neutral={0}
           disabled={idle}
           title="Leans the verticals, which is what an italic is"
+          // The one field that gets a drawing, because an italic is a slant and
+          // the icon says so faster than the word. The unit stays in the label:
+          // no drawing can carry a degree sign.
+          icon={<SlantIcon />}
           onApply={(v) => apply(skewing(v * DEGREES, 0), "Slant")}
         />
         <Action
@@ -157,28 +174,46 @@ export function TransformPanel(): React.JSX.Element {
         />
       </div>
 
+      {/* Drawings rather than words: four of them across a panel this narrow
+          leaves no room for a label, and the arrows they replace were the one
+          thing in the editor not drawn in the toolbar's own hand. Each says what
+          it does in its tooltip and to a screen reader. */}
       <div className={styles.buttons}>
-        <button type="button" disabled={idle} onClick={() => apply(scaling(-1, 1), "Flip")}>
-          Flip ↔
+        <button
+          type="button"
+          disabled={idle}
+          aria-label="Flip horizontally"
+          title="Flip horizontally"
+          onClick={() => apply(scaling(-1, 1), "Flip")}
+        >
+          <FlipHorizontalIcon />
         </button>
-        <button type="button" disabled={idle} onClick={() => apply(scaling(1, -1), "Flip")}>
-          Flip ↕
+        <button
+          type="button"
+          disabled={idle}
+          aria-label="Flip vertically"
+          title="Flip vertically"
+          onClick={() => apply(scaling(1, -1), "Flip")}
+        >
+          <FlipVerticalIcon />
         </button>
         <button
           type="button"
           disabled={idle}
           aria-label="Turn a quarter anticlockwise"
+          title="Turn a quarter anticlockwise"
           onClick={() => apply(rotation(90 * DEGREES), "Rotate")}
         >
-          ↺ 90°
+          <RotateLeftIcon />
         </button>
         <button
           type="button"
           disabled={idle}
           aria-label="Turn a quarter clockwise"
+          title="Turn a quarter clockwise"
           onClick={() => apply(rotation(-90 * DEGREES), "Rotate")}
         >
-          ↻ 90°
+          <RotateRightIcon />
         </button>
       </div>
     </div>
@@ -196,6 +231,7 @@ function Action({
   neutral,
   disabled,
   title,
+  icon,
   onApply,
 }: {
   readonly label: string;
@@ -203,6 +239,8 @@ function Action({
   readonly neutral: number;
   readonly disabled: boolean;
   readonly title?: string;
+  /** Shown before the label, where one says more than the words do. */
+  readonly icon?: React.ReactNode;
   readonly onApply: (value: number) => void;
 }): React.JSX.Element {
   const [draft, setDraft] = useState(String(neutral));
@@ -215,7 +253,10 @@ function Action({
 
   return (
     <label className={styles.field}>
-      <span className={styles.small}>{label}</span>
+      <span className={styles.small}>
+        {icon === undefined ? null : <span className={styles.mark}>{icon}</span>}
+        {label}
+      </span>
       <input
         className={styles.input}
         type="number"
