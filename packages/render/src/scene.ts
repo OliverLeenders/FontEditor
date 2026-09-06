@@ -211,6 +211,24 @@ export type Scene = {
    * here: the drawing and the status bar have to be showing one measurement, and
    * the surest way is for there to be only one.
    */
+  /**
+   * The ruler laid across the glyph, and what it passes through.
+   *
+   * Spans rather than a line: what makes this worth drawing is the numbers, and
+   * which stretches are ink is a question about the outline that the renderer
+   * has no business asking twice.
+   */
+  readonly section: {
+    readonly from: Vec2;
+    readonly to: Vec2;
+    readonly crossings: readonly Vec2[];
+    readonly spans: readonly {
+      readonly from: Vec2;
+      readonly to: Vec2;
+      readonly distance: number;
+      readonly ink: boolean;
+    }[];
+  } | null;
   readonly measurement: {
     readonly from: Vec2;
     readonly to: Vec2;
@@ -235,6 +253,7 @@ export type SceneInit = {
   readonly options?: Partial<RenderOptions>;
   readonly guides?: readonly HorizontalGuide[];
   readonly snapGuides?: readonly SnapGuide[];
+  readonly section?: Scene["section"];
   readonly hoveredAnchor?: AnchorId | null;
   readonly selectedAnchor?: AnchorId | null;
   readonly selectedComponentOutlines?: readonly Contour[];
@@ -261,6 +280,7 @@ export function scene(init: SceneInit): Scene {
     options: { ...DEFAULT_OPTIONS, ...init.options },
     guides: init.guides ?? [],
     snapGuides: init.snapGuides ?? [],
+    section: init.section ?? null,
     hoveredAnchor: init.hoveredAnchor ?? null,
     selectedAnchor: init.selectedAnchor ?? null,
     selectedComponentOutlines: init.selectedComponentOutlines ?? [],

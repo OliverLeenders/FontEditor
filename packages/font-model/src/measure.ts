@@ -2,6 +2,7 @@ import { type Vec2, project, tangent } from "@fonteditor/geometry";
 
 import { segmentAt, segmentCubic } from "./contour.js";
 import { strokeCrossings } from "./crossings.js";
+import { insideGlyph } from "./direction.js";
 import { type Glyph, glyphBounds } from "./glyph.js";
 import type { ContourId } from "./ids.js";
 
@@ -102,4 +103,59 @@ export function measureNormal(
 /** The measurement's angle in degrees, measured from the horizontal. */
 export function measureAngle(m: Measurement): number {
   return (Math.atan2(m.normal.y, m.normal.x) * 180) / Math.PI;
+}
+
+/**
+ * One stretch of a section line between two crossings of the outline.
+ *
+ * `ink` says whether that stretch is inside the letter. Both kinds are worth
+ * reading — the stretches of ink are stems and bars, the ones between them are
+ * counters and the gaps that hold a letter together — so both are measured and
+ * the caller decides how loudly to say each.
+ */
+export type SectionSpan = {
+  readonly from: Vec2;
+  readonly to: Vec2;
+  readonly distance: number;
+  readonly ink: boolean;
+};
+
+export type Section = {
+  readonly from: Vec2;
+  readonly to: Vec2;
+  /** Where the line meets the outline, in the order it meets them. */
+  readonly crossings: readonly Vec2[];
+  readonly spans: readonly SectionSpan[];
+};
+
+/**
+ * Cut a line across the glyph and measure what it passes through.
+ *
+ * The complement of {@link measureNormal}, which answers "how thick is this
+ * stem" for one stem square to the outline. This answers the other question a
+ * ruler is for: laid across a whole letter, what are all the widths in a row —
+ * stem, counter, stem — which is how the rhythm of an `n` or the fit of an `o`
+ * is actually judged.
+ *
+ * Whether a stretch is ink is asked of its midpoint rather than counted off by
+ * parity from one end, so a line that starts inside the letter is read
+ * correctly and a line that grazes a corner does not flip everything after it.
+ */
+export function sectionAcross(g: Glyph, from: Vec2, to: Vec2): Section {
+  const crossings = strokeCrossings(g, from, to).map((crossing) => crossing.point);
+
+  const spans: SectionSpan[] = [];
+  for (let i = 0; i + 1 < crossings.length; i++) {
+    const a = crossings[i]!;
+    const b = crossings[i + 1]!;
+    const middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    spans.push({
+      from: a,
+      to: b,
+      distance: Math.hypot(b.x - a.x, b.y - a.y),
+      ink: insideGlyph(g, middle),
+    });
+  }
+
+  return { from, to, crossings, spans };
 }

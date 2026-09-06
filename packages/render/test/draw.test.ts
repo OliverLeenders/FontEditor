@@ -663,3 +663,60 @@ describe("anchors", () => {
     expect(ctx.texts()).not.toContain("top");
   });
 });
+
+describe("a tangent node's triangle", () => {
+  /** A corner, a tangent whose handle points somewhere, and a corner after it. */
+  const withTangent = (handle: { x: number; y: number }) => {
+    const ids = counterIds("tan");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0)),
+        node(ids.node(), vec(100, 0), { type: "tangent", out: handle }),
+        node(ids.node(), vec(200, 200), { type: "corner", in: vec(150, 100) }),
+      ],
+      false,
+    );
+    return { ...base(c), glyph: addContour(glyph("t", { advance: 300 }), c) };
+  };
+
+  /**
+   * The three corners of the triangle drawn at the tangent node.
+   *
+   * Found as the closed run of three — a moveTo, two lineTo and a closePath —
+   * rather than by proximity: the handle line starts at the same point, so
+   * "near the node" alone would pick up half of it.
+   */
+  const triangle = (ctx: ReturnType<typeof render>) => {
+    const at = toScreen(VIEW, vec(100, 0));
+    const ops = ctx.ops;
+
+    for (let i = 0; i + 3 < ops.length; i++) {
+      const run = ops.slice(i, i + 4);
+      const shape = run.map((o) => o.op).join(" ");
+      if (shape !== "moveTo lineTo lineTo closePath") continue;
+
+      const corners = run.slice(0, 3).map((o) => ({ x: o.args[0]!, y: o.args[1]! }));
+      if (corners.every((c) => Math.hypot(c.x - at.x, c.y - at.y) < 12)) return corners;
+    }
+    return [];
+  };
+
+  it("points along the handle, not at the sky", () => {
+    const at = toScreen(VIEW, vec(100, 0));
+
+    // Handle to the right: the apex is the corner furthest to the right, and
+    // the other two sit level with each other on the left.
+    const east = triangle(render(withTangent(vec(160, 0))));
+    expect(east).toHaveLength(3);
+    const apexEast = east.reduce((best, p) => (p.x > best.x ? p : best));
+    expect(apexEast.x).toBeGreaterThan(at.x);
+    expect(Math.abs(apexEast.y - at.y)).toBeLessThan(0.001);
+
+    // Handle upward in design space is upward on screen, which is a smaller y.
+    const north = triangle(render(withTangent(vec(100, 60))));
+    const apexNorth = north.reduce((best, p) => (p.y < best.y ? p : best));
+    expect(apexNorth.y).toBeLessThan(at.y);
+    expect(Math.abs(apexNorth.x - at.x)).toBeLessThan(0.001);
+  });
+});

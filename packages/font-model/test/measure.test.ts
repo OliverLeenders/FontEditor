@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { reverseContour } from "../src/contour.js";
-import { glyph } from "../src/glyph.js";
+import { contour, reverseContour } from "../src/contour.js";
+import { addContour, glyph } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
-import { measureAngle, measureNormal } from "../src/measure.js";
+import { measureAngle, measureNormal, sectionAcross } from "../src/measure.js";
+import { node } from "../src/node.js";
 import { ellipseContour, rectContour } from "../src/shapes.js";
 
 const ids = counterIds("m");
 const at = (x: number, y: number) => ({ x, y });
+const vec = at;
 
 /** An upright stem 80 wide and 700 tall, starting at x = 100. */
 const stem = () =>
@@ -122,5 +124,58 @@ describe("what a measurement refuses", () => {
   it("says nothing about an empty glyph", () => {
     const empty = glyph("space", { advance: 250 });
     expect(measureNormal(empty, "x", 0, at(0, 0))).toBeNull();
+  });
+});
+
+describe("a section across the glyph", () => {
+  /** Two upright bars 100 wide, 100 apart: stem, counter, stem. */
+  function bars() {
+    const ids = counterIds("sec");
+    const bar = (left: number) =>
+      contour(
+        ids.contour(),
+        [
+          node(ids.node(), vec(left, 0)),
+          node(ids.node(), vec(left + 100, 0)),
+          node(ids.node(), vec(left + 100, 700)),
+          node(ids.node(), vec(left, 700)),
+        ],
+        true,
+      );
+    return addContour(addContour(glyph("n", { advance: 400 }), bar(0)), bar(200));
+  }
+
+  it("reads the widths in the order the line meets them", () => {
+    const out = sectionAcross(bars(), vec(-50, 350), vec(350, 350));
+
+    expect(out.crossings.map((c) => c.x)).toEqual([0, 100, 200, 300]);
+    expect(out.spans.map((s) => [s.distance, s.ink])).toEqual([
+      [100, true],
+      [100, false],
+      [100, true],
+    ]);
+  });
+
+  it("knows ink from counter wherever the line starts", () => {
+    // Starting inside the first bar: the parity of the crossings is the other
+    // way round, and asking the midpoint rather than counting gets it right.
+    const out = sectionAcross(bars(), vec(50, 350), vec(350, 350));
+    expect(out.spans.map((s) => [s.distance, s.ink])).toEqual([
+      [100, false],
+      [100, true],
+    ]);
+  });
+
+  it("reads a diagonal cut as the distance along it", () => {
+    const out = sectionAcross(bars(), vec(-50, 0), vec(350, 400));
+    // Every crossing is on the line, and the first span is the diagonal through
+    // the first bar rather than its horizontal width.
+    expect(out.spans[0]!.distance).toBeCloseTo(Math.hypot(100, 100), 6);
+  });
+
+  it("has nothing to say about a line that misses the letter", () => {
+    const out = sectionAcross(bars(), vec(-50, 900), vec(350, 900));
+    expect(out.crossings).toEqual([]);
+    expect(out.spans).toEqual([]);
   });
 });

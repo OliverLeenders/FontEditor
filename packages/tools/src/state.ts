@@ -12,7 +12,7 @@ import {
   updateGlyph,
 } from "@fonteditor/font-model";
 
-export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure";
+export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure" | "section";
 import {
   type BoxFrame,
   type BoxHandle,
@@ -217,6 +217,30 @@ export type EditorState = {
    * second answer that could disagree with the first.
    */
   readonly measure: Measurement | null;
+  /**
+   * The ruler laid across the glyph, if one is.
+   *
+   * The line only: what it crosses and how wide each stretch is are derived from
+   * it and the outline, and a copy kept here could disagree with the drawing the
+   * moment a point moved.
+   *
+   * `drawing` is true between pointer-down and pointer-up. A ruler that kept
+   * following the cursor afterwards could never be read, since reading it means
+   * moving the pointer to the numbers.
+   */
+  readonly section: {
+    readonly from: Vec2;
+    readonly to: Vec2;
+    readonly drawing: boolean;
+  } | null;
+  /**
+   * The tool to go back to when a held tool key is let go.
+   *
+   * Measuring is a thing you do *while* drawing, not instead of it — so holding
+   * its key borrows the tool and releasing it hands the drawing tool back. Null
+   * whenever the current tool was chosen rather than borrowed.
+   */
+  readonly heldFrom: ToolId | null;
   readonly view: ViewTransform;
   readonly selection: Selection;
   /**
@@ -285,6 +309,8 @@ export function editorState(init: EditorStateInit): EditorState {
     shape: null,
     knife: null,
     measure: null,
+    section: null,
+    heldFrom: null,
     view: init.view,
     selection: init.selection ?? [],
     selectedAnchor: null,

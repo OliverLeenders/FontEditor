@@ -155,6 +155,8 @@ export {
   pointerMove,
   pointerUp,
   select,
+  keyHold,
+  keyUp,
   setActiveTool,
 } from "./dispatch.js";
 
@@ -165,3 +167,4 @@ export type { KnifeOptions } from "./knife.js";
 export { knifeStroke } from "./knife.js";
 
 export { shownMeasurement } from "./measure.js";
+export { shownSection } from "./section.js";

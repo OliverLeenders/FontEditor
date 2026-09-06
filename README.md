@@ -130,7 +130,9 @@ pnpm dev
 
 Use PgUp and PgDn to move between glyphs. The toolbar is icons; every one names its
 shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
-`M` measure. With the pen, click for a corner point and drag for a smooth one, Alt while
+`L` ruler. Measuring one stem is **held** rather than switched to: `M` borrows the tool
+for as long as the key is down and gives the drawing tool back when it is let go, because
+measuring is something you do while drawing rather than instead of it. With the pen, click for a corner point and drag for a smooth one, Alt while
 dragging to leave only one handle, click the first point to close, Enter or Escape to
 finish open, Backspace to take a point back.
 
@@ -176,6 +178,14 @@ in the inspector and lands on its anchors where both glyphs have a matching pair
 `acute` carrying `_top` on a letter carrying `top` — and at the origin otherwise. Drag one
 by the shape it draws, type its offset, right-click it to open the glyph it refers to,
 put it back where the anchors say, or decompose the glyph and keep the outlines.
+
+**Two rulers.** Hold `M` and point at a stem: the reading is taken square to the outline,
+which is what a stem width is — a straight line dragged across a round letter measures a
+chord instead, and answers a different question. Click to pin the reading, let the key go
+to carry on drawing. `L` is the other kind: drag a line across the whole letter and every
+width along it is measured in a row — stem, counter, stem — with the stretches of ink
+told apart from the gaps between them. Shift holds the line to an eighth-turn, Escape
+takes it away, and it stays where it was put while you work under it.
 
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,
 reverse contour and delete. A handle offers the axis lock, its node's type, retract,

@@ -28,6 +28,7 @@ import {
   shownMeasurement,
   penPreview,
   shapePreview,
+  shownSection,
   snapHold,
   tunniSegments,
 } from "@fonteditor/tools";
@@ -208,6 +209,7 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
     shapePreview: shapePreview(editor, outlineIds),
     knifeStroke: knifeStroke(editor),
     measurement: measurementFor(state),
+    section: sectionFor(state),
     neighbours: state.showNeighbours
       ? neighboursFor(editor.document, editor.currentGlyph, state.stripText)
       : [],
@@ -243,6 +245,19 @@ function snapGuidesFor(editor: EditorState): SnapGuide[] {
   if (hold.x !== null) guides.push({ axis: "x", at: hold.x.at, from: hold.x.from });
   if (hold.y !== null) guides.push({ axis: "y", at: hold.y.at, from: hold.y.from });
   return guides;
+}
+
+/**
+ * The ruler to draw, if the section tool is the one in hand.
+ *
+ * Only then, for the reason the measurement is only drawn under the measure
+ * tool: a line left on the canvas by a tool you have put down is a reading about
+ * a shape you may since have changed.
+ */
+function sectionFor(state: StoreState): Scene["section"] {
+  const editor = state.session.editor;
+  if (editor.activeTool !== "section") return null;
+  return shownSection(editor);
 }
 
 /**

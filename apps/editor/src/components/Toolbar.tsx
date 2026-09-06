@@ -54,11 +54,15 @@ const TOOLS: readonly ToolButton[] = [
     hint: "Draw an ellipse  (E) · shift for a circle, alt from the centre",
     icon: EllipseIcon,
   },
+  // The ruler that stays. Measuring one stem is held rather than switched to —
+  // `M` borrows the tool and gives it back — because it is something you do
+  // while drawing; a line laid across the letter is something you then work
+  // under, so it has a switch of its own.
   {
-    id: "measure",
-    key: "M",
-    label: "Measure",
-    hint: "Measure across a stem  (M) · click to pin",
+    id: "section",
+    key: "L",
+    label: "Ruler",
+    hint: "Lay a ruler across the glyph  (L) · shift holds the angle · hold M to measure one stem",
     icon: MeasureIcon,
   },
 ];

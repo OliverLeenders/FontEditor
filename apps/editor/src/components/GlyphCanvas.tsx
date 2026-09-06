@@ -5,6 +5,7 @@ import {
   doubleClick,
   pickTarget,
   keyDown,
+  keyUp,
   pointerDown,
   pointerLeave,
   pointerMove,
@@ -342,6 +343,20 @@ export function GlyphCanvas({
         }
 
         onContextMenu({ x: event.clientX, y: event.clientY, target, point });
+      }}
+      onKeyUp={(event) => {
+        // Held tool keys are given back here — see `keyHold` in the tools.
+        store.applyTool(
+          keyUp(store.editor, {
+            key: event.key,
+            modifiers: {
+              shift: event.shiftKey,
+              alt: event.altKey,
+              ctrl: event.ctrlKey,
+              meta: event.metaKey,
+            },
+          }),
+        );
       }}
       onKeyDown={(event) => {
         // Tool keys and Escape belong to the tools; the application's own

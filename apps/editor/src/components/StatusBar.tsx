@@ -75,7 +75,7 @@ export function StatusBar({ workspace }: { workspace: "glyph" | "font" }): React
       {recovered ? <span className={styles.warn}>recovered unsaved work</span> : null}
       <span className={styles.hints}>
         {editing
-          ? "drag the Tunni point · double-click it to balance · space previews · ctrl-0 fits"
+          ? "hold M to measure a stem · L lays a ruler across · space previews · ctrl-0 fits"
           : "double-click a glyph to edit it · arrow keys move · enter opens · delete removes"}
       </span>
     </div>

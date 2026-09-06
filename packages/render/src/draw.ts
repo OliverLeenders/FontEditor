@@ -70,6 +70,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawShapePreview(ctx, s);
     drawKnifeStroke(ctx, s);
     drawMeasurement(ctx, s);
+    drawSection(ctx, s);
     drawTransformBox(ctx, s);
     drawMarquee(ctx, s);
   }
@@ -527,7 +528,7 @@ export function drawNodes(ctx: Canvas2D, s: Scene): void {
       const p = toScreen(s.view, n.pt);
       const isChosen = chosen.has(selectionKey({ contourId: c.id, nodeId: n.id, part: "point" }));
       const colour = isChosen ? s.palette.nodeSelected : s.palette.node;
-      traceNodeShape(ctx, n, p, s.metrics.nodeRadius);
+      traceNodeShape(ctx, n, p, s.metrics.nodeRadius, tangentAngle(n, s.view));
       ctx.strokeStyle = s.palette.halo;
       ctx.lineWidth = s.metrics.haloWidth;
       ctx.stroke();
@@ -537,20 +538,55 @@ export function drawNodes(ctx: Canvas2D, s: Scene): void {
   }
 }
 
-function traceNodeShape(ctx: Canvas2D, n: Node, p: Vec2, r: number): void {
+function traceNodeShape(ctx: Canvas2D, n: Node, p: Vec2, r: number, angle: number): void {
   ctx.beginPath();
   if (n.type === "corner") {
     ctx.rect(p.x - r, p.y - r, r * 2, r * 2);
     return;
   }
   if (n.type === "tangent") {
-    ctx.moveTo(p.x, p.y - r * 1.25);
-    ctx.lineTo(p.x + r * 1.1, p.y + r * 0.9);
-    ctx.lineTo(p.x - r * 1.1, p.y + r * 0.9);
+    // Turned to point along the tangent, which is the one thing the shape has
+    // to say: a tangent node is where the curve leaves along the straight side,
+    // and a triangle that always pointed up said nothing about which way.
+    const forward = { x: Math.cos(angle), y: Math.sin(angle) };
+    const across = { x: -forward.y, y: forward.x };
+    const tip = { x: p.x + forward.x * r * 1.25, y: p.y + forward.y * r * 1.25 };
+    const back = { x: p.x - forward.x * r * 0.9, y: p.y - forward.y * r * 0.9 };
+
+    ctx.moveTo(tip.x, tip.y);
+    ctx.lineTo(back.x + across.x * r * 1.1, back.y + across.y * r * 1.1);
+    ctx.lineTo(back.x - across.x * r * 1.1, back.y - across.y * r * 1.1);
     ctx.closePath();
     return;
   }
   ctx.arc(p.x, p.y, r, 0, TAU);
+}
+
+/**
+ * Which way a tangent node's triangle points, in screen coordinates.
+ *
+ * Along the handle: a tangent node has exactly one, it lies on the straight
+ * segment's line by definition, and it points the way the curve goes — so the
+ * triangle points into the curve and its base sits against the straight side.
+ *
+ * Screen coordinates, which is why this is not simply the design-space
+ * direction: y grows downward there and upward here, so a tangent pointing at
+ * the sky would otherwise be drawn pointing at the floor.
+ *
+ * Zero for anything else, and for a tangent node whose handle has been retracted
+ * onto it — there is no direction to be had, and up is as good as anything.
+ */
+function tangentAngle(n: Node, view: ViewTransform): number {
+  if (n.type !== "tangent") return 0;
+
+  const handle = n.out ?? n.in;
+  if (handle === null) return 0;
+
+  const from = toScreen(view, n.pt);
+  const to = toScreen(view, handle);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return dx === 0 && dy === 0 ? 0 : Math.atan2(dy, dx);
 }
 
 function haloedDisc(ctx: Canvas2D, s: Scene, p: Vec2, r: number, colour: string): void {
@@ -927,6 +963,70 @@ export function drawAnchors(ctx: Canvas2D, s: Scene): void {
     ctx.strokeText(a.name, p.x + arm + 4, p.y);
     ctx.fillStyle = chosen ? s.palette.anchorSelected : s.palette.anchor;
     ctx.fillText(a.name, p.x + arm + 4, p.y);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * The section ruler: the line, where it crosses the outline, and every width
+ * along it.
+ *
+ * The line itself is faint and the numbers are not, because the line is only
+ * where the question was asked. Each stretch is labelled at its middle, with the
+ * ink ones in the live colour: an `n` cut across the waist reads stem, counter,
+ * stem, which is the rhythm the letter is judged by.
+ */
+export function drawSection(ctx: Canvas2D, s: Scene): void {
+  const line = s.section;
+  if (line === null) return;
+
+  const from = toScreen(s.view, line.from);
+  const to = toScreen(s.view, line.to);
+
+  ctx.save();
+  ctx.strokeStyle = s.palette.section;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // A tick at every crossing, square to the line: the numbers are between them,
+  // and a number is only as trustworthy as the two ends it was taken from.
+  const along = Math.hypot(to.x - from.x, to.y - from.y);
+  const across =
+    along === 0 ? { x: 0, y: 0 } : { x: -(to.y - from.y) / along, y: (to.x - from.x) / along };
+
+  ctx.beginPath();
+  for (const crossing of line.crossings) {
+    const p = toScreen(s.view, crossing);
+    ctx.moveTo(p.x - across.x * 5, p.y - across.y * 5);
+    ctx.lineTo(p.x + across.x * 5, p.y + across.y * 5);
+  }
+  ctx.stroke();
+
+  ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  for (const span of line.spans) {
+    const a = toScreen(s.view, span.from);
+    const b = toScreen(s.view, span.to);
+    // Skipped where there is no room for the number rather than drawn on top of
+    // the ticks either side of it, which is what a run of hairline gaps would do.
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 26) continue;
+
+    const middle = { x: (a.x + b.x) / 2 + across.x * 11, y: (a.y + b.y) / 2 + across.y * 11 };
+    const text = String(Math.round(span.distance));
+
+    ctx.strokeStyle = s.palette.halo;
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, middle.x, middle.y);
+    ctx.fillStyle = span.ink ? s.palette.sectionInk : s.palette.section;
+    ctx.fillText(text, middle.x, middle.y);
   }
 
   ctx.restore();

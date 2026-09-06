@@ -149,3 +149,48 @@ export function filledContours(g: Glyph): readonly Contour[] {
   filled.set(g, corrected);
   return corrected;
 }
+
+/**
+ * A glyph's filled outlines as flat polygons, worked out once.
+ *
+ * For asking whether a point is inside the letter, which is a question the
+ * measuring tools ask on every pointer move. Memoised on the glyph for the same
+ * reason {@link filledContours} is: the model is persistent, so an unchanged
+ * glyph is the same object and there is no invalidation to get wrong.
+ */
+const polygons = new WeakMap<Glyph, Vec2[][]>();
+
+export function glyphPolygons(g: Glyph): readonly (readonly Vec2[])[] {
+  const known = polygons.get(g);
+  if (known !== undefined) return known;
+
+  const built = filledContours(g)
+    .filter((c) => c.closed)
+    .map(polygon);
+  polygons.set(g, built);
+  return built;
+}
+
+/**
+ * Whether a point is inside the ink, by the non-zero winding rule.
+ *
+ * The directions are corrected first — through {@link filledContours} — so a
+ * counter drawn the same way round as the shape holding it still reads as a
+ * hole, which is what the compiled font will draw.
+ */
+export function insideGlyph(g: Glyph, p: Vec2): boolean {
+  let winding = 0;
+  for (const poly of glyphPolygons(g)) {
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]!;
+      const b = poly[(i + 1) % poly.length]!;
+      const side = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
+      if (a.y <= p.y) {
+        if (b.y > p.y && side > 0) winding += 1;
+      } else if (b.y <= p.y && side < 0) {
+        winding -= 1;
+      }
+    }
+  }
+  return winding !== 0;
+}

@@ -67,6 +67,16 @@ export type RenderPalette = {
   readonly anchorSelected: string;
   /** The component being worked on, so a drag says what it has hold of. */
   readonly componentSelected: string;
+  /**
+   * The section ruler's line, and the widths along it.
+   *
+   * Two colours, because the line reads as two kinds of measurement: the
+   * stretches inside the ink are stems and bars, and the ones between them are
+   * counters and gaps. Both are worth knowing and only one of them is usually
+   * being looked for.
+   */
+  readonly section: string;
+  readonly sectionInk: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -99,6 +109,8 @@ export const LIGHT_PALETTE: RenderPalette = {
   anchor: "#2E8B72",
   anchorSelected: "#A96F22",
   componentSelected: "#A96F22",
+  section: "#7C8896",
+  sectionInk: "#A96F22",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -131,4 +143,6 @@ export const DARK_PALETTE: RenderPalette = {
   anchor: "#5FBFA0",
   anchorSelected: "#D6A05A",
   componentSelected: "#D6A05A",
+  section: "#8B99A8",
+  sectionInk: "#D6A05A",
 };
