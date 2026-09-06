@@ -41,6 +41,7 @@ export type StoreState = {
   readonly catalogQuery: CatalogQuery;
   /** Draw the glyphs either side, from the strip text, for judging spacing. */
   readonly showNeighbours: boolean;
+  readonly showAnchors: boolean;
   /** Show handles only where the work is. On by default; the canvas is calmer. */
   readonly autoHideHandles: boolean;
   /**
@@ -104,6 +105,7 @@ export function initialState(preferences: Preferences): StoreState {
     stripText: "hello",
     catalogQuery: DEFAULT_QUERY,
     showNeighbours: preferences.showNeighbours,
+    showAnchors: preferences.showAnchors,
     autoHideHandles: preferences.autoHideHandles,
     snapPoints: preferences.snapPoints,
     applyFeatures: preferences.applyFeatures,

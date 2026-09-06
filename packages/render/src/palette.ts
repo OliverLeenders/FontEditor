@@ -57,6 +57,14 @@ export type RenderPalette = {
   readonly neighbour: string;
   /** Outlines a component contributes: present, but not yours to edit here. */
   readonly component: string;
+  /**
+   * The cross marking an anchor, and the name that appears beside it on hover.
+   *
+   * Its own colour rather than a node's: an anchor is not part of the outline,
+   * and anything that reads as a point invites being dragged into the shape.
+   */
+  readonly anchor: string;
+  readonly anchorSelected: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -86,6 +94,8 @@ export const LIGHT_PALETTE: RenderPalette = {
   snapGuide: "#A96F22",
   neighbour: "rgba(19,25,34,0.22)",
   component: "rgba(19,25,34,0.55)",
+  anchor: "#2E8B72",
+  anchorSelected: "#A96F22",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -115,4 +125,6 @@ export const DARK_PALETTE: RenderPalette = {
   snapGuide: "#D6A05A",
   neighbour: "rgba(229,235,242,0.20)",
   component: "rgba(229,235,242,0.55)",
+  anchor: "#5FBFA0",
+  anchorSelected: "#D6A05A",
 };

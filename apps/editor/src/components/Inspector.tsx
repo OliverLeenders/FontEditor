@@ -19,7 +19,10 @@ import {
   focusedSegmentStatus,
   holdSegmentTension,
   moveCoordinateTo,
+  moveAnchorToPoint,
+  removeAnchorAt,
   removeComponent,
+  renameAnchorTo,
   renameCurrentGlyph,
   renameRefusal,
   result,
@@ -95,6 +98,12 @@ export function Inspector(): React.JSX.Element | null {
   const tensionIn = useStoreValue((s) => focusedSegmentScales(s.session.editor)?.lambda1 ?? null);
   const tensionOut = useStoreValue((s) => focusedSegmentScales(s.session.editor)?.lambda2 ?? null);
   const curveStatus = useStoreValue((s) => focusedSegmentStatus(s.session.editor));
+
+  const anchors = useStoreValue(
+    (s) =>
+      s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.anchors ?? EMPTY_ANCHORS,
+  );
+  const selectedAnchor = useStoreValue((s) => s.session.editor.selectedAnchor);
 
   const components = useStoreValue(
     (s) =>
@@ -281,6 +290,26 @@ export function Inspector(): React.JSX.Element | null {
     if (pan.current === null) return;
     pan.current = null;
     store.applyTool(result(store.editor, [commit]));
+  };
+
+  /**
+   * Move one anchor to an exact coordinate.
+   *
+   * The other axis is read from the glyph at the moment of the commit rather
+   * than from the field beside it, as the point coordinates above are.
+   */
+  const commitAnchor = (id: string, axis: "x" | "y", value: number): void => {
+    if (!Number.isFinite(value)) return;
+    const glyph = store.editor.document.glyphs[store.editor.currentGlyph];
+    const found = glyph?.anchors.find((a) => a.id === id);
+    if (found === undefined) return;
+
+    store.applyTool(
+      moveAnchorToPoint(store.editor, id, {
+        x: axis === "x" ? value : found.pt.x,
+        y: axis === "y" ? value : found.pt.y,
+      }),
+    );
   };
 
   const applyPointType = (type: NodeType): void => {
@@ -495,6 +524,60 @@ export function Inspector(): React.JSX.Element | null {
                 ))}
               </datalist>
             </div>
+          </div>
+        </Field>
+
+        <div className={styles.rule} />
+
+        {/* Where accents attach. Added from the canvas — right-click where you
+            want one — because a place is chosen by pointing at it; what a panel
+            is for is the name and the exact numbers. */}
+        <Field label={anchors.length === 0 ? "Anchors" : `Anchors · ${anchors.length}`}>
+          <div className={styles.components}>
+            {anchors.length === 0 && (
+              <span className={styles.readonly}>Right-click the canvas to add one</span>
+            )}
+            {anchors.map((a) => (
+              <div
+                key={a.id}
+                className={styles.anchorRow}
+                data-selected={a.id === selectedAnchor ? "true" : undefined}
+              >
+                <input
+                  className={styles.input}
+                  value={a.name}
+                  aria-label={`Name of the anchor at ${String(Math.round(a.pt.x))}, ${String(Math.round(a.pt.y))}`}
+                  spellCheck={false}
+                  title="What this place is called; an accent's own anchor starts with an underscore"
+                  onChange={(event) =>
+                    store.applyTool(renameAnchorTo(store.editor, a.id, event.target.value))
+                  }
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label={`X of the anchor ${a.name}`}
+                  value={shown(a.pt.x)}
+                  onChange={(event) => commitAnchor(a.id, "x", Number(event.target.value))}
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label={`Y of the anchor ${a.name}`}
+                  value={shown(a.pt.y)}
+                  onChange={(event) => commitAnchor(a.id, "y", Number(event.target.value))}
+                />
+                <button
+                  type="button"
+                  className={styles.componentRemove}
+                  title={`Remove ${a.name === "" ? "this anchor" : a.name}`}
+                  aria-label={`Remove the anchor ${a.name}`}
+                  onClick={() => store.applyTool(removeAnchorAt(store.editor, a.id))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
         </Field>
 
@@ -789,6 +872,7 @@ function Field({
 /** New components need ids; the panel owns a factory, as the menu does. */
 const componentIds = randomIds();
 const EMPTY_COMPONENTS: readonly never[] = [];
+const EMPTY_ANCHORS: readonly never[] = [];
 const EMPTY_GLYPH = {
   name: "",
   unicodes: [],

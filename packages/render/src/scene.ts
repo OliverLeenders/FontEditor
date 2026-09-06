@@ -1,5 +1,5 @@
 import type { Cubic, Rect, Vec2 } from "@fonteditor/geometry";
-import type { Contour, Glyph } from "@fonteditor/font-model";
+import type { AnchorId, Contour, Glyph } from "@fonteditor/font-model";
 import type { BoxFrame, Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
 import type { RenderPalette } from "./palette.js";
@@ -85,12 +85,15 @@ export type RenderOptions = {
   readonly showControls: boolean;
   /** The dashed handle-extension lines meeting at `s`. A diagnostic, off by default. */
   readonly showHandleIntersection: boolean;
+  /** The anchors of the glyph being edited. */
+  readonly showAnchors: boolean;
 };
 
 export const DEFAULT_OPTIONS: RenderOptions = {
   showFilledPreview: true,
   showControls: true,
   showHandleIntersection: false,
+  showAnchors: true,
   margins: true,
   autoHideHandles: false,
 };
@@ -117,6 +120,15 @@ export type Scene = {
   readonly guides: readonly HorizontalGuide[];
   /** Lines the drag in progress is caught on. Empty when nothing is caught. */
   readonly snapGuides: readonly SnapGuide[];
+  /**
+   * The anchor the pointer is over, and the one being worked on.
+   *
+   * The name is written out only for the hovered one. A glyph carries two or
+   * three anchors and they sit where accents go — over the letter, under it —
+   * which is exactly where a permanent label would cover the drawing.
+   */
+  readonly hoveredAnchor: AnchorId | null;
+  readonly selectedAnchor: AnchorId | null;
   /**
    * Segments currently showing their Tunni controls — typically the one under
    * the cursor and the one being worked on, which are often but not always the
@@ -214,6 +226,8 @@ export type SceneInit = {
   readonly options?: Partial<RenderOptions>;
   readonly guides?: readonly HorizontalGuide[];
   readonly snapGuides?: readonly SnapGuide[];
+  readonly hoveredAnchor?: AnchorId | null;
+  readonly selectedAnchor?: AnchorId | null;
   readonly tunniSegments?: readonly SegmentRef[];
   readonly selection?: Selection;
   readonly marquee?: Rect | null;
@@ -237,6 +251,8 @@ export function scene(init: SceneInit): Scene {
     options: { ...DEFAULT_OPTIONS, ...init.options },
     guides: init.guides ?? [],
     snapGuides: init.snapGuides ?? [],
+    hoveredAnchor: init.hoveredAnchor ?? null,
+    selectedAnchor: init.selectedAnchor ?? null,
     tunniSegments: init.tunniSegments ?? [],
     selection: init.selection ?? [],
     marquee: init.marquee ?? null,

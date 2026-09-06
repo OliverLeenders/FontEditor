@@ -1,7 +1,9 @@
 import { vec } from "@fonteditor/geometry";
 import {
   type Contour,
+  addAnchor,
   addContour,
+  anchor,
   contour,
   counterIds,
   glyph,
@@ -243,5 +245,39 @@ describe("nodesInRect", () => {
     // handles are not independently selectable this way.
     const found = nodesInRect(ringGlyph(), -200, 200, 200, 300);
     expect(found).toHaveLength(1);
+  });
+});
+
+describe("anchors", () => {
+  const withAnchor = () =>
+    addAnchor(
+      addContour(glyph("a", { advance: 600 }), ring()),
+      anchor("k1", "top", { x: 0, y: 250 }),
+    );
+
+  it("is offered only when anchors are drawn", () => {
+    const g = withAnchor();
+    expect(buildHitIndex(g).targets.some((t) => t.kind === "anchor")).toBe(false);
+    expect(buildHitIndex(g, [], { anchors: true }).targets.some((t) => t.kind === "anchor")).toBe(
+      true,
+    );
+  });
+
+  it("is picked where it sits", () => {
+    const index = buildHitIndex(withAnchor(), [], { anchors: true });
+    expect(pick(index, { x: 4, y: 254 }, 20)?.kind).toBe("anchor");
+  });
+
+  it("does not shadow a node from further away", () => {
+    // Level with a node in the pick order, so the nearer of the two wins. An
+    // anchor that outranked a node would make points unreachable wherever a
+    // `bottom` sits on the baseline beside them.
+    const g = addAnchor(
+      addContour(glyph("a", { advance: 600 }), ring()),
+      anchor("k2", "bottom", { x: 40, y: 250 }),
+    );
+    const index = buildHitIndex(g, [], { anchors: true });
+    expect(pick(index, { x: 2, y: 250 }, 60)?.kind).toBe("node");
+    expect(pick(index, { x: 38, y: 250 }, 60)?.kind).toBe("anchor");
   });
 });

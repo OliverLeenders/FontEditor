@@ -1,10 +1,12 @@
 import { type Vec2, about, add, keepsAxes, rotation, sub } from "@fonteditor/geometry";
 import {
+  type AnchorId,
   type ContourId,
   type Glyph,
   type NodeId,
   contourById,
   metricLines,
+  moveAnchorTo,
   moveSegmentTunniLine,
   nodeById,
   segmentAt,
@@ -219,6 +221,36 @@ export function startBoxTransform(
       },
     },
     [begin(handle.action === "rotate" ? "Rotate" : "Scale", false)],
+  );
+}
+
+/**
+ * Begin dragging an anchor.
+ *
+ * Selecting it as well, so the panel shows what is being moved — and clearing
+ * the point selection, because a box round points that are not moving while an
+ * anchor is would say something untrue about what the drag does.
+ */
+export function startAnchorDrag(
+  state: EditorState,
+  input: PointerInput,
+  anchorId: AnchorId,
+): ToolResult {
+  return result(
+    {
+      ...state,
+      selection: [],
+      selectedAnchor: anchorId,
+      gesture: {
+        kind: "dragAnchor",
+        origin: input.point,
+        anchorId,
+        before: state.document,
+        moved: false,
+        snapped: NO_HOLD,
+      },
+    },
+    [begin("Move anchor")],
   );
 }
 
@@ -534,6 +566,24 @@ const CONTINUE: Continuations = {
       updateContour(g, gesture.contourId, (c) =>
         setHandle(c, gesture.nodeId, gesture.part, snapped.point, gesture.breakSmooth),
       ),
+    );
+    return {
+      ...state,
+      document: document ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta), snapped: snapped.hold },
+    };
+  },
+
+  dragAnchor: (state, gesture, input, delta, options) => {
+    // Snapped like a node, and against the same lines: an anchor is placed
+    // relative to the drawing — the middle of a letter, the height its accents
+    // sit at — so the stem edges and metric lines are exactly what it wants.
+    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const snapping = snappingFor(state, input, options, started, []);
+    const snapped = snapPoint(input.point, snapping, gesture.snapped);
+
+    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+      moveAnchorTo(g, gesture.anchorId, snapped.point),
     );
     return {
       ...state,

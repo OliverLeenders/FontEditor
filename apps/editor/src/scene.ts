@@ -191,6 +191,8 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
       label: line.name,
     })),
     snapGuides: snapGuidesFor(editor),
+    hoveredAnchor: editor.hoveredAnchor,
+    selectedAnchor: editor.selectedAnchor,
     tunniSegments: tunniSegments(editor),
     selection: editor.selection,
     marquee: marqueeRect(editor),
@@ -207,6 +209,7 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
     options: {
       showControls: !state.previewing,
       autoHideHandles: handlesAutoHidden(state),
+      showAnchors: state.showAnchors,
     },
   });
 }

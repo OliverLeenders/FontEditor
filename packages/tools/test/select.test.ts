@@ -3,7 +3,9 @@ import {
   type Contour,
   type FontDocument,
   type Glyph,
+  addAnchor,
   addContour,
+  anchor,
   contour,
   counterIds,
   fontDocument,
@@ -1198,5 +1200,81 @@ describe("selecting a whole contour", () => {
   it("leaves a second click on empty canvas alone", () => {
     const s = two();
     expect(doubleClick(s, pointerInput(vec(900, 900))).state).toBe(s);
+  });
+});
+
+describe("anchors on the canvas", () => {
+  /** The arch, with somewhere for an accent to sit above it. */
+  const withAnchor = (): { state: EditorState; id: string } => {
+    const { state } = start();
+    const glyphName = state.currentGlyph;
+    const document = {
+      ...state.document,
+      glyphs: {
+        ...state.document.glyphs,
+        [glyphName]: addAnchor(
+          state.document.glyphs[glyphName]!,
+          anchor("k1", "top", vec(320, 760)),
+        ),
+      },
+    };
+    return { state: { ...state, document }, id: "k1" };
+  };
+
+  const anchorOf = (s: EditorState) => firstGlyph(s.document).anchors[0]!;
+
+  it("names itself under the pointer, and stops when the pointer leaves", () => {
+    const { state, id } = withAnchor();
+    expect(pointerMove(state, pointerInput(vec(320, 760))).state.hoveredAnchor).toBe(id);
+    expect(pointerMove(state, pointerInput(vec(320, 500))).state.hoveredAnchor).toBeNull();
+  });
+
+  it("is dragged, and lands where the drag ends", () => {
+    const { state, id } = withAnchor();
+    const moved = drag(state, vec(320, 760), [vec(340, 770), vec(360, 780)]);
+
+    expect(anchorOf(moved).pt).toEqual(vec(360, 780));
+    expect(moved.selectedAnchor).toBe(id);
+    // The outline is untouched: an anchor is not part of the shape.
+    expect(firstGlyph(moved.document).contours[0]).toBe(firstGlyph(state.document).contours[0]);
+  });
+
+  it("is one undoable step, and takes the point selection with it", () => {
+    const { state } = withAnchor();
+    const selected: EditorState = {
+      ...state,
+      selection: [
+        { contourId: state.document.glyphs["n"]!.contours[0]!.id, nodeId: "n1", part: "point" },
+      ],
+    };
+
+    const down = pointerDown(selected, pointerInput(vec(320, 760)));
+    expect(down.effects).toEqual([{ kind: "beginTransaction", label: "Move anchor" }]);
+    // A box round points that are not moving, while an anchor is, would say
+    // something untrue about what the drag does.
+    expect(down.state.selection).toEqual([]);
+  });
+
+  it("is put down again by a press on the outline, and by one on nothing", () => {
+    const { state } = withAnchor();
+    const held = drag(state, vec(320, 760), [vec(330, 770)]);
+    expect(held.selectedAnchor).not.toBeNull();
+
+    expect(pointerDown(held, pointerInput(vec(100, 480))).state.selectedAnchor).toBeNull();
+    expect(pointerDown(held, pointerInput(vec(20, 20))).state.selectedAnchor).toBeNull();
+  });
+
+  it("is what Backspace removes while it is the thing selected", () => {
+    const { state } = withAnchor();
+    const held = drag(state, vec(320, 760), [vec(330, 770)]);
+
+    const after = keyDown(held, keyInput("Backspace")).state;
+    expect(firstGlyph(after.document).anchors).toHaveLength(0);
+  });
+
+  it("cannot be grabbed where anchors are not drawn", () => {
+    const { state } = withAnchor();
+    const press = pointerDown(state, pointerInput(vec(320, 760)), { anchors: false });
+    expect(press.state.gesture?.kind).not.toBe("dragAnchor");
   });
 });

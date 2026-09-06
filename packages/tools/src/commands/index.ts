@@ -19,6 +19,15 @@
  */
 
 export {
+  addAnchorAt,
+  deleteSelectedAnchor,
+  freeAnchorName,
+  moveAnchorToPoint,
+  removeAnchorAt,
+  renameAnchorTo,
+} from "./anchors.js";
+
+export {
   balanceSegmentAt,
   convertSegment,
   focusedSegmentScales,

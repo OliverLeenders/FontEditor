@@ -31,6 +31,7 @@ export function PreferencesPanel(): React.JSX.Element {
   const autoHide = useStoreValue((s) => s.autoHideHandles);
   const snapPoints = useStoreValue((s) => s.snapPoints);
   const neighbours = useStoreValue((s) => s.showNeighbours);
+  const anchors = useStoreValue((s) => s.showAnchors);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -117,6 +118,12 @@ export function PreferencesPanel(): React.JSX.Element {
             hint="Draw the letters either side, from the strip text"
             on={neighbours}
             onChange={() => store.toggleNeighbours()}
+          />
+          <Switch
+            label="Show anchors"
+            hint="The places accents attach, named on hover"
+            on={anchors}
+            onChange={() => store.toggleAnchors()}
           />
 
           <div className={styles.footer}>

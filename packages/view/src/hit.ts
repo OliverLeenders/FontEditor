@@ -9,6 +9,7 @@ import {
   project,
 } from "@fonteditor/geometry";
 import {
+  type AnchorId,
   type Contour,
   type ContourId,
   type Glyph,
@@ -27,6 +28,7 @@ export type HitKind =
   | "node"
   | "handleIn"
   | "handleOut"
+  | "anchor"
   | "tunniPoint"
   | "tunniLine"
   | "segment"
@@ -40,6 +42,7 @@ export type HitTarget =
       readonly nodeId: NodeId;
       readonly point: Vec2;
     }
+  | { readonly kind: "anchor"; readonly anchorId: AnchorId; readonly point: Vec2 }
   | {
       readonly kind: "tunniPoint";
       readonly contourId: ContourId;
@@ -75,6 +78,11 @@ export type HitTarget =
 export const PICK_PRIORITY: Readonly<Record<HitKind, number>> = {
   tunniPoint: 0,
   node: 1,
+  // Level with a node rather than above it, so distance decides between the
+  // two. An anchor usually floats clear of the outline, but a `bottom` sitting
+  // on the baseline lands near real points, and neither should be able to
+  // shadow the other from further away.
+  anchor: 1,
   handleIn: 2,
   handleOut: 2,
   tunniLine: 3,
@@ -157,6 +165,8 @@ export function handleIsVisible(
 export type HitOptions = {
   /** Whether the margin lines are drawn, and so grabbable. */
   readonly margins?: boolean;
+  /** Whether anchors are drawn, and so grabbable. Off by default, as margins are. */
+  readonly anchors?: boolean;
   readonly handles?: HandleVisibility;
 };
 
@@ -174,6 +184,12 @@ export function buildHitIndex(
   if (options.margins === true) {
     targets.push({ kind: "originLine", x: 0 });
     targets.push({ kind: "advanceLine", x: g.advance });
+  }
+
+  if (options.anchors === true) {
+    for (const a of g.anchors) {
+      targets.push({ kind: "anchor", anchorId: a.id, point: a.pt });
+    }
   }
 
   for (const c of g.contours) {
@@ -258,6 +274,7 @@ export function distanceToTarget(
     case "node":
     case "handleIn":
     case "handleOut":
+    case "anchor":
     case "tunniPoint":
       return distance(p, target.point);
     case "tunniLine":

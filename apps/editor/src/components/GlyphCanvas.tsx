@@ -58,6 +58,9 @@ function selectOptions(store: EditorStore): ToolOptions {
     autoHideHandles: handlesAutoHidden(state),
     snapExtremes: state.snapPoints,
     snapNeighbours: state.snapPoints,
+    // Only what is drawn may be grabbed, which is the rule the margins and the
+    // Tunni controls already follow.
+    anchors: state.showAnchors,
   };
 }
 

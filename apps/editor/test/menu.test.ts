@@ -73,6 +73,9 @@ describe("context menu", () => {
     // whatever was clicked, so it is reachable from anywhere on the canvas.
     expect(labels(store, null)).toEqual([
       "Select all points",
+      // Named for the anchor it would make, which is the first usual name the
+      // glyph is not already using.
+      "Add anchor here (top)",
       "Round selection",
       "Round this glyph",
     ]);

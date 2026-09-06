@@ -14,13 +14,19 @@ import {
   selectionBounds,
 } from "@fonteditor/view";
 
-import { deleteSelectedPoints, reverseSelectedContour, selectContour } from "./commands/index.js";
+import {
+  deleteSelectedAnchor,
+  deleteSelectedPoints,
+  reverseSelectedContour,
+  selectContour,
+} from "./commands/index.js";
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import {
   EMPTY_GLYPH,
   type GestureOptions,
   continueGesture,
   selectSegmentEnds,
+  startAnchorDrag,
   startItemDrag,
   startMarginDrag,
   startBoxTransform,
@@ -79,6 +85,8 @@ export type SelectOptions = GestureOptions & {
    * renderer draws them by default.
    */
   readonly margins?: boolean;
+  /** Whether anchors are drawn, and so pickable. On by default, as they are drawn. */
+  readonly anchors?: boolean;
   /**
    * Hide handles away from the work, matching `autoHideHandles` in the renderer.
    *
@@ -164,6 +172,10 @@ export function pointerDown(
 
   const target = pickAt(state, input.point, options);
   if (target === null) {
+    // Nothing under the pointer, so nothing is being worked on — including the
+    // anchor that was.
+    if (state.selectedAnchor !== null)
+      return startMarquee({ ...base, selectedAnchor: null }, input);
     // Inside the box, with nothing of the outline under the pointer: take hold
     // of the selection and move it. Anything pickable still wins — a point you
     // can see is a point you meant to grab — so this takes over only the case
@@ -183,7 +195,11 @@ export function pointerDown(
     case "node":
     case "handleIn":
     case "handleOut":
-      return startItemDrag(base, input, target);
+      // An outline grab puts the anchor down: the two are separate things and
+      // only one of them can be what the next arrow key or Backspace means.
+      return startItemDrag({ ...base, selectedAnchor: null }, input, target);
+    case "anchor":
+      return startAnchorDrag(base, input, target.anchorId);
     case "tunniPoint":
       return startTunniDrag(base, input, "dragTunniPoint", target.segmentIndex, target.contourId);
     case "tunniLine":
@@ -206,9 +222,14 @@ export function pointerMove(
   if (gesture === null) {
     // No drag: all that changes is where the cursor is and, from that, which
     // segment is showing its Tunni controls.
+    const over = pickAt(state, input.point, options);
     return result({
       ...state,
       cursor: input.point,
+      // Only what the pointer is actually on: an anchor names itself on hover,
+      // and a name that appeared because the cursor was vaguely nearby would
+      // be one more label over the drawing.
+      hoveredAnchor: over?.kind === "anchor" ? over.anchorId : null,
       hoveredSegment: hoveredSegment(
         currentGlyph(state) ?? EMPTY_GLYPH,
         input.point,
@@ -314,6 +335,9 @@ export function keyDown(
   // ends, and Escape is how it ends.
   if (state.gesture === null && !input.modifiers.ctrl && !input.modifiers.meta) {
     if (input.key === "Backspace" || input.key === "Delete") {
+      // An anchor is selected on its own, so it is what Backspace means while
+      // one is — and the point selection is empty then anyway.
+      if (state.selectedAnchor !== null) return deleteSelectedAnchor(state);
       return deleteSelectedPoints(state);
     }
     if (input.key.toLowerCase() === "r") {
@@ -370,6 +394,7 @@ const NUDGES: Record<string, Vec2 | undefined> = {
 function pickAt(state: EditorState, p: Vec2, options: SelectOptions): HitTarget | null {
   const index = buildHitIndex(currentGlyph(state) ?? EMPTY_GLYPH, tunniSegments(state), {
     margins: options.margins ?? true,
+    anchors: options.anchors ?? true,
     handles: handleVisibility(state, options),
   });
   const tolerance = screenTolerance(state.view, options.hitPixels ?? DEFAULT_HIT_PIXELS);

@@ -1,7 +1,10 @@
 import { contourById, randomIds, segmentAt } from "@fonteditor/font-model";
 import {
+  addAnchorAt,
   balanceSegmentAt,
   centreCurrentGlyph,
+  freeAnchorName,
+  removeAnchorAt,
   extractHandles,
   extractSegmentHandles,
   convertSegment,
@@ -52,6 +55,16 @@ export type Item =
 /** New points from the menu need ids; the app owns the factory. */
 const ids = randomIds();
 
+/** Stands in when the current glyph has gone, so the labels stay readable. */
+const EMPTY_GLYPH = {
+  name: "",
+  unicodes: [],
+  advance: 0,
+  contours: [],
+  components: [],
+  anchors: [],
+};
+
 /**
  * Build the menu for whatever was right-clicked.
  *
@@ -86,6 +99,14 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: "Select all points",
         run: () => store.applyTool(selectAllPoints(editor)),
+      },
+      // Placed where the click was, which is the only thing "here" can mean —
+      // and named for what it will most likely be, since an accent over a
+      // letter is what most anchors are.
+      {
+        kind: "item",
+        label: `Add anchor here (${freeAnchorName(editor.document.glyphs[editor.currentGlyph] ?? EMPTY_GLYPH)})`,
+        run: () => store.applyTool(addAnchorAt(editor, request.point, ids)),
       },
       { kind: "separator" },
       ...rounding,
@@ -233,6 +254,18 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       run: () => store.applyTool(reverseContourAt(editor, contourId)),
     });
     return items;
+  }
+
+  if (target.kind === "anchor") {
+    // Renaming is a text field's job, and the inspector has one. What a menu
+    // can do well is take the thing away.
+    return [
+      {
+        kind: "item",
+        label: "Remove anchor",
+        run: () => store.applyTool(removeAnchorAt(editor, target.anchorId)),
+      },
+    ];
   }
 
   if (target.kind === "originLine" || target.kind === "advanceLine") {

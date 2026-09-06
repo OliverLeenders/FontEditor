@@ -51,6 +51,8 @@ export type Preferences = {
   readonly snapPoints: boolean;
   /** Draw the glyphs either side, from the strip text. */
   readonly showNeighbours: boolean;
+  /** Draw the glyph's anchors, and let them be grabbed. */
+  readonly showAnchors: boolean;
   /**
    * Apply the font's own features to the spacing line and the proof.
    *
@@ -77,6 +79,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   autoHideHandles: true,
   snapPoints: true,
   showNeighbours: true,
+  showAnchors: true,
   applyFeatures: true,
   spacingSize: 128,
   proofSize: 32,
@@ -124,6 +127,7 @@ export function loadPreferences(): Preferences {
     autoHideHandles: boolean(raw["autoHideHandles"], DEFAULT_PREFERENCES.autoHideHandles),
     snapPoints: boolean(raw["snapPoints"], DEFAULT_PREFERENCES.snapPoints),
     showNeighbours: boolean(raw["showNeighbours"], DEFAULT_PREFERENCES.showNeighbours),
+    showAnchors: boolean(raw["showAnchors"], DEFAULT_PREFERENCES.showAnchors),
     applyFeatures: boolean(raw["applyFeatures"], DEFAULT_PREFERENCES.applyFeatures),
     spacingSize: number(raw["spacingSize"], DEFAULT_PREFERENCES.spacingSize, {
       min: MIN_SPACING_SIZE,

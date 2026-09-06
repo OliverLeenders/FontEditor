@@ -65,6 +65,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
     drawNodes(ctx, s);
+    drawAnchors(ctx, s);
     drawPenPreview(ctx, s);
     drawShapePreview(ctx, s);
     drawKnifeStroke(ctx, s);
@@ -859,4 +860,59 @@ export function drawTransformBox(ctx: Canvas2D, s: Scene): void {
   ctx.arc(Math.round(knob.x) + 0.5, Math.round(knob.y) + 0.5, size + 1, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+}
+
+/**
+ * The anchors of the glyph being edited: a small cross each, named on hover.
+ *
+ * A cross rather than a dot, and in its own colour, because an anchor is not
+ * part of the outline. Anything drawn as a filled point reads as something to
+ * pull a handle off, and an anchor has no handles, no curve, and no business
+ * being mistaken for a node.
+ *
+ * The name appears only under the pointer. A letter carries `top` and `bottom`
+ * where accents go — over the drawing and under it — so a label that were always
+ * on would sit across the very shape it belongs to.
+ */
+export function drawAnchors(ctx: Canvas2D, s: Scene): void {
+  if (!s.options.showAnchors || s.glyph.anchors.length === 0) return;
+
+  const arm = s.metrics.nodeRadius + 1.5;
+  ctx.save();
+  ctx.lineCap = "butt";
+
+  for (const a of s.glyph.anchors) {
+    const p = toScreen(s.view, a.pt);
+    const chosen = a.id === s.selectedAnchor;
+
+    ctx.beginPath();
+    ctx.moveTo(p.x - arm, p.y);
+    ctx.lineTo(p.x + arm, p.y);
+    ctx.moveTo(p.x, p.y - arm);
+    ctx.lineTo(p.x, p.y + arm);
+
+    // Haloed like a node, for the same reason: the cross has to stay legible
+    // where it crosses the filled preview.
+    ctx.strokeStyle = s.palette.halo;
+    ctx.lineWidth = s.metrics.haloWidth + 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = chosen ? s.palette.anchorSelected : s.palette.anchor;
+    ctx.lineWidth = chosen ? 2 : 1.5;
+    ctx.stroke();
+
+    if (a.id !== s.hoveredAnchor || a.name === "") continue;
+
+    ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    // Written over its own halo rather than a box: a panel behind five
+    // characters would hide more of the drawing than the characters do.
+    ctx.strokeStyle = s.palette.halo;
+    ctx.lineWidth = 3;
+    ctx.strokeText(a.name, p.x + arm + 4, p.y);
+    ctx.fillStyle = chosen ? s.palette.anchorSelected : s.palette.anchor;
+    ctx.fillText(a.name, p.x + arm + 4, p.y);
+  }
+
+  ctx.restore();
 }

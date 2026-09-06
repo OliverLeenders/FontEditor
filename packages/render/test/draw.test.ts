@@ -1,7 +1,9 @@
 import { vec } from "@fonteditor/geometry";
 import {
   type Contour,
+  addAnchor,
   addContour,
+  anchor,
   contour,
   counterIds,
   glyph,
@@ -627,5 +629,37 @@ describe("what the fill draws", () => {
       metrics: DEFAULT_METRICS,
     });
     expect(built.filled).toEqual([square]);
+  });
+});
+
+describe("anchors", () => {
+  const withAnchor = (extra: Record<string, unknown> = {}) => ({
+    ...base(ring()),
+    glyph: addAnchor(
+      addContour(glyph("test", { advance: 600 }), ring()),
+      anchor("k1", "top", vec(0, 250)),
+    ),
+    ...extra,
+  });
+
+  it("draws a cross, not a point", () => {
+    const ctx = render(withAnchor());
+    const p = toScreen(VIEW, vec(0, 250));
+
+    // Two strokes through the same place, level and upright: the arms of a
+    // cross. A node would be an arc or a rect instead.
+    const moves = ctx.all("moveTo").map((o) => o.args);
+    expect(moves.some(([x, y]) => y === p.y && x !== p.x)).toBe(true);
+    expect(moves.some(([x, y]) => x === p.x && y !== p.y)).toBe(true);
+  });
+
+  it("writes the name only for the anchor under the pointer", () => {
+    expect(render(withAnchor()).texts()).not.toContain("top");
+    expect(render(withAnchor({ hoveredAnchor: "k1" })).texts()).toContain("top");
+  });
+
+  it("draws nothing at all when anchors are turned off", () => {
+    const ctx = render(withAnchor({ options: { showAnchors: false }, hoveredAnchor: "k1" }));
+    expect(ctx.texts()).not.toContain("top");
   });
 });

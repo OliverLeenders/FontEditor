@@ -249,3 +249,15 @@
   opacity: 0.38;
   cursor: default;
 }
+
+/* One row per anchor: what it is called, where it is, and a way to remove it.
+   The name gets the room, since the numbers are three digits and it is not. */
+.anchorRow {
+  display: grid;
+  grid-template-columns: 1fr 3.2rem 3.2rem 1.1rem;
+  align-items: center;
+  gap: 0.25rem;
+}
+.anchorRow[data-selected="true"] .input {
+  border-color: var(--accent);
+}

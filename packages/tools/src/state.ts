@@ -1,5 +1,6 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
 import {
+  type AnchorId,
   type ContourId,
   type FontDocument,
   type Glyph,
@@ -111,6 +112,21 @@ export type Gesture =
       readonly moved: boolean;
     }
   | {
+      /**
+       * Dragging one anchor.
+       *
+       * Its own gesture rather than a selection of one, because an anchor is not
+       * in the selection: it has no contour and no node, and every consumer of
+       * `Selection` would have to learn about a member that has neither.
+       */
+      readonly kind: "dragAnchor";
+      readonly origin: Vec2;
+      readonly anchorId: AnchorId;
+      readonly before: FontDocument;
+      readonly moved: boolean;
+      readonly snapped: SnapHold;
+    }
+  | {
       readonly kind: "marquee";
       readonly origin: Vec2;
       readonly current: Vec2;
@@ -187,6 +203,15 @@ export type EditorState = {
   readonly measure: Measurement | null;
   readonly view: ViewTransform;
   readonly selection: Selection;
+  /**
+   * The anchor being worked on, and the one under the pointer.
+   *
+   * Apart from `selection` deliberately. An anchor is not part of the outline,
+   * so scaling a letter must not scale where its accents attach — which is
+   * exactly what would happen if anchors joined the box round the selection.
+   */
+  readonly selectedAnchor: AnchorId | null;
+  readonly hoveredAnchor: AnchorId | null;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
   readonly hoveredSegment: SegmentRef | null;
   /**
@@ -238,6 +263,8 @@ export function editorState(init: EditorStateInit): EditorState {
     measure: null,
     view: init.view,
     selection: init.selection ?? [],
+    selectedAnchor: null,
+    hoveredAnchor: null,
     hoveredSegment: init.hoveredSegment ?? null,
     focusedSegment: init.focusedSegment ?? null,
     cursor: init.cursor ?? null,

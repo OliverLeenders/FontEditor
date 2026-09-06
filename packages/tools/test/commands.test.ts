@@ -40,7 +40,13 @@ import {
   addKernGroup,
   breakOutKern,
   nudgeKern,
+  addAnchorAt,
   balanceSegmentAt,
+  deleteSelectedAnchor,
+  freeAnchorName,
+  moveAnchorToPoint,
+  removeAnchorAt,
+  renameAnchorTo,
   focusedSegmentScales,
   focusedSegmentStatus,
   holdSegmentTension,
@@ -1515,5 +1521,71 @@ describe("the node the handle fields act on", () => {
       ],
     };
     expect(selectedNode(two)).toBeNull();
+  });
+});
+
+describe("anchors", () => {
+  const withAnchor = (): { s: EditorState; id: string } => {
+    const { s } = start();
+    const out = addAnchorAt(s, vec(120, 700), counterIds("q"));
+    return { s: out.state, id: out.state.selectedAnchor! };
+  };
+
+  it("puts one where it was asked for, named for what it probably is", () => {
+    const { s, id } = withAnchor();
+    const only = firstGlyph(s.document).anchors[0]!;
+
+    expect(only.id).toBe(id);
+    expect(only.name).toBe("top");
+    expect(only.pt).toEqual(vec(120, 700));
+    // Selected as it lands, and the point selection put down: only one of the
+    // two can be what the next key means.
+    expect(s.selectedAnchor).toBe(id);
+    expect(s.selection).toEqual([]);
+  });
+
+  it("names the next ones without collision", () => {
+    const { s } = withAnchor();
+    const second = addAnchorAt(s, vec(120, 0), counterIds("r")).state;
+    expect(firstGlyph(second.document).anchors[1]!.name).toBe("bottom");
+    expect(freeAnchorName(firstGlyph(second.document))).toBe("center");
+  });
+
+  it("moves one to an exact place, as one coalescing step", () => {
+    const { s, id } = withAnchor();
+    const out = moveAnchorToPoint(s, id, vec(130, 690));
+
+    expect(firstGlyph(out.state.document).anchors[0]!.pt).toEqual(vec(130, 690));
+    expect(out.effects).toEqual([
+      { kind: "beginTransaction", label: "Move anchor" },
+      { kind: "commitTransaction" },
+    ]);
+  });
+
+  it("renames one, and refuses a name the glyph already uses", () => {
+    const { s, id } = withAnchor();
+    const two = addAnchorAt(s, vec(120, 0), counterIds("r")).state;
+
+    expect(firstGlyph(renameAnchorTo(two, id, "hat").state.document).anchors[0]!.name).toBe("hat");
+    // "bottom" is the second one's name, so the first cannot take it.
+    const refused = renameAnchorTo(two, id, "bottom");
+    expect(refused.state).toBe(two);
+    expect(refused.effects).toEqual([]);
+  });
+
+  it("removes one, and forgets it was selected", () => {
+    const { s, id } = withAnchor();
+    const out = removeAnchorAt(s, id);
+
+    expect(firstGlyph(out.state.document).anchors).toHaveLength(0);
+    expect(out.state.selectedAnchor).toBeNull();
+    expect(removeAnchorAt(out.state, id).state).toBe(out.state);
+  });
+
+  it("is what Backspace takes away while one is selected", () => {
+    const { s } = withAnchor();
+    const out = deleteSelectedAnchor(s);
+    expect(firstGlyph(out.state.document).anchors).toHaveLength(0);
+    expect(deleteSelectedAnchor(out.state).state).toBe(out.state);
   });
 });

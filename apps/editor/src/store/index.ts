@@ -343,6 +343,10 @@ export class EditorStore {
     this.remember({ showNeighbours: !this.state.showNeighbours });
   }
 
+  toggleAnchors(): void {
+    this.remember({ showAnchors: !this.state.showAnchors });
+  }
+
   toggleApplyFeatures(): void {
     this.remember({ applyFeatures: !this.state.applyFeatures });
   }
