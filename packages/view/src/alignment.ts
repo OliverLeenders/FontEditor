@@ -23,6 +23,9 @@ export type AlignmentOptions = {
    *
    * Stem edges, overshoot tops, the point across a counter — the structurally
    * meaningful ones, and few: a handful per glyph rather than every node.
+   *
+   * A turn is offered on the axis it turns about, and — to a drag in another
+   * contour — on both. See {@link alignmentLines}.
    */
   readonly extremes?: boolean;
   /**
@@ -133,6 +136,15 @@ function neighboursOf(c: Contour, nodeId: string): Node[] {
  * that is not staying still. That is also why this asks for the glyph at the
  * start of the gesture — candidates computed from the live glyph would be
  * dragged around by the very drag trying to catch them.
+ *
+ * An extreme is offered on the axis it turns about, and to a drag in *another*
+ * contour on both of its axes. The leftmost point of an `o` is a landmark in x
+ * by turning there; its height is a landmark too, but only to the counter, which
+ * is drawn deliberately level with it — and without that, dragging the counter's
+ * side to the height of the bowl's side catches nothing, because a point that
+ * turns in x contributes no horizontal line at all. Within one contour the other
+ * coordinate is left out: it means much less there, and offering it everywhere
+ * doubles the candidates, which is exactly what this module exists to avoid.
  */
 export function alignmentLines(
   g: Glyph,
@@ -144,6 +156,10 @@ export function alignmentLines(
   // Keyed by node rather than by selected part: a node's handles travel with it,
   // so neither the node nor either handle is standing still to be caught.
   const movingNodes = new Set(moving.map((item) => `${item.contourId} ${item.nodeId}`));
+  // Which contours the drag is in, so the others can offer both of their axes to
+  // it. Empty when nothing is moving, and then nothing is another contour's
+  // drag to offer to.
+  const movingContours = new Set(moving.map((item) => item.contourId));
 
   const xs: SnapLine[] = [];
   const ys: SnapLine[] = [];
@@ -184,7 +200,10 @@ export function alignmentLines(
         const next = around(c, i, 1) ?? n.pt;
 
         const axes = extremeAxes(n, previous, next);
-        if (axes.x || axes.y) add(n.pt, "extreme", axes);
+        if (!axes.x && !axes.y) continue;
+
+        const elsewhere = movingContours.size > 0 && !movingContours.has(c.id);
+        add(n.pt, "extreme", elsewhere ? BOTH : axes);
       }
     }
   }

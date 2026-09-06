@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { alignmentLines } from "../src/alignment.js";
 import type { Selection } from "../src/selection.js";
+import { snapDelta } from "../src/snap.js";
 
 const ids = counterIds();
 const at = (x: number, y: number) => ({ x, y });
@@ -182,6 +183,63 @@ describe("extremes", () => {
   });
 });
 
+/**
+ * A counter for the ring above: level top and bottom, upright sides — and its
+ * sides ten units above the ring's, so a line from one is never a line from the
+ * other by accident.
+ */
+function counter() {
+  return contour(
+    ids.contour(),
+    [
+      node(ids.node(), at(300, 530), { type: "smooth", in: at(240, 530), out: at(360, 530) }),
+      node(ids.node(), at(420, 360), { type: "smooth", in: at(420, 430), out: at(420, 290) }),
+      node(ids.node(), at(300, 170), { type: "smooth", in: at(360, 170), out: at(240, 170) }),
+      node(ids.node(), at(180, 360), { type: "smooth", in: at(180, 290), out: at(180, 430) }),
+    ],
+    true,
+  );
+}
+
+describe("extremes across contours", () => {
+  const outer = ring();
+  const inner = counter();
+  const o = glyph("o", { advance: 600, contours: [outer, inner] });
+
+  const dragging = (c: { id: string; nodes: readonly { id: string }[] }, i: number): Selection => [
+    { contourId: c.id, nodeId: c.nodes[i]!.id, part: "point" },
+  ];
+
+  it("offers another contour's turns on both of their axes", () => {
+    // Dragging the counter's top. The bowl's sides turn in x, and their height
+    // is what the counter's sides are drawn level with — so it has to be
+    // offered, or a counter can never be aligned to the shape holding it.
+    const lines = alignmentLines(o, dragging(inner, 0), { extremes: true });
+    expect(values(lines.ys)).toContain(350);
+    expect(values(lines.xs)).toContain(300);
+  });
+
+  it("keeps a contour's own turns to the axis they turn about", () => {
+    // The counter's own sides are in the drag's contour, so their height stays
+    // out: within one shape the other coordinate means much less, and offering
+    // it everywhere doubles the candidates.
+    const lines = alignmentLines(o, dragging(inner, 0), { extremes: true });
+    expect(values(lines.ys)).not.toContain(360);
+
+    // And the other way round, which is the same rule seen from the bowl.
+    const other = alignmentLines(o, dragging(outer, 0), { extremes: true });
+    expect(values(other.ys)).toContain(360);
+    expect(values(other.ys)).not.toContain(350);
+  });
+
+  it("offers nothing across contours when nothing is being dragged", () => {
+    // No drag, so there is nobody for the other coordinate to be a landmark to.
+    const lines = alignmentLines(o, [], { extremes: true });
+    expect(values(lines.ys)).toEqual([0, 170, 530, 700]);
+    expect(values(lines.xs)).toEqual([60, 180, 420, 540]);
+  });
+});
+
 describe("neighbours", () => {
   const c = ring();
   const g = glyph("o", { advance: 600, contours: [c] });
@@ -252,5 +310,63 @@ describe("both together", () => {
     const lines = alignmentLines(g, moving, { extremes: true, neighbours: true });
     // The bottom node is not adjacent to the top one, and is still an extreme.
     expect(values(lines.ys)).toEqual([0, 350]);
+  });
+});
+
+/**
+ * The `o` this rule was written for, coordinates and all, from a real drawing.
+ *
+ * Kept as it was reported: the counter's left node one unit above the bowl's,
+ * with no horizontal line to catch on because the bowl's side turns in x.
+ */
+function reportedBowl() {
+  return contour(
+    ids.contour(),
+    [
+      node(ids.node(), at(472, 249), { type: "smooth", in: at(472, 89), out: at(472, 406) }),
+      node(ids.node(), at(252, 511), { type: "smooth", in: at(388, 511), out: at(119, 511) }),
+      node(ids.node(), at(31, 249), { type: "smooth", in: at(31, 402), out: at(31, 92) }),
+      node(ids.node(), at(252, -12), { type: "smooth", in: at(114, -12), out: at(384, -12) }),
+    ],
+    true,
+  );
+}
+
+function reportedCounter() {
+  return contour(
+    ids.contour(),
+    [
+      node(ids.node(), at(391, 248), { type: "smooth", in: at(391, 349), out: at(391, 147) }),
+      node(ids.node(), at(254, 67), { type: "smooth", in: at(335, 67), out: at(174, 67) }),
+      node(ids.node(), at(116, 250), { type: "smooth", in: at(116, 149), out: at(116, 351) }),
+      node(ids.node(), at(252, 421), { type: "smooth", in: at(172, 421), out: at(333, 421) }),
+    ],
+    true,
+  );
+}
+
+describe("a drag across a real counter", () => {
+  it("lands the counter's side on the height of the bowl's", () => {
+    const bowl = reportedBowl();
+    const counter = reportedCounter();
+    const o = glyph("o", { advance: 500, contours: [bowl, counter] });
+
+    const moving: Selection = [
+      { contourId: counter.id, nodeId: counter.nodes[2]!.id, part: "point" },
+    ];
+    const lines = alignmentLines(o, moving, { extremes: true, neighbours: true });
+    // Before the cross-axis rule these were [-12, 67, 421, 511]: the two sides
+    // of the bowl turn in x, so the height they share was offered by nothing.
+    expect(values(lines.ys)).toContain(249);
+
+    const landed = snapDelta([at(116, 250)], at(0, -0.6), {
+      xs: lines.xs,
+      ys: lines.ys,
+      enter: 9,
+      stay: 15,
+      stickiness: 1.6,
+      grid: 1,
+    });
+    expect(250 + landed.delta.y).toBe(249);
   });
 });
