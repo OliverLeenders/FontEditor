@@ -1045,6 +1045,63 @@ describe("the box round a selection", () => {
     expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(100, 6);
   });
 
+  it("drags the whole selection from inside the box", () => {
+    // The complaint this answers: a drag begun on the shape you had just
+    // selected threw the selection away and started a marquee.
+    const start = chosen();
+    const grabbed = pointerDown(start, pointerInput(vec(50, 50)));
+    expect(grabbed.state.gesture).toMatchObject({ kind: "dragSelection" });
+    expect(grabbed.state.selection).toEqual(start.selection);
+
+    const moved = pointerMove(grabbed.state, pointerInput(vec(80, 70))).state;
+    expect(where(moved, "p0")).toEqual(vec(30, 20));
+    expect(where(moved, "p2")).toEqual(vec(130, 120));
+  });
+
+  it("lets anything under the pointer win the press", () => {
+    // A point you can see inside the box is a point you meant to grab. Both
+    // grabs drag, so what tells them apart is what the step is called.
+    const start = chosen();
+    const label = (r: ReturnType<typeof pointerDown>) =>
+      r.effects.flatMap((e) => (e.kind === "beginTransaction" ? [e.label] : []));
+
+    expect(label(pointerDown(start, pointerInput(vec(100, 100))))).toEqual(["Move node"]);
+    expect(label(pointerDown(start, pointerInput(vec(50, 50))))).toEqual(["Move selection"]);
+
+    // And a box handle still outranks both.
+    expect(pointerDown(start, pointerInput(vec(110, 110))).state.gesture?.kind).toBe(
+      "transformBox",
+    );
+  });
+
+  it("keeps shift meaning add-to-selection, so inside the box still marquees", () => {
+    // Otherwise the points inside the box would be the only ones that could not
+    // be gathered.
+    const start = chosen();
+    const grabbed = pointerDown(start, pointerInput(vec(50, 50), { shift: true }));
+    expect(grabbed.state.gesture?.kind).toBe("marquee");
+  });
+
+  it("still starts a marquee outside the box", () => {
+    const start = chosen();
+    expect(pointerDown(start, pointerInput(vec(400, 400))).state.gesture?.kind).toBe("marquee");
+  });
+
+  it("takes hold of a turned box where it is drawn", () => {
+    // The frame is a quarter turn round, so the box covers the square as it
+    // stands: inside is still inside, and the space beside it is not.
+    const start = chosen();
+    const turned: EditorState = {
+      ...start,
+      boxFrame: { angle: Math.PI / 2, of: start.selection },
+    };
+    expect(pointerDown(turned, pointerInput(vec(50, 50))).state.gesture?.kind).toBe(
+      "dragSelection",
+    );
+    expect(pointerDown(turned, pointerInput(vec(-50, 50))).state.gesture?.kind).toBe("marquee");
+    expect(pointerDown(turned, pointerInput(vec(300, 300))).state.gesture?.kind).toBe("marquee");
+  });
+
   it("puts one entry on the undo stack for the whole drag", () => {
     const start = chosen();
     const box = selectionBox(start)!.rect;

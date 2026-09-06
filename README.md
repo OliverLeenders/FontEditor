@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1549 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1556 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -92,8 +92,10 @@ or about the glyph's own origin — which is what slanting an italic has to use,
 turning about the selection would shift every glyph sideways by a different amount — or
 about the baseline under the selection.
 
-Select two points or more and a dashed box appears round them with eight handles and a
-round knob on a stem above the top edge: a corner scales both axes, an edge scales one,
+Select two points or more and a dashed box appears round them. Drag from inside it to
+move everything selected — anything under the pointer still wins the press, so a point
+you can see is a point you can still grab, and shift keeps its own meaning and starts a
+marquee. The box has eight handles and a round knob on a stem above the top edge: a corner scales both axes, an edge scales one,
 and the knob turns — as does just outside a corner, which is the same gesture without
 having to reach for the knob. Shift holds the shape on a scale and the angle on a turn,
 and alt works about the middle instead of the opposite corner. The box stands a little

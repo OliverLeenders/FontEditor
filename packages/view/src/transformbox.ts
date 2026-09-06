@@ -121,6 +121,23 @@ export function boxRotatePoint(frame: BoxFrame, stem: number): Vec2 {
   return boxToWorld(frame, { x: top.x, y: top.y + stem });
 }
 
+/**
+ * Whether a point is inside the box.
+ *
+ * In the frame's own coordinates, so a turned box is the shape that is drawn
+ * rather than the upright rectangle around it. What the inside is *for* is the
+ * tools' business: this only says where it is.
+ */
+export function boxContains(frame: BoxFrame, world: Vec2): boolean {
+  const p = boxToLocal(frame, world);
+  return (
+    p.x >= frame.rect.minX &&
+    p.x <= frame.rect.maxX &&
+    p.y >= frame.rect.minY &&
+    p.y <= frame.rect.maxY
+  );
+}
+
 /** The middle of the box, in the design plane. */
 export function boxCentre(frame: BoxFrame): Vec2 {
   return boxToWorld(frame, {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   TURN_STEP,
+  boxContains,
   boxHandlePoint,
   boxPivot,
   boxRotatePoint,
@@ -223,5 +224,23 @@ describe("the turn knob", () => {
     const handle = { at: "top", action: "rotate" } as const;
     const pivot = boxPivot(box, handle, false);
     expect(boxTurn(box, handle, pivot, at(-50, 50), false)).toBeCloseTo(Math.PI / 2, 6);
+  });
+});
+
+describe("what counts as inside", () => {
+  it("takes the box itself, edges included", () => {
+    expect(boxContains(box, at(50, 50))).toBe(true);
+    expect(boxContains(box, at(0, 0))).toBe(true);
+    expect(boxContains(box, at(100, 100))).toBe(true);
+    expect(boxContains(box, at(-1, 50))).toBe(false);
+    expect(boxContains(box, at(50, 101))).toBe(false);
+  });
+
+  it("means the shape that is drawn once the box is turned", () => {
+    // Turned a quarter anticlockwise about the origin, the box now covers the
+    // plane's second quadrant: its own middle is at (-50, 50), and where the
+    // upright box sat is outside it.
+    expect(boxContains(turned, at(-50, 50))).toBe(true);
+    expect(boxContains(turned, at(50, 50))).toBe(false);
   });
 });

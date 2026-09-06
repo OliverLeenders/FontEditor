@@ -116,6 +116,7 @@ export {
   BOX_STEM_PIXELS,
   TURN_STEP,
   boxCentre,
+  boxContains,
   boxHandlePoint,
   boxPivot,
   boxRotatePoint,

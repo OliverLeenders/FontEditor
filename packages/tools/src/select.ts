@@ -5,6 +5,7 @@ import {
   type HandleVisibility,
   type HitTarget,
   BOX_STEM_PIXELS,
+  boxContains,
   buildHitIndex,
   hoveredSegment,
   pick,
@@ -24,6 +25,7 @@ import {
   startMarginDrag,
   startBoxTransform,
   startMarquee,
+  startSelectionDrag,
   startTunniDrag,
   translateSelection,
 } from "./gestures.js";
@@ -161,7 +163,21 @@ export function pointerDown(
   }
 
   const target = pickAt(state, input.point, options);
-  if (target === null) return startMarquee(base, input);
+  if (target === null) {
+    // Inside the box, with nothing of the outline under the pointer: take hold
+    // of the selection and move it. Anything pickable still wins — a point you
+    // can see is a point you meant to grab — so this takes over only the case
+    // that used to start a marquee on top of your own selection and throw it
+    // away.
+    //
+    // Shift is the exception, and keeps its meaning: it adds to a selection, so
+    // it still starts a marquee. Otherwise the box would make the points inside
+    // it the only ones that could not be gathered.
+    if (box !== null && !input.modifiers.shift && boxContains(box, input.point)) {
+      return startSelectionDrag(base, input);
+    }
+    return startMarquee(base, input);
+  }
 
   switch (target.kind) {
     case "node":

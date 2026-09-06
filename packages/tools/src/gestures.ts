@@ -115,6 +115,34 @@ export function startMarquee(state: EditorState, input: PointerInput): ToolResul
   });
 }
 
+/**
+ * Begin dragging everything that is selected, from inside the box round it.
+ *
+ * The box is how a selection says where it is, so taking hold of it there is
+ * what anyone would try — and until now the inside of it belonged to the
+ * marquee, which meant a drag begun on the shape you had just selected threw
+ * the selection away and started a new one.
+ *
+ * Nothing is selected or deselected by it: what moves is exactly what was
+ * already chosen, which is the difference between this and dragging a node.
+ */
+export function startSelectionDrag(state: EditorState, input: PointerInput): ToolResult {
+  return result(
+    {
+      ...state,
+      gesture: {
+        kind: "dragSelection",
+        origin: input.point,
+        items: state.selection,
+        before: state.document,
+        moved: false,
+        snapped: NO_HOLD,
+      },
+    },
+    [begin("Move selection")],
+  );
+}
+
 export function startItemDrag(
   state: EditorState,
   input: PointerInput,

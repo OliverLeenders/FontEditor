@@ -16,6 +16,7 @@ import {
   type BoxHandle,
   BOX_STEM_PIXELS,
   PICK_TOLERANCE_SCALE,
+  boxContains,
   buildHitIndex,
   itemForTarget,
   hasItem,
@@ -178,6 +179,10 @@ export function GlyphCanvas({
       canvas.style.cursor = cursorForHandle(editor.gesture.handle);
       return;
     }
+    if (editor.gesture?.kind === "dragSelection") {
+      canvas.style.cursor = "move";
+      return;
+    }
 
     const point = toDesign(editor.view, surface.toCanvasPoint(event));
 
@@ -197,6 +202,11 @@ export function GlyphCanvas({
       }
     }
 
+    // Inside the box, where a drag takes the whole selection with it. Said with
+    // the cursor because nothing else says it: the box looks like a thing to
+    // grab at its handles, and the space inside it looks like empty canvas.
+    const inside = box !== null && boxContains(box, point);
+
     const glyph = editor.document.glyphs[editor.currentGlyph];
     if (glyph === undefined) {
       canvas.style.cursor = "";
@@ -205,7 +215,7 @@ export function GlyphCanvas({
 
     const reach = screenTolerance(editor.view, HIT_PIXELS) * (PICK_TOLERANCE_SCALE.originLine ?? 1);
     const near = Math.abs(point.x) <= reach || Math.abs(point.x - glyph.advance) <= reach;
-    if (!near) {
+    if (!near && !inside) {
       canvas.style.cursor = "";
       return;
     }
@@ -218,8 +228,13 @@ export function GlyphCanvas({
       point,
       screenTolerance(editor.view, HIT_PIXELS),
     );
-    const onMargin = target?.kind === "originLine" || target?.kind === "advanceLine";
-    canvas.style.cursor = onMargin ? "ew-resize" : "";
+    if (target?.kind === "originLine" || target?.kind === "advanceLine") {
+      canvas.style.cursor = "ew-resize";
+      return;
+    }
+    // Only where the press would actually move the selection: anything pickable
+    // wins the press, so it must not be promised the move cursor.
+    canvas.style.cursor = inside && target === null ? "move" : "";
   };
 
   return (
