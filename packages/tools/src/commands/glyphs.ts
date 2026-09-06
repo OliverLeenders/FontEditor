@@ -1,22 +1,15 @@
 import {
-  type ComponentId,
-  type ComponentSource,
   type GlyphName,
-  type IdFactory,
   type RenameProblem,
-  addGlyphComponent,
-  component,
   deleteProblem,
   glyph,
   putGlyph,
   removeGlyph,
-  removeGlyphComponent,
   renameGlyph as renameInDocument,
   renameProblem,
-  wouldRecurse,
 } from "@fonteditor/font-model";
 import { type ToolResult, begin, commit, result } from "../effects.js";
-import { type EditorState, editCurrentGlyph } from "../state.js";
+import type { EditorState } from "../state.js";
 import { done } from "./shared.js";
 
 /**
@@ -76,31 +69,6 @@ export function deleteGlyph(state: EditorState, name: GlyphName): ToolResult {
     { ...state, document, currentGlyph, selection: [], focusedSegment: null, hoveredSegment: null },
     [begin(`Delete ${name}`, false), commit],
   );
-}
-
-/**
- * Place another glyph inside the current one.
- *
- * Refuses a placement that would close a loop, rather than accepting it and
- * drawing nothing: "that would make a refer to itself" is a far better answer
- * than a glyph that silently stops appearing.
- */
-export function addComponent(state: EditorState, base: GlyphName, ids: IdFactory): ToolResult {
-  const owner = state.currentGlyph;
-  if (base === "" || state.document.glyphs[base] === undefined) return result(state);
-
-  const source: ComponentSource = { glyphOf: (name) => state.document.glyphs[name] ?? null };
-  if (wouldRecurse(source, owner, base)) return result(state);
-
-  const document = editCurrentGlyph(state, (g) =>
-    addGlyphComponent(g, component(ids.component(), base)),
-  );
-  return done(state, document === null ? null : { ...state, document }, `Add ${base}`);
-}
-
-export function removeComponent(state: EditorState, id: ComponentId): ToolResult {
-  const document = editCurrentGlyph(state, (g) => removeGlyphComponent(g, id));
-  return done(state, document === null ? null : { ...state, document }, "Remove component");
 }
 
 /**

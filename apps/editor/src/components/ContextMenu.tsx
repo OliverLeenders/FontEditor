@@ -1,10 +1,14 @@
 import { contourById, randomIds, segmentAt } from "@fonteditor/font-model";
 import {
   addAnchorAt,
+  attachComponent,
+  attachmentFor,
   balanceSegmentAt,
   centreCurrentGlyph,
+  decomposeCurrentGlyph,
   freeAnchorName,
   removeAnchorAt,
+  removeComponent,
   extractHandles,
   extractSegmentHandles,
   convertSegment,
@@ -254,6 +258,45 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       run: () => store.applyTool(reverseContourAt(editor, contourId)),
     });
     return items;
+  }
+
+  if (target.kind === "component") {
+    const { componentId } = target;
+    const placed = editor.document.glyphs[editor.currentGlyph]?.components.find(
+      (c) => c.id === componentId,
+    );
+    const aligns = attachmentFor(editor, componentId) !== null;
+
+    return [
+      {
+        kind: "item",
+        label: placed === undefined ? "Open glyph" : `Open ${placed.base}`,
+        disabled: placed === undefined,
+        run: () => {
+          if (placed !== undefined) store.setCurrentGlyph(placed.base);
+        },
+      },
+      {
+        kind: "item",
+        label: "Align to anchors",
+        // Shown as unavailable rather than hidden: whether it applies is a fact
+        // about the two glyphs — a letter with no `top`, an accent with no
+        // `_top` — and worth being able to see the absence of.
+        disabled: !aligns,
+        run: () => store.applyTool(attachComponent(editor, componentId)),
+      },
+      { kind: "separator" },
+      {
+        kind: "item",
+        label: "Decompose glyph",
+        run: () => store.applyTool(decomposeCurrentGlyph(editor, ids)),
+      },
+      {
+        kind: "item",
+        label: "Remove component",
+        run: () => store.applyTool(removeComponent(editor, componentId)),
+      },
+    ];
   }
 
   if (target.kind === "anchor") {

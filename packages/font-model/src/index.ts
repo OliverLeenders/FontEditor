@@ -41,7 +41,10 @@ export type { Component, ComponentSource } from "./component.js";
 export {
   MAX_COMPONENT_DEPTH,
   component,
+  attachmentOffset,
   movedComponent,
+  placedComponent,
+  transformedComponent,
   resolveComponent,
   resolveGlyphComponents,
   wouldRecurse,
@@ -151,6 +154,7 @@ export {
   addContour,
   addAnchor,
   addGlyphComponent,
+  decomposedGlyph,
   anchorById,
   anchorNamed,
   isComposite,

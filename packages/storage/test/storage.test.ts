@@ -1,9 +1,13 @@
-import { vec } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE, vec } from "@fonteditor/geometry";
 import {
   type Contour,
   type FontDocument,
   type Glyph,
+  addAnchor,
   addContour,
+  addGlyphComponent,
+  anchor,
+  component,
   contour,
   DEFAULT_FONT_INFO,
   counterIds,
@@ -104,6 +108,36 @@ describe("serialization", () => {
 
   it("stamps every file with a schema version", () => {
     expect(encodeGlyph(firstGlyph(document())).schema).toBe(SCHEMA_VERSION);
+  });
+
+  it("keeps the anchors, which autosave used to drop on the floor", () => {
+    const g = addAnchor(firstGlyph(document()), anchor("k1", "top", vec(300, 700)));
+    const decoded = decodeGlyph(JSON.parse(JSON.stringify(encodeGlyph(g))) as unknown);
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) expect(decoded.value.anchors).toEqual(g.anchors);
+  });
+
+  it("keeps the components, transform and all", () => {
+    const g = addGlyphComponent(
+      firstGlyph(document()),
+      component("k2", "acute", { ...IDENTITY_AFFINE, xOffset: 40, yOffset: -10 }),
+    );
+    const decoded = decodeGlyph(JSON.parse(JSON.stringify(encodeGlyph(g))) as unknown);
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) expect(decoded.value.components).toEqual(g.components);
+  });
+
+  it("reads a glyph written before anchors existed", () => {
+    // The field is optional on the way in: a file saved by an older build has
+    // no `anchors` key at all, and must still open.
+    const encoded = encodeGlyph(firstGlyph(document())) as Record<string, unknown>;
+    delete encoded["anchors"];
+
+    const decoded = decodeGlyph(encoded);
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) expect(decoded.value.anchors).toEqual([]);
   });
 });
 

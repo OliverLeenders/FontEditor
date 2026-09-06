@@ -27,6 +27,8 @@ import {
   node,
   orderedGlyphs,
   segmentAt,
+  addAnchor,
+  anchor,
   rectContour,
   segmentCount,
   sidebearings,
@@ -41,7 +43,14 @@ import {
   breakOutKern,
   nudgeKern,
   addAnchorAt,
+  addComponent,
+  attachComponent,
+  attachmentFor,
   balanceSegmentAt,
+  decomposeCurrentGlyph,
+  deleteSelectedComponent,
+  moveComponentTo,
+  removeComponent,
   deleteSelectedAnchor,
   freeAnchorName,
   moveAnchorToPoint,
@@ -1587,5 +1596,127 @@ describe("anchors", () => {
     const out = deleteSelectedAnchor(s);
     expect(firstGlyph(out.state.document).anchors).toHaveLength(0);
     expect(deleteSelectedAnchor(out.state).state).toBe(out.state);
+  });
+});
+
+describe("components", () => {
+  /** An `aacute` waiting to be built, beside the two glyphs it is built from. */
+  const parts = (): EditorState => {
+    const letter = addAnchor(
+      glyph("a", {
+        advance: 500,
+        contours: [rectContour(counterIds("a"), { minX: 0, minY: 0, maxX: 400, maxY: 600 })],
+      }),
+      anchor("k1", "top", vec(250, 700)),
+    );
+    const accent = addAnchor(
+      glyph("acute", {
+        advance: 0,
+        contours: [rectContour(counterIds("b"), { minX: 0, minY: 0, maxX: 80, maxY: 60 })],
+      }),
+      anchor("k2", "_top", vec(40, 690)),
+    );
+    const composite = addAnchor(
+      glyph("aacute", { advance: 500 }),
+      anchor("k3", "top", vec(250, 900)),
+    );
+
+    return editorState({
+      document: fontDocument([letter, accent, composite]),
+      view: { scale: 1, tx: 0, ty: 0 },
+      currentGlyph: "aacute",
+    });
+  };
+
+  const placed = (s: EditorState) => s.document.glyphs["aacute"]!.components;
+
+  it("lands a new one on its anchors", () => {
+    const out = addComponent(parts(), "acute", counterIds("c"));
+    const only = placed(out.state)[0]!;
+
+    // `_top` at (40, 690) has to reach `top` at (250, 900).
+    expect(only.transform.xOffset).toBe(210);
+    expect(only.transform.yOffset).toBe(210);
+    expect(out.state.selectedComponent).toBe(only.id);
+  });
+
+  it("lands one with nothing to line up by at the origin", () => {
+    const s = parts();
+    const out = addComponent(s, "a", counterIds("c"));
+    const only = placed(out.state)[0]!;
+
+    expect(only.base).toBe("a");
+    expect(only.transform.xOffset).toBe(0);
+    expect(only.transform.yOffset).toBe(0);
+  });
+
+  it("refuses a placement that would close a loop", () => {
+    const s = parts();
+    const out = addComponent(s, "aacute", counterIds("c"));
+    expect(out.state).toBe(s);
+  });
+
+  it("moves one to an exact offset, as one coalescing step", () => {
+    const s = addComponent(parts(), "acute", counterIds("c")).state;
+    const id = placed(s)[0]!.id;
+
+    const out = moveComponentTo(s, id, vec(100, 20));
+    expect(placed(out.state)[0]!.transform).toMatchObject({ xOffset: 100, yOffset: 20 });
+    expect(out.effects).toEqual([
+      { kind: "beginTransaction", label: "Move component" },
+      { kind: "commitTransaction" },
+    ]);
+  });
+
+  it("puts a nudged one back where the anchors say", () => {
+    const s = addComponent(parts(), "acute", counterIds("c")).state;
+    const id = placed(s)[0]!.id;
+    const nudged = moveComponentTo(s, id, vec(0, 0)).state;
+
+    expect(attachmentFor(nudged, id)).toEqual(vec(210, 210));
+    const back = attachComponent(nudged, id).state;
+    expect(placed(back)[0]!.transform).toMatchObject({ xOffset: 210, yOffset: 210 });
+  });
+
+  it("has nothing to align by where the pair is missing", () => {
+    const s = addComponent(parts(), "a", counterIds("c")).state;
+    const id = placed(s)[0]!.id;
+
+    expect(attachmentFor(s, id)).toBeNull();
+    expect(attachComponent(s, id).state).toBe(s);
+  });
+
+  it("takes one away, and forgets it was selected", () => {
+    const s = addComponent(parts(), "acute", counterIds("c")).state;
+    const id = placed(s)[0]!.id;
+
+    const out = removeComponent(s, id);
+    expect(placed(out.state)).toHaveLength(0);
+    expect(out.state.selectedComponent).toBeNull();
+    expect(deleteSelectedComponent(out.state).state).toBe(out.state);
+  });
+
+  it("is what Backspace takes away while one is selected", () => {
+    const s = addComponent(parts(), "acute", counterIds("c")).state;
+    const out = deleteSelectedComponent(s);
+    expect(placed(out.state)).toHaveLength(0);
+  });
+
+  it("decomposes into contours of its own, and stops referring", () => {
+    const s = addComponent(parts(), "acute", counterIds("c")).state;
+    const out = decomposeCurrentGlyph(s, counterIds("d"));
+    const g = out.state.document.glyphs["aacute"]!;
+
+    expect(g.components).toHaveLength(0);
+    // The accent's rectangle, placed: four nodes at the offset it sat at.
+    expect(g.contours).toHaveLength(1);
+    expect(g.contours[0]!.nodes[0]!.pt).toEqual(vec(210, 210));
+    // The anchors are the glyph's own and stay exactly where they were.
+    expect(g.anchors).toHaveLength(1);
+  });
+
+  it("does nothing to a glyph with no components", () => {
+    const s = parts();
+    expect(decomposeCurrentGlyph(s, counterIds("d")).state).toBe(s);
   });
 });

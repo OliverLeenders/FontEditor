@@ -3,25 +3,22 @@ import {
   type ToolOptions,
   BOX_HANDLE_PIXELS,
   doubleClick,
-  handleVisibility,
+  pickTarget,
   keyDown,
   pointerDown,
   pointerLeave,
   pointerMove,
   pointerUp,
   selectionBox,
-  tunniSegments,
 } from "@fonteditor/tools";
 import {
   type BoxHandle,
   BOX_STEM_PIXELS,
   PICK_TOLERANCE_SCALE,
   boxContains,
-  buildHitIndex,
   itemForTarget,
   hasItem,
   panBy,
-  pick,
   pickBoxHandle,
   screenTolerance,
   toDesign,
@@ -143,19 +140,11 @@ export function GlyphCanvas({
   };
 
   /** What the pointer is over, by the same rules the tools pick with. */
-  const targetAt = (point: { x: number; y: number }) => {
-    const editor = store.editor;
-    const glyph = editor.document.glyphs[editor.currentGlyph];
-    if (glyph === undefined) return null;
-    return pick(
-      buildHitIndex(glyph, tunniSegments(editor), {
-        margins: true,
-        handles: handleVisibility(editor, selectOptions(store)),
-      }),
-      point,
-      screenTolerance(editor.view, HIT_PIXELS),
-    );
-  };
+  // The tool's own answer, not a second one built here: two ideas of what is
+  // under the pointer is exactly how a menu comes to offer something the tool
+  // will not do, or a cursor to promise a grab that does not happen.
+  const targetAt = (point: { x: number; y: number }) =>
+    pickTarget(store.editor, point, { ...selectOptions(store), hitPixels: HIT_PIXELS });
 
   /**
    * Open the glyph beside this one, when the second click landed on it.
@@ -268,14 +257,7 @@ export function GlyphCanvas({
       return;
     }
 
-    const target = pick(
-      buildHitIndex(glyph, tunniSegments(editor), {
-        margins: true,
-        handles: handleVisibility(editor, selectOptions(store)),
-      }),
-      point,
-      screenTolerance(editor.view, HIT_PIXELS),
-    );
+    const target = targetAt(point);
     if (target?.kind === "originLine" || target?.kind === "advanceLine") {
       canvas.style.cursor = "ew-resize";
       return;

@@ -1,4 +1,5 @@
 import {
+  type Anchor,
   type Component,
   type Kerning,
   EMPTY_KERNING,
@@ -12,6 +13,7 @@ import {
   BOTH_LOCKED,
   DEFAULT_FONT_INFO,
   NO_LOCK,
+  anchor,
   component,
   contour,
   glyph,
@@ -65,6 +67,12 @@ export type StoredComponent = {
   readonly transform: readonly [number, number, number, number, number, number];
 };
 
+export type StoredAnchor = {
+  readonly id: string;
+  readonly name: string;
+  readonly at: StoredPoint;
+};
+
 export type StoredGlyph = {
   readonly schema: number;
   readonly name: string;
@@ -76,6 +84,8 @@ export type StoredGlyph = {
    * reads. Written always, so one saved now says plainly that it has none.
    */
   readonly components?: readonly StoredComponent[];
+  /** Optional on the way in, for the same reason components are. */
+  readonly anchors?: readonly StoredAnchor[];
 };
 
 export type StoredFontInfo = {
@@ -114,6 +124,7 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     advance: g.advance,
     contours: g.contours.map(encodeContour),
     components: g.components.map(encodeComponent),
+    anchors: g.anchors.map((a) => ({ id: a.id, name: a.name, at: point(a.pt) })),
   };
 }
 
@@ -311,7 +322,25 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
     }
   }
 
-  return ok(glyph(source["name"], { unicodes, advance, contours, components }));
+  const anchors: Anchor[] = [];
+  if (Array.isArray(source["anchors"])) {
+    for (const raw of source["anchors"]) {
+      const decoded = decodeAnchor(raw);
+      // Dropped rather than failing the glyph, as a malformed component is:
+      // losing one attachment point is recoverable, losing the outline is not.
+      if (decoded !== null) anchors.push(decoded);
+    }
+  }
+
+  return ok(glyph(source["name"], { unicodes, advance, contours, components, anchors }));
+}
+
+function decodeAnchor(raw: unknown): Anchor | null {
+  if (!isRecord(raw)) return null;
+  if (typeof raw["id"] !== "string" || typeof raw["name"] !== "string") return null;
+
+  const at = decodePoint(raw["at"]);
+  return at === null ? null : anchor(raw["id"], raw["name"], at);
 }
 
 function decodeComponent(raw: unknown): Component | null {

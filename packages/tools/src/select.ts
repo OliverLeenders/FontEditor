@@ -1,5 +1,14 @@
 import { type Vec2, rotation } from "@fonteditor/geometry";
-import { balanceSegment, setNodeType, updateContour } from "@fonteditor/font-model";
+import {
+  type ComponentId,
+  type ComponentSource,
+  type Contour,
+  balanceSegment,
+  counterIds,
+  resolveComponent,
+  setNodeType,
+  updateContour,
+} from "@fonteditor/font-model";
 import {
   type BoxFrame,
   type HandleVisibility,
@@ -16,6 +25,7 @@ import {
 
 import {
   deleteSelectedAnchor,
+  deleteSelectedComponent,
   deleteSelectedPoints,
   reverseSelectedContour,
   selectContour,
@@ -27,6 +37,7 @@ import {
   continueGesture,
   selectSegmentEnds,
   startAnchorDrag,
+  startComponentDrag,
   startItemDrag,
   startMarginDrag,
   startBoxTransform,
@@ -174,8 +185,9 @@ export function pointerDown(
   if (target === null) {
     // Nothing under the pointer, so nothing is being worked on — including the
     // anchor that was.
-    if (state.selectedAnchor !== null)
-      return startMarquee({ ...base, selectedAnchor: null }, input);
+    if (state.selectedAnchor !== null || state.selectedComponent !== null) {
+      return startMarquee({ ...base, selectedAnchor: null, selectedComponent: null }, input);
+    }
     // Inside the box, with nothing of the outline under the pointer: take hold
     // of the selection and move it. Anything pickable still wins — a point you
     // can see is a point you meant to grab — so this takes over only the case
@@ -197,9 +209,15 @@ export function pointerDown(
     case "handleOut":
       // An outline grab puts the anchor down: the two are separate things and
       // only one of them can be what the next arrow key or Backspace means.
-      return startItemDrag({ ...base, selectedAnchor: null }, input, target);
+      return startItemDrag(
+        { ...base, selectedAnchor: null, selectedComponent: null },
+        input,
+        target,
+      );
     case "anchor":
-      return startAnchorDrag(base, input, target.anchorId);
+      return startAnchorDrag({ ...base, selectedComponent: null }, input, target.anchorId);
+    case "component":
+      return startComponentDrag(base, input, target.componentId);
     case "tunniPoint":
       return startTunniDrag(base, input, "dragTunniPoint", target.segmentIndex, target.contourId);
     case "tunniLine":
@@ -338,6 +356,7 @@ export function keyDown(
       // An anchor is selected on its own, so it is what Backspace means while
       // one is — and the point selection is empty then anyway.
       if (state.selectedAnchor !== null) return deleteSelectedAnchor(state);
+      if (state.selectedComponent !== null) return deleteSelectedComponent(state);
       return deleteSelectedPoints(state);
     }
     if (input.key.toLowerCase() === "r") {
@@ -391,10 +410,47 @@ const NUDGES: Record<string, Vec2 | undefined> = {
 // internals
 // ---------------------------------------------------------------------------
 
+/**
+ * What each of the current glyph's components draws, for the hit index.
+ *
+ * Resolved here rather than in `view`, which knows about one glyph at a time and
+ * would have to be handed the whole font to follow a reference.
+ */
+function placedComponents(state: EditorState): { id: ComponentId; contours: readonly Contour[] }[] {
+  const glyph = currentGlyph(state);
+  if (glyph === null || glyph.components.length === 0) return [];
+
+  const source: ComponentSource = { glyphOf: (name) => state.document.glyphs[name] ?? null };
+  return glyph.components.map((c) => ({
+    id: c.id,
+    contours: resolveComponent(source, c.base, c.transform, pickIds, [glyph.name]),
+  }));
+}
+
+/** Resolved outlines are thrown away after the pick; their ids never escape. */
+const pickIds = counterIds("pick");
+
+/**
+ * What the pointer is over, by the same rules the tool itself uses.
+ *
+ * Exported because the interface asks the question too — for the cursor, for the
+ * context menu, for deciding whether a double-click landed on empty canvas — and
+ * two answers to "what is under the pointer" is exactly how a menu comes to
+ * offer something the tool will not do.
+ */
+export function pickTarget(
+  state: EditorState,
+  p: Vec2,
+  options: SelectOptions = {},
+): HitTarget | null {
+  return pickAt(state, p, options);
+}
+
 function pickAt(state: EditorState, p: Vec2, options: SelectOptions): HitTarget | null {
   const index = buildHitIndex(currentGlyph(state) ?? EMPTY_GLYPH, tunniSegments(state), {
     margins: options.margins ?? true,
     anchors: options.anchors ?? true,
+    components: placedComponents(state),
     handles: handleVisibility(state, options),
   });
   const tolerance = screenTolerance(state.view, options.hitPixels ?? DEFAULT_HIT_PIXELS);

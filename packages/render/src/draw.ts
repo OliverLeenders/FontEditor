@@ -783,13 +783,28 @@ export function drawNeighbours(ctx: Canvas2D, s: Scene): void {
  */
 export function drawComponents(ctx: Canvas2D, s: Scene): void {
   const drawable = s.componentOutlines.filter((c) => c.nodes.length >= 2);
-  if (drawable.length === 0) return;
+  const held = s.selectedComponentOutlines.filter((c) => c.nodes.length >= 2);
+  if (drawable.length === 0 && held.length === 0) return;
 
   ctx.save();
-  ctx.fillStyle = s.palette.component;
-  ctx.beginPath();
-  for (const c of drawable) traceContour(ctx, s.view, c);
-  ctx.fill();
+  if (drawable.length > 0) {
+    ctx.fillStyle = s.palette.component;
+    ctx.beginPath();
+    for (const c of drawable) traceContour(ctx, s.view, c);
+    ctx.fill();
+  }
+
+  // The one being worked on is filled like the rest and outlined on top, so a
+  // drag says what it has hold of without the shape itself changing weight.
+  if (held.length > 0) {
+    ctx.beginPath();
+    for (const c of held) traceContour(ctx, s.view, c);
+    ctx.fillStyle = s.palette.component;
+    ctx.fill();
+    ctx.strokeStyle = s.palette.componentSelected;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
   ctx.restore();
 }
 

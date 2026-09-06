@@ -1,6 +1,14 @@
-import { type Affine, IDENTITY_AFFINE, applyAffine, composeAffine } from "@fonteditor/geometry";
+import {
+  type Affine,
+  type Vec2,
+  IDENTITY_AFFINE,
+  applyAffine,
+  composeAffine,
+} from "@fonteditor/geometry";
 
+import { pairedName } from "./anchor.js";
 import { type Contour, contour } from "./contour.js";
+import { type Glyph, anchorNamed } from "./glyph.js";
 import type { ComponentId, IdFactory } from "./ids.js";
 import { node } from "./node.js";
 
@@ -25,6 +33,23 @@ export function component(
   transform: Affine = IDENTITY_AFFINE,
 ): Component {
   return { id, base, transform };
+}
+
+/** Place a component at an exact offset, for a number typed into a field. */
+export function placedComponent(c: Component, x: number, y: number): Component {
+  if (c.transform.xOffset === x && c.transform.yOffset === y) return c;
+  return { ...c, transform: { ...c.transform, xOffset: x, yOffset: y } };
+}
+
+/**
+ * Change how a component is placed, keeping which glyph it places.
+ *
+ * The base is not part of what a transform can say: pointing a component at a
+ * different glyph is a different edit, and one that has to be checked for
+ * recursion first.
+ */
+export function transformedComponent(c: Component, transform: Affine): Component {
+  return { ...c, transform };
 }
 
 export function movedComponent(c: Component, dx: number, dy: number): Component {
@@ -133,6 +158,36 @@ export function resolveGlyphComponents(
     out.push(...resolveComponent(source, c.base, c.transform, ids, [owner]));
   }
   return out;
+}
+
+/**
+ * Where a component has to sit for its anchors to meet the ones it lands on.
+ *
+ * The convention the whole system rests on: an accent carries `_top`, a letter
+ * carries `top`, and the accent is placed so the two coincide. Which pair to use
+ * is not stated anywhere — it is whichever mark anchor of the accent names an
+ * anchor the letter actually has, which is why an `acute` carrying only `_top`
+ * lands on any letter with a `top` and on no letter without one.
+ *
+ * Returns the offset to place the component at, or `null` when the two glyphs
+ * share no such pair and there is nothing to align by. Only the offset: an
+ * accent is not scaled or turned by being attached, and a transform that already
+ * scales it keeps doing so.
+ */
+export function attachmentOffset(owner: Glyph, accent: Glyph, transform: Affine): Vec2 | null {
+  for (const mark of accent.anchors) {
+    const wanted = pairedName(mark);
+    if (wanted === null) continue;
+
+    const on = anchorNamed(owner, wanted);
+    if (on === null) continue;
+
+    // Where the accent's own anchor lands under the transform as it stands,
+    // ignoring the offset — the offset is what is being solved for.
+    const carried = applyAffine({ ...transform, xOffset: 0, yOffset: 0 }, mark.pt);
+    return { x: on.pt.x - carried.x, y: on.pt.y - carried.y };
+  }
+  return null;
 }
 
 /**

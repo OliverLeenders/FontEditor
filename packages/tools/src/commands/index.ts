@@ -19,6 +19,18 @@
  */
 
 export {
+  addComponent,
+  attachComponent,
+  attachmentFor,
+  componentSource,
+  decomposeCurrentGlyph,
+  decomposeGlyphAt,
+  deleteSelectedComponent,
+  moveComponentTo,
+  removeComponent,
+} from "./components.js";
+
+export {
   addAnchorAt,
   deleteSelectedAnchor,
   freeAnchorName,
@@ -43,11 +55,9 @@ export { infoProblem, setInfo } from "./font.js";
 
 export type { NewGlyph } from "./glyphs.js";
 export {
-  addComponent,
   createGlyphs,
   deleteGlyph,
   deleteRefusal,
-  removeComponent,
   renameCurrentGlyph,
   renameRefusal,
 } from "./glyphs.js";

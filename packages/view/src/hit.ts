@@ -6,10 +6,12 @@ import {
   distance,
   distanceToRect,
   distanceToSegment,
+  flatten,
   project,
 } from "@fonteditor/geometry";
 import {
   type AnchorId,
+  type ComponentId,
   type Contour,
   type ContourId,
   type Glyph,
@@ -29,6 +31,7 @@ export type HitKind =
   | "handleIn"
   | "handleOut"
   | "anchor"
+  | "component"
   | "tunniPoint"
   | "tunniLine"
   | "segment"
@@ -43,6 +46,19 @@ export type HitTarget =
       readonly point: Vec2;
     }
   | { readonly kind: "anchor"; readonly anchorId: AnchorId; readonly point: Vec2 }
+  /**
+   * A glyph placed inside this one, as the outlines it draws.
+   *
+   * Flattened at index time rather than measured as curves: a component is
+   * picked by its whole area, not by a particular segment of it — there is
+   * nothing inside it to address, since the way to change those shapes is to
+   * open the glyph they come from.
+   */
+  | {
+      readonly kind: "component";
+      readonly componentId: ComponentId;
+      readonly outlines: readonly (readonly Vec2[])[];
+    }
   | {
       readonly kind: "tunniPoint";
       readonly contourId: ContourId;
@@ -87,11 +103,15 @@ export const PICK_PRIORITY: Readonly<Record<HitKind, number>> = {
   handleOut: 2,
   tunniLine: 3,
   segment: 4,
+  // Under everything the outline offers. A component is a large target — the
+  // whole area of a letter — and anything of your own drawing that falls inside
+  // it is what a click there means.
+  component: 5,
   // Last, and deliberately so. They run the full height of the canvas, so they
   // are under the cursor far more often than anything else; letting them
   // outrank a node would make points near the origin unpickable.
-  originLine: 5,
-  advanceLine: 5,
+  originLine: 6,
+  advanceLine: 6,
 };
 
 export type HitIndex = {
@@ -167,6 +187,17 @@ export type HitOptions = {
   readonly margins?: boolean;
   /** Whether anchors are drawn, and so grabbable. Off by default, as margins are. */
   readonly anchors?: boolean;
+  /**
+   * The outlines each component draws, already resolved.
+   *
+   * Passed in rather than resolved here: resolving needs every other glyph in
+   * the font, and this package knows about one glyph at a time. The host has
+   * them anyway — they are what it draws.
+   */
+  readonly components?: readonly {
+    readonly id: ComponentId;
+    readonly contours: readonly Contour[];
+  }[];
   readonly handles?: HandleVisibility;
 };
 
@@ -184,6 +215,13 @@ export function buildHitIndex(
   if (options.margins === true) {
     targets.push({ kind: "originLine", x: 0 });
     targets.push({ kind: "advanceLine", x: g.advance });
+  }
+
+  for (const placed of options.components ?? []) {
+    const outlines = placed.contours.map(outlineOf).filter((poly) => poly.length >= 3);
+    if (outlines.length > 0) {
+      targets.push({ kind: "component", componentId: placed.id, outlines });
+    }
   }
 
   if (options.anchors === true) {
@@ -254,6 +292,54 @@ export function buildHitIndex(
   return { targets };
 }
 
+/** A contour as a closed polygon, fine enough to pick by. */
+function outlineOf(c: Contour): Vec2[] {
+  const points: Vec2[] = [];
+  for (const segment of segments(c)) {
+    points.push(...flatten(segmentCubic(segment), 0.5).slice(0, -1));
+  }
+  return points;
+}
+
+/** Whether a point is inside a closed polygon, by the non-zero rule. */
+function insidePolygon(p: Vec2, poly: readonly Vec2[]): boolean {
+  let winding = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
+    const side = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
+    if (a.y <= p.y) {
+      if (b.y > p.y && side > 0) winding += 1;
+    } else if (b.y <= p.y && side < 0) {
+      winding -= 1;
+    }
+  }
+  return winding !== 0;
+}
+
+/**
+ * How far a point is from the shape a component draws: nothing at all when it is
+ * inside one, and the distance to the nearest edge otherwise.
+ *
+ * Inside counts because a component has no interior of its own to click on —
+ * unlike the glyph's own contours, whose points and segments are what a press
+ * there is aiming at.
+ */
+function distanceToOutlines(outlines: readonly (readonly Vec2[])[], p: Vec2): number {
+  let inside = false;
+  let best = Number.POSITIVE_INFINITY;
+
+  for (const poly of outlines) {
+    if (insidePolygon(p, poly)) inside = !inside;
+    for (let i = 0; i < poly.length; i++) {
+      const gap = distanceToSegment(poly[i]!, poly[(i + 1) % poly.length]!, p);
+      if (gap < best) best = gap;
+    }
+  }
+
+  return inside ? 0 : best;
+}
+
 /**
  * Distance from a design-space point to a target, in design units.
  *
@@ -277,6 +363,8 @@ export function distanceToTarget(
     case "anchor":
     case "tunniPoint":
       return distance(p, target.point);
+    case "component":
+      return distanceToOutlines(target.outlines, p);
     case "tunniLine":
       return distanceToSegment(target.from, target.to, p);
     case "segment": {

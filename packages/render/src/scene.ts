@@ -130,6 +130,15 @@ export type Scene = {
   readonly hoveredAnchor: AnchorId | null;
   readonly selectedAnchor: AnchorId | null;
   /**
+   * The outlines of the component being worked on, drawn apart from the rest.
+   *
+   * Kept beside `componentOutlines` rather than marked within it: what is
+   * selected is the reference, and the renderer is handed shapes rather than
+   * references. Splitting them at the source is simpler than teaching the
+   * drawing code which contour belongs to which component.
+   */
+  readonly selectedComponentOutlines: readonly Contour[];
+  /**
    * Segments currently showing their Tunni controls — typically the one under
    * the cursor and the one being worked on, which are often but not always the
    * same. Duplicates are tolerated and drawn once.
@@ -228,6 +237,7 @@ export type SceneInit = {
   readonly snapGuides?: readonly SnapGuide[];
   readonly hoveredAnchor?: AnchorId | null;
   readonly selectedAnchor?: AnchorId | null;
+  readonly selectedComponentOutlines?: readonly Contour[];
   readonly tunniSegments?: readonly SegmentRef[];
   readonly selection?: Selection;
   readonly marquee?: Rect | null;
@@ -253,6 +263,7 @@ export function scene(init: SceneInit): Scene {
     snapGuides: init.snapGuides ?? [],
     hoveredAnchor: init.hoveredAnchor ?? null,
     selectedAnchor: init.selectedAnchor ?? null,
+    selectedComponentOutlines: init.selectedComponentOutlines ?? [],
     tunniSegments: init.tunniSegments ?? [],
     selection: init.selection ?? [],
     marquee: init.marquee ?? null,

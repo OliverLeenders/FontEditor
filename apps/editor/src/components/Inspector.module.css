@@ -261,3 +261,38 @@
 .anchorRow[data-selected="true"] .input {
   border-color: var(--accent);
 }
+
+/* The base name in a component row: a link to that glyph, not a label. */
+.componentOpen {
+  padding: 0.2rem 0.3rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.componentOpen:hover {
+  background: var(--surface-2);
+}
+
+.align {
+  padding: 0.22rem 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.align:hover:not(:disabled) {
+  color: var(--ink);
+}
+.align:disabled {
+  opacity: 0.38;
+  cursor: default;
+}

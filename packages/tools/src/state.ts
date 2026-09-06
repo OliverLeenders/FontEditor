@@ -1,6 +1,7 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
 import {
   type AnchorId,
+  type ComponentId,
   type ContourId,
   type FontDocument,
   type Glyph,
@@ -113,6 +114,21 @@ export type Gesture =
     }
   | {
       /**
+       * Dragging one component: the whole glyph it places, by its offset.
+       *
+       * What moves is the transform, never the shapes — those belong to the
+       * glyph being referred to, and an editor that let them be nudged here
+       * would have given up the reference without saying so.
+       */
+      readonly kind: "dragComponent";
+      readonly origin: Vec2;
+      readonly componentId: ComponentId;
+      readonly before: FontDocument;
+      readonly moved: boolean;
+      readonly snapped: SnapHold;
+    }
+  | {
+      /**
        * Dragging one anchor.
        *
        * Its own gesture rather than a selection of one, because an anchor is not
@@ -212,6 +228,14 @@ export type EditorState = {
    */
   readonly selectedAnchor: AnchorId | null;
   readonly hoveredAnchor: AnchorId | null;
+  /**
+   * The component being worked on.
+   *
+   * Apart from `selection` for the reason the anchor is: it is not points, and
+   * the operations that apply to it — move it, take it away, decompose it — are
+   * about the reference rather than about anything inside it.
+   */
+  readonly selectedComponent: ComponentId | null;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
   readonly hoveredSegment: SegmentRef | null;
   /**
@@ -265,6 +289,7 @@ export function editorState(init: EditorStateInit): EditorState {
     selection: init.selection ?? [],
     selectedAnchor: null,
     hoveredAnchor: null,
+    selectedComponent: null,
     hoveredSegment: init.hoveredSegment ?? null,
     focusedSegment: init.focusedSegment ?? null,
     cursor: init.cursor ?? null,

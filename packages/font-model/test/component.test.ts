@@ -4,13 +4,22 @@ import { describe, expect, it } from "vitest";
 import {
   type ComponentSource,
   MAX_COMPONENT_DEPTH,
+  attachmentOffset,
   component,
   movedComponent,
   resolveComponent,
   wouldRecurse,
 } from "../src/component.js";
+import { anchor } from "../src/anchor.js";
 import { contour } from "../src/contour.js";
-import { type Glyph, glyph, isComposite } from "../src/glyph.js";
+import {
+  type Glyph,
+  addAnchor,
+  addGlyphComponent,
+  decomposedGlyph,
+  glyph,
+  isComposite,
+} from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
 import { node } from "../src/node.js";
 
@@ -192,5 +201,62 @@ describe("isComposite", () => {
     ).toBe(false);
     expect(isComposite(glyph("a", { contours: [square("s")] }))).toBe(false);
     expect(isComposite(glyph("a"))).toBe(false);
+  });
+});
+
+describe("attachment by anchors", () => {
+  const letter = () =>
+    addAnchor(glyph("a", { advance: 500 }), anchor("k1", "top", { x: 250, y: 700 }));
+  const accent = () =>
+    addAnchor(glyph("acute", { advance: 0 }), anchor("k2", "_top", { x: 40, y: 690 }));
+
+  it("solves the offset that makes the pair coincide", () => {
+    const at = attachmentOffset(letter(), accent(), IDENTITY_AFFINE)!;
+    expect(at).toEqual({ x: 210, y: 10 });
+
+    // Which is to say: placed there, the accent's own anchor lands on the
+    // letter's.
+    const placed = { x: 40 + at.x, y: 690 + at.y };
+    expect(placed).toEqual({ x: 250, y: 700 });
+  });
+
+  it("solves it under a transform that is already scaling the accent", () => {
+    const half = { ...IDENTITY_AFFINE, xScale: 0.5, yScale: 0.5 };
+    const at = attachmentOffset(letter(), accent(), half)!;
+    // The mark anchor is carried by the scale first: 40 and 690 halve.
+    expect(at).toEqual({ x: 230, y: 355 });
+  });
+
+  it("has no answer where the two share no pair", () => {
+    const bare = glyph("acute", { advance: 0 });
+    expect(attachmentOffset(letter(), bare, IDENTITY_AFFINE)).toBeNull();
+
+    // A base anchor on the accent is not a mark anchor: only `_top` attaches.
+    const wrong = addAnchor(glyph("acute"), anchor("k3", "top", { x: 40, y: 690 }));
+    expect(attachmentOffset(letter(), wrong, IDENTITY_AFFINE)).toBeNull();
+
+    // And a letter without the anchor the accent names.
+    expect(attachmentOffset(glyph("b"), accent(), IDENTITY_AFFINE)).toBeNull();
+  });
+});
+
+describe("decomposing", () => {
+  it("draws the components in as contours and gives up the references", () => {
+    const composed = addGlyphComponent(
+      glyph("aacute", { advance: 500 }),
+      component("k1", "acute", { ...IDENTITY_AFFINE, xOffset: 10 }),
+    );
+    const out = decomposedGlyph(composed, () => [
+      contour("c9", [node("n9", { x: 0, y: 0 }), node("n10", { x: 10, y: 10 })], false),
+    ]);
+
+    expect(out.components).toHaveLength(0);
+    expect(out.contours).toHaveLength(1);
+    expect(out.contours[0]!.nodes).toHaveLength(2);
+  });
+
+  it("leaves a glyph with nothing to decompose exactly as it was", () => {
+    const plain = glyph("a", { advance: 500 });
+    expect(decomposedGlyph(plain, () => [])).toBe(plain);
   });
 });

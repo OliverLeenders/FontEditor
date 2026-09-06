@@ -1,11 +1,13 @@
-import { distance, vec } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE, distance, vec } from "@fonteditor/geometry";
 import {
   type Contour,
   type FontDocument,
   type Glyph,
   addAnchor,
   addContour,
+  addGlyphComponent,
   anchor,
+  component,
   contour,
   counterIds,
   fontDocument,
@@ -1276,5 +1278,83 @@ describe("anchors on the canvas", () => {
     const { state } = withAnchor();
     const press = pointerDown(state, pointerInput(vec(320, 760)), { anchors: false });
     expect(press.state.gesture?.kind).not.toBe("dragAnchor");
+  });
+});
+
+describe("components on the canvas", () => {
+  /** A composite: an empty `x` with the arch placed inside it, offset. */
+  const composite = (): { state: EditorState; id: string } => {
+    const arched = addContour(glyph("n", { advance: 640 }), arch());
+    const owner = addGlyphComponent(
+      glyph("x", { advance: 640 }),
+      component("k1", "n", { ...IDENTITY_AFFINE, xOffset: 0, yOffset: 0 }),
+    );
+
+    return {
+      state: editorState({
+        document: fontDocument([arched, owner]),
+        view: VIEW,
+        currentGlyph: "x",
+      }),
+      id: "k1",
+    };
+  };
+
+  const placedAt = (s: EditorState) => s.document.glyphs["x"]!.components[0]!.transform;
+
+  it("is picked by the shape it draws, and dragged by its offset", () => {
+    const { state, id } = composite();
+
+    // A point on the arch, which belongs to the glyph being referred to — there
+    // is nothing of this glyph's own there to pick instead.
+    const moved = drag(state, vec(320, 690), [vec(340, 700), vec(360, 710)]);
+
+    expect(moved.selectedComponent).toBe(id);
+    expect(placedAt(moved)).toMatchObject({ xOffset: 40, yOffset: 20 });
+    // The glyph it refers to is untouched: what moved was the reference.
+    expect(moved.document.glyphs["n"]).toBe(state.document.glyphs["n"]);
+  });
+
+  it("says what it has hold of, and lets go on a press elsewhere", () => {
+    const { state } = composite();
+    const held = drag(state, vec(320, 690), [vec(330, 700)]);
+    expect(held.selectedComponent).not.toBeNull();
+
+    expect(pointerDown(held, pointerInput(vec(20, 20))).state.selectedComponent).toBeNull();
+  });
+
+  it("is one undoable step from press to release", () => {
+    const { state } = composite();
+    const down = pointerDown(state, pointerInput(vec(320, 690)));
+    expect(down.effects).toEqual([{ kind: "beginTransaction", label: "Move component" }]);
+  });
+
+  it("is what Backspace removes while it is the thing selected", () => {
+    const { state } = composite();
+    const held = drag(state, vec(320, 690), [vec(330, 700)]);
+
+    const after = keyDown(held, keyInput("Backspace")).state;
+    expect(after.document.glyphs["x"]!.components).toHaveLength(0);
+  });
+
+  it("never wins a press over the glyph's own outline", () => {
+    // The same shape drawn twice: once as this glyph's contour, once as a
+    // component of it. What is editable here has to win, or the points would be
+    // unreachable wherever a component sits over them.
+    const { state } = composite();
+    const both: EditorState = {
+      ...state,
+      document: {
+        ...state.document,
+        glyphs: {
+          ...state.document.glyphs,
+          x: addContour(state.document.glyphs["x"]!, arch()),
+        },
+      },
+    };
+
+    const press = pointerDown(both, pointerInput(vec(320, 700)));
+    expect(press.state.selectedComponent).toBeNull();
+    expect(press.state.selection.length).toBeGreaterThan(0);
   });
 });

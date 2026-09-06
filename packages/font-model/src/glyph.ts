@@ -139,6 +139,23 @@ export function updateGlyphComponent(
   return { ...g, components };
 }
 
+/**
+ * The same glyph with its components drawn into it as contours.
+ *
+ * The one operation that gives up the reference on purpose: after this the shape
+ * is the glyph's own, and correcting the letter it came from will not correct
+ * this any more. That is exactly what it is for — a composite that has to be
+ * departed from, an accent nudged for one letter only, a font going somewhere
+ * that cannot follow references.
+ *
+ * Returns the glyph unchanged when it has no components, so a caller can tell
+ * whether anything happened by comparing references.
+ */
+export function decomposedGlyph(g: Glyph, resolve: (g: Glyph) => readonly Contour[]): Glyph {
+  if (g.components.length === 0) return g;
+  return { ...g, contours: [...g.contours, ...resolve(g)], components: [] };
+}
+
 /** True when the glyph draws nothing of its own and is purely assembled. */
 export function isComposite(g: Glyph): boolean {
   return g.contours.length === 0 && g.components.length > 0;

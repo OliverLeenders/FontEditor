@@ -11,7 +11,7 @@ derives from the reverse-engineering write-up in
 
 **A font drawn here can be exported and installed.** Five workspaces — Font, Glyph,
 Spacing, Features, Proof — around a canvas with select, pen, knife, rectangle, ellipse
-and measure tools, snapping, boolean union, components, kerning, a `.fea` subset, and
+and measure tools, snapping, boolean union, anchors and components, kerning, a `.fea` subset, and
 OTF and UFO in both directions. Everything autosaves.
 
 | Phase |                                     | Status                                                            |
@@ -53,6 +53,12 @@ The gaps worth naming, in the order they would bite someone using this:
   as drawn. Where the boolean refuses — a boundary that will not close — the overlap goes
   into the font and the glyph is named in the export warnings. The UFO is written as drawn, overlaps and all: it is source, and the
   tools that read it remove overlaps themselves.
+
+- **Anchors are stored and drawn, and not yet compiled.** A letter carries `top`, an
+  accent carries `_top`, and a component placed in a glyph lands where the pair says it
+  belongs — which is what makes accents follow the letter when its anchor moves. The UFO
+  carries them both ways, format 1 and 2. What is not there yet is GPOS mark attachment:
+  the OTF gets the accent drawn in the right place, not a rule that would place it.
 
 - **Contour directions are corrected where the font is compiled, not in the drawing.**
   A rasteriser fills one path by the non-zero winding rule, so two contours that overlap
@@ -134,6 +140,14 @@ knob or by a number typed into the inspector: it lies along the shape rather tha
 standing upright round it, and its handles then scale along its own axes. Ctrl-Z undoes
 and Ctrl-Shift-Z redoes, and either stands the box upright again — how far the points
 were turned is not part of the history.
+
+**Anchors and components.** Right-click empty canvas to put an anchor down; it is a
+small cross, named on hover, dragged like a point and snapped to the same lines. The
+inspector lists them with an editable name and coordinates. A component is added by name
+in the inspector and lands on its anchors where both glyphs have a matching pair — an
+`acute` carrying `_top` on a letter carrying `top` — and at the origin otherwise. Drag one
+by the shape it draws, type its offset, right-click it to open the glyph it refers to,
+put it back where the anchors say, or decompose the glyph and keep the outlines.
 
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,
 reverse contour and delete. A handle offers the axis lock, its node's type, retract,

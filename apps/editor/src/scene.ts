@@ -1,6 +1,7 @@
 import type { Vec2 } from "@fonteditor/geometry";
 import {
   type ComponentSource,
+  type Contour,
   type FontDocument,
   type Glyph,
   filledContours,
@@ -169,10 +170,14 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
     // drawn: the compiler corrects their directions, and a preview that showed
     // a notch the font will not have would be lying in the other direction.
     filled: filledContours(glyph),
-    componentOutlines:
-      glyph.components.length === 0
+    // The one being worked on is resolved apart from the others, so the
+    // renderer can outline it without having to know which contour came
+    // from which reference.
+    componentOutlines: resolvedComponents(glyph, source, (c) => c.id !== editor.selectedComponent),
+    selectedComponentOutlines:
+      editor.selectedComponent === null
         ? []
-        : resolveGlyphComponents(source, glyph.name, glyph.components, outlineIds),
+        : resolvedComponents(glyph, source, (c) => c.id === editor.selectedComponent),
     view: editor.view,
     viewport: size,
     palette: palette(),
@@ -212,6 +217,17 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
       showAnchors: state.showAnchors,
     },
   });
+}
+
+/** What some of a glyph's components draw, resolved for one frame. */
+function resolvedComponents(
+  glyph: Glyph,
+  source: ComponentSource,
+  wanted: (c: Glyph["components"][number]) => boolean,
+): Contour[] {
+  const chosen = glyph.components.filter(wanted);
+  if (chosen.length === 0) return [];
+  return resolveGlyphComponents(source, glyph.name, chosen, outlineIds);
 }
 
 /**

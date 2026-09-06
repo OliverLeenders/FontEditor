@@ -65,6 +65,8 @@ export type RenderPalette = {
    */
   readonly anchor: string;
   readonly anchorSelected: string;
+  /** The component being worked on, so a drag says what it has hold of. */
+  readonly componentSelected: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -96,6 +98,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   component: "rgba(19,25,34,0.55)",
   anchor: "#2E8B72",
   anchorSelected: "#A96F22",
+  componentSelected: "#A96F22",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -127,4 +130,5 @@ export const DARK_PALETTE: RenderPalette = {
   component: "rgba(229,235,242,0.55)",
   anchor: "#5FBFA0",
   anchorSelected: "#D6A05A",
+  componentSelected: "#D6A05A",
 };

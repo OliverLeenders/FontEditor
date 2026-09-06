@@ -1,11 +1,13 @@
 import { type Vec2, about, add, keepsAxes, rotation, sub } from "@fonteditor/geometry";
 import {
   type AnchorId,
+  type ComponentId,
   type ContourId,
   type Glyph,
   type NodeId,
   contourById,
   metricLines,
+  movedComponent,
   moveAnchorTo,
   moveSegmentTunniLine,
   nodeById,
@@ -18,6 +20,7 @@ import {
   translateNodes,
   updateContour,
   updateGlyph,
+  updateGlyphComponent,
 } from "@fonteditor/font-model";
 import {
   type BoxFrame,
@@ -221,6 +224,36 @@ export function startBoxTransform(
       },
     },
     [begin(handle.action === "rotate" ? "Rotate" : "Scale", false)],
+  );
+}
+
+/**
+ * Begin dragging a component.
+ *
+ * The point selection goes, as it does for an anchor: what is being moved is a
+ * placed glyph, and a box round points that are staying put would say otherwise.
+ */
+export function startComponentDrag(
+  state: EditorState,
+  input: PointerInput,
+  componentId: ComponentId,
+): ToolResult {
+  return result(
+    {
+      ...state,
+      selection: [],
+      selectedAnchor: null,
+      selectedComponent: componentId,
+      gesture: {
+        kind: "dragComponent",
+        origin: input.point,
+        componentId,
+        before: state.document,
+        moved: false,
+        snapped: NO_HOLD,
+      },
+    },
+    [begin("Move component")],
   );
 }
 
@@ -565,6 +598,27 @@ const CONTINUE: Continuations = {
     const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
       updateContour(g, gesture.contourId, (c) =>
         setHandle(c, gesture.nodeId, gesture.part, snapped.point, gesture.breakSmooth),
+      ),
+    );
+    return {
+      ...state,
+      document: document ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta), snapped: snapped.hold },
+    };
+  },
+
+  dragComponent: (state, gesture, input, delta, options) => {
+    // Only the grid and the font's own lines: the outlines a component draws
+    // belong to another glyph, so there is nothing of *this* drawing for them
+    // to line up with except the metrics — and an accent lining itself up with
+    // the letter under it is what anchors are for.
+    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const snapping = snappingFor(state, input, options, started, []);
+    const snapped = snapDelta([gesture.origin], delta, snapping, gesture.snapped);
+
+    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+      updateGlyphComponent(g, gesture.componentId, (c) =>
+        movedComponent(c, snapped.delta.x, snapped.delta.y),
       ),
     );
     return {
