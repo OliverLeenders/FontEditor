@@ -8,6 +8,7 @@ import {
   deleteSelectedPoints,
   insertPointOnSegment,
   nodeCanBeTangent,
+  selectContour,
   nodeHasMissingHandle,
   nodeHvLocked,
   retractHandle,
@@ -99,6 +100,12 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     items.push(
       {
         kind: "item",
+        label: "Select contour",
+        run: () => store.applyTool(selectContour(editor, contourId)),
+      },
+      { kind: "separator" },
+      {
+        kind: "item",
         label: "Corner",
         run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
       },
@@ -183,6 +190,12 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       { kind: "separator" },
       {
         kind: "item",
+        label: "Select contour",
+        run: () => store.applyTool(selectContour(editor, contourId)),
+      },
+      { kind: "separator" },
+      {
+        kind: "item",
         label: "Corner",
         run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
       },
@@ -246,6 +259,15 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       ? { contourId: target.contourId, segmentIndex: target.segmentIndex }
       : null;
   if (segment === null) return items;
+
+  items.push(
+    {
+      kind: "item",
+      label: "Select contour",
+      run: () => store.applyTool(selectContour(editor, segment.contourId)),
+    },
+    { kind: "separator" },
+  );
 
   // The segment actions are offered for all three segment-bearing targets, not
   // just the curve itself. A Tunni point and its line sit directly on top of the

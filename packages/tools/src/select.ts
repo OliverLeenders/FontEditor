@@ -11,7 +11,7 @@ import {
   selectionBounds,
 } from "@fonteditor/view";
 
-import { deleteSelectedPoints, reverseSelectedContour } from "./commands.js";
+import { deleteSelectedPoints, reverseSelectedContour, selectContour } from "./commands.js";
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import {
   EMPTY_GLYPH,
@@ -217,13 +217,35 @@ export function pointerLeave(state: EditorState): ToolResult {
   return result({ ...state, cursor: null, hoveredSegment: null });
 }
 
+/**
+ * The second click.
+ *
+ * On a Tunni point it balances the segment, which is the one thing here that
+ * changes the drawing. Anywhere else on a contour it takes the whole contour:
+ * one click on a segment already gives you its two ends, so this is the next
+ * step out and the same gesture every drawing program uses for it. Shift
+ * gathers a shape made of several contours one at a time.
+ */
 export function doubleClick(
   state: EditorState,
   input: PointerInput,
   options: SelectOptions = {},
 ): ToolResult {
   const target = pickAt(state, input.point, options);
-  if (target === null || target.kind !== "tunniPoint") return result(state);
+  if (target === null) return result(state);
+
+  // Everything that names a contour widens to it. The margins name the glyph
+  // rather than a contour, so a second click on one has nothing to widen to.
+  if (
+    target.kind === "node" ||
+    target.kind === "handleIn" ||
+    target.kind === "handleOut" ||
+    target.kind === "segment" ||
+    target.kind === "tunniLine"
+  ) {
+    return selectContour(state, target.contourId, input.modifiers.shift);
+  }
+  if (target.kind !== "tunniPoint") return result(state);
 
   const document = editCurrentGlyph(state, (g) =>
     updateContour(g, target.contourId, (c) => balanceSegment(c, target.segmentIndex)),

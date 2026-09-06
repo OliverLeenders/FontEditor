@@ -78,7 +78,9 @@ import {
   type SegmentRef,
   type Selection,
   type SelectionItem,
+  addItems,
   itemPoint,
+  sameItem,
   selectionBounds,
 } from "@fonteditor/view";
 
@@ -1106,4 +1108,41 @@ export function transformSelection(
     !keepsAxes(transform),
   );
   return done(state, document === null ? null : { ...state, document }, label);
+}
+
+/**
+ * Select every on-curve point of one contour.
+ *
+ * The handles are left out for the same reason the arrow keys leave them out: a
+ * point carries its own, so selecting both would say twice what is about to
+ * move. What this is for is the whole letter-shape at once — to transform it, to
+ * nudge it, to see its box.
+ *
+ * `additive` adds to what is already selected rather than replacing it, so a
+ * shape made of several contours can be gathered one at a time.
+ */
+export function selectContour(
+  state: EditorState,
+  contourId: ContourId,
+  additive = false,
+): ToolResult {
+  const glyph = currentGlyph(state);
+  const c = glyph === null ? null : contourById(glyph, contourId);
+  if (c === null || c.nodes.length === 0) return result(state);
+
+  const items: Selection = c.nodes.map((n) => ({
+    contourId,
+    nodeId: n.id,
+    part: "point" as const,
+  }));
+  const selection = additive ? addItems(state.selection, items) : items;
+
+  // The same selection is not a change, and handing back a new array would mark
+  // the session dirty and set the autosave going for nothing.
+  return result(sameSelection(selection, state.selection) ? state : { ...state, selection });
+}
+
+/** Whether two selections hold the same things, in the same order. */
+function sameSelection(a: Selection, b: Selection): boolean {
+  return a.length === b.length && a.every((item, i) => sameItem(item, b[i]!));
 }

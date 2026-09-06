@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1424 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1433 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -84,7 +84,9 @@ dragging to leave only one handle, click the first point to close, Enter or Esca
 finish open, Backspace to take a point back.
 
 With the select tool: drag nodes, handles, the blue Tunni line and the amber Tunni
-point. Double-click a Tunni point to balance the segment. Shift extends the selection,
+point. Double-click a Tunni point to balance the segment. Double-click a contour — a point of it, a handle, or the curve itself — to select all of
+its points, and hold shift to gather another contour with it; the same is in the
+right-click menu. Shift extends the selection,
 Alt breaks a smooth node's handle link, arrow keys nudge, Backspace deletes selected
 points, `R` reverses the contour, and Escape cancels a drag. A point with a straight
 segment on one side and a curve on the other can be made **tangent**, from the inspector

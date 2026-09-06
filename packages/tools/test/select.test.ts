@@ -17,6 +17,7 @@ import {
 import type { Selection, ViewTransform } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
+import { selectContour } from "../src/commands.js";
 import { pointerInput, keyInput } from "../src/input.js";
 import {
   cancel,
@@ -997,5 +998,84 @@ describe("the box round a selection", () => {
     const box = selectionBox(start)!;
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY))).state;
     expect(grabbed.selection).toEqual(start.selection);
+  });
+});
+
+describe("selecting a whole contour", () => {
+  /** Two contours, so gathering one does not gather the other. */
+  const two = (): EditorState => {
+    const ids = counterIds("sc");
+    const outer = contour(
+      ids.contour(),
+      [node("o0", vec(0, 0)), node("o1", vec(100, 0)), node("o2", vec(100, 100))],
+      true,
+    );
+    const inner = contour(
+      ids.contour(),
+      [node("i0", vec(20, 20)), node("i1", vec(60, 20)), node("i2", vec(60, 60))],
+      true,
+    );
+    const document = fontDocument([glyph("a", { advance: 200, contours: [outer, inner] })]);
+    return editorState({ document, view: VIEW, currentGlyph: "a" });
+  };
+
+  const ids = (s: EditorState) => s.selection.map((i) => i.nodeId);
+  const contourIdOf = (s: EditorState, at: number) => firstGlyph(s.document).contours[at]!.id;
+
+  it("takes every on-curve point and no handles", () => {
+    const s = two();
+    const out = selectContour(s, contourIdOf(s, 0)).state;
+    expect(ids(out)).toEqual(["o0", "o1", "o2"]);
+    expect(out.selection.every((i) => i.part === "point")).toBe(true);
+  });
+
+  it("replaces what was selected", () => {
+    const s = two();
+    const first = selectContour(s, contourIdOf(s, 1)).state;
+    const second = selectContour(first, contourIdOf(s, 0)).state;
+    expect(ids(second)).toEqual(["o0", "o1", "o2"]);
+  });
+
+  it("adds to it when asked, so a shape of several contours can be gathered", () => {
+    const s = two();
+    const first = selectContour(s, contourIdOf(s, 0)).state;
+    const both = selectContour(first, contourIdOf(s, 1), true).state;
+    expect(ids(both)).toEqual(["o0", "o1", "o2", "i0", "i1", "i2"]);
+  });
+
+  it("is not a change when the same contour is already the selection", () => {
+    // A new array every time would mark the session dirty and set the autosave
+    // going for nothing.
+    const once = selectContour(two(), contourIdOf(two(), 0)).state;
+    expect(selectContour(once, contourIdOf(once, 0)).state).toBe(once);
+  });
+
+  it("does nothing for a contour that is not there", () => {
+    const s = two();
+    expect(selectContour(s, "nope").state).toBe(s);
+  });
+
+  it("comes from a second click on the contour", () => {
+    const s = two();
+    // On a segment of the outer contour, between its first two points.
+    const out = doubleClick(s, pointerInput(vec(50, 0)));
+    expect(ids(out.state)).toEqual(["o0", "o1", "o2"]);
+  });
+
+  it("comes from a second click on one of its points too", () => {
+    const s = two();
+    expect(ids(doubleClick(s, pointerInput(vec(100, 100))).state)).toEqual(["o0", "o1", "o2"]);
+  });
+
+  it("gathers a second contour when shift is held", () => {
+    const s = two();
+    const first = doubleClick(s, pointerInput(vec(50, 0))).state;
+    const both = doubleClick(first, pointerInput(vec(40, 20), { shift: true })).state;
+    expect(ids(both)).toEqual(["o0", "o1", "o2", "i0", "i1", "i2"]);
+  });
+
+  it("leaves a second click on empty canvas alone", () => {
+    const s = two();
+    expect(doubleClick(s, pointerInput(vec(900, 900))).state).toBe(s);
   });
 });

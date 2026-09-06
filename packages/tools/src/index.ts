@@ -85,6 +85,7 @@ export {
   nudgeSidebearing,
   nodeCanBeTangent,
   nodeHasMissingHandle,
+  selectContour,
   selectedCanBeTangent,
   transformOriginPoint,
   transformSelection,
