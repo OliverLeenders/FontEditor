@@ -7,6 +7,7 @@ import {
   correctDirections,
   counterIds,
   kernIndex,
+  removeOverlap,
   resolveGlyphComponents,
   segments,
 } from "@fonteditor/font-model";
@@ -91,19 +92,53 @@ function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Con
 }
 
 /**
+ * One outline out of overlapping ones, because CFF does not allow overlaps.
+ *
+ * The OpenType specification is flat about it: `glyf` supports overlapping
+ * contours and CFF2 supports them, and the CFF outlines written here do not —
+ * CFF CharStrings are filled by the even-odd rule, under which two shapes
+ * subtract where they cross. Most rasterisers are lenient and fill by winding
+ * anyway, which is why a font with overlaps can look perfect in a browser and
+ * come out of a Windows preview or a printer with a notch where a stem crosses
+ * a shoulder.
+ *
+ * So the union is taken here, on the way into the file, and the drawing is left
+ * exactly as it was drawn — the same arrangement every font tool has, where a
+ * designer keeps the pieces apart and the compiler joins them.
+ *
+ * Refused rather than guessed when two edges lie along each other: there are no
+ * crossings to split at, and a guess would silently reshape the letter. That is
+ * worth a warning, because it is a glyph to go and look at.
+ */
+function unioned(
+  g: Glyph,
+  contours: readonly Contour[],
+  ids: IdFactory,
+  warnings: string[],
+): readonly Contour[] {
+  // Components are already resolved into `contours`; passing them again would
+  // draw each of them twice.
+  const union = removeOverlap({ ...g, contours, components: [] }, ids);
+  if (union !== null) return union.glyph.contours;
+
+  warnings.push(
+    `${g.name}: contours overlap along an edge and could not be joined, so the overlap is in the font.`,
+  );
+  return contours;
+}
+
+/**
  * The contours as the file needs them: each running the way its nesting says.
  *
- * A rasteriser fills one path by the non-zero winding rule, so two contours that
- * overlap must run the same way round or the overlap is subtracted — a stem
- * crossing a shoulder comes out with a notch in it. Which way a contour runs is
- * an accident of the order its points were placed, so it is put right here,
- * where the font is compiled, and the drawing is left exactly as it was drawn.
+ * Which way a contour runs is an accident of the order its points were placed,
+ * and it decides what a rasteriser filling by the winding rule takes for ink: a
+ * counter must run against what holds it or it is not a hole. Put right here,
+ * where the font is compiled, so the drawing stays as drawn.
  *
- * Not reported. A warning is for something to act on, and this is the compiler
- * doing its job: which way a contour runs is not a decision anyone made, and
- * nearly every hand-drawn glyph would carry the note. The editor fills the
- * corrected contours too, so nothing about it is hidden — what is on the canvas
- * is what the file will draw.
+ * Not reported, unlike the union above. A warning is for something to act on,
+ * and this is the compiler doing its job — nearly every hand-drawn glyph would
+ * carry the note. The editor fills the corrected contours too, so what is on the
+ * canvas is what the file will draw.
  */
 function directed(contours: readonly Contour[]): readonly Contour[] {
   return correctDirections(contours);
@@ -181,7 +216,7 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
     } = {
       name: g.name,
       advanceWidth: Math.max(0, Math.round(g.advance)),
-      path: pathFor(g, directed(flatten(g, document, ids)), warnings),
+      path: pathFor(g, directed(unioned(g, flatten(g, document, ids), ids, warnings)), warnings),
     };
 
     // Several code points can map to one glyph, and dropping the extras would

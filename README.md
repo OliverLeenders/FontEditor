@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1571 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1576 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -44,6 +44,17 @@ The gaps worth naming, in the order they would bite someone using this:
   there to show the letter you are drawing beside its neighbours. Positioning rules are
   applied to both as well — a glyph moves where the rule says and the pen moves by the
   advance the rule gave it.
+- **Overlaps are removed where the font is compiled, and the drawing keeps them.** CFF —
+  the outline format an OTF written here carries — does not allow overlapping contours:
+  its CharStrings are filled by the even-odd rule, under which two shapes subtract where
+  they cross. Most rasterisers are lenient and fill by winding anyway, which is why a font
+  with overlaps looks perfect in a browser and comes out of a Windows preview with a notch
+  where a stem crosses a shoulder. So the exporter takes the union, and the drawing is left
+  as drawn. Where the boolean refuses — two edges lying exactly along each other, or a
+  tangency it cannot chain — the overlap goes into the font and the glyph is named in the
+  export warnings. The UFO is written as drawn, overlaps and all: it is source, and the
+  tools that read it remove overlaps themselves.
+
 - **Contour directions are corrected where the font is compiled, not in the drawing.**
   A rasteriser fills one path by the non-zero winding rule, so two contours that overlap
   must run the same way round or the overlap is subtracted — a stem crossing a shoulder
