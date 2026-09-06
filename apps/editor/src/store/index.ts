@@ -230,9 +230,16 @@ export class EditorStore {
     const { viewport } = this.state;
     if (viewport.width === width && viewport.height === height) return;
 
-    const first = viewport.width === 0;
+    // The first *useful* size, not merely the first non-zero one. A canvas
+    // measured before the page has laid out is zero, which the surface reports
+    // as 1×1 — and fitting a glyph to a one-pixel window is a zoom nobody wants.
+    // Worse, the real size arriving a frame later then counted as "not the
+    // first", so the view stayed at that nonsense and the glyph opened off
+    // screen until somebody pressed ctrl-0.
+    const useful = width > 1 && height > 1;
+    const wasUseful = viewport.width > 1 && viewport.height > 1;
     this.patch({ viewport: { width, height } });
-    if (first) this.fitGlyph();
+    if (useful && !wasUseful) this.fitGlyph();
   }
 
   fitGlyph(): void {

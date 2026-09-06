@@ -9,6 +9,7 @@ import {
 } from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
+import { inParallel } from "./parallel.js";
 
 import {
   type StoredGlyph,
@@ -93,12 +94,14 @@ export type SaveReport = {
 };
 
 export async function saveGlyphs(store: FileStore, glyphs: readonly Glyph[]): Promise<SaveReport> {
-  const written: string[] = [];
-  for (const g of glyphs) {
+  // A few at a time rather than one: importing a font writes every glyph it
+  // has, and a thousand awaited round trips end to end is most of the time it
+  // takes to open one.
+  const written = await inParallel(glyphs, async (g) => {
     const path = glyphPath(g.name);
     await store.write(path, JSON.stringify(encodeGlyph(g)));
-    written.push(path);
-  }
+    return path;
+  });
   return { written };
 }
 
@@ -110,9 +113,7 @@ export async function saveDocument(
   const changed = dirtyGlyphs(previous, document);
   const report = await saveGlyphs(store, changed);
 
-  for (const name of removedGlyphs(previous, document)) {
-    await store.remove(glyphPath(name));
-  }
+  await inParallel(removedGlyphs(previous, document), (name) => store.remove(glyphPath(name)));
 
   // The index is small and cheap; rewriting it whenever anything moved keeps it
   // honest about which glyphs exist and in what order.
@@ -148,21 +149,20 @@ export async function replaceDocument(
   store: FileStore,
   document: FontDocument,
 ): Promise<{ readonly written: number; readonly removed: number }> {
-  const keep = new Set<string>();
-  for (const name of document.glyphOrder) {
-    const g = document.glyphs[name];
-    if (g === undefined) continue;
-    const path = glyphPath(g.name);
-    await store.write(path, JSON.stringify(encodeGlyph(g)));
-    keep.add(path);
-  }
+  const wanted = document.glyphOrder
+    .map((name) => document.glyphs[name])
+    .filter((g): g is Glyph => g !== undefined);
+  const keep = new Set(
+    await inParallel(wanted, async (g) => {
+      const path = glyphPath(g.name);
+      await store.write(path, JSON.stringify(encodeGlyph(g)));
+      return path;
+    }),
+  );
 
-  let removed = 0;
-  for (const path of await store.list(GLYPHS_PREFIX)) {
-    if (keep.has(path)) continue;
-    await store.remove(path);
-    removed++;
-  }
+  const stale = (await store.list(GLYPHS_PREFIX)).filter((path) => !keep.has(path));
+  await inParallel(stale, (path) => store.remove(path));
+  const removed = stale.length;
 
   await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
@@ -254,8 +254,15 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
   const problems: string[] = [];
   const glyphs = new Map<string, Glyph>();
 
-  for (const path of await store.list(GLYPHS_PREFIX)) {
-    const raw = await store.read(path);
+  // Read a few at a time, and fold the results in afterwards in the order the
+  // paths came in: which glyph wins a name collision and which problem is
+  // reported first must not depend on which read finished first.
+  const files = await inParallel(await store.list(GLYPHS_PREFIX), async (path) => ({
+    path,
+    raw: await store.read(path),
+  }));
+
+  for (const { path, raw } of files) {
     if (raw === null) continue;
     const decoded = decodeFile(raw);
     if (decoded.ok) glyphs.set(decoded.value.name, decoded.value);
@@ -327,7 +334,7 @@ function decodeFile(raw: string): ReturnType<typeof decodeGlyph> {
 
 /** Remove everything. Used by "start over", and by tests. */
 export async function wipe(store: FileStore): Promise<void> {
-  for (const path of await store.list("")) await store.remove(path);
+  await inParallel(await store.list(""), (path) => store.remove(path));
 }
 
 export { DEFAULT_FONT_INFO, SCHEMA_VERSION };

@@ -147,19 +147,19 @@ const ASCII_NAMES: Readonly<Record<number, string>> = {
 /**
  * What to call a glyph for a given code point.
  *
- * Letters and digits are themselves; the rest of ASCII uses its conventional
- * name; anything else falls back to the `uniXXXX` form the AGL specifies, which
- * is also what the importer invents for an unnamed glyph — so a glyph created
- * here and one read from a file end up called the same thing.
+ * Letters are themselves; digits and the rest of ASCII use their conventional
+ * names, which for a digit is the word — `five`, not `5`, as the AGL has it.
+ * Anything else falls back to the `uniXXXX` form the AGL specifies, which is
+ * also what the importer invents for an unnamed glyph, so a glyph created here
+ * and one read from a file end up called the same thing.
  */
 export function glyphNameForCodePoint(codePoint: number): string {
   const known = ASCII_NAMES[codePoint];
   if (known !== undefined) return known;
 
-  const isDigit = codePoint >= 0x30 && codePoint <= 0x39;
   const isUpper = codePoint >= 0x41 && codePoint <= 0x5a;
   const isLower = codePoint >= 0x61 && codePoint <= 0x7a;
-  if (isDigit || isUpper || isLower) return String.fromCodePoint(codePoint);
+  if (isUpper || isLower) return String.fromCodePoint(codePoint);
 
   if (codePoint > 0xffff) {
     return `u${codePoint.toString(16).toUpperCase().padStart(6, "0")}`;

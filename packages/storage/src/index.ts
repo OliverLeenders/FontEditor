@@ -76,3 +76,5 @@ export type { LoadedProject } from "./client.js";
 export { StorageClient } from "./client.js";
 
 export { OpfsFileStore, requestPersistence } from "./opfs.js";
+
+export { AT_ONCE, inParallel } from "./parallel.js";

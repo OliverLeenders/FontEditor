@@ -228,6 +228,28 @@ describe("EditorStore", () => {
       expect(Number.isFinite(view.ty)).toBe(true);
     });
 
+    it("waits for a size worth fitting to", () => {
+      // A canvas measured before the page has laid out is zero, which the
+      // surface reports as 1×1. Fitting a glyph to a one-pixel window is a zoom
+      // nobody wants — and taking that as "the first viewport" left the real
+      // size, a frame later, counting as not the first, so the glyph opened off
+      // screen until somebody pressed ctrl-0.
+      store.setViewport(1, 1);
+      const unfitted = store.editor.view;
+
+      store.setViewport(800, 600);
+      expect(store.editor.view).not.toBe(unfitted);
+      expect(store.editor.view.scale).toBeLessThan(1);
+    });
+
+    it("does not refit when the window is merely resized", () => {
+      store.setViewport(800, 600);
+      const view = store.editor.view;
+      store.setViewport(900, 700);
+      // Framing again under the reader would move the drawing while they work.
+      expect(store.editor.view).toBe(view);
+    });
+
     it("ignores a viewport that has not changed", () => {
       store.setViewport(800, 600);
       const view = store.editor.view;
