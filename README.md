@@ -19,14 +19,34 @@ OTF and UFO in both directions. Everything autosaves.
 | 0     | Foundations and the geometry kernel | done                                                              |
 | 1     | The editing surface                 | done                                                              |
 | 2     | Undo, redo, persistence             | done                                                              |
-| 3     | From paths to a glyph               | done                                                              |
+| 3     | From paths to a glyph               | done, and anchors with it                                         |
 | 4     | From a glyph to a font              | done                                                              |
 | 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools |
 | 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                  |
 | 7     | Spacing and kerning                 | done                                                              |
-| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
+| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks   |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1581 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1674 tests, run on CI; preferences persist       |
+
+### What the table missed
+
+Ten phases were enough to get a font out of the door and not enough to describe the
+work. These are the things that turned out to be missing from the plan rather than
+from the code — some now done, the rest in roughly the order they would be reached
+for.
+
+| What is missing                            | State       | Why it is missing                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Anchors and mark attachment**            | done        | Not a phase at all, and it belongs to two: a glyph carries them, and they compile. Placing accents by hand is the thing this replaces.                                                                                                                                                                   |
+| **Not dropping what we do not understand** | half done   | Twice now a reader has quietly discarded what it had no field for — anchors from a `.glif`, then anchors from our own autosave. Both are fixed; guidelines, notes, glyph `lib` and every `fontinfo` key beyond seven are still discarded, and a UFO from another tool comes back poorer than it went in. |
+| **Font metadata**                          | not started | The info model holds seven fields. A released font also needs a version, a licence, a designer, an italic angle, weight and width classes, a vendor id, and typographic family names — without which an italic does not announce itself as one and a family of more than four styles groups wrongly.     |
+| **Curve quality**                          | not started | The Tunni line says what one segment is doing. Nothing yet says whether two segments agree — curvature combs, and the harmonising that follows from reading one.                                                                                                                                         |
+| **Guides, and something to trace**         | not started | A glyph holds no guides of its own, and there is no way to put a scan or a reference letter behind the drawing.                                                                                                                                                                                          |
+| **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                           |
+| **A file on disk**                         | not started | Work lives in the browser's private filesystem and leaves it only as an export. Opening and saving a project where the user can see it is not the same thing.                                                                                                                                            |
+| **`glyf` outlines**                        | not started | Everything written is CFF. A TrueType flavour is what hinting and most web pipelines want, and it is also the outline format that permits the overlaps this removes.                                                                                                                                     |
+| **Preflight**                              | not started | Open contours, duplicate points, off-grid coordinates, a composite whose base is missing, an accent with no anchor to land on: all findable, none reported anywhere.                                                                                                                                     |
+| **Testing the interface**                  | not started | Every package below `apps/editor` is tested; the React in it is not, for want of a DOM testing library.                                                                                                                                                                                                  |
 
 ### What the table is hiding
 
