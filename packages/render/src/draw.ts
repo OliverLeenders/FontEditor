@@ -14,9 +14,12 @@ import {
   type SegmentRef,
   type ViewTransform,
   BOX_ANCHORS,
+  BOX_STEM_PIXELS,
   boxHandlePoint,
+  boxRotatePoint,
   handleIsVisible,
   sameSegment,
+  screenTolerance,
   selectionKey,
   toScreen,
 } from "@fonteditor/view";
@@ -794,14 +797,19 @@ export function drawComponents(ctx: Canvas2D, s: Scene): void {
  * same size however far you have zoomed in.
  */
 export function drawTransformBox(ctx: Canvas2D, s: Scene): void {
-  if (s.transformBox === null) return;
+  const frame = s.transformBox;
+  if (frame === null) return;
 
-  const a = toScreen(s.view, { x: s.transformBox.minX, y: s.transformBox.minY });
-  const b = toScreen(s.view, { x: s.transformBox.maxX, y: s.transformBox.maxY });
-  const left = Math.min(a.x, b.x);
-  const top = Math.min(a.y, b.y);
-  const width = Math.abs(b.x - a.x);
-  const height = Math.abs(b.y - a.y);
+  // Traced corner to corner rather than as a rectangle, because the box can be
+  // held at an angle and a rectangle in screen coordinates cannot be.
+  const corner = (at: "topLeft" | "topRight" | "bottomRight" | "bottomLeft") =>
+    toScreen(s.view, boxHandlePoint(frame, at));
+  const outline = [
+    corner("topLeft"),
+    corner("topRight"),
+    corner("bottomRight"),
+    corner("bottomLeft"),
+  ];
 
   // Dashed, so it is never mistaken for something the font contains.
   ctx.save();
@@ -809,7 +817,21 @@ export function drawTransformBox(ctx: Canvas2D, s: Scene): void {
   ctx.strokeStyle = s.palette.marqueeStroke;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.rect(left + 0.5, top + 0.5, width, height);
+  outline.forEach((p, i) => {
+    if (i === 0) ctx.moveTo(p.x, p.y);
+    else ctx.lineTo(p.x, p.y);
+  });
+  ctx.closePath();
+  ctx.stroke();
+
+  // The knob's stem, drawn under the handles and dashed with the box it belongs
+  // to. It runs from the top edge, which is the one place on the box where
+  // nothing else is going on.
+  const top = toScreen(s.view, boxHandlePoint(frame, "top"));
+  const knob = toScreen(s.view, boxRotatePoint(frame, screenTolerance(s.view, BOX_STEM_PIXELS)));
+  ctx.beginPath();
+  ctx.moveTo(top.x, top.y);
+  ctx.lineTo(knob.x, knob.y);
   ctx.stroke();
   ctx.restore();
 
@@ -820,10 +842,17 @@ export function drawTransformBox(ctx: Canvas2D, s: Scene): void {
   ctx.strokeStyle = s.palette.marqueeStroke;
   ctx.lineWidth = 1;
   for (const at of BOX_ANCHORS) {
-    const p = toScreen(s.view, boxHandlePoint(s.transformBox, at));
+    const p = toScreen(s.view, boxHandlePoint(frame, at));
     ctx.beginPath();
     ctx.rect(Math.round(p.x) - size + 0.5, Math.round(p.y) - size + 0.5, size * 2, size * 2);
     ctx.fill();
     ctx.stroke();
   }
+
+  // Round, where the eight are square: it turns rather than resizes, and the
+  // shape is the only thing saying so before you take hold of it.
+  ctx.beginPath();
+  ctx.arc(Math.round(knob.x) + 0.5, Math.round(knob.y) + 0.5, size + 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
 }

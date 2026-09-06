@@ -2,9 +2,11 @@ import {
   type Affine,
   type Vec2,
   about,
+  applyAffine,
   isTranslation,
   keepsAxes,
   project,
+  rotation,
 } from "@fonteditor/geometry";
 import {
   type ComponentId,
@@ -80,14 +82,20 @@ import {
   type SelectionItem,
   addItems,
   itemPoint,
-  sameItem,
+  sameSelection,
   selectionBounds,
 } from "@fonteditor/view";
 
 import { type ToolResult, begin, commit, result } from "./effects.js";
 import { translateSelection } from "./gestures.js";
 import { transformedDocument } from "./transform.js";
-import { type EditorState, currentGlyph, editCurrentGlyph } from "./state.js";
+import {
+  type EditorState,
+  boxAngle,
+  currentGlyph,
+  editCurrentGlyph,
+  turnedFrame,
+} from "./state.js";
 
 /**
  * One-shot edits, as opposed to gestures.
@@ -1051,17 +1059,26 @@ export function transformOriginPoint(state: EditorState, origin: TransformOrigin
   if (origin.kind === "origin") return { x: 0, y: 0 };
 
   const glyph = currentGlyph(state);
-  const box = glyph === null ? null : selectionBounds(glyph, state.selection);
+  // In the frame the box is drawn in, so that "the top left of the selection"
+  // names the corner the user can see rather than the corner of an upright
+  // rectangle nothing is being held in.
+  const angle = boxAngle(state);
+  const frame = angle === 0 ? undefined : rotation(-angle);
+  const box = glyph === null ? null : selectionBounds(glyph, state.selection, frame);
   if (box === null) return null;
 
   const middleX = (box.minX + box.maxX) / 2;
-  if (origin.kind === "baseline") return { x: middleX, y: 0 };
+  const back = (p: Vec2): Vec2 => (angle === 0 ? p : applyAffine(rotation(angle), p));
 
-  return {
+  // The baseline is the plane's, not the frame's: y = 0 is where the font sits,
+  // whatever angle the selection is being held at.
+  if (origin.kind === "baseline") return { x: back({ x: middleX, y: 0 }).x, y: 0 };
+
+  return back({
     x: origin.x === "left" ? box.minX : origin.x === "right" ? box.maxX : middleX,
     // Design units are y-up, so the top of the box is its maximum.
     y: origin.y === "bottom" ? box.minY : origin.y === "top" ? box.maxY : (box.minY + box.maxY) / 2,
-  };
+  });
 }
 
 /**
@@ -1087,6 +1104,7 @@ export function transformSelection(
   transform: Affine,
   origin: TransformOrigin,
   label: string,
+  turn = 0,
 ): ToolResult {
   // A transform that changes nothing should not cost an undo entry, and every
   // point would otherwise be rewritten to an equal but distinct value.
@@ -1107,7 +1125,12 @@ export function transformSelection(
     about(transform, centre),
     !keepsAxes(transform),
   );
-  return done(state, document === null ? null : { ...state, document }, label);
+
+  // A turn moves the box as well as the points. The caller says how far, because
+  // an angle cannot be read back out of a matrix without deciding first whether
+  // a flip is a turn — and here the caller knows, since it built the transform.
+  const boxFrame = turn === 0 ? state.boxFrame : turnedFrame(state, turn);
+  return done(state, document === null ? null : { ...state, document, boxFrame }, label);
 }
 
 /**
@@ -1140,9 +1163,4 @@ export function selectContour(
   // The same selection is not a change, and handing back a new array would mark
   // the session dirty and set the autosave going for nothing.
   return result(sameSelection(selection, state.selection) ? state : { ...state, selection });
-}
-
-/** Whether two selections hold the same things, in the same order. */
-function sameSelection(a: Selection, b: Selection): boolean {
-  return a.length === b.length && a.every((item, i) => sameItem(item, b[i]!));
 }

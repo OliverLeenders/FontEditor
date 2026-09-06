@@ -1,13 +1,4 @@
-import {
-  type Rect,
-  type Vec2,
-  about,
-  add,
-  keepsAxes,
-  rotation,
-  scaling,
-  sub,
-} from "@fonteditor/geometry";
+import { type Vec2, about, add, keepsAxes, rotation, sub } from "@fonteditor/geometry";
 import {
   type Glyph,
   contourById,
@@ -25,6 +16,7 @@ import {
   updateGlyph,
 } from "@fonteditor/font-model";
 import {
+  type BoxFrame,
   type BoxHandle,
   type HitTarget,
   type SegmentRef,
@@ -50,6 +42,7 @@ import {
   toggleItem,
   boxPivot,
   boxScale,
+  boxScaleTransform,
   boxTurn,
 } from "@fonteditor/view";
 
@@ -179,7 +172,7 @@ export function startBoxTransform(
   state: EditorState,
   input: PointerInput,
   handle: BoxHandle,
-  box: Rect,
+  box: BoxFrame,
 ): ToolResult {
   return result(
     {
@@ -551,12 +544,19 @@ const CONTINUE: Continuations = {
     // Shift means "hold the shape" on a scale and "hold the angle" on a turn,
     // which are the same instruction read against what is being changed.
     let transform;
+    let boxFrame = state.boxFrame;
     if (gesture.handle.action === "rotate") {
-      transform = rotation(boxTurn(gesture.box, gesture.handle, pivot, input.point, shift));
+      const turned = boxTurn(gesture.box, gesture.handle, pivot, input.point, shift);
+      transform = rotation(turned);
+      // Measured from the angle the box was at when the drag began, for the same
+      // reason the points are: a running total would drift over a long turn.
+      boxFrame = { angle: gesture.box.angle + turned, of: gesture.items };
     } else {
       const by = boxScale(gesture.box, gesture.handle, pivot, input.point, shift);
       if (!Number.isFinite(by.x) || !Number.isFinite(by.y)) return state;
-      transform = scaling(by.x, by.y);
+      // Along the box's own axes rather than the plane's, so a handle on a
+      // turned box pulls the way it points.
+      transform = boxScaleTransform(gesture.box, by);
     }
 
     // From the document as it was when the drag began, so the answer depends on
@@ -572,6 +572,7 @@ const CONTINUE: Continuations = {
     return {
       ...state,
       document: document ?? gesture.before,
+      boxFrame,
       gesture: { ...gesture, moved: gesture.moved || budged(delta) },
     };
   },

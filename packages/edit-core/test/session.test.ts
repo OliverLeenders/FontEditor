@@ -163,6 +163,21 @@ describe("undo and redo", () => {
     expect(redo(back).editor.selection).toHaveLength(1);
   });
 
+  it("stands the selection's box upright again", () => {
+    // How far the points were turned is not in the history, so after stepping
+    // through it the angle is no longer known — and a box still at an angle
+    // would be drawn round a shape that is not at that angle any more.
+    const { s } = start();
+    const moved = drag(s, vec(100, 480), [vec(160, 540)]);
+    const turned = {
+      ...moved,
+      editor: { ...moved.editor, boxFrame: { angle: 0.4, of: moved.editor.selection } },
+    };
+
+    expect(undo(turned).editor.boxFrame).toBeNull();
+    expect(redo(undo(turned)).editor.boxFrame).toBeNull();
+  });
+
   // Being teleported across the canvas by an undo is disorienting, and nobody
   // asked for it.
   it("leaves the camera exactly where it was", () => {

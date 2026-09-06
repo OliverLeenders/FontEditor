@@ -53,8 +53,15 @@ export function TransformPanel(): React.JSX.Element {
   const [origin, setOrigin] = useState<TransformOrigin>({ kind: "box", x: "centre", y: "middle" });
   const idle = points === 0;
 
-  const apply = (transform: Parameters<typeof transformSelection>[1], label: string): void => {
-    store.applyTool(transformSelection(store.editor, transform, origin, label));
+  const apply = (
+    transform: Parameters<typeof transformSelection>[1],
+    label: string,
+    // How far this is a turn, in radians. The box round the selection is held at
+    // an angle and has to follow, and only the caller knows: a matrix cannot say
+    // whether it was meant as a turn or as a pair of flips.
+    turn = 0,
+  ): void => {
+    store.applyTool(transformSelection(store.editor, transform, origin, label, turn));
   };
 
   const anchored = (x: string, y: string): boolean =>
@@ -149,7 +156,7 @@ export function TransformPanel(): React.JSX.Element {
           label="Rotate °"
           neutral={0}
           disabled={idle}
-          onApply={(v) => apply(rotation(v * DEGREES), "Rotate")}
+          onApply={(v) => apply(rotation(v * DEGREES), "Rotate", v * DEGREES)}
         />
       </div>
 
@@ -202,7 +209,7 @@ export function TransformPanel(): React.JSX.Element {
           disabled={idle}
           aria-label="Turn a quarter anticlockwise"
           title="Turn a quarter anticlockwise"
-          onClick={() => apply(rotation(90 * DEGREES), "Rotate")}
+          onClick={() => apply(rotation(90 * DEGREES), "Rotate", 90 * DEGREES)}
         >
           <RotateLeftIcon />
         </button>
@@ -211,7 +218,7 @@ export function TransformPanel(): React.JSX.Element {
           disabled={idle}
           aria-label="Turn a quarter clockwise"
           title="Turn a quarter clockwise"
-          onClick={() => apply(rotation(-90 * DEGREES), "Rotate")}
+          onClick={() => apply(rotation(-90 * DEGREES), "Rotate", -90 * DEGREES)}
         >
           <RotateRightIcon />
         </button>

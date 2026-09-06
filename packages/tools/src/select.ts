@@ -1,8 +1,10 @@
-import type { Rect, Vec2 } from "@fonteditor/geometry";
+import { type Vec2, rotation } from "@fonteditor/geometry";
 import { balanceSegment, setNodeType, updateContour } from "@fonteditor/font-model";
 import {
+  type BoxFrame,
   type HandleVisibility,
   type HitTarget,
+  BOX_STEM_PIXELS,
   buildHitIndex,
   hoveredSegment,
   pick,
@@ -26,7 +28,13 @@ import {
   translateSelection,
 } from "./gestures.js";
 import type { KeyInput, PointerInput } from "./input.js";
-import { type EditorState, currentGlyph, editCurrentGlyph, tunniSegments } from "./state.js";
+import {
+  type EditorState,
+  boxAngle,
+  currentGlyph,
+  editCurrentGlyph,
+  tunniSegments,
+} from "./state.js";
 
 /**
  * The select tool: what a pointer or a key does to the editor.
@@ -107,19 +115,27 @@ export const BOX_OUTSET_PIXELS = 10;
  * Two points at least. One point has no box worth the name — every handle would
  * be the same distance from it, and there is no shape there to scale.
  */
-export function selectionBox(state: EditorState): Rect | null {
+export function selectionBox(state: EditorState): BoxFrame | null {
   const points = state.selection.filter((item) => item.part === "point");
   if (points.length < 2) return null;
 
-  const box = selectionBounds(currentGlyph(state) ?? EMPTY_GLYPH, state.selection);
+  const angle = boxAngle(state);
+  const box = selectionBounds(
+    currentGlyph(state) ?? EMPTY_GLYPH,
+    state.selection,
+    angle === 0 ? undefined : rotation(-angle),
+  );
   if (box === null) return null;
 
   const out = screenTolerance(state.view, BOX_OUTSET_PIXELS);
   return {
-    minX: box.minX - out,
-    minY: box.minY - out,
-    maxX: box.maxX + out,
-    maxY: box.maxY + out,
+    rect: {
+      minX: box.minX - out,
+      minY: box.minY - out,
+      maxX: box.maxX + out,
+      maxY: box.maxY + out,
+    },
+    angle,
   };
 }
 
@@ -135,7 +151,12 @@ export function pointerDown(
   // point where the whole selection was meant to move.
   const box = selectionBox(state);
   if (box !== null) {
-    const handle = pickBoxHandle(box, input.point, screenTolerance(state.view, BOX_HANDLE_PIXELS));
+    const handle = pickBoxHandle(
+      box,
+      input.point,
+      screenTolerance(state.view, BOX_HANDLE_PIXELS),
+      screenTolerance(state.view, BOX_STEM_PIXELS),
+    );
     if (handle !== null) return startBoxTransform(base, input, handle, box);
   }
 
@@ -308,6 +329,12 @@ export function cancel(state: EditorState): ToolResult {
 
   if (gesture.kind === "marquee") {
     return result({ ...state, selection: gesture.before, gesture: null }, [abort]);
+  }
+  if (gesture.kind === "transformBox") {
+    // A turn abandoned halfway leaves the box where it was standing when the
+    // drag began, along with the points.
+    const frame = gesture.box.angle === 0 ? null : { angle: gesture.box.angle, of: gesture.items };
+    return result({ ...state, document: gesture.before, gesture: null, boxFrame: frame }, [abort]);
   }
   return result({ ...state, document: gesture.before, gesture: null }, [abort]);
 }

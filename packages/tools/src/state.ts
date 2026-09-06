@@ -12,6 +12,7 @@ import {
 
 export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure";
 import {
+  type BoxFrame,
   type BoxHandle,
   type Selection,
   type SegmentRef,
@@ -19,6 +20,7 @@ import {
   type ViewTransform,
   NO_HOLD,
   sameSegment,
+  sameSelection,
 } from "@fonteditor/view";
 
 /**
@@ -103,7 +105,7 @@ export type Gesture =
       readonly kind: "transformBox";
       readonly origin: Vec2;
       readonly handle: BoxHandle;
-      readonly box: Rect;
+      readonly box: BoxFrame;
       readonly items: Selection;
       readonly before: FontDocument;
       readonly moved: boolean;
@@ -199,6 +201,19 @@ export type EditorState = {
   readonly focusedSegment: SegmentRef | null;
   readonly cursor: Vec2 | null;
   readonly gesture: Gesture | null;
+  /**
+   * The angle the selection’s box is held at, and what it was measured round.
+   *
+   * A box fitted round turned points has to be turned itself, or it stands off
+   * the shape on every side and grows as the shape turns — so a rotation leaves
+   * its angle here and the box is fitted in that frame from then on.
+   *
+   * `of` is the selection the angle was earned by. It is compared rather than
+   * cleared: an angle belongs to the points that were turned, and asking whether
+   * those are still the ones selected answers every "when should this be
+   * forgotten" case at once, without a reset in every place a selection is made.
+   */
+  readonly boxFrame: { readonly angle: number; readonly of: Selection } | null;
 };
 
 export type EditorStateInit = {
@@ -227,6 +242,7 @@ export function editorState(init: EditorStateInit): EditorState {
     focusedSegment: init.focusedSegment ?? null,
     cursor: init.cursor ?? null,
     gesture: null,
+    boxFrame: null,
   };
 }
 
@@ -270,6 +286,28 @@ export function editCurrentGlyph(
 }
 
 /** The marquee rectangle for the renderer, or `null` when none is in progress. */
+/**
+ * The angle the selection's box is held at: what a rotation left behind, if it
+ * was these points that were rotated.
+ *
+ * Selecting something else puts the box upright again, which is what anyone
+ * would expect — an angle is a fact about a set of points, not about the editor.
+ */
+export function boxAngle(state: EditorState): number {
+  const frame = state.boxFrame;
+  if (frame === null) return 0;
+  return sameSelection(frame.of, state.selection) ? frame.angle : 0;
+}
+
+/** The angle after turning by `by`, as this state would then remember it. */
+export function turnedFrame(
+  state: EditorState,
+  by: number,
+): { readonly angle: number; readonly of: Selection } | null {
+  const angle = boxAngle(state) + by;
+  return angle === 0 ? null : { angle, of: state.selection };
+}
+
 export function marqueeRect(state: EditorState): Rect | null {
   const gesture = state.gesture;
   if (gesture === null || gesture.kind !== "marquee") return null;

@@ -39,6 +39,7 @@ export {
   itemsInRect,
   removeItems,
   sameItem,
+  sameSelection,
   selectionKey,
   selectionBounds,
   selectionPoints,
@@ -107,13 +108,19 @@ export {
 export type { AlignmentLines, AlignmentOptions } from "./alignment.js";
 export { alignmentLines } from "./alignment.js";
 
-export type { BoxAnchor, BoxHandle } from "./transformbox.js";
+export type { BoxAnchor, BoxFrame, BoxHandle } from "./transformbox.js";
 export {
   BOX_ANCHORS,
+  BOX_STEM_PIXELS,
   TURN_STEP,
+  boxCentre,
   boxHandlePoint,
   boxPivot,
+  boxRotatePoint,
   boxScale,
+  boxScaleTransform,
+  boxToLocal,
+  boxToWorld,
   boxTurn,
   pickBoxHandle,
 } from "./transformbox.js";

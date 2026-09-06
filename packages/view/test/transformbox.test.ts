@@ -4,13 +4,15 @@ import {
   TURN_STEP,
   boxHandlePoint,
   boxPivot,
+  boxRotatePoint,
   boxScale,
+  boxScaleTransform,
   boxTurn,
   pickBoxHandle,
 } from "../src/transformbox.js";
 
 /** A hundred-unit square from the origin, so every number reads at a glance. */
-const box = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
+const box = { rect: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, angle: 0 };
 const at = (x: number, y: number) => ({ x, y });
 
 describe("where the handles are", () => {
@@ -39,7 +41,9 @@ describe("picking a handle", () => {
   it("prefers the corner where a corner and an edge overlap", () => {
     // The corner carries two axes; the edge carries one, and is the lesser
     // answer wherever both are true.
-    expect(pickBoxHandle({ minX: 0, minY: 0, maxX: 8, maxY: 8 }, at(0, 8), 5)?.at).toBe("topLeft");
+    expect(
+      pickBoxHandle({ rect: { minX: 0, minY: 0, maxX: 8, maxY: 8 }, angle: 0 }, at(0, 8), 5)?.at,
+    ).toBe("topLeft");
   });
 
   it("turns just outside a corner", () => {
@@ -105,7 +109,7 @@ describe("what a drag from a handle does", () => {
   it("leaves an axis alone when the box has no extent along it", () => {
     // Two points in a vertical line: there is no width to compare against, so
     // there is no horizontal factor to be had.
-    const flat = { minX: 50, minY: 0, maxX: 50, maxY: 100 };
+    const flat = { rect: { minX: 50, minY: 0, maxX: 50, maxY: 100 }, angle: 0 };
     const handle = { at: "topRight", action: "scale" } as const;
     const pivot = boxPivot(flat, handle, false);
     expect(boxScale(flat, handle, pivot, at(999, 200), false).x).toBe(1);
@@ -125,5 +129,99 @@ describe("what a drag from a handle does", () => {
     const pivot = boxPivot(box, handle, false);
     const turned = boxTurn(box, handle, pivot, at(2, 0), true);
     expect(turned / TURN_STEP).toBeCloseTo(Math.round(turned / TURN_STEP), 9);
+  });
+});
+
+/**
+ * A box held at a right angle, which is the one turn whose answers can be read
+ * off by eye: the frame's x runs up the plane and its y runs left along it.
+ */
+const turned = { rect: { minX: 0, minY: 0, maxX: 100, maxY: 100 }, angle: Math.PI / 2 };
+
+describe("a box held at an angle", () => {
+  it("puts its handles where the turn puts them", () => {
+    // The frame's top left, turned a quarter anticlockwise about the origin.
+    const p = boxHandlePoint(turned, "topLeft");
+    expect(p.x).toBeCloseTo(-100, 6);
+    expect(p.y).toBeCloseTo(0, 6);
+  });
+
+  it("keeps the middle where it is when the box is square about it", () => {
+    const p = boxHandlePoint(turned, "top");
+    expect(p.x).toBeCloseTo(-100, 6);
+    expect(p.y).toBeCloseTo(50, 6);
+  });
+
+  it("picks a handle from the pointer turned back into the frame", () => {
+    expect(pickBoxHandle(turned, at(-98, 2), 5)).toEqual({ at: "topLeft", action: "scale" });
+    // Where the top left would be if the box were upright is now the bottom
+    // right of it: the same corner of the plane, a different corner of the box.
+    expect(pickBoxHandle(turned, at(2, 98), 5)).toEqual({
+      at: "bottomRight",
+      action: "scale",
+    });
+  });
+
+  it("scales along its own axes rather than the plane's", () => {
+    const handle = { at: "top", action: "scale" } as const;
+    const pivot = boxPivot(turned, handle, false);
+    // The frame's up now points along the plane's −x, so that is the way to pull.
+    const by = boxScale(turned, handle, pivot, at(-200, 50), false);
+    expect(by.y).toBeCloseTo(2, 6);
+    expect(by.x).toBe(1);
+  });
+
+  it("turns the scale back into the plane", () => {
+    // Doubling the frame's y doubles the plane's x, since the frame is a quarter
+    // turn round. What comes out is the transform to apply to the points.
+    const t = boxScaleTransform(turned, { x: 1, y: 2 });
+    expect(t.xScale).toBeCloseTo(2, 6);
+    expect(t.yScale).toBeCloseTo(1, 6);
+    expect(t.xyScale).toBeCloseTo(0, 6);
+    expect(t.yxScale).toBeCloseTo(0, 6);
+  });
+
+  it("hands back the bare scale when there is no angle", () => {
+    // Exactly, not nearly: an upright box must go on doing what it always did.
+    expect(boxScaleTransform(box, { x: 2, y: 3 })).toEqual({
+      xScale: 2,
+      xyScale: 0,
+      yxScale: 0,
+      yScale: 3,
+      xOffset: 0,
+      yOffset: 0,
+    });
+  });
+});
+
+describe("the turn knob", () => {
+  it("stands off the top edge, along the box's own up", () => {
+    expect(boxRotatePoint(box, 20)).toEqual(at(50, 120));
+
+    const p = boxRotatePoint(turned, 20);
+    expect(p.x).toBeCloseTo(-120, 6);
+    expect(p.y).toBeCloseTo(50, 6);
+  });
+
+  it("is picked as a turn when a stem is given", () => {
+    expect(pickBoxHandle(box, at(50, 120), 5, 20)).toEqual({ at: "top", action: "rotate" });
+  });
+
+  it("is not there at all when no stem is given", () => {
+    // The renderer decides whether the knob is drawn; a pick that assumed one
+    // would take a click over empty canvas.
+    expect(pickBoxHandle(box, at(50, 120), 5)).toBeNull();
+  });
+
+  it("leaves the top handle its own place", () => {
+    expect(pickBoxHandle(box, at(50, 100), 5, 20)).toEqual({ at: "top", action: "scale" });
+  });
+
+  it("turns about the middle, from the ray the top edge already names", () => {
+    // The knob sits directly above the middle, so a pointer to the left of it is
+    // a quarter turn anticlockwise.
+    const handle = { at: "top", action: "rotate" } as const;
+    const pivot = boxPivot(box, handle, false);
+    expect(boxTurn(box, handle, pivot, at(-50, 50), false)).toBeCloseTo(Math.PI / 2, 6);
   });
 });

@@ -14,6 +14,7 @@ import {
 } from "@fonteditor/tools";
 import {
   type BoxHandle,
+  BOX_STEM_PIXELS,
   PICK_TOLERANCE_SCALE,
   buildHitIndex,
   itemForTarget,
@@ -184,7 +185,12 @@ export function GlyphCanvas({
     // handles sit over everything else, so the cursor has to say so.
     const box = selectionBox(editor);
     if (box !== null) {
-      const handle = pickBoxHandle(box, point, screenTolerance(editor.view, BOX_HANDLE_PIXELS));
+      const handle = pickBoxHandle(
+        box,
+        point,
+        screenTolerance(editor.view, BOX_HANDLE_PIXELS),
+        screenTolerance(editor.view, BOX_STEM_PIXELS),
+      );
       if (handle !== null) {
         canvas.style.cursor = cursorForHandle(handle);
         return;

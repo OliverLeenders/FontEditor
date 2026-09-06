@@ -133,6 +133,11 @@ export function undo(s: EditSession): EditSession {
       document: entry.before,
       selection: entry.selectionBefore,
       gesture: null,
+      // The box round the selection stands upright again: how far the points
+      // were turned is not in the history, so after stepping through it the
+      // editor no longer knows, and a box left at an angle would be drawn round
+      // a shape that is no longer at that angle.
+      boxFrame: null,
     },
     history: stepBack(s.history),
     pending: null,
@@ -150,6 +155,7 @@ export function redo(s: EditSession): EditSession {
       document: entry.after,
       selection: entry.selectionAfter,
       gesture: null,
+      boxFrame: null,
     },
     history: stepForward(s.history),
     pending: null,

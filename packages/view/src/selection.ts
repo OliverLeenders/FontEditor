@@ -1,4 +1,4 @@
-import type { Rect, Vec2 } from "@fonteditor/geometry";
+import { type Affine, type Rect, type Vec2, applyAffine } from "@fonteditor/geometry";
 import {
   type ContourId,
   type Glyph,
@@ -43,6 +43,11 @@ export function selectionKey(item: SelectionItem): string {
 
 export function sameItem(a: SelectionItem, b: SelectionItem): boolean {
   return a.contourId === b.contourId && a.nodeId === b.nodeId && a.part === b.part;
+}
+
+/** Whether two selections hold the same things, in the same order. */
+export function sameSelection(a: Selection, b: Selection): boolean {
+  return a.length === b.length && a.every((item, i) => sameItem(item, b[i]!));
 }
 
 export function hasItem(selection: Selection, item: SelectionItem): boolean {
@@ -149,8 +154,13 @@ export function selectionPoints(g: Glyph, selection: Selection): Vec2[] {
  * not the point, which is exactly where rotating a handle pair wants to pivot.
  *
  * `null` when nothing is selected, or when what is selected is only handles.
+ *
+ * `into` measures the points somewhere other than where they lie — the box round
+ * a selection held at an angle is wanted in that angle's own frame, and turning
+ * each point on the way in is how a box gets fitted to a shape rather than to
+ * the shape's shadow on the axes.
  */
-export function selectionBounds(g: Glyph, selection: Selection): Rect | null {
+export function selectionBounds(g: Glyph, selection: Selection, into?: Affine): Rect | null {
   let box: Rect | null = null;
 
   for (const item of selection) {
@@ -159,14 +169,15 @@ export function selectionBounds(g: Glyph, selection: Selection): Rect | null {
     const n = c === null ? null : nodeById(c, item.nodeId);
     if (n === null) continue;
 
+    const pt = into === undefined ? n.pt : applyAffine(into, n.pt);
     box =
       box === null
-        ? { minX: n.pt.x, minY: n.pt.y, maxX: n.pt.x, maxY: n.pt.y }
+        ? { minX: pt.x, minY: pt.y, maxX: pt.x, maxY: pt.y }
         : {
-            minX: Math.min(box.minX, n.pt.x),
-            minY: Math.min(box.minY, n.pt.y),
-            maxX: Math.max(box.maxX, n.pt.x),
-            maxY: Math.max(box.maxY, n.pt.y),
+            minX: Math.min(box.minX, pt.x),
+            minY: Math.min(box.minY, pt.y),
+            maxX: Math.max(box.maxX, pt.x),
+            maxY: Math.max(box.maxY, pt.y),
           };
   }
 

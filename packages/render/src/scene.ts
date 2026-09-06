@@ -1,6 +1,6 @@
 import type { Cubic, Rect, Vec2 } from "@fonteditor/geometry";
 import type { Contour, Glyph } from "@fonteditor/font-model";
-import type { Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
+import type { BoxFrame, Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
 import type { RenderPalette } from "./palette.js";
 
@@ -131,9 +131,10 @@ export type Scene = {
    *
    * Already stood off from the selection by whoever worked it out: how far is a
    * question about pixels, and this scene is handed answers rather than asked to
-   * work them out.
+   * work them out. It carries the angle it is held at, so a turned selection has
+   * a box that lies along it rather than an upright one shrugging round it.
    */
-  readonly transformBox: Rect | null;
+  readonly transformBox: BoxFrame | null;
   /**
    * The pen's rubber band: the segment that would exist if the next click landed
    * where the cursor is.
@@ -202,7 +203,7 @@ export type SceneInit = {
   readonly tunniSegments?: readonly SegmentRef[];
   readonly selection?: Selection;
   readonly marquee?: Rect | null;
-  readonly transformBox?: Rect | null;
+  readonly transformBox?: BoxFrame | null;
   readonly penPreview?: Cubic | null;
   readonly neighbours?: readonly NeighbourGlyph[];
   readonly componentOutlines?: readonly Contour[];

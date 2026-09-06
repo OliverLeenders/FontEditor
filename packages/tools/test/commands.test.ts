@@ -32,7 +32,7 @@ import {
   sidebearings,
   component,
 } from "@fonteditor/font-model";
-import type { ViewTransform } from "@fonteditor/view";
+import { type ViewTransform, boxHandlePoint } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -75,12 +75,13 @@ import {
   selectedCoordinate,
   setNodeHvLock,
   setPointType,
+  transformOriginPoint,
   transformSelection,
   unroundedCount,
 } from "../src/commands.js";
 import { keyInput } from "../src/input.js";
-import { keyDown } from "../src/select.js";
-import { type EditorState, editorState } from "../src/state.js";
+import { keyDown, selectionBox } from "../src/select.js";
+import { type EditorState, boxAngle, editorState } from "../src/state.js";
 
 const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
 const VIEW: ViewTransform = { scale: 1, tx: 0, ty: 0 };
@@ -1308,6 +1309,74 @@ describe("transforming a selection", () => {
     const left = { x: n.in!.x - n.pt.x, y: n.in!.y - n.pt.y };
     const right = { x: n.out!.x - n.pt.x, y: n.out!.y - n.pt.y };
     expect(left.x * right.y - left.y * right.x).toBeCloseTo(0, 6);
+  });
+
+  it("turns the box with the points, so the two go on agreeing", () => {
+    // The complaint this answers: a rotation typed into the panel turned the
+    // selection and left the box standing upright round it.
+    const chosen = pick(square(), "p0", "p1", "p2", "p3");
+    const after = transformSelection(chosen, rotation(0.4), BOX_CENTRE, "Rotate", 0.4).state;
+
+    expect(boxAngle(after)).toBeCloseTo(0.4, 12);
+    expect(selectionBox(after)?.angle).toBeCloseTo(0.4, 12);
+  });
+
+  it("adds one turn to the next, rather than starting again from upright", () => {
+    const chosen = pick(square(), "p0", "p1", "p2", "p3");
+    const once = transformSelection(chosen, rotation(0.4), BOX_CENTRE, "Rotate", 0.4).state;
+    const twice = transformSelection(once, rotation(0.2), BOX_CENTRE, "Rotate", 0.2).state;
+    expect(boxAngle(twice)).toBeCloseTo(0.6, 12);
+  });
+
+  it("leaves the box upright for a transform that is not a turn", () => {
+    const chosen = pick(square(), "p0", "p1", "p2", "p3");
+    const after = transformSelection(chosen, scaling(2, 2), BOX_CENTRE, "Scale").state;
+    expect(boxAngle(after)).toBe(0);
+  });
+
+  it("forgets the angle when something else is selected", () => {
+    // The angle belongs to the points that were turned. Another selection has
+    // not been turned, and its box is upright.
+    const chosen = pick(square(), "p0", "p1", "p2", "p3");
+    const after = transformSelection(chosen, rotation(0.4), BOX_CENTRE, "Rotate", 0.4).state;
+    expect(boxAngle(pick(after, "p0", "p1"))).toBe(0);
+  });
+
+  it("fits the box to the turned shape rather than round its shadow", () => {
+    // A square turned an eighth: measured in the plane the box would be wider by
+    // root two, and measured in the frame it is the square it always was.
+    const chosen = pick(square(), "p0", "p1", "p2", "p3");
+    const eighth = Math.PI / 4;
+    const after = transformSelection(chosen, rotation(eighth), BOX_CENTRE, "Rotate", eighth).state;
+    const box = selectionBox(after)!;
+    expect(box.rect.maxX - box.rect.minX).toBeCloseTo(box.rect.maxY - box.rect.minY, 6);
+  });
+
+  it("anchors a transform at the corner of the box that is drawn", () => {
+    // "The bottom left of the selection" has to mean the corner the user can
+    // see, which after a turn is not the corner of an upright rectangle.
+    const chosen = pick(square(), "p0", "p1", "p2", "p3");
+    const quarter = Math.PI / 2;
+    const after = transformSelection(
+      chosen,
+      rotation(quarter),
+      BOX_CENTRE,
+      "Rotate",
+      quarter,
+    ).state;
+
+    // A square turned a quarter is the same square, and its frame's bottom left
+    // is the plane's bottom right: (100, 0), not the (0, 0) an upright reading
+    // would give. The drawn box stands the outset further out, so this is the
+    // same corner rather than the same point.
+    const corner = transformOriginPoint(after, { kind: "box", x: "left", y: "bottom" })!;
+    expect(corner.x).toBeCloseTo(100, 6);
+    expect(corner.y).toBeCloseTo(0, 6);
+
+    const box = selectionBox(after)!;
+    const drawn = boxHandlePoint(box, "bottomLeft");
+    expect(drawn.x).toBeGreaterThan(corner.x);
+    expect(drawn.y).toBeLessThan(corner.y);
   });
 
   it("lets an axis lock go when the transform stops it holding", () => {

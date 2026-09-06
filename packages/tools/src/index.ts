@@ -32,6 +32,7 @@ export type {
   ToolId,
 } from "./state.js";
 export {
+  boxAngle,
   currentGlyph,
   editCurrentGlyph,
   editorState,

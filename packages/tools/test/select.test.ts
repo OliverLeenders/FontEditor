@@ -14,7 +14,7 @@ import {
   segmentTunniPoint,
   sidebearings,
 } from "@fonteditor/font-model";
-import type { Selection, ViewTransform } from "@fonteditor/view";
+import { type Selection, type ViewTransform, boxHandlePoint, boxPivot } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import { selectContour } from "../src/commands.js";
@@ -903,7 +903,7 @@ describe("the box round a selection", () => {
   it("stands off from the selection so its handles miss the points", () => {
     // A corner point sits exactly on the corner of its own bounds, and a box
     // drawn tight against it would put a handle where the point is.
-    const box = selectionBox(chosen())!;
+    const box = selectionBox(chosen())!.rect;
     expect(box.minX).toBeLessThan(0);
     expect(box.maxY).toBeGreaterThan(100);
   });
@@ -926,7 +926,7 @@ describe("the box round a selection", () => {
 
   it("takes a handle and scales what is selected", () => {
     const start = chosen();
-    const box = selectionBox(start)!;
+    const box = selectionBox(start)!.rect;
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY)));
     expect(grabbed.state.gesture?.kind).toBe("transformBox");
 
@@ -945,7 +945,7 @@ describe("the box round a selection", () => {
     // Two moves to the same place as one: a drag that compounded would land
     // somewhere else entirely.
     const start = chosen();
-    const box = selectionBox(start)!;
+    const box = selectionBox(start)!.rect;
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY))).state;
 
     const once = pointerMove(grabbed, pointerInput(vec(300, 300))).state;
@@ -959,7 +959,7 @@ describe("the box round a selection", () => {
 
   it("holds the middle still when alt is down", () => {
     const start = chosen();
-    const box = selectionBox(start)!;
+    const box = selectionBox(start)!.rect;
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY), { alt: true })).state;
     const moved = pointerMove(
       grabbed,
@@ -973,7 +973,7 @@ describe("the box round a selection", () => {
 
   it("turns from just outside a corner", () => {
     const start = chosen();
-    const box = selectionBox(start)!;
+    const box = selectionBox(start)!.rect;
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX + 9, box.maxY + 9)));
     expect(grabbed.state.gesture).toMatchObject({
       kind: "transformBox",
@@ -981,9 +981,73 @@ describe("the box round a selection", () => {
     });
   });
 
+  it("takes the knob standing above the box, and takes it as a turn", () => {
+    // The box runs -10..110 at this zoom, so the top edge is at 110 and the knob
+    // 22 further up. A drawn handle rather than the invisible ring: the ring is
+    // still there, but nothing about the box said it was.
+    const grabbed = pointerDown(chosen(), pointerInput(vec(50, 132)));
+    expect(grabbed.state.gesture).toMatchObject({
+      kind: "transformBox",
+      handle: { at: "top", action: "rotate" },
+    });
+  });
+
+  it("turns the box along with the points", () => {
+    const start = chosen();
+    const grabbed = pointerDown(start, pointerInput(vec(50, 132))).state;
+    // Straight out to the left of the middle, which is a quarter turn from
+    // straight up.
+    const moved = pointerMove(grabbed, pointerInput(vec(-100, 50))).state;
+
+    expect(moved.boxFrame?.angle).toBeCloseTo(Math.PI / 2, 6);
+    expect(selectionBox(moved)?.angle).toBeCloseTo(Math.PI / 2, 6);
+    // And the points went with it: the corner at (0, 0) is now at (100, 0).
+    expect(where(moved, "p0").x).toBeCloseTo(100, 6);
+    expect(where(moved, "p0").y).toBeCloseTo(0, 6);
+  });
+
+  it("stands the box up again when the turn is abandoned", () => {
+    const start = chosen();
+    const grabbed = pointerDown(start, pointerInput(vec(50, 132))).state;
+    const moved = pointerMove(grabbed, pointerInput(vec(-100, 50))).state;
+
+    const back = cancel(moved).state;
+    expect(back.boxFrame).toBeNull();
+    expect(back.document).toBe(start.document);
+  });
+
+  it("scales a turned box along its own axes", () => {
+    // The handle has to pull the way it points, or a box at an angle would
+    // stretch the selection sideways to itself.
+    const start = chosen();
+    const turned = pointerMove(
+      pointerDown(start, pointerInput(vec(50, 132))).state,
+      pointerInput(vec(-100, 50)),
+    ).state;
+    const up = pointerUp(turned).state;
+
+    const box = selectionBox(up)!;
+    const handle = { at: "top", action: "scale" } as const;
+    const top = boxHandlePoint(box, handle.at);
+    const pivot = boxPivot(box, handle, false);
+    // Twice as far from the opposite edge, along the box's own up.
+    const pulled = vec(pivot.x + (top.x - pivot.x) * 2, pivot.y + (top.y - pivot.y) * 2);
+    const scaled = pointerMove(
+      pointerDown(up, pointerInput(top)).state,
+      pointerInput(pulled),
+    ).state;
+
+    // The square was turned a quarter, so the box's up is the plane's −x: what
+    // doubles is the width on screen, and the height is untouched.
+    const xs = ["p0", "p1", "p2", "p3"].map((id) => where(scaled, id).x);
+    const ys = ["p0", "p1", "p2", "p3"].map((id) => where(scaled, id).y);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(200, 6);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeCloseTo(100, 6);
+  });
+
   it("puts one entry on the undo stack for the whole drag", () => {
     const start = chosen();
-    const box = selectionBox(start)!;
+    const box = selectionBox(start)!.rect;
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY)));
     expect(grabbed.effects.map((e) => e.kind)).toEqual(["beginTransaction"]);
 
@@ -995,7 +1059,7 @@ describe("the box round a selection", () => {
 
   it("leaves the selection alone: the box moves what was already chosen", () => {
     const start = chosen();
-    const box = selectionBox(start)!;
+    const box = selectionBox(start)!.rect;
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY))).state;
     expect(grabbed.selection).toEqual(start.selection);
   });
