@@ -111,6 +111,23 @@ export function extrema(s: Cubic): number[] {
 }
 
 /**
+ * The box round the four control points.
+ *
+ * Looser than {@link bounds} and far cheaper — no root finding, four comparisons
+ * a coordinate — and, since a Bézier lies inside the convex hull of its control
+ * points, still a box the curve is certainly inside. That is what a rejection
+ * test wants: never wrong about "too far away", allowed to be pessimistic.
+ */
+export function controlBounds(s: Cubic): Rect {
+  return {
+    minX: Math.min(s.a.x, s.c1.x, s.c2.x, s.b.x),
+    minY: Math.min(s.a.y, s.c1.y, s.c2.y, s.b.y),
+    maxX: Math.max(s.a.x, s.c1.x, s.c2.x, s.b.x),
+    maxY: Math.max(s.a.y, s.c1.y, s.c2.y, s.b.y),
+  };
+}
+
+/**
  * Exact bounding box: the hull of the endpoints and the extrema.
  *
  * The control-point hull would be cheaper and is a valid *outer* bound, but it

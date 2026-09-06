@@ -147,6 +147,19 @@ export function isFinitePoint(p: Vec2): boolean {
   return Number.isFinite(p.x) && Number.isFinite(p.y);
 }
 
+/**
+ * How far a point lies outside a rectangle, or zero when it is inside.
+ *
+ * A lower bound on the distance to anything the rectangle contains, which is
+ * what makes it worth having: it answers "can this possibly be within reach"
+ * with four comparisons, before the expensive exact question is asked.
+ */
+export function distanceToRect(box: Rect, p: Vec2): number {
+  const dx = Math.max(box.minX - p.x, 0, p.x - box.maxX);
+  const dy = Math.max(box.minY - p.y, 0, p.y - box.maxY);
+  return Math.hypot(dx, dy);
+}
+
 /** Bounding rectangle of a non-empty list of points, or `null` when empty. */
 export function boundsOf(points: readonly Vec2[]): Rect | null {
   const first = points[0];

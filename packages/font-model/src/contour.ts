@@ -294,6 +294,27 @@ export function translateNodeBy(c: Contour, id: NodeId, delta: Vec2): Contour | 
   return settled(replaceNode(c, i, translateNode(c.nodes[i]!, delta)));
 }
 
+/**
+ * Move many nodes of one contour at once.
+ *
+ * One pass over the nodes and one settling of the tangents, where calling
+ * {@link translateNodeBy} in a loop is a search, a copy of the whole node list
+ * and a full tangent sweep *per node* — quadratic in the size of the selection,
+ * which stopped being a theoretical worry when selecting a whole contour became
+ * one gesture. Ids that name nothing here are ignored, the way a selection is
+ * allowed to outlive what it named.
+ *
+ * Settling once at the end is also the more correct answer: a tangent node reads
+ * its neighbours, and the neighbours have all moved by the time it is asked.
+ */
+export function translateNodes(c: Contour, ids: ReadonlySet<NodeId>, delta: Vec2): Contour | null {
+  if (ids.size === 0) return null;
+  if (!c.nodes.some((n) => ids.has(n.id))) return null;
+
+  const nodes = c.nodes.map((n) => (ids.has(n.id) ? translateNode(n, delta) : n));
+  return enforceTangents({ ...c, nodes });
+}
+
 export function setNodePoint(c: Contour, id: NodeId, pt: Vec2): Contour | null {
   const i = nodeIndex(c, id);
   if (i < 0) return null;

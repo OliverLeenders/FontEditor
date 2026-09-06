@@ -7,6 +7,7 @@ import {
   coincident,
   cross,
   distance,
+  distanceToRect,
   dot,
   normalize,
   rotate,
@@ -112,5 +113,23 @@ describe("boundsOf", () => {
       maxX: 4,
       maxY: 5,
     });
+  });
+});
+
+describe("distance to a rectangle", () => {
+  const box = { minX: 0, minY: 0, maxX: 10, maxY: 10 };
+
+  it("is nothing for a point inside, and on the edge", () => {
+    expect(distanceToRect(box, vec(5, 5))).toBe(0);
+    expect(distanceToRect(box, vec(0, 5))).toBe(0);
+  });
+
+  it("measures straight out from an edge", () => {
+    expect(distanceToRect(box, vec(-3, 5))).toBe(3);
+    expect(distanceToRect(box, vec(5, 14))).toBe(4);
+  });
+
+  it("measures to the corner when the point is beyond both axes", () => {
+    expect(distanceToRect(box, vec(13, 14))).toBe(5);
   });
 });

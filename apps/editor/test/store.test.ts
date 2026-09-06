@@ -5,8 +5,8 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store.js");
-const { setPointType, deleteSelectedPoints } = await import("@fonteditor/tools");
-const { glyphBounds, sidebearings } = await import("@fonteditor/font-model");
+const { setPointType, deleteSelectedPoints, begin, commit } = await import("@fonteditor/tools");
+const { glyphBounds, sidebearings, updateGlyph } = await import("@fonteditor/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
 
@@ -111,6 +111,48 @@ describe("EditorStore", () => {
       selectAllPoints(store);
       store.applyTool(deleteSelectedPoints(store.editor));
       expect(store.undoLabel()).toMatch(/Delete point/);
+    });
+  });
+
+  describe("saving while a gesture is in flight", () => {
+    /** The same document with one glyph a unit wider: a change, cheaply made. */
+    const widened = (store: Store) => {
+      const name = store.editor.currentGlyph;
+      const document = updateGlyph(store.editor.document, name, (g) => ({
+        ...g,
+        advance: g.advance + 1,
+      }))!;
+      return { ...store.editor, document };
+    };
+
+    it("waits for the gesture to finish before telling autosave", () => {
+      // Every pointer move of a drag makes a new document, and none of them is a
+      // step the user could undo to. Journalling each one wrote the glyph to
+      // disk a hundred times a second for states nobody asked to keep.
+      store.applyTool({ state: widened(store), effects: [begin("Drag")] });
+      expect(store.getState().saveStatus).toBe("idle");
+
+      store.applyTool({ state: widened(store), effects: [] });
+      expect(store.getState().saveStatus).toBe("idle");
+
+      store.applyTool({ state: widened(store), effects: [commit] });
+      expect(store.getState().saveStatus).toBe("pending");
+    });
+
+    it("tells it at once for an edit that is not a gesture", () => {
+      selectAllPoints(store);
+      store.applyTool(deleteSelectedPoints(store.editor));
+      expect(store.getState().saveStatus).toBe("pending");
+    });
+
+    it("wakes its listeners once per tool call, not twice", () => {
+      // Two patches per call meant every pointer move redrew the canvas and
+      // re-ran every selector twice.
+      let calls = 0;
+      const stop = store.subscribe(() => calls++);
+      store.applyTool({ state: widened(store), effects: [begin("Drag"), commit] });
+      stop();
+      expect(calls).toBe(1);
     });
   });
 

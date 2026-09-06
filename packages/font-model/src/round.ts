@@ -43,6 +43,12 @@ function roundPoint(p: Vec2, grid: number): Vec2 {
  * handle drag swing the other side — and demoting hundreds of nodes to corners
  * would destroy that to record an error too small to see. The next edit to
  * either handle restores the geometry exactly.
+ *
+ * The same goes for a tangent node, whose handle can land a fraction off the
+ * line it is meant to leave along. Rounding is the one place in the model where
+ * the geometry is not settled afterwards, and deliberately so: the point of the
+ * command is that coordinates come out whole, and a settling pass would put some
+ * of them back on fractions to keep a constraint nobody can see at this scale.
  */
 function roundNode(n: Node, grid: number): Node {
   const pt = roundPoint(n.pt, grid);

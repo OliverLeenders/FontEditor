@@ -119,6 +119,19 @@ describe("character lookup", () => {
     expect(glyphForCodePoint(sample(), 0x7a)).toBeNull();
   });
 
+  it("answers from the document it was asked about, not the one before it", () => {
+    // The lookup is indexed, and the index is keyed on the document. A glyph
+    // whose code points have changed must not be found by the old ones.
+    const before = sample();
+    const b = before.glyphs["b"]!;
+    const after = putGlyph(before, { ...b, unicodes: [0x7a] });
+
+    expect(glyphForCodePoint(after, 0x7a)?.name).toBe("b");
+    expect(glyphForCodePoint(after, 0x62)).toBeNull();
+    // And the document it came from still says what it always said.
+    expect(glyphForCodePoint(before, 0x62)?.name).toBe("b");
+  });
+
   it("resolves a string to one entry per character", () => {
     const found = glyphsForString(sample(), "cab");
     expect(found.map((g) => g?.name ?? null)).toEqual(["c", "a", "b"]);

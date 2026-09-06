@@ -204,3 +204,35 @@ describe("sameSegment", () => {
     expect(sameSegment(null, { contourId: "c1", segmentIndex: 0 })).toBe(false);
   });
 });
+
+describe("measuring a segment the caller has said is far", () => {
+  const g = glyph("a", { advance: 600, contours: [arch()] });
+  const ref = { contourId: g.contours[0]!.id, segmentIndex: 0 };
+
+  it("gives the exact distance inside the limit", () => {
+    const near = vec(150, 500);
+    const exact = segmentProximity(g, ref, near)!;
+    expect(segmentProximity(g, ref, near, 1000)).toBeCloseTo(exact, 9);
+  });
+
+  it("still says far when it is far, without measuring exactly", () => {
+    // Beyond the limit the answer only has to be a floor under the truth, which
+    // is what lets the projection be skipped.
+    const away = vec(5000, 5000);
+    const rough = segmentProximity(g, ref, away, 10)!;
+    expect(rough).toBeGreaterThan(10);
+    expect(rough).toBeLessThanOrEqual(segmentProximity(g, ref, away)! + 1e-9);
+  });
+
+  it("wakes whichever segment is really the nearest", () => {
+    // The limit is an optimisation, not a behaviour: what wakes is still the
+    // segment with the smallest exact distance, measured without one.
+    for (const cursor of [vec(150, 520), vec(300, 660), vec(500, 520)]) {
+      const measured = [0, 1].map((segmentIndex) =>
+        segmentProximity(g, { contourId: ref.contourId, segmentIndex }, cursor)!,
+      );
+      const nearest = measured[0]! <= measured[1]! ? 0 : 1;
+      expect(hoveredSegment(g, cursor, VIEW, null)?.segmentIndex).toBe(nearest);
+    }
+  });
+});

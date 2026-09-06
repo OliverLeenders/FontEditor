@@ -43,6 +43,7 @@ export {
   cross,
   distance,
   distanceSq,
+  distanceToRect,
   dot,
   equals,
   isFinitePoint,
@@ -72,6 +73,7 @@ export type { Cubic, Projection, Quadratic } from "./cubic.js";
 export {
   arcLength,
   bounds,
+  controlBounds,
   cubic,
   derivative,
   evaluate,

@@ -44,13 +44,13 @@ import styles from "./GlyphCanvas.module.css";
  * — no reconciliation of the tabs, the toolbar, the inspector or the strip,
  * sixty times a second, to move a single node.
  */
+/** The pick radius the select tool uses, which the cursor has to agree with. */
+const HIT_PIXELS = 11;
+
 /**
  * What the select tool needs from the interface: what it may pick, and where a
  * drag may land. Read from the same rules the renderer draws by.
  */
-/** The pick radius the select tool uses, which the cursor has to agree with. */
-const HIT_PIXELS = 11;
-
 function selectOptions(store: EditorStore): ToolOptions {
   const state = store.getState();
   return {

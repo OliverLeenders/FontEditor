@@ -1,4 +1,11 @@
-import { type Vec2, distance, distanceToSegment, project } from "@fonteditor/geometry";
+import {
+  type Vec2,
+  controlBounds,
+  distance,
+  distanceToRect,
+  distanceToSegment,
+  project,
+} from "@fonteditor/geometry";
 import {
   type ContourId,
   type Glyph,
@@ -49,15 +56,20 @@ export type ActivationOptions = {
  * handles at the thirds, but those are a materialisation for geometric queries,
  * not something the user can reach for.
  */
-export function segmentProximity(g: Glyph, ref: SegmentRef, p: Vec2): number | null {
+export function segmentProximity(
+  g: Glyph,
+  ref: SegmentRef,
+  p: Vec2,
+  limit = Number.POSITIVE_INFINITY,
+): number | null {
   const c = contourById(g, ref.contourId);
   if (c === null) return null;
   const segment = segmentAt(c, ref.segmentIndex);
   if (segment === null) return null;
 
-  const cubic = segmentCubic(segment);
-  let best = project(cubic, p).distance;
-
+  // The cheap parts of the ensemble first, so the curve has something to be
+  // measured against before it is projected onto.
+  let best = Number.POSITIVE_INFINITY;
   if (segment.out !== null) best = Math.min(best, distance(p, segment.out));
   if (segment.in !== null) best = Math.min(best, distance(p, segment.in));
 
@@ -71,6 +83,15 @@ export function segmentProximity(g: Glyph, ref: SegmentRef, p: Vec2): number | n
     const tunni = segmentTunniPoint(c, ref.segmentIndex);
     if (tunni !== null) best = Math.min(best, distance(p, tunni));
   }
+
+  // The curve, but only when it could change the answer: its bounding box gives
+  // a distance it cannot be nearer than, and if that is already worse than what
+  // the handles gave, or further than the caller cares about, the projection is
+  // work whose result is thrown away.
+  const cubic = segmentCubic(segment);
+  const floor = distanceToRect(controlBounds(cubic), p);
+  if (floor < best && floor <= limit) best = Math.min(best, project(cubic, p).distance);
+  else best = Math.min(best, floor);
 
   return best;
 }
@@ -112,7 +133,12 @@ export function hoveredSegment(
   for (const c of g.contours) {
     for (let i = 0; i < segmentCount(c); i++) {
       const ref: SegmentRef = { contourId: c.id, segmentIndex: i };
-      const d = segmentProximity(g, ref, cursor);
+      // Nothing beyond the wider radius can win or hold, and nothing further
+      // than the nearest segment found so far can win either — so segments out
+      // there need only be shown to be far, not measured exactly. The winner is
+      // still measured exactly, because a segment is only dismissed when it is
+      // provably worse than one that was.
+      const d = segmentProximity(g, ref, cursor, Math.min(stay, bestDistance));
       if (d !== null && d < bestDistance) {
         bestDistance = d;
         best = ref;
@@ -123,7 +149,7 @@ export function hoveredSegment(
   if (best === null) return null;
 
   if (current !== null && !sameSegment(current, best)) {
-    const holdDistance = segmentProximity(g, current, cursor);
+    const holdDistance = segmentProximity(g, current, cursor, stay);
     if (holdDistance !== null && holdDistance < stay && holdDistance < bestDistance * stickiness) {
       return current;
     }

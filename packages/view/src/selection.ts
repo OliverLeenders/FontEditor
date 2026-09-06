@@ -41,6 +41,43 @@ export function selectionKey(item: SelectionItem): string {
   return `${item.contourId}${sep}${item.nodeId}${sep}${item.part}`;
 }
 
+/** The key without the part, naming a node rather than one thing about it. */
+function nodeKey(item: { contourId: ContourId; nodeId: NodeId }): string {
+  return `${item.contourId}${String.fromCharCode(0)}${item.nodeId}`;
+}
+
+/**
+ * A selection as a set of keys, worked out once per selection.
+ *
+ * Both the renderer and the hit index ask "is this selected" for every node of
+ * the glyph, every frame and every pointer move. Answering by scanning the
+ * selection is quadratic, and selecting a whole contour — one gesture — is
+ * exactly the case that makes both sides of that product large.
+ *
+ * Keyed on the selection array itself, which is safe for the same reason the
+ * document cache is: these are immutable values, so an array that has changed is
+ * a different array.
+ */
+const itemKeys = new WeakMap<Selection, ReadonlySet<string>>();
+const nodeKeys = new WeakMap<Selection, ReadonlySet<string>>();
+
+export function selectedKeys(selection: Selection): ReadonlySet<string> {
+  const known = itemKeys.get(selection);
+  if (known !== undefined) return known;
+  const built = new Set(selection.map(selectionKey));
+  itemKeys.set(selection, built);
+  return built;
+}
+
+/** The same, but naming whole nodes: any part of a node puts it in. */
+export function selectedNodeKeys(selection: Selection): ReadonlySet<string> {
+  const known = nodeKeys.get(selection);
+  if (known !== undefined) return known;
+  const built = new Set(selection.map(nodeKey));
+  nodeKeys.set(selection, built);
+  return built;
+}
+
 export function sameItem(a: SelectionItem, b: SelectionItem): boolean {
   return a.contourId === b.contourId && a.nodeId === b.nodeId && a.part === b.part;
 }

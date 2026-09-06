@@ -2,7 +2,9 @@ import {
   type Cubic,
   type TunniStatus,
   type Vec2,
+  controlBounds,
   distance,
+  distanceToRect,
   distanceToSegment,
   project,
 } from "@fonteditor/geometry";
@@ -19,7 +21,7 @@ import {
 } from "@fonteditor/font-model";
 
 import { type SegmentRef, sameSegment } from "./proximity.js";
-import type { Selection } from "./selection.js";
+import { type Selection, selectedNodeKeys } from "./selection.js";
 
 export type HitKind =
   | "node"
@@ -142,7 +144,7 @@ export function handleIsVisible(
   const n = c.nodes[nodeIndex];
   if (n === undefined) return false;
 
-  if (v.selection.some((item) => item.contourId === c.id && item.nodeId === n.id)) return true;
+  if (selectedNodeKeys(v.selection).has(`${c.id}${String.fromCharCode(0)}${n.id}`)) return true;
 
   const count = segmentCount(c);
   if (count === 0) return false;
@@ -236,8 +238,22 @@ export function buildHitIndex(
   return { targets };
 }
 
-/** Distance from a design-space point to a target, in design units. */
-export function distanceToTarget(target: HitTarget, p: Vec2): number {
+/**
+ * Distance from a design-space point to a target, in design units.
+ *
+ * `limit` is how near the caller cares about. It changes nothing about the
+ * answer inside that distance and lets a segment be dismissed by its bounding
+ * box when the point is plainly nowhere near it — which matters because
+ * projecting a point onto a cubic costs a hundred-odd evaluations, and a pick
+ * asks every segment of the glyph on every pointer move. Beyond the limit the
+ * result is only guaranteed to be *at least* the true distance, which is all a
+ * caller comparing against the limit can use it for.
+ */
+export function distanceToTarget(
+  target: HitTarget,
+  p: Vec2,
+  limit = Number.POSITIVE_INFINITY,
+): number {
   switch (target.kind) {
     case "node":
     case "handleIn":
@@ -246,8 +262,10 @@ export function distanceToTarget(target: HitTarget, p: Vec2): number {
       return distance(p, target.point);
     case "tunniLine":
       return distanceToSegment(target.from, target.to, p);
-    case "segment":
-      return project(target.cubic, p).distance;
+    case "segment": {
+      const floor = distanceToRect(controlBounds(target.cubic), p);
+      return floor > limit ? floor : project(target.cubic, p).distance;
+    }
     case "originLine":
     case "advanceLine":
       // Vertical and unbounded, so only the horizontal gap counts.
@@ -289,10 +307,9 @@ export type Hit = {
 export function pickAll(index: HitIndex, p: Vec2, tolerance: number): Hit[] {
   const hits: Hit[] = [];
   for (const target of index.targets) {
-    const d = distanceToTarget(target, p);
-    if (d <= tolerance * (PICK_TOLERANCE_SCALE[target.kind] ?? 1)) {
-      hits.push({ target, distance: d });
-    }
+    const reach = tolerance * (PICK_TOLERANCE_SCALE[target.kind] ?? 1);
+    const d = distanceToTarget(target, p, reach);
+    if (d <= reach) hits.push({ target, distance: d });
   }
   hits.sort((l, r) => {
     const byPriority = PICK_PRIORITY[l.target.kind] - PICK_PRIORITY[r.target.kind];

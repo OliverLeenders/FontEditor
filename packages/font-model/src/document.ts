@@ -174,22 +174,44 @@ export function setGlyphOrder(
 // ---------------------------------------------------------------------------
 
 /**
+ * Every code point the font covers, for one document.
+ *
+ * Keyed on the document object itself, which is what makes an index safe here:
+ * the model is persistent, so a document that has changed at all is a different
+ * object and gets a different map. There is no invalidation to get wrong, and a
+ * document nobody holds any more takes its map with it.
+ */
+const cmaps = new WeakMap<FontDocument, Map<number, Glyph>>();
+
+function cmap(document: FontDocument): Map<number, Glyph> {
+  const known = cmaps.get(document);
+  if (known !== undefined) return known;
+
+  const built = new Map<number, Glyph>();
+  for (const name of document.glyphOrder) {
+    const g = document.glyphs[name];
+    if (g === undefined) continue;
+    // First in the glyph order wins, which is what the scan this replaced did.
+    for (const codePoint of g.unicodes) if (!built.has(codePoint)) built.set(codePoint, g);
+  }
+  cmaps.set(document, built);
+  return built;
+}
+
+/**
  * The glyph carrying a given code point, or `null`.
  *
  * Named for what it takes. It was `glyphForCharacter`, which reads as though a
  * string would do and cost one failing test before anyone noticed.
  *
- * Built by scanning rather than kept as an index, because the map is small and a
- * cached index is one more thing that can fall out of step with the document.
- * Revisit if a real font makes it slow — which would mean thousands of glyphs
- * and a hot loop, neither of which exists yet.
+ * This was a scan, on the grounds that the map is small and an index is one more
+ * thing that can fall out of step. It became the hot path anyway: the strip
+ * resolves its text on every pointer move of a drag, and the proof resolves a
+ * paragraph, so a real font ran a linear search per character per frame. The
+ * index above is what answers it now.
  */
 export function glyphForCodePoint(document: FontDocument, codePoint: number): Glyph | null {
-  for (const name of document.glyphOrder) {
-    const g = document.glyphs[name];
-    if (g !== undefined && g.unicodes.includes(codePoint)) return g;
-  }
-  return null;
+  return cmap(document).get(codePoint) ?? null;
 }
 
 /**

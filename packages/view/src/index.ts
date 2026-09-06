@@ -40,6 +40,8 @@ export {
   removeItems,
   sameItem,
   sameSelection,
+  selectedKeys,
+  selectedNodeKeys,
   selectionKey,
   selectionBounds,
   selectionPoints,

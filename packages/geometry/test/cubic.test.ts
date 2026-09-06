@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   arcLength,
   bounds,
+  controlBounds,
   cubic,
   derivative,
   evaluate,
@@ -16,7 +17,7 @@ import {
   subcurve,
   tangent,
 } from "../src/cubic.js";
-import { distance, vec } from "../src/vec2.js";
+import { distance, distanceToRect, vec } from "../src/vec2.js";
 
 /** An arch: up from the origin, over, and back down to (100, 0). */
 const ARCH = cubic(vec(0, 0), vec(0, 100), vec(100, 100), vec(100, 0));
@@ -158,5 +159,32 @@ describe("project", () => {
   it("reports a point that lies on the curve", () => {
     const p = project(ARCH, vec(20, 40));
     expect(distance(p.point, evaluate(ARCH, p.t))).toBeCloseTo(0, 10);
+  });
+});
+
+describe("the control box", () => {
+  it("holds the curve, and is looser than the exact bounds", () => {
+    // A curve with long handles: its own box stops where the curve does, and the
+    // control box goes out to where the handles are.
+    const s = { a: vec(0, 0), c1: vec(0, 200), c2: vec(100, 200), b: vec(100, 0) };
+    const exact = bounds(s);
+    const box = controlBounds(s);
+
+    expect(box.maxY).toBe(200);
+    expect(exact.maxY).toBeLessThan(box.maxY);
+    expect(box.minX).toBeLessThanOrEqual(exact.minX);
+    expect(box.maxX).toBeGreaterThanOrEqual(exact.maxX);
+    expect(box.minY).toBeLessThanOrEqual(exact.minY);
+  });
+
+  it("never claims a point is far when the curve is near", () => {
+    // The property the rejection test depends on: the box distance is a floor
+    // under the real one, so anything it dismisses really was out of reach.
+    const s = { a: vec(0, 0), c1: vec(50, 150), c2: vec(150, -150), b: vec(200, 0) };
+    for (const p of [vec(-40, 20), vec(100, 90), vec(240, -30), vec(100, 0)]) {
+      expect(distanceToRect(controlBounds(s), p)).toBeLessThanOrEqual(
+        project(s, p).distance + 1e-9,
+      );
+    }
   });
 });

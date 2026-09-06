@@ -20,6 +20,7 @@ import {
   handleIsVisible,
   sameSegment,
   screenTolerance,
+  selectedKeys,
   selectionKey,
   toScreen,
 } from "@fonteditor/view";
@@ -294,7 +295,7 @@ export function handleVisibility(s: Scene): HandleVisibility {
 }
 
 export function drawHandles(ctx: Canvas2D, s: Scene): void {
-  const chosen = new Set(s.selection.map(selectionKey));
+  const chosen = selectedKeys(s.selection);
   const visibility = handleVisibility(s);
 
   for (const c of s.glyph.contours) {
@@ -518,7 +519,7 @@ export function drawMarquee(ctx: Canvas2D, s: Scene): void {
  * and UFO convention, so the muscle memory transfers.
  */
 export function drawNodes(ctx: Canvas2D, s: Scene): void {
-  const chosen = new Set(s.selection.map(selectionKey));
+  const chosen = selectedKeys(s.selection);
   for (const c of s.glyph.contours) {
     for (const n of c.nodes) {
       const p = toScreen(s.view, n.pt);

@@ -1,6 +1,8 @@
 import { type Vec2, about, add, keepsAxes, rotation, sub } from "@fonteditor/geometry";
 import {
+  type ContourId,
   type Glyph,
+  type NodeId,
   contourById,
   metricLines,
   moveSegmentTunniLine,
@@ -11,7 +13,7 @@ import {
   setLeftSidebearing,
   setSegmentTunniPoint,
   sidebearings,
-  translateNodeBy,
+  translateNodes,
   updateContour,
   updateGlyph,
 } from "@fonteditor/font-model";
@@ -308,12 +310,22 @@ export function translateSelection(g: Glyph, selection: Selection, delta: Vec2):
     else handleCount.set(key, (handleCount.get(key) ?? 0) + 1);
   }
 
-  let next = g;
-
+  // Grouped by contour, so each is rewritten once however many of its points
+  // are selected. One `updateContour` per point copies the node list and settles
+  // the tangents every time, which is quadratic in a selection that can now be a
+  // whole contour in one gesture.
+  const byContour = new Map<ContourId, Set<NodeId>>();
   for (const item of selection) {
     if (item.part !== "point") continue;
-    next =
-      updateContour(next, item.contourId, (c) => translateNodeBy(c, item.nodeId, delta)) ?? next;
+    const ids = byContour.get(item.contourId) ?? new Set<NodeId>();
+    ids.add(item.nodeId);
+    byContour.set(item.contourId, ids);
+  }
+
+  let next = g;
+
+  for (const [contourId, ids] of byContour) {
+    next = updateContour(next, contourId, (c) => translateNodes(c, ids, delta)) ?? next;
   }
 
   for (const item of selection) {

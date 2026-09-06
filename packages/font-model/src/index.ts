@@ -78,6 +78,7 @@ export {
   setSegmentCubic,
   setSegmentTunniPoint,
   translateNodeBy,
+  translateNodes,
   unionRect,
 } from "./contour.js";
 

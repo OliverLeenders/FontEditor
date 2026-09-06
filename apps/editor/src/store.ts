@@ -255,14 +255,26 @@ export class EditorStore {
 
   // ---- tool plumbing -----------------------------------------------------
 
-  /** Fold a tool's output in, and tell autosave in case anything committed. */
+  /**
+   * Fold a tool's output in, and tell autosave in case anything committed.
+   *
+   * Not while a gesture is in flight. `pending` is exactly "a transaction is
+   * open", and every pointer move of a drag produces a new document that is not
+   * a step yet — telling autosave about each of them wrote the glyph to the
+   * journal a hundred times a second for a state the user has not committed to
+   * and undo cannot return to. The commit at the end of the drag says everything
+   * those writes were saying, once.
+   */
   applyTool(outcome: ToolResult): void {
     const session = applyToSession(this.state.session, outcome);
-    this.patch({ session });
-    this.disk.commit(session.editor.document);
-    if (this.state.saveStatus !== this.disk.status) {
-      this.patch({ saveStatus: this.disk.status });
-    }
+    if (session.pending === null) this.disk.commit(session.editor.document);
+    // One patch, not two: each one wakes every listener, and a drag would
+    // otherwise redraw and re-run every selector twice per pointer event.
+    this.patch(
+      this.state.saveStatus === this.disk.status
+        ? { session }
+        : { session, saveStatus: this.disk.status },
+    );
   }
 
   /** Change something that is not the document — the camera, or which glyph. */

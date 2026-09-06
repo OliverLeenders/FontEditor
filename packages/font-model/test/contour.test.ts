@@ -27,6 +27,7 @@ import {
   setSegmentCubic,
   setSegmentTunniPoint,
   translateNodeBy,
+  translateNodes,
   extendHandle,
   extendSegmentHandles,
   isHalfHandled,
@@ -151,6 +152,28 @@ describe("moving nodes", () => {
 
   it("returns null for an unknown node", () => {
     expect(translateNodeBy(ringContour(), "nope", vec(1, 1))).toBeNull();
+  });
+
+  it("moves many at once for the same answer as moving them one by one", () => {
+    const c = ringContour();
+    const ids = c.nodes.slice(0, 2).map((n) => n.id);
+    const delta = vec(10, 5);
+
+    const together = translateNodes(c, new Set(ids), delta)!;
+    let apart = c;
+    for (const id of ids) apart = translateNodeBy(apart, id, delta)!;
+
+    expect(together.nodes).toEqual(apart.nodes);
+  });
+
+  it("ignores ids it does not have, and declines when none of them land", () => {
+    const c = ringContour();
+    const some = translateNodes(c, new Set([c.nodes[0]!.id, "nope"]), vec(1, 0))!;
+    expect(some.nodes[0]!.pt.x).toBe(c.nodes[0]!.pt.x + 1);
+    expect(some.nodes[1]!).toEqual(c.nodes[1]!);
+
+    expect(translateNodes(c, new Set(["nope"]), vec(1, 0))).toBeNull();
+    expect(translateNodes(c, new Set<string>(), vec(1, 0))).toBeNull();
   });
 });
 

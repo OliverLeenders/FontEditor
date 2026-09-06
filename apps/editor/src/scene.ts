@@ -2,6 +2,7 @@ import {
   type ComponentSource,
   type FontDocument,
   type Glyph,
+  glyphForCodePoint,
   metricLines,
   randomIds,
   resolveGlyphComponents,
@@ -56,12 +57,14 @@ export function neighboursFor(
   text: string,
   reach = 2,
 ): NeighbourGlyph[] {
+  // The model's own lookup rather than a scan written out again here: it is
+  // indexed, and this runs once per character on every frame.
   const names: string[] = [];
   for (const character of text) {
     const codePoint = character.codePointAt(0);
     if (codePoint === undefined) continue;
-    const found = Object.values(document.glyphs).find((g) => g.unicodes.includes(codePoint));
-    if (found !== undefined) names.push(found.name);
+    const found = glyphForCodePoint(document, codePoint);
+    if (found !== null) names.push(found.name);
   }
 
   const at = names.indexOf(currentGlyph);
