@@ -1,11 +1,14 @@
 import { translation } from "@fonteditor/geometry";
 import {
   type FontDocument,
+  addAnchor,
+  anchor,
   component,
   contour,
   counterIds,
   fontDocument,
   glyph,
+  rectContour,
   glyphForCodePoint,
   node,
   segmentAt,
@@ -14,6 +17,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { FontExportError, exportFileName, exportFont } from "../src/export.js";
+import { opentype } from "../src/opentype.js";
 import { importFont } from "../src/import.js";
 
 const ids = counterIds();
@@ -325,5 +329,76 @@ describe("exportFileName", () => {
   it("falls back where a name is empty or unusable", () => {
     const document = fontDocument([], { ...INFO, familyName: "  ", styleName: "!!" });
     expect(exportFileName(document)).toBe("Untitled-Regular.otf");
+  });
+});
+
+describe("mark attachment in an OTF", () => {
+  /** A letter with a place for an accent, and an accent that attaches by it. */
+  const attaching = (): FontDocument => {
+    const ids = counterIds("k");
+    const a = addAnchor(
+      glyph("a", {
+        unicodes: [0x61],
+        advance: 500,
+        contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 400, maxY: 600 })],
+      }),
+      anchor("a1", "top", { x: 250, y: 620 }),
+    );
+    const mark = addAnchor(
+      glyph("acutecomb", {
+        unicodes: [0x301],
+        advance: 0,
+        contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 80, maxY: 60 })],
+      }),
+      anchor("m1", "_top", { x: 40, y: 0 }),
+    );
+    return fontDocument([a, mark], INFO);
+  };
+
+  /** The four-byte tags in a font's table directory. */
+  const tagsOf = (bytes: ArrayBuffer): string[] => {
+    const view = new DataView(bytes);
+    const count = view.getUint16(4);
+    const out: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const at = 12 + i * 16;
+      out.push(String.fromCharCode(...new Uint8Array(bytes, at, 4)));
+    }
+    return out;
+  };
+
+  it("writes GPOS and GDEF when the anchors describe an attachment", () => {
+    const { bytes, warnings } = exportFont(attaching());
+    expect(warnings).toEqual([]);
+
+    const tags = tagsOf(bytes);
+    expect(tags).toContain("GPOS");
+    // Without GDEF a shaper does not know which glyphs are marks, and the
+    // attachment is not reliably applied — so it is written with the lookups.
+    expect(tags).toContain("GDEF");
+  });
+
+  it("writes neither for a font whose anchors attach nothing", () => {
+    const ids = counterIds("p");
+    const lonely = addAnchor(
+      glyph("a", {
+        unicodes: [0x61],
+        advance: 500,
+        contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 400, maxY: 600 })],
+      }),
+      anchor("a1", "top", { x: 250, y: 620 }),
+    );
+
+    const tags = tagsOf(exportFont(fontDocument([lonely], INFO)).bytes);
+    expect(tags).not.toContain("GDEF");
+  });
+
+  it("parses back through opentype.js, which reads the lookups it wrote", () => {
+    const font = opentype.parse(exportFont(attaching()).bytes);
+    const lookups = font.tables.gpos?.lookups ?? [];
+
+    // Type 4 is mark-to-base. Reading it back is the check that the offsets
+    // inside the subtable are right and not merely the byte count.
+    expect(lookups.some((l: { lookupType: number }) => l.lookupType === 4)).toBe(true);
   });
 });

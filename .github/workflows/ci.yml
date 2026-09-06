@@ -96,3 +96,9 @@ jobs:
       # The only test here whose input was written by something other than us.
       - name: Read back what fontTools wrote
         run: FOREIGN_UFO="$RUNNER_TEMP/ufo/FromFontTools.ufo.zip" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
+
+      - name: Export the mark-attachment proof font
+        run: OTF_OUT="$RUNNER_TEMP/otf" pnpm --filter @fonteditor/font-io exec vitest run proof-otf
+
+      - name: Read its GPOS with fontTools
+        run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-Regular.otf"

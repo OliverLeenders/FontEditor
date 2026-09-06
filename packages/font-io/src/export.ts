@@ -7,6 +7,7 @@ import {
   correctDirections,
   counterIds,
   kernIndex,
+  orderedGlyphs,
   removeOverlap,
   resolveGlyphComponents,
   segments,
@@ -16,6 +17,7 @@ import { kerningLookups, kerningSubtables } from "./gpos.js";
 import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
 import { compileFeatures } from "./features.js";
+import { compileMarks } from "./marks.js";
 import { withTable } from "./sfnt.js";
 import type { OtGlyph, OtPath } from "opentype.js";
 
@@ -261,24 +263,42 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
   // thing a font can have, and a second `kern` feature is one a shaper ignores.
   const kernSubtables = kerningSubtables(kernIndex(document.kerning), (name) => order.get(name));
   const kernLookups = kerningLookups(kernSubtables);
+
+  // The third source: the anchors. A component placed by them puts the accent
+  // in the outline; this is the rule that puts it there for a letter and a
+  // combining mark typed as two characters, where there is no composite to
+  // place anything into.
+  const marks = compileMarks(orderedGlyphs(document), (name) => order.get(name));
+  for (const problem of marks.warnings) warnings.push(problem);
+
+  const markAt = kernLookups.length + features.positioning.lookups.length;
   const gpos = layoutTable(
     mergeFeatures(
-      kernLookups.length === 0 ? [] : [{ tag: "kern", lookups: kernLookups.map((_, i) => i) }],
-      shiftFeatures(features.positioning.entries, kernLookups.length),
+      mergeFeatures(
+        kernLookups.length === 0 ? [] : [{ tag: "kern", lookups: kernLookups.map((_, i) => i) }],
+        shiftFeatures(features.positioning.entries, kernLookups.length),
+      ),
+      marks.features.map((tag, i) => ({ tag, lookups: [markAt + i] })),
     ),
-    [...kernLookups, ...features.positioning.lookups],
+    [...kernLookups, ...features.positioning.lookups, ...marks.lookups],
   );
   for (const problem of features.problems) {
     warnings.push(`features, line ${String(problem.line)}: ${problem.message}`);
   }
 
-  if (gpos.length === 0 && features.table.length === 0) return { bytes, warnings };
+  if (gpos.length === 0 && features.table.length === 0 && marks.gdef.length === 0) {
+    return { bytes, warnings };
+  }
 
   // Spliced one after the other, each on the bytes the last produced, so the
   // directory and the checksums are right whichever of the two exists.
   let out: Uint8Array = new Uint8Array(bytes);
   if (gpos.length > 0) out = withTable(out, "GPOS", gpos);
   if (features.table.length > 0) out = withTable(out, "GSUB", features.table);
+  // GDEF last, and only alongside the lookups that need it: a shaper reads it to
+  // know which glyphs are marks, and mark attachment without it is not reliably
+  // applied.
+  if (gpos.length > 0 && marks.gdef.length > 0) out = withTable(out, "GDEF", marks.gdef);
   return { bytes: out.buffer.slice(0) as ArrayBuffer, warnings };
 }
 

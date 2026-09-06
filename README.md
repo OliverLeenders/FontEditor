@@ -54,11 +54,16 @@ The gaps worth naming, in the order they would bite someone using this:
   into the font and the glyph is named in the export warnings. The UFO is written as drawn, overlaps and all: it is source, and the
   tools that read it remove overlaps themselves.
 
-- **Anchors are stored and drawn, and not yet compiled.** A letter carries `top`, an
-  accent carries `_top`, and a component placed in a glyph lands where the pair says it
-  belongs — which is what makes accents follow the letter when its anchor moves. The UFO
-  carries them both ways, format 1 and 2. What is not there yet is GPOS mark attachment:
-  the OTF gets the accent drawn in the right place, not a rule that would place it.
+- **Anchors do both jobs: placing components, and mark attachment.** A letter carries
+  `top`, an accent carries `_top`, and a component placed in a glyph lands where the pair
+  says it belongs — which is what makes every accent follow the letter when its anchor
+  moves. The same anchors compile into GPOS: mark-to-base for an accent on a letter,
+  mark-to-mark where an accent offers a `top` of its own for a second one to stack on,
+  and the `GDEF` glyph classes without which a shaper does not know which glyphs are
+  marks. So `a` + U+0301 typed as two characters is positioned by the font, with no
+  composite glyph involved. The UFO carries the anchors both ways, format 1 and 2. What
+  is not there is a mark glyph in two classes at once — the format gives it one, and a
+  glyph with two attaching anchors is named in the export warnings.
 
 - **Contour directions are corrected where the font is compiled, not in the drawing.**
   A rasteriser fills one path by the non-zero winding rule, so two contours that overlap
@@ -78,13 +83,16 @@ The gaps worth naming, in the order they would bite someone using this:
   than by which piece starts nearest, which is the only thing that can answer a point
   where four pieces meet. Refusal is still the last resort when a boundary will not
   close; a real 822-glyph font now goes through without one.
-- **The UFO is checked against fontTools on every push.** A proof font covering curves,
-  components, composites, case-colliding names, groups, class kerning and features is
-  exported, read by `fontTools.ufoLib` with validation on, compiled by `feaLib`, written
-  back out by fontTools and imported again — see `tools/ufo-check`. What is still
-  unproven is the OTF against a rasteriser, and the UFO against the editors people
-  actually use, which agree with fontTools about the format and not always about what a
-  font should contain.
+- **Both files are checked against fontTools on every push.** A proof UFO covering
+  curves, components, composites, case-colliding names, groups, class kerning and
+  features is exported, read by `fontTools.ufoLib` with validation on, compiled by
+  `feaLib`, written back out by fontTools and imported again — see `tools/ufo-check`. A
+  proof OTF covering mark attachment is exported and its GPOS decompiled by fontTools,
+  which is then asked for the anchors back by name — see `tools/otf-check`, and the
+  reason it exists: that table is offsets into offsets, and a test written here would be
+  checking our arithmetic against our own arithmetic. What is still unproven is the OTF
+  against a rasteriser, and the UFO against the editors people actually use, which agree
+  with fontTools about the format and not always about what a font should contain.
 
 ## Getting started
 
