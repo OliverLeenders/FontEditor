@@ -88,10 +88,24 @@ for name in names:
         "points": [c for c in pen.value if c[0] == "addPoint"],
         "components": [c for c in pen.value if c[0] == "addComponent"],
         "contours": sum(1 for c in pen.value if c[0] == "beginPath"),
+        "anchors": getattr(glyph, "anchors", []),
     }
 
     if getattr(glyph, "width", None) is None:
         problem(f"glyph {name}", "no advance width")
+
+# anchors: read back by name, and nowhere in the outline. An anchor written as
+# a one-point contour is the format-1 spelling, and reading it as a contour is
+# the mistake this asks about.
+anchored = {name: g["anchors"] for name, g in drawn.items() if g["anchors"]}
+note(f"anchors: { {name: [a['name'] for a in a_list] for name, a_list in anchored.items()} }")
+
+for name, anchors in anchored.items():
+    for a in anchors:
+        if not a.get("name"):
+            problem(f"glyph {name}", "an anchor with no name")
+        if a.get("x") is None or a.get("y") is None:
+            problem(f"glyph {name}", f"anchor {a.get('name')!r} has no position")
 
 # every component points at a glyph that exists
 for name, g in drawn.items():

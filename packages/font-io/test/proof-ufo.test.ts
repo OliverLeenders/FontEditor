@@ -1,4 +1,6 @@
 import {
+  addAnchor,
+  anchor,
   EMPTY_KERNING,
   type FontDocument,
   type Kerning,
@@ -151,7 +153,12 @@ function proof(): FontDocument {
     [
       glyph(".notdef", { advance: 500, contours: [wedge()] }),
       glyph("space", { unicodes: [0x20], advance: 260 }),
-      glyph("A", { unicodes: [0x41], advance: 620, contours: [wedge()] }),
+      // Anchors on both sides of an attachment, so a foreign reader is asked
+      // about them too: `A` offers a place, `acute` attaches by one.
+      addAnchor(
+        glyph("A", { unicodes: [0x41], advance: 620, contours: [wedge()] }),
+        anchor(ids.anchor(), "top", { x: 310, y: 720 }),
+      ),
       glyph("a", { unicodes: [0x61], advance: 560, contours: [ring(60, 500, 520, 0)] }),
       glyph("a.alt", { advance: 560, contours: [halfHandled()] }),
       glyph("O", { unicodes: [0x4f], advance: 700, contours: [ring(50, 650, 720, -20)] }),
@@ -161,7 +168,10 @@ function proof(): FontDocument {
       glyph("i", { unicodes: [0x69], advance: 280, contours: [wedge()] }),
       glyph("fi", { advance: 600, contours: [openRun(), wedge()] }),
       glyph("period", { unicodes: [0x2e], advance: 260, contours: [wedge()] }),
-      glyph("acute", { unicodes: [0x2ca], advance: 0, contours: [wedge()] }),
+      addAnchor(
+        glyph("acute", { unicodes: [0x2ca], advance: 0, contours: [wedge()] }),
+        anchor(ids.anchor(), "_top", { x: 120, y: 460 }),
+      ),
       glyph("Aacute", {
         unicodes: [0xc1],
         advance: 620,
@@ -257,6 +267,9 @@ describe("the proof font", () => {
         nodes: g.contours.map((c) => c.nodes.length),
         closed: g.contours.map((c) => c.closed),
         components: g.components.map((c) => c.base),
+        // By name and position: an anchor that came back as a one-point contour
+        // would pass every other line here.
+        anchors: g.anchors.map((a) => [a.name, a.pt.x, a.pt.y]),
       }));
     expect(shape(after)).toEqual(shape(before));
 

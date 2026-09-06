@@ -10,7 +10,9 @@ in the type world go through, and it decompiles the tables structurally rather
 than trusting their lengths.
 """
 
+import os
 import sys
+import tempfile
 
 from fontTools.ttLib import TTFont
 
@@ -140,6 +142,28 @@ else:
             problem("mkmk", f"acutecomb offers {placed}, expected a top at (0, 720)")
     if "a" in stacked:
         problem("mkmk", "a is a letter and has no business in mark-to-mark")
+
+# ------------------------------------------------------- and written back out
+# fontTools recompiles what it decompiled, so a table it can read but not
+# rebuild is one whose structure it only tolerated. Reading the lookups out of
+# its own bytes is the stricter question.
+with tempfile.TemporaryDirectory() as tmp:
+    again_path = os.path.join(tmp, "again.otf")
+    try:
+        font.save(again_path)
+        again = TTFont(again_path)
+        rebuilt = again["GPOS"].table
+    except Exception as e:  # noqa: BLE001
+        problem("rewrite", f"{type(e).__name__}: {e}")
+    else:
+        types = sorted({lookup.LookupType for lookup in rebuilt.LookupList.Lookup})
+        note(f"after fontTools rewrote it: lookup types {types}")
+        if 4 not in types:
+            problem("rewrite", "the mark-to-base lookup did not survive")
+        if 6 not in types:
+            problem("rewrite", "the mark-to-mark lookup did not survive")
+        if "GDEF" not in again:
+            problem("rewrite", "GDEF did not survive")
 
 # ---------------------------------------------------------------------- said
 print("\n".join(notes))
