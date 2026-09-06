@@ -4,7 +4,7 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 
 installBrowserGlobals();
 
-const { EditorStore } = await import("../src/store.js");
+const { EditorStore } = await import("../src/store/index.js");
 const { handlesAutoHidden, neighboursFor, sceneFor } = await import("../src/scene.js");
 const { setActiveTool } = await import("@fonteditor/tools");
 

@@ -1,0 +1,128 @@
+import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
+import { session as newSession } from "@fonteditor/edit-core";
+import { importFont as parseFontFile, importUfo, looksLikeUfo } from "@fonteditor/font-io";
+import {
+  type FontDocument,
+  type GlyphName,
+  DEFAULT_FONT_INFO,
+  fontDocument,
+  glyph,
+  randomIds,
+} from "@fonteditor/font-model";
+import { editorState } from "@fonteditor/tools";
+
+import type { Persistence } from "../persistence.js";
+import type { StoreHost } from "./state.js";
+
+/**
+ * Putting a whole font in front of the reader: a new one, or one from a file.
+ *
+ * Free functions over the store rather than methods on it, because this is the
+ * one part that reads files, and it is long enough — two readers, a warning
+ * format each, and the rule about what replaces what — to be worth reading on
+ * its own.
+ */
+
+/** What opening a font needs of the store beyond reading and patching state. */
+export type FontHost = StoreHost & {
+  readonly disk: Persistence;
+  /** The glyph to open once the font is on screen, and the camera to frame it. */
+  showGlyph: (name: GlyphName) => void;
+  setCatalogQuery: (changes: Partial<CatalogQuery>) => void;
+};
+
+/** What a font brought in from a file turned out to be. */
+export type ImportReport = {
+  family: string;
+  glyphs: number;
+  warnings: string[];
+};
+
+/**
+ * Start a new, empty font, discarding whatever is open.
+ *
+ * Empty means genuinely empty apart from `.notdef`, which every font needs and
+ * which no one wants to remember to make. Destructive, so the caller is
+ * expected to have asked first; the store's job is to do it cleanly rather
+ * than to second-guess it.
+ */
+export async function newFont(host: FontHost): Promise<void> {
+  const document = fontDocument([glyph(".notdef", { advance: 500 })], DEFAULT_FONT_INFO);
+  await adoptDocument(host, document);
+}
+
+/**
+ * Replace the document with a font read from a file.
+ *
+ * Which reader is used comes from the file's name rather than from sniffing
+ * its bytes: a UFO is a zip and a zip could be anything, so the only honest
+ * way to know one is that it was offered as one. Being wrong is cheap — the
+ * UFO reader says what it could not find.
+ *
+ * Deliberately *not* an undoable edit. Undo is for the shape you are drawing;
+ * a single ctrl-Z that silently swapped the whole font back would be alarming
+ * rather than useful, and the history it restored would describe glyphs that
+ * are no longer open. The session starts again on the new font.
+ */
+export async function importFont(
+  host: FontHost,
+  bytes: ArrayBuffer,
+  fileName = "",
+): Promise<ImportReport> {
+  const read = looksLikeUfo(fileName)
+    ? await readUfo(bytes)
+    : (() => {
+        const parsed = parseFontFile(bytes, randomIds());
+        return {
+          document: parsed.document,
+          warnings: parsed.warnings.map((w) =>
+            w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
+          ),
+        };
+      })();
+
+  await adoptDocument(host, read.document);
+
+  const { info, glyphOrder } = read.document;
+  return {
+    family: `${info.familyName} ${info.styleName}`.trim(),
+    glyphs: glyphOrder.length,
+    warnings: read.warnings,
+  };
+}
+
+async function readUfo(
+  bytes: ArrayBuffer,
+): Promise<{ document: FontDocument; warnings: string[] }> {
+  const out = await importUfo(bytes, randomIds());
+  // A UFO that cannot be read is reported rather than half-adopted: there is
+  // no partial font to fall back on the way a damaged glyph has one.
+  if ("reason" in out) throw new Error(out.reason);
+
+  return {
+    document: out.document,
+    warnings: out.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
+  };
+}
+
+/**
+ * Make a document the one being edited, on screen and on disk.
+ *
+ * Shared by opening a font and by starting a new one, because they differ only
+ * in where the document came from. The history is replaced rather than
+ * appended to, for the reason `importFont` gives.
+ */
+async function adoptDocument(host: FontHost, document: FontDocument): Promise<void> {
+  showDocument(host, document, false);
+  host.setCatalogQuery(DEFAULT_QUERY);
+  await host.disk.replaceAll(document);
+}
+
+/** Put a document on screen, starting its history over. */
+export function showDocument(host: FontHost, document: FontDocument, recovered: boolean): void {
+  host.patch({
+    session: newSession(editorState({ document, view: host.state().session.editor.view })),
+    recovered,
+  });
+  host.showGlyph(document.glyphOrder[0] ?? "");
+}

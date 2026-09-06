@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
 import { positionerFrom, shaperFrom } from "../shaping.js";
-import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store.js";
+import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./ProofView.module.css";

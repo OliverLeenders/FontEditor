@@ -21,7 +21,7 @@ export { NO_MODIFIERS, keyInput, modifiers, pointerInput } from "./input.js";
 export type { Effect, ToolResult } from "./effects.js";
 export { abort, begin, commit, result } from "./effects.js";
 
-export type { NewGlyph } from "./commands.js";
+export type { NewGlyph } from "./commands/index.js";
 
 export type {
   EditorState,
@@ -99,7 +99,7 @@ export {
   selectAllPoints,
   setNodeHvLock,
   setPointType,
-} from "./commands.js";
+} from "./commands/index.js";
 
 export {
   clipboardText,

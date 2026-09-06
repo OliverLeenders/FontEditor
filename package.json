@@ -10,7 +10,6 @@
   },
   "scripts": {
     "dev": "pnpm --filter @fonteditor/editor dev",
-    "dev:playground": "pnpm --filter @fonteditor/playground dev",
     "test": "pnpm --filter \"./packages/*\" --filter @fonteditor/editor test",
     "test:watch": "pnpm --filter @fonteditor/geometry test:watch",
     "typecheck": "pnpm -r typecheck",

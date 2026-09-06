@@ -1,6 +1,6 @@
 import { createContext, useContext, useSyncExternalStore } from "react";
 
-import type { EditorStore, StoreState } from "./store.js";
+import type { EditorStore, StoreState } from "./store/index.js";
 
 const StoreContext = createContext<EditorStore | null>(null);
 

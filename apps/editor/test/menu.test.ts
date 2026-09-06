@@ -5,7 +5,7 @@ import { installBrowserGlobals } from "./browser-globals.js";
 
 installBrowserGlobals();
 
-const { EditorStore } = await import("../src/store.js");
+const { EditorStore } = await import("../src/store/index.js");
 const { itemsFor } = await import("../src/components/ContextMenu.js");
 const { contourById, segmentAt, segmentCount, sidebearings } =
   await import("@fonteditor/font-model");

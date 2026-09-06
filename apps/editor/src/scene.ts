@@ -29,7 +29,7 @@ import {
 } from "@fonteditor/tools";
 
 import { isDarkNow } from "./scheme.js";
-import type { StoreState } from "./store.js";
+import type { StoreState } from "./store/index.js";
 
 const EMPTY: Glyph = { name: "", unicodes: [], advance: 0, contours: [], components: [] };
 

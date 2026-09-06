@@ -25,7 +25,7 @@ import {
 import type { HitTarget } from "@fonteditor/view";
 import { useEffect, useRef } from "react";
 
-import type { EditorStore } from "../store.js";
+import type { EditorStore } from "../store/index.js";
 import styles from "./ContextMenu.module.css";
 
 export type MenuRequest = {

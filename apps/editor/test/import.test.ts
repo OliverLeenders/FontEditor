@@ -5,7 +5,7 @@ import { duplicateNameFont, threeGlyphFont } from "./fonts.js";
 
 installBrowserGlobals();
 
-const { EditorStore } = await import("../src/store.js");
+const { EditorStore } = await import("../src/store/index.js");
 type Store = InstanceType<typeof EditorStore>;
 
 describe("importing a font into the store", () => {

@@ -88,34 +88,6 @@ importers:
         specifier: ^5.4.21
         version: 5.4.21(@types/node@22.20.1)
 
-  apps/playground:
-    dependencies:
-      '@fonteditor/edit-core':
-        specifier: workspace:*
-        version: link:../../packages/edit-core
-      '@fonteditor/font-model':
-        specifier: workspace:*
-        version: link:../../packages/font-model
-      '@fonteditor/geometry':
-        specifier: workspace:*
-        version: link:../../packages/geometry
-      '@fonteditor/render':
-        specifier: workspace:*
-        version: link:../../packages/render
-      '@fonteditor/storage':
-        specifier: workspace:*
-        version: link:../../packages/storage
-      '@fonteditor/tools':
-        specifier: workspace:*
-        version: link:../../packages/tools
-      '@fonteditor/view':
-        specifier: workspace:*
-        version: link:../../packages/view
-    devDependencies:
-      vite:
-        specifier: ^5.4.21
-        version: 5.4.21(@types/node@22.20.1)
-
   packages/catalog:
     dependencies:
       '@fonteditor/font-model':

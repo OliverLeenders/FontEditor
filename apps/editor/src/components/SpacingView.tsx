@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { KernGroups } from "./KernGroups.js";
 import { palette } from "../scene.js";
 import { positionerFrom, shaperFrom } from "../shaping.js";
-import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store.js";
+import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./SpacingView.module.css";

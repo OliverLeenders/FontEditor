@@ -78,7 +78,7 @@ import {
   transformOriginPoint,
   transformSelection,
   unroundedCount,
-} from "../src/commands.js";
+} from "../src/commands/index.js";
 import { keyInput } from "../src/input.js";
 import { keyDown, selectionBox } from "../src/select.js";
 import { type EditorState, boxAngle, editorState } from "../src/state.js";

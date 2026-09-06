@@ -7,7 +7,7 @@ installBrowserGlobals();
 const { MAX_OUTLINE_WIDTH, MIN_PROOF_SIZE } = await import("../src/limits.js");
 const { DEFAULT_PREFERENCES, loadPreferences, savePreferences } =
   await import("../src/preferences.js");
-const { EditorStore } = await import("../src/store.js");
+const { EditorStore } = await import("../src/store/index.js");
 
 describe("reading preferences", () => {
   beforeEach(() => {

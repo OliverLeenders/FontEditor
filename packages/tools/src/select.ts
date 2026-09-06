@@ -13,7 +13,7 @@ import {
   selectionBounds,
 } from "@fonteditor/view";
 
-import { deleteSelectedPoints, reverseSelectedContour, selectContour } from "./commands.js";
+import { deleteSelectedPoints, reverseSelectedContour, selectContour } from "./commands/index.js";
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import {
   EMPTY_GLYPH,

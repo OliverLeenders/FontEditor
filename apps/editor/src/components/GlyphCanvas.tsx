@@ -30,7 +30,7 @@ import {
 import { useEffect, useRef } from "react";
 
 import { handlesAutoHidden, sceneFor } from "../scene.js";
-import type { EditorStore } from "../store.js";
+import type { EditorStore } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore } from "../useStore.js";
 import type { MenuRequest } from "./ContextMenu.js";

@@ -1,27 +1,14 @@
-import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
-import { importFont as parseFontFile, importUfo, looksLikeUfo } from "@fonteditor/font-io";
+import type { CatalogQuery } from "@fonteditor/catalog";
 import {
-  type EditSession,
-  apply as applyToSession,
   canRedoSession,
   canUndoSession,
   redo,
   redoLabelOf,
-  session as newSession,
   undo,
   undoLabelOf,
+  apply as applyToSession,
 } from "@fonteditor/edit-core";
-import {
-  type FontDocument,
-  type Glyph,
-  type GlyphName,
-  DEFAULT_FONT_INFO,
-  fontDocument,
-  glyph,
-  randomIds,
-  setFeatures,
-} from "@fonteditor/font-model";
-import type { AutosaveStatus } from "@fonteditor/storage";
+import { type Glyph, type GlyphName, setFeatures } from "@fonteditor/font-model";
 import {
   type EditorState,
   type ToolId,
@@ -29,13 +16,12 @@ import {
   begin,
   commit,
   currentGlyph,
-  editorState,
   result,
   setActiveTool,
 } from "@fonteditor/tools";
 import type { ViewTransform } from "@fonteditor/view";
 
-import { frameGlyph } from "./framing.js";
+import { frameGlyph } from "../framing.js";
 import {
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
@@ -45,38 +31,17 @@ import {
   MIN_PROOF_LEADING,
   MIN_PROOF_SIZE,
   MIN_SPACING_SIZE,
-} from "./limits.js";
+} from "../limits.js";
 import {
-  DEFAULT_PREFERENCES,
   type InspectorPlacement,
-  type Preferences,
   type ThemeChoice,
   clampInspector,
   loadPreferences,
-  savePreferences,
-} from "./preferences.js";
-import {
-  type Ownership,
-  Persistence,
-  type PersistenceReport,
-  type StorageState,
-} from "./persistence.js";
-import { starterFont } from "./sample.js";
-
-/**
- * What the proof shows before anyone types anything.
- *
- * Lowercase, because that is what a text face is judged on and what most fonts
- * here will have first. It says what it is rather than being a pangram: a
- * pangram exercises the alphabet, which is the glyph browser's job, where a
- * proof is for reading.
- */
-const PROOF_TEXT = [
-  "handgloves and the shape of the space between them",
-  "no one reads a letter, they read a line of them",
-  "",
-  "the only way to know whether a font works is to set it and look",
-].join(String.fromCharCode(10));
+} from "../preferences.js";
+import { Persistence, type PersistenceReport } from "../persistence.js";
+import { type FontHost, type ImportReport, importFont, newFont, showDocument } from "./fonts.js";
+import { defaults, remember, within } from "./settings.js";
+import { type StoreState, initialState } from "./state.js";
 
 // Re-exported so the panels that already read these from the store keep working;
 // they live in `limits.ts` because the preferences need them too, and preferences
@@ -91,81 +56,12 @@ export {
   MIN_PROOF_SIZE,
   MIN_PROOF_LEADING,
   MIN_SPACING_SIZE,
-} from "./limits.js";
-export { DEFAULT_PREFERENCES } from "./preferences.js";
-export type { InspectorPlacement, Preferences, ThemeChoice } from "./preferences.js";
-
-export type { Ownership, StorageState };
-
-/**
- * Everything the interface reads, in one immutable value.
- *
- * Replaced wholesale on every change, so a selector comparing with `Object.is`
- * sees exactly the slices that moved.
- */
-export type StoreState = {
-  readonly session: EditSession;
-  readonly saveStatus: AutosaveStatus;
-  readonly storage: StorageState;
-  readonly storageDetail: string;
-  readonly recovered: boolean;
-  /** Only the owning tab writes. A second tab shows the font and saves nothing. */
-  readonly ownership: Ownership;
-  /** What the glyph strip is showing, as typed. */
-  readonly stripText: string;
-  /** Space held: draw the shape without any controls. */
-  readonly previewing: boolean;
-  readonly inspector: InspectorPlacement;
-  /** Which palette to draw with, or "system" to follow the reader's machine. */
-  readonly theme: ThemeChoice;
-  /** What the glyph browser is filtered to. Not undoable, so it lives out here. */
-  readonly catalogQuery: CatalogQuery;
-  /** Draw the glyphs either side, from the strip text, for judging spacing. */
-  readonly showNeighbours: boolean;
-  /** Show handles only where the work is. On by default; the canvas is calmer. */
-  readonly autoHideHandles: boolean;
-  /**
-   * Let a drag catch on the glyph's own points as well as the font's lines.
-   *
-   * The metric lines are always live and need no setting: the canvas draws them,
-   * so catching on one explains itself. These do not draw yet, which is what the
-   * switch is for.
-   */
-  readonly snapPoints: boolean;
-  /** Apply the font's features when setting the spacing line and the proof. */
-  readonly applyFeatures: boolean;
-  /**
-   * How heavy the outline is drawn, in screen pixels.
-   *
-   * A preference rather than a fact about the font: a hairline is right for
-   * judging a curve against the grid, and a heavier stroke is right for reading
-   * the shape across the room.
-   */
-  readonly outlineWidth: number;
-  /**
-   * The spacing workspace's own text and type size.
-   *
-   * Its own, not the glyph strip's: spacing wants strings like "nonno" that
-   * would be odd sitting under the drawing canvas, and the two views want
-   * different text at the same time. Seeded from the strip so nothing is retyped.
-   */
-  readonly spacingText: string;
-  readonly spacingSize: number;
-  /** Whether the spacing view's arrows adjust a glyph or the gap before it. */
-  readonly spacingMode: "space" | "kern";
-  /**
-   * The proof's own text, size and leading.
-   *
-   * Its own again, for the reason spacing has its own: a proof wants paragraphs
-   * and the spacing view wants "nonno", and having to retype one to see the
-   * other would make comparing them a chore rather than a glance.
-   */
-  readonly proofText: string;
-  readonly proofSize: number;
-  /** Line spacing as a multiple of the em, which is how type is set. */
-  readonly proofLeading: number;
-  readonly viewport: { readonly width: number; readonly height: number };
-};
+} from "../limits.js";
+export { DEFAULT_PREFERENCES } from "../preferences.js";
+export type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
+export type { Ownership, StorageState } from "../persistence.js";
+export type { StoreState } from "./state.js";
+export type { ImportReport } from "./fonts.js";
 
 /**
  * The editor's state, held outside React.
@@ -190,41 +86,31 @@ export class EditorStore {
   private state: StoreState;
   private readonly listeners = new Set<() => void>();
   private readonly disk: Persistence;
+  /**
+   * The store as the modules below it see it: read the state, change the state,
+   * and the few verbs opening a font needs. Built once rather than per call, so
+   * passing it costs nothing.
+   */
+  private readonly host: FontHost;
 
   constructor() {
-    // Read once, before anything renders, so the first frame is already in the
-    // reader's theme rather than flashing the default and correcting itself.
-    const preferences = loadPreferences();
-
-    this.state = {
-      session: newSession(
-        editorState({ document: starterFont(), view: { scale: 1, tx: 0, ty: 0 } }),
-      ),
-      saveStatus: "idle",
-      storage: "connecting",
-      storageDetail: "",
-      recovered: false,
-      ownership: "owner",
-      stripText: "hello",
-      catalogQuery: DEFAULT_QUERY,
-      showNeighbours: preferences.showNeighbours,
-      autoHideHandles: preferences.autoHideHandles,
-      snapPoints: preferences.snapPoints,
-      applyFeatures: preferences.applyFeatures,
-      outlineWidth: preferences.outlineWidth,
-      spacingText: "nonno",
-      spacingSize: preferences.spacingSize,
-      spacingMode: "space",
-      proofText: PROOF_TEXT,
-      proofSize: preferences.proofSize,
-      proofLeading: preferences.proofLeading,
-      previewing: false,
-      inspector: preferences.inspector,
-      theme: preferences.theme,
-      viewport: { width: 0, height: 0 },
-    };
-
+    // The preferences are read before the state is built, so the very first
+    // frame is already in the reader's theme.
+    this.state = initialState(loadPreferences());
     this.disk = new Persistence((changes: PersistenceReport) => this.patch(changes));
+    this.host = {
+      state: () => this.state,
+      patch: (changes) => {
+        this.patch(changes);
+      },
+      disk: this.disk,
+      showGlyph: (name) => {
+        this.setCurrentGlyph(name);
+      },
+      setCatalogQuery: (changes) => {
+        this.setCatalogQuery(changes);
+      },
+    };
   }
 
   // ---- subscription ------------------------------------------------------
@@ -364,98 +250,14 @@ export class EditorStore {
 
   // ---- opening a font ----------------------------------------------------
 
-  /**
-   * Start a new, empty font, discarding whatever is open.
-   *
-   * Empty means genuinely empty apart from `.notdef`, which every font needs and
-   * which no one wants to remember to make. Destructive, so the caller is
-   * expected to have asked first; the store's job is to do it cleanly rather
-   * than to second-guess it.
-   */
+  /** Start a new, empty font, discarding whatever is open. */
   async newFont(): Promise<void> {
-    const document = fontDocument([glyph(".notdef", { advance: 500 })], DEFAULT_FONT_INFO);
-    await this.adoptDocument(document);
+    await newFont(this.host);
   }
 
-  /**
-   * Replace the document with a font read from a file.
-   *
-   * Which reader is used comes from the file's name rather than from sniffing
-   * its bytes: a UFO is a zip and a zip could be anything, so the only honest
-   * way to know one is that it was offered as one. Being wrong is cheap — the
-   * UFO reader says what it could not find.
-   *
-   * Deliberately *not* an undoable edit. Undo is for the shape you are drawing;
-   * a single ctrl-Z that silently swapped the whole font back would be alarming
-   * rather than useful, and the history it restored would describe glyphs that
-   * are no longer open. The session starts again on the new font.
-   */
-  async importFont(
-    bytes: ArrayBuffer,
-    fileName = "",
-  ): Promise<{
-    family: string;
-    glyphs: number;
-    warnings: string[];
-  }> {
-    const read = looksLikeUfo(fileName)
-      ? await this.readUfo(bytes)
-      : (() => {
-          const parsed = parseFontFile(bytes, randomIds());
-          return {
-            document: parsed.document,
-            warnings: parsed.warnings.map((w) =>
-              w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
-            ),
-          };
-        })();
-
-    await this.adoptDocument(read.document);
-
-    const { info, glyphOrder } = read.document;
-    return {
-      family: `${info.familyName} ${info.styleName}`.trim(),
-      glyphs: glyphOrder.length,
-      warnings: read.warnings,
-    };
-  }
-
-  private async readUfo(
-    bytes: ArrayBuffer,
-  ): Promise<{ document: FontDocument; warnings: string[] }> {
-    const out = await importUfo(bytes, randomIds());
-    // A UFO that cannot be read is reported rather than half-adopted: there is
-    // no partial font to fall back on the way a damaged glyph has one.
-    if ("reason" in out) throw new Error(out.reason);
-
-    return {
-      document: out.document,
-      warnings: out.warnings.map((w) =>
-        w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
-      ),
-    };
-  }
-
-  /**
-   * Make a document the one being edited, on screen and on disk.
-   *
-   * Shared by opening a font and by starting a new one, because they differ only
-   * in where the document came from. The history is replaced rather than
-   * appended to, for the reason `importFont` gives.
-   */
-  private async adoptDocument(document: FontDocument): Promise<void> {
-    this.showDocument(document, false);
-    this.setCatalogQuery(DEFAULT_QUERY);
-    await this.disk.replaceAll(document);
-  }
-
-  /** Put a document on screen, starting its history over. */
-  private showDocument(document: FontDocument, recovered: boolean): void {
-    this.patch({
-      session: newSession(editorState({ document, view: this.editor.view })),
-      recovered,
-    });
-    this.setCurrentGlyph(document.glyphOrder[0] ?? "");
+  /** Replace the document with a font read from a file. */
+  async importFont(bytes: ArrayBuffer, fileName = ""): Promise<ImportReport> {
+    return await importFont(this.host, bytes, fileName);
   }
 
   // ---- settings ----------------------------------------------------------
@@ -487,10 +289,8 @@ export class EditorStore {
   }
 
   setOutlineWidth(outlineWidth: number): void {
-    if (!Number.isFinite(outlineWidth)) return;
-    this.remember({
-      outlineWidth: Math.min(MAX_OUTLINE_WIDTH, Math.max(MIN_OUTLINE_WIDTH, outlineWidth)),
-    });
+    const held = within(outlineWidth, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH);
+    if (held !== null) this.remember({ outlineWidth: held });
   }
 
   setSpacingText(spacingText: string): void {
@@ -518,22 +318,18 @@ export class EditorStore {
   }
 
   setProofSize(proofSize: number): void {
-    if (!Number.isFinite(proofSize)) return;
-    this.remember({ proofSize: Math.min(MAX_PROOF_SIZE, Math.max(MIN_PROOF_SIZE, proofSize)) });
+    const held = within(proofSize, MIN_PROOF_SIZE, MAX_PROOF_SIZE);
+    if (held !== null) this.remember({ proofSize: held });
   }
 
   setProofLeading(proofLeading: number): void {
-    if (!Number.isFinite(proofLeading)) return;
-    this.remember({
-      proofLeading: Math.min(MAX_PROOF_LEADING, Math.max(MIN_PROOF_LEADING, proofLeading)),
-    });
+    const held = within(proofLeading, MIN_PROOF_LEADING, MAX_PROOF_LEADING);
+    if (held !== null) this.remember({ proofLeading: held });
   }
 
   setSpacingSize(spacingSize: number): void {
-    if (!Number.isFinite(spacingSize)) return;
-    this.remember({
-      spacingSize: Math.min(MAX_SPACING_SIZE, Math.max(MIN_SPACING_SIZE, spacingSize)),
-    });
+    const held = within(spacingSize, MIN_SPACING_SIZE, MAX_SPACING_SIZE);
+    if (held !== null) this.remember({ spacingSize: held });
   }
 
   toggleNeighbours(): void {
@@ -546,44 +342,12 @@ export class EditorStore {
 
   /** Put every preference back where it started. */
   resetPreferences(): void {
-    this.remember({
-      theme: DEFAULT_PREFERENCES.theme,
-      outlineWidth: DEFAULT_PREFERENCES.outlineWidth,
-      autoHideHandles: DEFAULT_PREFERENCES.autoHideHandles,
-      snapPoints: DEFAULT_PREFERENCES.snapPoints,
-      showNeighbours: DEFAULT_PREFERENCES.showNeighbours,
-      applyFeatures: DEFAULT_PREFERENCES.applyFeatures,
-      spacingSize: DEFAULT_PREFERENCES.spacingSize,
-      proofSize: DEFAULT_PREFERENCES.proofSize,
-      proofLeading: DEFAULT_PREFERENCES.proofLeading,
-    });
+    this.remember(defaults());
   }
 
-  /**
-   * Patch the state and write the preferences that came out of it.
-   *
-   * One door, so a setting cannot be added to the store and quietly not be
-   * remembered — which is what happened to every one of these before now.
-   */
+  /** Every setting is written through one door: see `settings.ts`. */
   private remember(changes: Partial<StoreState>): void {
-    this.patch(changes);
-    savePreferences(this.preferences());
-  }
-
-  private preferences(): Preferences {
-    const s = this.state;
-    return {
-      theme: s.theme,
-      outlineWidth: s.outlineWidth,
-      autoHideHandles: s.autoHideHandles,
-      snapPoints: s.snapPoints,
-      showNeighbours: s.showNeighbours,
-      applyFeatures: s.applyFeatures,
-      spacingSize: s.spacingSize,
-      proofSize: s.proofSize,
-      proofLeading: s.proofLeading,
-      inspector: s.inspector,
-    };
+    remember(this.host, changes);
   }
 
   setStripText(stripText: string): void {
@@ -660,7 +424,7 @@ export class EditorStore {
     const loaded = await this.disk.reload();
     if (loaded === null || loaded.kind !== "loaded") return;
 
-    this.showDocument(loaded.document, loaded.recovered);
+    showDocument(this.host, loaded.document, loaded.recovered);
     this.disk.markLoaded(loaded.document, loaded.recovered);
     this.patch({ saveStatus: this.disk.status });
   }

@@ -17,7 +17,7 @@ import {
 import { type Selection, type ViewTransform, boxHandlePoint, boxPivot } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
-import { selectContour } from "../src/commands.js";
+import { selectContour } from "../src/commands/index.js";
 import { pointerInput, keyInput } from "../src/input.js";
 import {
   cancel,

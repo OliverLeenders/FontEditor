@@ -70,13 +70,6 @@ Then run the editor and open http://localhost:5174:
 pnpm dev
 ```
 
-The playground is a bare canvas harness kept for isolating rendering and tool problems
-without the interface around them:
-
-```bash
-pnpm dev:playground
-```
-
 Use PgUp and PgDn to move between glyphs. The toolbar is icons; every one names its
 shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
 `M` measure. With the pen, click for a corner point and drag for a smooth one, Alt while
@@ -143,7 +136,6 @@ pnpm typecheck
 ```
 apps/
   editor/       The editor: shell, panels, and the canvas.
-  playground/   A bare canvas harness, for isolating rendering and tool problems.
 
 packages/
   geometry/     Vec2, cubic Béziers, and the Tunni-line kernel. Pure; no DOM.

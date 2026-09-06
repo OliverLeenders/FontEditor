@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App.js";
 import { applyTheme } from "./scheme.js";
-import { EditorStore } from "./store.js";
+import { EditorStore } from "./store/index.js";
 import { StoreProvider } from "./useStore.js";
 import "./styles/tokens.css";
 import "./styles/controls.css";

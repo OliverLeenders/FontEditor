@@ -4,7 +4,7 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 
 installBrowserGlobals();
 
-const { EditorStore } = await import("../src/store.js");
+const { EditorStore } = await import("../src/store/index.js");
 const { setPointType, deleteSelectedPoints, begin, commit } = await import("@fonteditor/tools");
 const { glyphBounds, sidebearings, updateGlyph } = await import("@fonteditor/font-model");
 
