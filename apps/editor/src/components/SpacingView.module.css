@@ -181,3 +181,14 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* The specimen list. Sized to its longest name rather than to the strings it
+   holds, which are eighty characters of alphabet nobody needs to read here. */
+.specimens {
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.82rem;
+}

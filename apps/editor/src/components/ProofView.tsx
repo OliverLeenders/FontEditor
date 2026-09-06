@@ -3,6 +3,7 @@ import { layoutParagraph, wheelIntent } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
+import { PROOF_SPECIMENS, specimenNamed } from "../specimens.js";
 import { positionerFrom, shaperFrom } from "../shaping.js";
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
@@ -253,6 +254,26 @@ export function ProofView(): React.JSX.Element {
         >
           Features
         </button>
+
+        {/* Beside the features button rather than by the text, which is at the
+            other end of the view: this chooses what is set, and everything in
+            this bar is about how it is set. */}
+        <select
+          className={styles.specimens}
+          aria-label="Specimen"
+          value={specimenNamed(PROOF_SPECIMENS, text) ?? ""}
+          onChange={(event) => {
+            const chosen = PROOF_SPECIMENS.find((s) => s.name === event.target.value);
+            if (chosen !== undefined) store.setProofText(chosen.text);
+          }}
+        >
+          {specimenNamed(PROOF_SPECIMENS, text) === null && <option value="">Custom</option>}
+          {PROOF_SPECIMENS.map((s) => (
+            <option key={s.name} value={s.name}>
+              {s.name}
+            </option>
+          ))}
+        </select>
 
         <span className={styles.count}>
           {lines.length === 1 ? "1 line" : `${String(lines.length)} lines`}

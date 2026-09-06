@@ -6,6 +6,7 @@ import type { AutosaveStatus } from "@fonteditor/storage";
 import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
 import type { Ownership, StorageState } from "../persistence.js";
 import { starterFont } from "../sample.js";
+import { PROOF_TEXT } from "../specimens.js";
 
 /**
  * The shape of everything the interface reads, and where it starts.
@@ -14,21 +15,6 @@ import { starterFont } from "../sample.js";
  * scene builder, every selector and every panel names this type, and none of
  * them cares how the store's methods are written.
  */
-
-/**
- * What the proof shows before anyone types anything.
- *
- * Lowercase, because that is what a text face is judged on and what most fonts
- * here will have first. It says what it is rather than being a pangram: a
- * pangram exercises the alphabet, which is the glyph browser's job, where a
- * proof is for reading.
- */
-const PROOF_TEXT = [
-  "handgloves and the shape of the space between them",
-  "no one reads a letter, they read a line of them",
-  "",
-  "the only way to know whether a font works is to set it and look",
-].join(String.fromCharCode(10));
 
 /**
  * Everything the interface reads, in one immutable value.

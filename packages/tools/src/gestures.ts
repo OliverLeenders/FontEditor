@@ -401,9 +401,10 @@ function rectOf(a: Vec2, b: Vec2) {
  * may only catch on something visible. A pull towards an invisible line is
  * indistinguishable from a bug.
  *
- * Which is why the alignment lines are off unless a caller asks for them. They
- * are not drawn yet, and until they are, turning them on would be adding exactly
- * that bug.
+ * Which is why the alignment lines are off unless a caller asks for them, and
+ * why the line a drag is caught on is drawn while it holds: a stem edge is not
+ * on the canvas the way the baseline is, so the guide is what makes the catch
+ * visible. See `drawSnapGuides` in the renderer.
  *
  * The tolerances are converted from screen pixels, so the catch feels the same
  * at every zoom instead of covering half the em at a distance. Holding ctrl

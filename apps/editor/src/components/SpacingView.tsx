@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { KernGroups } from "./KernGroups.js";
 import { palette } from "../scene.js";
+import { SPACING_SPECIMENS, specimenNamed } from "../specimens.js";
 import { positionerFrom, shaperFrom } from "../shaping.js";
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
@@ -280,6 +281,26 @@ export function SpacingView({
           spellCheck={false}
           onChange={(event) => store.setSpacingText(event.target.value)}
         />
+        {/* The strings worth spacing against are few, long and easy to mistype,
+            so they are picked rather than typed. The field stays editable —
+            what a list of specimens is for is getting to one quickly, not
+            deciding what may be looked at. */}
+        <select
+          className={styles.specimens}
+          aria-label="Specimen"
+          value={specimenNamed(SPACING_SPECIMENS, text) ?? ""}
+          onChange={(event) => {
+            const chosen = SPACING_SPECIMENS.find((s) => s.name === event.target.value);
+            if (chosen !== undefined) store.setSpacingText(chosen.text);
+          }}
+        >
+          {specimenNamed(SPACING_SPECIMENS, text) === null && <option value="">Custom</option>}
+          {SPACING_SPECIMENS.map((s) => (
+            <option key={s.name} value={s.name}>
+              {s.name}
+            </option>
+          ))}
+        </select>
         {/* Two exclusive modes rather than a modifier key: adjusting a letter's
             own space and adjusting the gap before it are different jobs, and
             which one the arrows are doing should be visible, not remembered. */}

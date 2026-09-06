@@ -113,3 +113,13 @@
   opacity: 0.45;
   cursor: default;
 }
+
+/* The specimen list, beside the features button it is sized to match. */
+.specimens {
+  padding: 0.28rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.82rem;
+}
