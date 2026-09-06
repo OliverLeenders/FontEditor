@@ -3,6 +3,7 @@ import {
   type ComponentSource,
   type FontDocument,
   type Glyph,
+  filledContours,
   glyphBounds,
   glyphForCodePoint,
   metricLines,
@@ -157,6 +158,10 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
 
   return buildScene({
     glyph,
+    // What the exported font will fill, rather than the contours exactly as
+    // drawn: the compiler corrects their directions, and a preview that showed
+    // a notch the font will not have would be lying in the other direction.
+    filled: filledContours(glyph),
     componentOutlines:
       glyph.components.length === 0
         ? []

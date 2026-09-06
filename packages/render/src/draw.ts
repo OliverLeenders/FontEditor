@@ -5,6 +5,7 @@ import {
   type Node,
   type Segment,
   segmentCubic,
+  filledContours,
   segmentTunniPoint,
   segmentTunniStatus,
   segments,
@@ -172,7 +173,7 @@ export function drawSnapGuides(ctx: Canvas2D, s: Scene): void {
  * confident nonsense a designer should never have to second-guess.
  */
 export function drawFilledPreview(ctx: Canvas2D, s: Scene): void {
-  const closed = s.glyph.contours.filter((c) => c.closed && c.nodes.length >= 2);
+  const closed = s.filled.filter((c) => c.closed && c.nodes.length >= 2);
   if (closed.length === 0) return;
 
   ctx.beginPath();
@@ -623,7 +624,9 @@ export function drawGlyphThumbnail(
     ty: box.y + padding + metrics.ascender * scale,
   };
 
-  const drawable = glyph.contours.filter((c) => c.nodes.length >= 2);
+  // The corrected contours, so a counter is a hole in the browser and the strip
+  // exactly as it will be in the font.
+  const drawable = filledContours(glyph).filter((c) => c.nodes.length >= 2);
   if (drawable.length === 0) return;
 
   ctx.beginPath();

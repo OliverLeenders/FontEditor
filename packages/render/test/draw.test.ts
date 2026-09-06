@@ -565,3 +565,67 @@ describe("the mark on a locked handle", () => {
     expect(Math.abs((to?.args[1] ?? NaN) - (from?.args[1] ?? NaN))).toBeGreaterThan(1);
   });
 });
+
+describe("what the fill draws", () => {
+  it("fills the contours it was handed, not the glyph's own", () => {
+    // The scene carries a direction-corrected copy: the compiler corrects them
+    // on the way into a font, and a preview of the contours exactly as drawn
+    // would show a notch where the exported font has none.
+    const ids = counterIds("f");
+    const square = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0)),
+        node(ids.node(), vec(100, 0)),
+        node(ids.node(), vec(100, 100)),
+        node(ids.node(), vec(0, 100)),
+      ],
+      true,
+    );
+    const other = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(300, 0)),
+        node(ids.node(), vec(400, 0)),
+        node(ids.node(), vec(400, 100)),
+      ],
+      true,
+    );
+
+    const ctx = new RecordingContext();
+    drawScene(
+      ctx,
+      scene({
+        glyph: glyph("a", { advance: 500, contours: [square] }),
+        filled: [other],
+        view: VIEW,
+        viewport: VIEWPORT,
+        palette: LIGHT_PALETTE,
+        metrics: DEFAULT_METRICS,
+      }),
+    );
+
+    // The fill traced the contour it was handed rather than the glyph's own.
+    const moves = ctx.all("moveTo").map((o) => o.args[0]);
+    expect(moves).toContain(toScreen(VIEW, vec(300, 0)).x);
+    // The outline is still the glyph's, so its own contour is traced too.
+    expect(moves).toContain(toScreen(VIEW, vec(0, 0)).x);
+  });
+
+  it("falls back to the glyph's own contours when nothing else is said", () => {
+    const ids = counterIds("g");
+    const square = contour(
+      ids.contour(),
+      [node(ids.node(), vec(0, 0)), node(ids.node(), vec(100, 0)), node(ids.node(), vec(100, 100))],
+      true,
+    );
+    const built = scene({
+      glyph: glyph("a", { advance: 500, contours: [square] }),
+      view: VIEW,
+      viewport: VIEWPORT,
+      palette: LIGHT_PALETTE,
+      metrics: DEFAULT_METRICS,
+    });
+    expect(built.filled).toEqual([square]);
+  });
+});

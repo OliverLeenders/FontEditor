@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1561 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1571 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -44,6 +44,15 @@ The gaps worth naming, in the order they would bite someone using this:
   there to show the letter you are drawing beside its neighbours. Positioning rules are
   applied to both as well — a glyph moves where the rule says and the pen moves by the
   advance the rule gave it.
+- **Contour directions are corrected where the font is compiled, not in the drawing.**
+  A rasteriser fills one path by the non-zero winding rule, so two contours that overlap
+  must run the same way round or the overlap is subtracted — a stem crossing a shoulder
+  comes out with a notch in it — and a counter must run the opposite way to what holds it
+  or it is not a hole. Which way a contour runs is an accident of the order its points
+  were placed, so the exporter puts it right and the canvas fills the corrected contours,
+  which is why what you see is what the file draws. The UFO is written as drawn: it is
+  the source, and another tool may have its own view.
+
 - **Overlap removal declines edges that lie along each other.** Two shapes sharing a
   whole edge have no crossing points to split at, so it refuses rather than guesses,
   which is the right failure for a shape a designer will really draw. A contour that

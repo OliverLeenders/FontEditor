@@ -82,6 +82,8 @@ export {
   unionRect,
 } from "./contour.js";
 
+export { contourWinding, correctDirections, filledContours } from "./direction.js";
+
 export type { MetricLine, Sidebearings } from "./metrics.js";
 export {
   centreGlyph,

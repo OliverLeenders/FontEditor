@@ -4,6 +4,7 @@ import {
   type FontDocument,
   type Glyph,
   type IdFactory,
+  correctDirections,
   counterIds,
   kernIndex,
   resolveGlyphComponents,
@@ -79,14 +80,33 @@ function tracePath(path: OtPath, c: Contour): void {
  * what it drew — but the fact that it *was* composed does not survive, which is
  * one of the two reasons the UFO export exists alongside this one.
  */
-function flatten(g: Glyph, document: FontDocument, ids: IdFactory): Contour[] {
-  if (g.components.length === 0) return [...g.contours];
+function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Contour[] {
+  if (g.components.length === 0) return g.contours;
 
   const source: ComponentSource = {
     glyphOf: (name) => document.glyphs[name] ?? null,
   };
 
   return [...g.contours, ...resolveGlyphComponents(source, g.name, g.components, ids)];
+}
+
+/**
+ * The contours as the file needs them: each running the way its nesting says.
+ *
+ * A rasteriser fills one path by the non-zero winding rule, so two contours that
+ * overlap must run the same way round or the overlap is subtracted — a stem
+ * crossing a shoulder comes out with a notch in it. Which way a contour runs is
+ * an accident of the order its points were placed, so it is put right here,
+ * where the font is compiled, and the drawing is left exactly as it was drawn.
+ *
+ * Not reported. A warning is for something to act on, and this is the compiler
+ * doing its job: which way a contour runs is not a decision anyone made, and
+ * nearly every hand-drawn glyph would carry the note. The editor fills the
+ * corrected contours too, so nothing about it is hidden — what is on the canvas
+ * is what the file will draw.
+ */
+function directed(contours: readonly Contour[]): readonly Contour[] {
+  return correctDirections(contours);
 }
 
 function pathFor(g: Glyph, contours: readonly Contour[], warnings: string[]): OtPath {
@@ -161,7 +181,7 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
     } = {
       name: g.name,
       advanceWidth: Math.max(0, Math.round(g.advance)),
-      path: pathFor(g, flatten(g, document, ids), warnings),
+      path: pathFor(g, directed(flatten(g, document, ids)), warnings),
     };
 
     // Several code points can map to one glyph, and dropping the extras would

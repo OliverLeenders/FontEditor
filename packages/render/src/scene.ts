@@ -136,6 +136,20 @@ export type Scene = {
    */
   readonly transformBox: BoxFrame | null;
   /**
+   * The glyph's own contours as the fill sees them, directions corrected.
+   *
+   * A rasteriser fills one path by the non-zero winding rule, so two contours
+   * running opposite ways subtract where they overlap — and which way a contour
+   * runs is an accident of the order its points were placed. The compiler puts
+   * that right on the way into a font; this is the same list, so what is drawn
+   * here is what the exported font will draw.
+   *
+   * Handed in rather than worked out per frame: it costs a containment test
+   * between every pair of contours, and the answer only changes when the glyph
+   * does.
+   */
+  readonly filled: readonly Contour[];
+  /**
    * The pen's rubber band: the segment that would exist if the next click landed
    * where the cursor is.
    */
@@ -204,6 +218,7 @@ export type SceneInit = {
   readonly selection?: Selection;
   readonly marquee?: Rect | null;
   readonly transformBox?: BoxFrame | null;
+  readonly filled?: readonly Contour[];
   readonly penPreview?: Cubic | null;
   readonly neighbours?: readonly NeighbourGlyph[];
   readonly componentOutlines?: readonly Contour[];
@@ -226,6 +241,7 @@ export function scene(init: SceneInit): Scene {
     selection: init.selection ?? [],
     marquee: init.marquee ?? null,
     transformBox: init.transformBox ?? null,
+    filled: init.filled ?? init.glyph.contours,
     penPreview: init.penPreview ?? null,
     neighbours: init.neighbours ?? [],
     componentOutlines: init.componentOutlines ?? [],
