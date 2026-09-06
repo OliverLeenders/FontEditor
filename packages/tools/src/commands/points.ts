@@ -1,6 +1,7 @@
 import {
   type ContourId,
   type NodeId,
+  type Node as NodeShape,
   type HandleLock,
   type NodeType,
   NO_LOCK,
@@ -68,6 +69,28 @@ export function nodeCanBeTangent(
   if (c === null) return false;
   const index = nodeIndex(c, nodeId);
   return index >= 0 && canBeTangent(c, index);
+}
+
+/**
+ * The one node the handle fields act on, when the selection names exactly one.
+ *
+ * A handle belongs to a node, so selecting either says which node is meant: the
+ * point itself, or one of the two handles hanging off it. Anything else — no
+ * selection, or several — is `null`, for the reason {@link selectedCoordinate}
+ * is: fields that showed one arbitrary member of a set would promise to edit the
+ * set and edit one of it.
+ */
+export function selectedNode(
+  state: EditorState,
+): { readonly contourId: ContourId; readonly nodeId: NodeId; readonly node: NodeShape } | null {
+  if (state.selection.length !== 1) return null;
+  const item = state.selection[0]!;
+
+  const glyph = currentGlyph(state);
+  const c = glyph === null ? null : contourById(glyph, item.contourId);
+  const found = c === null ? null : nodeById(c, item.nodeId);
+  if (found === null) return null;
+  return { contourId: item.contourId, nodeId: item.nodeId, node: found };
 }
 
 /** Whether every selected point could be tangent, for the inspector's button. */

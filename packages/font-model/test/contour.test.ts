@@ -17,6 +17,7 @@ import {
   segmentCount,
   segmentCubic,
   segmentIndexForHandle,
+  segmentLambdas,
   segmentTunniPoint,
   segmentTunniStatus,
   segments,
@@ -25,6 +26,7 @@ import {
   setNodePoint,
   setNodeType,
   setSegmentCubic,
+  setSegmentLambdas,
   setSegmentTunniPoint,
   translateNodeBy,
   translateNodes,
@@ -301,8 +303,32 @@ describe("the Tunni bridge", () => {
     expect(distance(segmentTunniPoint(moved, 0)!, target)).toBeLessThan(1e-6);
   });
 
+  it("reads and writes a segment's handle scales", () => {
+    const c = ringContour();
+    const before = segmentLambdas(c, 0)!;
+    expect(before.lambda1).toBeCloseTo(before.lambda2, 9);
+
+    const set = setSegmentLambdas(c, 0, { lambda1: 0.4, lambda2: 0.8 })!;
+    const after = segmentLambdas(set, 0)!;
+    expect(after.lambda1).toBeCloseTo(0.4, 9);
+    expect(after.lambda2).toBeCloseTo(0.8, 9);
+
+    // Written back through the nodes, so the next segment sees the change too:
+    // the second node's incoming handle is the one that moved.
+    expect(set.nodes[0]!.pt).toEqual(c.nodes[0]!.pt);
+    expect(set.nodes[1]!.in).not.toEqual(c.nodes[1]!.in);
+    expect(set.nodes[1]!.out).toEqual(c.nodes[1]!.out);
+  });
+
+  it("refuses handle scales that would collapse a handle onto its anchor", () => {
+    const c = ringContour();
+    expect(setSegmentLambdas(c, 0, { lambda1: 0, lambda2: 0.5 })).toBeNull();
+    expect(segmentLambdas(triangleContour(), 0)).toBeNull();
+  });
+
   it("declines on a line segment instead of fabricating handles", () => {
     const t = triangleContour();
+    expect(setSegmentLambdas(t, 0, { lambda1: 0.5, lambda2: 0.5 })).toBeNull();
     expect(balanceSegment(t, 0)).toBeNull();
     expect(setSegmentTunniPoint(t, 0, vec(50, 50))).toBeNull();
     expect(moveSegmentTunniLine(t, 0, vec(50, 50))).toBeNull();

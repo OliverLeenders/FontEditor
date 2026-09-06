@@ -264,3 +264,56 @@ function sameDirection(anchor: Vec2, before: Vec2, after: Vec2): boolean {
   const d1 = sub(after, anchor);
   return dot(d0, d1) > 0;
 }
+
+/**
+ * Set both handle scales directly, keeping the anchors and the handle
+ * directions.
+ *
+ * The inverse of {@link tunniLambdas} applied to a real segment: read the
+ * intersection the two handles already point at, place them along their own
+ * lines at the scales asked for, and refuse the result if a handle has collapsed
+ * onto its anchor or flipped through it. This is what a typed tension field
+ * writes, and what {@link pannedLambdas} is fed into.
+ */
+export function setLambdas(s: Cubic, scales: HandleScales): Cubic | null {
+  if (!Number.isFinite(scales.lambda1) || !Number.isFinite(scales.lambda2)) return null;
+  const is = handleIntersection(s);
+  if (is === null) return null;
+  const next = cubicFromLambdas(s.a, s.b, is, scales);
+  return next === null ? null : preserveHandles(s, next);
+}
+
+/**
+ * How lopsided a pair of scales is, from `-1` (all the length on the second
+ * handle) through `0` (balanced) to `1` (all of it on the first).
+ *
+ * `null` when the two scales sum to nothing, which is where the question stops
+ * meaning anything: there is no length to divide between them.
+ */
+export function panOf(scales: HandleScales): number | null {
+  const sum = scales.lambda1 + scales.lambda2;
+  if (!Number.isFinite(sum) || sum === 0) return null;
+  return (scales.lambda1 - scales.lambda2) / sum;
+}
+
+/**
+ * The same pair of scales shifted onto one handle, without changing how much
+ * there is of them: `λ1 + λ2` is held, and only the split moves.
+ *
+ * Holding the *sum* rather than the product is what makes this a pan and not a
+ * tension change in disguise. In the coordinates of {@link tunniPoint}, moving
+ * λ1 up by `d` and λ2 down by `d` moves the Tunni point by `2d·(b − a)` — along
+ * the chord, exactly — while an equal change to both moves it across. So the two
+ * controls are the two axes of the same point, and a slider that panned by
+ * holding the product would slide the curve's belly along the chord *and* fatten
+ * it: at a pan of 0.9 the same segment goes from a depth of 34 units to 77.
+ *
+ * Pan 0 is the mean of the two, which is precisely {@link balance} — so the
+ * middle of the slider and the balance command are the same place.
+ */
+export function pannedLambdas(scales: HandleScales, pan: number): HandleScales | null {
+  if (!Number.isFinite(pan)) return null;
+  const mean = (scales.lambda1 + scales.lambda2) / 2;
+  if (!Number.isFinite(mean)) return null;
+  return { lambda1: mean * (1 + pan), lambda2: mean * (1 - pan) };
+}

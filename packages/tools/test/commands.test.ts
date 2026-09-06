@@ -41,6 +41,11 @@ import {
   breakOutKern,
   nudgeKern,
   balanceSegmentAt,
+  focusedSegmentScales,
+  focusedSegmentStatus,
+  holdSegmentTension,
+  selectedNode,
+  setSegmentTension,
   deleteKernGroup,
   kernGroupHolding,
   kernGroupPairs,
@@ -1411,5 +1416,104 @@ describe("transforming a selection", () => {
   it("names the entry it puts on the undo stack", () => {
     const out = transformSelection(pick(square(), "p0"), translation(1, 0), BOX_CENTRE, "Move");
     expect(out.effects.map((e) => e.kind)).toEqual(["beginTransaction", "commitTransaction"]);
+  });
+});
+
+describe("tension", () => {
+  /** The ring with one segment picked out, as clicking a curve leaves it. */
+  const onSegment = (index = 0): { s: EditorState; c: Contour } => {
+    const { s, c } = start();
+    return { s: { ...s, focusedSegment: { contourId: c.id, segmentIndex: index } }, c };
+  };
+
+  it("reads the focused segment's handle scales, and nothing when none is focused", () => {
+    const { s } = onSegment();
+    const scales = focusedSegmentScales(s)!;
+    expect(scales.lambda1).toBeCloseTo(scales.lambda2, 9);
+    expect(focusedSegmentStatus(s)).toBe("ok");
+
+    expect(focusedSegmentScales(start().s)).toBeNull();
+    expect(focusedSegmentStatus(start().s)).toBeNull();
+  });
+
+  it("has nothing to read on a straight segment, and says why", () => {
+    const { s, c } = start(triangle());
+    const flat = { ...s, focusedSegment: { contourId: c.id, segmentIndex: 0 } };
+    expect(focusedSegmentScales(flat)).toBeNull();
+    expect(focusedSegmentStatus(flat)).toBe("flat");
+  });
+
+  it("sets both handle scales as one coalescing step", () => {
+    const { s } = onSegment();
+    const out = setSegmentTension(s, s.focusedSegment!, { lambda1: 0.4, lambda2: 0.8 });
+
+    const after = focusedSegmentScales(out.state)!;
+    expect(after.lambda1).toBeCloseTo(0.4, 9);
+    expect(after.lambda2).toBeCloseTo(0.8, 9);
+    // Typing "40" is two calls and should leave one step behind, so the step
+    // may merge with the one before it.
+    expect(out.effects).toEqual([
+      { kind: "beginTransaction", label: "Set tension" },
+      { kind: "commitTransaction" },
+    ]);
+  });
+
+  it("leaves the state alone when the scales cannot be had", () => {
+    const { s } = onSegment();
+    const out = setSegmentTension(s, s.focusedSegment!, { lambda1: 0, lambda2: 0.5 });
+    expect(out.state).toBe(s);
+    expect(out.effects).toEqual([]);
+  });
+
+  it("declares no transaction while a control is being dragged", () => {
+    const { s } = onSegment();
+    const out = holdSegmentTension(s, s.focusedSegment!, { lambda1: 0.4, lambda2: 0.8 });
+    expect(out.effects).toEqual([]);
+    expect(focusedSegmentScales(out.state)!.lambda1).toBeCloseTo(0.4, 9);
+  });
+
+  it("cannot compound, because every value is absolute", () => {
+    // What the pan slider depends on: the panel recomputes the scales from the
+    // ones the drag began with, so passing through the same value twice lands
+    // in the same place rather than drifting a little further each time.
+    const { s } = onSegment();
+    const segment = s.focusedSegment!;
+
+    const once = holdSegmentTension(s, segment, { lambda1: 0.4, lambda2: 0.8 }).state;
+    const wandered = holdSegmentTension(once, segment, { lambda1: 0.9, lambda2: 0.3 }).state;
+    const back = holdSegmentTension(wandered, segment, { lambda1: 0.4, lambda2: 0.8 }).state;
+
+    const there = focusedSegmentScales(back)!;
+    expect(there.lambda1).toBeCloseTo(0.4, 9);
+    expect(there.lambda2).toBeCloseTo(0.8, 9);
+  });
+});
+
+describe("the node the handle fields act on", () => {
+  it("is the selected point, or the node a selected handle hangs off", () => {
+    const { s, c } = start();
+    const point = selectedNode(selectPoint(s, c, 1))!;
+    expect(point.nodeId).toBe(c.nodes[1]!.id);
+    expect(point.node.pt).toEqual(vec(250, 0));
+
+    const onHandle: EditorState = {
+      ...s,
+      selection: [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "in" }],
+    };
+    expect(selectedNode(onHandle)!.nodeId).toBe(c.nodes[1]!.id);
+  });
+
+  it("is nothing for an empty selection, or for several", () => {
+    const { s, c } = start();
+    expect(selectedNode(s)).toBeNull();
+
+    const two: EditorState = {
+      ...s,
+      selection: [
+        { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" },
+        { contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" },
+      ],
+    };
+    expect(selectedNode(two)).toBeNull();
   });
 });

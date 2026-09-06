@@ -214,3 +214,38 @@
 .name:disabled {
   color: var(--ink-2);
 }
+
+/* One row per handle: which side it is, how far it reaches, and which way. */
+.handles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.handleRow {
+  display: grid;
+  grid-template-columns: 1.6rem 1fr 1fr;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.side {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
+
+/* The pan slider. Drawn from the tokens for the reason the steppers are: the
+   platform's own is a control nothing in the theme reaches. */
+.slider {
+  width: 100%;
+  height: 1.1rem;
+  margin: 0;
+  background: none;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.slider:disabled {
+  opacity: 0.38;
+  cursor: default;
+}

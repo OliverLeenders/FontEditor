@@ -6,6 +6,9 @@ import {
   cubicFromLambdas,
   handleIntersection,
   moveTunniLine,
+  panOf,
+  pannedLambdas,
+  setLambdas,
   setTunniPoint,
   tunniLambdas,
   tunniLine,
@@ -239,5 +242,77 @@ describe("moveTunniLine", () => {
   it("returns null when there is no line to move", () => {
     expect(moveTunniLine(FLAT, vec(120, 40))).toBeNull();
     expect(moveTunniLine(ZERO_LENGTH_HANDLE, vec(120, 40))).toBeNull();
+  });
+});
+
+describe("setLambdas", () => {
+  it("puts the handles exactly at the scales it was given", () => {
+    const next = setLambdas(ASYMMETRIC, { lambda1: 0.4, lambda2: 0.55 })!;
+    expect(next).not.toBeNull();
+
+    const scales = tunniLambdas(next)!;
+    expect(scales.lambda1).toBeCloseTo(0.4, 9);
+    expect(scales.lambda2).toBeCloseTo(0.55, 9);
+    // Anchors are not the tension's business.
+    expect(next.a).toEqual(ASYMMETRIC.a);
+    expect(next.b).toEqual(ASYMMETRIC.b);
+  });
+
+  it("refuses a scale that would collapse a handle onto its anchor or past it", () => {
+    expect(setLambdas(ASYMMETRIC, { lambda1: 0, lambda2: 0.5 })).toBeNull();
+    expect(setLambdas(ASYMMETRIC, { lambda1: -0.2, lambda2: 0.5 })).toBeNull();
+  });
+
+  it("declines where there is no intersection to measure against", () => {
+    expect(setLambdas(PARALLEL_HANDLES, { lambda1: 0.5, lambda2: 0.5 })).toBeNull();
+    expect(setLambdas(ASYMMETRIC, { lambda1: Number.NaN, lambda2: 0.5 })).toBeNull();
+  });
+});
+
+describe("pan", () => {
+  it("reads how lopsided a pair of scales is", () => {
+    // 0.3 and 0.7: the second handle holds the extra fifth of the total.
+    expect(panOf({ lambda1: ASYMMETRIC_LAMBDA_1, lambda2: ASYMMETRIC_LAMBDA_2 })).toBeCloseTo(
+      -0.4,
+      12,
+    );
+    expect(panOf({ lambda1: 0.45, lambda2: 0.45 })).toBe(0);
+    expect(panOf({ lambda1: 0.5, lambda2: -0.5 })).toBeNull();
+  });
+
+  it("holds the sum, so panning moves length across rather than adding it", () => {
+    const scales = { lambda1: ASYMMETRIC_LAMBDA_1, lambda2: ASYMMETRIC_LAMBDA_2 };
+    for (const at of [-0.9, -0.25, 0, 0.25, 0.9]) {
+      const panned = pannedLambdas(scales, at)!;
+      expect(panned.lambda1 + panned.lambda2).toBeCloseTo(1, 12);
+      expect(panOf(panned)).toBeCloseTo(at, 12);
+    }
+  });
+
+  it("is the balance command at its middle", () => {
+    const scales = tunniLambdas(ASYMMETRIC)!;
+    const centred = setLambdas(ASYMMETRIC, pannedLambdas(scales, 0)!)!;
+    const balanced = balance(ASYMMETRIC)!;
+
+    expect(distance(centred.c1, balanced.c1)).toBeLessThan(1e-9);
+    expect(distance(centred.c2, balanced.c2)).toBeLessThan(1e-9);
+    expect(distance(centred.c1, ASYMMETRIC_BALANCED.c1)).toBeLessThan(1e-9);
+  });
+
+  it("slides the Tunni point along the chord, which is what makes it a pan", () => {
+    // The claim the whole choice of invariant rests on: holding the sum moves
+    // the Tunni point by a multiple of (b - a) and by nothing across it. Here
+    // the chord is horizontal, so panning may move x and must not move y.
+    const scales = tunniLambdas(ASYMMETRIC)!;
+    const before = tunniPoint(ASYMMETRIC)!;
+
+    for (const at of [-0.6, 0, 0.6]) {
+      const panned = setLambdas(ASYMMETRIC, pannedLambdas(scales, at)!)!;
+      const after = tunniPoint(panned)!;
+      expect(after.y).toBeCloseTo(before.y, 9);
+    }
+
+    const far = setLambdas(ASYMMETRIC, pannedLambdas(scales, 0.6)!)!;
+    expect(tunniPoint(far)!.x).not.toBeCloseTo(before.x, 3);
   });
 });

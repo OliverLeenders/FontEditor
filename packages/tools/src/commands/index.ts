@@ -21,9 +21,13 @@
 export {
   balanceSegmentAt,
   convertSegment,
+  focusedSegmentScales,
+  focusedSegmentStatus,
+  holdSegmentTension,
   insertPointOnSegment,
   reverseContourAt,
   reverseSelectedContour,
+  setSegmentTension,
 } from "./contours.js";
 
 export { infoProblem, setInfo } from "./font.js";
@@ -67,6 +71,7 @@ export {
   retractHandle,
   segmentHasMissingHandle,
   selectedCanBeTangent,
+  selectedNode,
   setNodeHvLock,
   setPointType,
 } from "./points.js";

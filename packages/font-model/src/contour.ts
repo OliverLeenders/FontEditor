@@ -1,5 +1,6 @@
 import {
   type Cubic,
+  type HandleScales,
   type Rect,
   type TunniStatus,
   type Vec2,
@@ -12,9 +13,11 @@ import {
   lerp,
   lineAsCubic,
   moveTunniLine,
+  setLambdas,
   setTunniPoint,
   split,
   sub,
+  tunniLambdas,
   tunniPoint,
   tunniStatus,
 } from "@fonteditor/geometry";
@@ -666,6 +669,24 @@ export function segmentTunniPoint(c: Contour, index: number): Vec2 | null {
   const segment = segmentAt(c, index);
   if (segment === null || segment.kind === "line") return null;
   return tunniPoint(segmentCubic(segment));
+}
+
+/**
+ * The two handle scales of a segment: how far along its own handle line each
+ * control point sits, where `1` is the point the two lines cross at.
+ *
+ * `null` for a straight segment as well as a degenerate one — a line has no
+ * handles to scale, which is the same answer as "there is nothing to read here".
+ */
+export function segmentLambdas(c: Contour, index: number): HandleScales | null {
+  const segment = segmentAt(c, index);
+  if (segment === null || segment.kind === "line") return null;
+  return tunniLambdas(segmentCubic(segment));
+}
+
+/** Place both handles at the given scales. The write to {@link segmentLambdas}. */
+export function setSegmentLambdas(c: Contour, index: number, scales: HandleScales): Contour | null {
+  return applyToSegment(c, index, (geometry) => setLambdas(geometry, scales));
 }
 
 export function balanceSegment(c: Contour, index: number): Contour | null {
