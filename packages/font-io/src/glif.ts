@@ -1,9 +1,11 @@
 import {
+  type Anchor,
   type Component,
   type Contour,
   type Glyph,
   type IdFactory,
   type Node,
+  anchor,
   component,
   contour,
   glyph,
@@ -78,11 +80,21 @@ export function parseGlif(
   const outline = childNamed(root, "outline");
   const contours: Contour[] = [];
   const components: Component[] = [];
+  const anchors: Anchor[] = [];
 
   if (outline !== null) {
     for (const element of outline.children) {
       if (!("name" in element)) continue;
       if (element.name === "contour") {
+        // A format-1 file has no <anchor> element and writes an anchor as a
+        // contour of one named move point. Reading that as a one-point contour
+        // would put a stray point in the outline and lose the attachment, so it
+        // is recognised here and turned into what it means.
+        const legacy = legacyAnchor(element, ids);
+        if (legacy !== null) {
+          anchors.push(legacy);
+          continue;
+        }
         const c = parseContour(element, ids, warn);
         if (c !== null) contours.push(c);
       } else if (element.name === "component") {
@@ -92,7 +104,36 @@ export function parseGlif(
     }
   }
 
-  return glyph(name, { unicodes, advance, contours, components });
+  // Format 2 puts anchors beside the outline rather than inside it.
+  for (const element of childrenNamed(root, "anchor")) {
+    const x = number(element.attributes["x"]);
+    const y = number(element.attributes["y"]);
+    if (x === null || y === null) {
+      warn("dropped an anchor with no position");
+      continue;
+    }
+    anchors.push(anchor(ids.anchor(), element.attributes["name"] ?? "", { x, y }));
+  }
+
+  return glyph(name, { unicodes, advance, contours, components, anchors });
+}
+
+/** A format-1 anchor: one point, of type `move`, carrying a name. */
+function legacyAnchor(element: XmlElement, ids: IdFactory): Anchor | null {
+  const points = childrenNamed(element, "point");
+  if (points.length !== 1) return null;
+
+  const only = points[0]!;
+  if (only.attributes["type"] !== "move") return null;
+
+  const name = only.attributes["name"];
+  if (name === undefined || name === "") return null;
+
+  const x = number(only.attributes["x"]);
+  const y = number(only.attributes["y"]);
+  if (x === null || y === null) return null;
+
+  return anchor(ids.anchor(), name, { x, y });
 }
 
 function parseComponent(

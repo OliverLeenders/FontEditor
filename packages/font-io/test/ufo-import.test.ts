@@ -1,5 +1,7 @@
 import {
   EMPTY_KERNING,
+  addAnchor,
+  anchor,
   contour,
   counterIds,
   fontDocument,
@@ -446,6 +448,84 @@ describe("reading a glif written by something else", () => {
     const { document } = await read(`<contour><point x="0" y="0" type="line"/></contour>`);
     expect(document.glyphs["a"]?.advance).toBe(500);
     expect(document.glyphs["a"]?.unicodes).toEqual([0x61]);
+  });
+});
+
+describe("anchors", () => {
+  const wrapGlyph = (body: string) => [
+    { path: "x.ufo/metainfo.plist", text: "<plist><dict/></plist>" },
+    {
+      path: "x.ufo/glyphs/contents.plist",
+      text: "<plist><dict><key>a</key><string>a.glif</string></dict></plist>",
+    },
+    {
+      path: "x.ufo/glyphs/a.glif",
+      text: `<?xml version="1.0"?><glyph name="a" format="2"><advance width="500"/>${body}</glyph>`,
+    },
+  ];
+
+  const readGlyph = async (body: string) => {
+    const out = await importUfo(zip(wrapGlyph(body)).buffer as ArrayBuffer, counterIds("g"));
+    if ("reason" in out) throw new Error(out.reason);
+    return out.document.glyphs["a"]!;
+  };
+
+  it("reads the anchors beside the outline", async () => {
+    const g = await readGlyph(
+      `<outline/><anchor name="top" x="250" y="700"/><anchor name="bottom" x="250" y="0"/>`,
+    );
+    expect(g.anchors.map((a) => [a.name, a.pt.x, a.pt.y])).toEqual([
+      ["top", 250, 700],
+      ["bottom", 250, 0],
+    ]);
+  });
+
+  it("reads a format-1 anchor, which is written as a named move point", async () => {
+    // Older files have no <anchor> element. Read as a contour this would put a
+    // stray one-point path in the outline and lose the attachment entirely.
+    const g = await readGlyph(
+      `<outline><contour><point x="250" y="700" type="move" name="top"/></contour></outline>`,
+    );
+    expect(g.contours).toHaveLength(0);
+    expect(g.anchors.map((a) => [a.name, a.pt.x, a.pt.y])).toEqual([["top", 250, 700]]);
+  });
+
+  it("keeps a real one-point contour a contour", async () => {
+    // A move point with no name is not an anchor, whatever else it is.
+    const g = await readGlyph(
+      `<outline><contour><point x="10" y="20" type="move"/></contour></outline>`,
+    );
+    expect(g.anchors).toHaveLength(0);
+    expect(g.contours).toHaveLength(1);
+  });
+
+  it("carries them out again, and back in unchanged", async () => {
+    const accent = addAnchor(glyph("acute", { advance: 0 }), anchor("k1", "_top", at(120, 690)));
+    const letter = addAnchor(
+      glyph("a", { advance: 500, contours: [shapes().ring] }),
+      anchor("k2", "top", at(250, 700)),
+    );
+
+    const document = fontDocument([letter, accent], INFO);
+    const out = await importUfo(exportUfo(document).bytes.buffer as ArrayBuffer, counterIds("r"));
+    if ("reason" in out) throw new Error(out.reason);
+
+    expect(out.document.glyphs["a"]!.anchors.map((a) => [a.name, a.pt.x, a.pt.y])).toEqual([
+      ["top", 250, 700],
+    ]);
+    expect(out.document.glyphs["acute"]!.anchors.map((a) => [a.name, a.pt.x, a.pt.y])).toEqual([
+      ["_top", 120, 690],
+    ]);
+  });
+
+  it("does not write one with no name, which could attach nothing", async () => {
+    const nameless = addAnchor(glyph("a", { advance: 500 }), anchor("k3", "", at(0, 0)));
+    const out = await importUfo(
+      exportUfo(fontDocument([nameless], INFO)).bytes.buffer as ArrayBuffer,
+      counterIds("n"),
+    );
+    if ("reason" in out) throw new Error(out.reason);
+    expect(out.document.glyphs["a"]!.anchors).toHaveLength(0);
   });
 });
 

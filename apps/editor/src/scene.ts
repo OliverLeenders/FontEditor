@@ -34,7 +34,14 @@ import {
 import { isDarkNow } from "./scheme.js";
 import type { StoreState } from "./store/index.js";
 
-const EMPTY: Glyph = { name: "", unicodes: [], advance: 0, contours: [], components: [] };
+const EMPTY: Glyph = {
+  name: "",
+  unicodes: [],
+  advance: 0,
+  contours: [],
+  components: [],
+  anchors: [],
+};
 
 /** Resolved component outlines are throwaway; their ids never leave the frame. */
 const outlineIds = randomIds();

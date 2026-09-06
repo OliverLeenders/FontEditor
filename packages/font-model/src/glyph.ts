@@ -1,15 +1,15 @@
 import type { Rect } from "@fonteditor/geometry";
 
+import { type Anchor, movedAnchor, renamedAnchor } from "./anchor.js";
 import type { Component } from "./component.js";
 import { type Contour, type Segment, contourBounds, segments, unionRect } from "./contour.js";
-import type { ComponentId, ContourId } from "./ids.js";
+import type { AnchorId, ComponentId, ContourId } from "./ids.js";
 
 /**
  * A single glyph.
  *
- * Deliberately minimal for now: components, anchors and guides belong to phase 3
- * and are left out rather than stubbed, so nothing reads as supported when it is
- * not. Adding them is additive — no existing field changes shape.
+ * Guides are still left out rather than stubbed, so nothing reads as supported
+ * when it is not. Adding them is additive — no existing field changes shape.
  *
  * Coordinates are fractional throughout. TrueType wants integers on the em grid,
  * but rounding at every edit would compound through transforms and, later,
@@ -31,6 +31,14 @@ export type Glyph = {
    * to compile — and never in the document.
    */
   readonly components: readonly Component[];
+  /**
+   * Named places other glyphs attach to. See {@link Anchor}.
+   *
+   * Beside the outline rather than in it: an anchor is not part of the shape and
+   * must not be drawn, transformed, or exported as though it were. It moves when
+   * it is moved.
+   */
+  readonly anchors: readonly Anchor[];
 };
 
 export type GlyphInit = {
@@ -38,6 +46,7 @@ export type GlyphInit = {
   readonly advance?: number;
   readonly contours?: readonly Contour[];
   readonly components?: readonly Component[];
+  readonly anchors?: readonly Anchor[];
 };
 
 export function glyph(name: string, init: GlyphInit = {}): Glyph {
@@ -47,7 +56,62 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     advance: init.advance ?? 0,
     contours: init.contours ?? [],
     components: init.components ?? [],
+    anchors: init.anchors ?? [],
   };
+}
+
+// ---------------------------------------------------------------------------
+// anchors
+// ---------------------------------------------------------------------------
+
+export function anchorById(g: Glyph, id: AnchorId): Anchor | null {
+  return g.anchors.find((a) => a.id === id) ?? null;
+}
+
+/** The anchor going by a name, which is how another glyph finds one. */
+export function anchorNamed(g: Glyph, name: string): Anchor | null {
+  return g.anchors.find((a) => a.name === name) ?? null;
+}
+
+export function addAnchor(g: Glyph, a: Anchor): Glyph {
+  return { ...g, anchors: [...g.anchors, a] };
+}
+
+export function removeAnchor(g: Glyph, id: AnchorId): Glyph | null {
+  const kept = g.anchors.filter((a) => a.id !== id);
+  return kept.length === g.anchors.length ? null : { ...g, anchors: kept };
+}
+
+function updateAnchor(g: Glyph, id: AnchorId, change: (a: Anchor) => Anchor): Glyph | null {
+  const i = g.anchors.findIndex((a) => a.id === id);
+  if (i < 0) return null;
+  const next = change(g.anchors[i]!);
+  if (next === g.anchors[i]) return g;
+  const anchors = g.anchors.slice();
+  anchors[i] = next;
+  return { ...g, anchors };
+}
+
+export function moveAnchorBy(g: Glyph, id: AnchorId, dx: number, dy: number): Glyph | null {
+  return updateAnchor(g, id, (a) => movedAnchor(a, dx, dy));
+}
+
+export function moveAnchorTo(g: Glyph, id: AnchorId, pt: { x: number; y: number }): Glyph | null {
+  return updateAnchor(g, id, (a) =>
+    a.pt.x === pt.x && a.pt.y === pt.y ? a : { ...a, pt: { x: pt.x, y: pt.y } },
+  );
+}
+
+/**
+ * Rename an anchor, unless the name is already taken in this glyph.
+ *
+ * Two anchors called `top` would make "the top of this letter" a question with
+ * two answers, and every glyph built on it would get whichever came first.
+ */
+export function renameAnchor(g: Glyph, id: AnchorId, name: string): Glyph | null {
+  const existing = anchorNamed(g, name);
+  if (existing !== null && existing.id !== id) return null;
+  return updateAnchor(g, id, (a) => renamedAnchor(a, name));
 }
 
 // ---------------------------------------------------------------------------

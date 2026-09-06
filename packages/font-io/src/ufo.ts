@@ -225,6 +225,16 @@ export function glif(g: Glyph): string {
     lines.push("\t</outline>");
   }
 
+  // After the outline, which is where format 2 puts them and where every reader
+  // looks. An anchor with no name is not written: the name is the whole of what
+  // an anchor is for, and a nameless one would attach nothing to nothing.
+  for (const a of g.anchors) {
+    if (a.name === "") continue;
+    lines.push(
+      `\t<anchor name="${escapeXml(a.name)}" x="${String(round(a.pt.x))}" y="${String(round(a.pt.y))}"/>`,
+    );
+  }
+
   lines.push("</glyph>", "");
   return lines.join("\n");
 }

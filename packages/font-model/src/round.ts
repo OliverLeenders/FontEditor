@@ -1,5 +1,6 @@
 import type { Vec2 } from "@fonteditor/geometry";
 
+import type { Anchor } from "./anchor.js";
 import type { Component } from "./component.js";
 import type { Contour } from "./contour.js";
 import { type FontDocument, putGlyph } from "./document.js";
@@ -81,14 +82,23 @@ function roundComponent(c: Component, grid: number): Component {
 export function roundGlyph(g: Glyph, grid: number = UNIT_GRID): Glyph {
   const contours = g.contours.map((c) => roundContour(c, grid));
   const components = g.components.map((c) => roundComponent(c, grid));
+  const anchors = g.anchors.map((a) => roundAnchor(a, grid));
   const advance = roundTo(g.advance, grid);
 
   const same =
     advance === g.advance &&
     contours.every((c, i) => c === g.contours[i]) &&
-    components.every((c, i) => c === g.components[i]);
+    components.every((c, i) => c === g.components[i]) &&
+    anchors.every((a, i) => a === g.anchors[i]);
 
-  return same ? g : { ...g, contours, components, advance };
+  return same ? g : { ...g, contours, components, anchors, advance };
+}
+
+/** An anchor sits on the grid like anything else a font writes down. */
+function roundAnchor(a: Anchor, grid: number): Anchor {
+  const x = roundTo(a.pt.x, grid);
+  const y = roundTo(a.pt.y, grid);
+  return x === a.pt.x && y === a.pt.y ? a : { ...a, pt: { x, y } };
 }
 
 /** How many of a font's glyphs {@link roundFont} would change. */

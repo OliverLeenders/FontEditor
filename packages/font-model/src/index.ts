@@ -15,7 +15,10 @@
 
 export { glyphFileName, glyphNameForCodePoint } from "./names.js";
 
-export type { ComponentId, ContourId, IdFactory, NodeId } from "./ids.js";
+export type { Anchor } from "./anchor.js";
+export { anchor, isMarkAnchor, movedAnchor, pairedName, renamedAnchor } from "./anchor.js";
+
+export type { AnchorId, ComponentId, ContourId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";
 
 export type { HandleLock, Node, NodeInit, NodeType } from "./node.js";
@@ -146,8 +149,15 @@ export {
 export type { Glyph, GlyphInit } from "./glyph.js";
 export {
   addContour,
+  addAnchor,
   addGlyphComponent,
+  anchorById,
+  anchorNamed,
   isComposite,
+  moveAnchorBy,
+  moveAnchorTo,
+  removeAnchor,
+  renameAnchor,
   removeGlyphComponent,
   updateGlyphComponent,
   allSegments,

@@ -789,7 +789,14 @@ function Field({
 /** New components need ids; the panel owns a factory, as the menu does. */
 const componentIds = randomIds();
 const EMPTY_COMPONENTS: readonly never[] = [];
-const EMPTY_GLYPH = { name: "", unicodes: [], advance: 0, contours: [], components: [] };
+const EMPTY_GLYPH = {
+  name: "",
+  unicodes: [],
+  advance: 0,
+  contours: [],
+  components: [],
+  anchors: [],
+};
 const EMPTY_CODES: readonly number[] = [];
 
 /**
