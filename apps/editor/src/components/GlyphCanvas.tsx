@@ -30,7 +30,7 @@ import {
 } from "@fonteditor/view";
 import { useEffect, useRef } from "react";
 
-import { handlesAutoHidden, sceneFor } from "../scene.js";
+import { handlesAutoHidden, neighbourAt, neighboursFor, sceneFor, withinGlyph } from "../scene.js";
 import type { EditorStore } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore } from "../useStore.js";
@@ -137,6 +137,51 @@ export function GlyphCanvas({
         meta: event.metaKey,
       },
     };
+  };
+
+  /** What the pointer is over, by the same rules the tools pick with. */
+  const targetAt = (point: { x: number; y: number }) => {
+    const editor = store.editor;
+    const glyph = editor.document.glyphs[editor.currentGlyph];
+    if (glyph === undefined) return null;
+    return pick(
+      buildHitIndex(glyph, tunniSegments(editor), {
+        margins: true,
+        handles: handleVisibility(editor, selectOptions(store)),
+      }),
+      point,
+      screenTolerance(editor.view, HIT_PIXELS),
+    );
+  };
+
+  /**
+   * Open the glyph beside this one, when the second click landed on it.
+   *
+   * The neighbours are context — the letters this one will stand next to — and
+   * the obvious thing to do with a letter you can see is to go and work on it.
+   *
+   * Everything about the glyph being edited comes first: anything pickable, and
+   * the whole box round its drawing. A glyph may overshoot well outside its own
+   * sidebearings, and a double-click on the part that hangs over the next letter
+   * is still a double-click on this one.
+   */
+  const openNeighbour = (point: { x: number; y: number }): boolean => {
+    const state = store.getState();
+    const editor = store.editor;
+    // Only what is drawn may be addressed, which is the same rule the Tunni
+    // controls and the margin lines follow.
+    if (!state.showNeighbours || editor.activeTool !== "select") return false;
+
+    const glyph = editor.document.glyphs[editor.currentGlyph];
+    if (glyph === undefined || withinGlyph(glyph, point)) return false;
+    if (targetAt(point) !== null) return false;
+
+    const neighbours = neighboursFor(editor.document, editor.currentGlyph, state.stripText);
+    const found = neighbourAt(neighbours, point);
+    if (found === null) return false;
+
+    store.setCurrentGlyph(found.glyph.name);
+    return true;
   };
 
   /**
@@ -287,7 +332,9 @@ export function GlyphCanvas({
         if (panFrom.current === null) store.applyTool(pointerLeave(store.editor));
       }}
       onDoubleClick={(event) => {
-        store.applyTool(doubleClick(store.editor, toInput(event as unknown as PointerEvent)));
+        const input = toInput(event as unknown as PointerEvent);
+        if (openNeighbour(input.point)) return;
+        store.applyTool(doubleClick(store.editor, input));
       }}
       onContextMenu={(event) => {
         event.preventDefault();
@@ -298,19 +345,8 @@ export function GlyphCanvas({
         // the same hit index the tools use — so the menu can never offer an
         // action for something the canvas is not actually showing.
         const editor = store.editor;
-        const glyph = editor.document.glyphs[editor.currentGlyph];
         const { point } = toInput(event as unknown as PointerEvent);
-        const target =
-          glyph === undefined
-            ? null
-            : pick(
-                buildHitIndex(glyph, tunniSegments(editor), {
-                  margins: true,
-                  handles: handleVisibility(editor, selectOptions(store)),
-                }),
-                point,
-                screenTolerance(editor.view, HIT_PIXELS),
-              );
+        const target = targetAt(point);
         // Right-clicking selects what it lands on, the way every editor does —
         // and it is what makes the menu's selection-based actions ("Delete
         // point") act on the thing you actually clicked. An existing multi

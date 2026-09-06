@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1556 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1561 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -85,6 +85,11 @@ points, `R` reverses the contour, and Escape cancels a drag. A point with a stra
 segment on one side and a curve on the other can be made **tangent**, from the inspector
 or the right-click menu: the curve then leaves along the line, and stays that way when
 either end of the line moves.
+
+The glyphs either side are drawn from the strip text, dimmed, for judging spacing —
+**double-click one to open it**. Everything about the glyph being edited comes first:
+anything pickable, and the whole box round its drawing, so a shape that overshoots well
+outside its own sidebearings is still that shape where it hangs over the next letter.
 
 The inspector transforms whatever is selected by a number rather than by dragging: move,
 scale, rotate, slant, flip. It turns about any of the nine points of the selection's box,

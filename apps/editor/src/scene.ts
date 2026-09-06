@@ -1,7 +1,9 @@
+import type { Vec2 } from "@fonteditor/geometry";
 import {
   type ComponentSource,
   type FontDocument,
   type Glyph,
+  glyphBounds,
   glyphForCodePoint,
   metricLines,
   randomIds,
@@ -91,6 +93,39 @@ export function neighboursFor(
   }
 
   return out;
+}
+
+/**
+ * The neighbour the point falls in, if any.
+ *
+ * By the advance rather than by the drawing: the band is what the glyph
+ * occupies in the line, and a comma should be as easy to reach as an `m`. Bands
+ * do not overlap, so the first match is the answer.
+ *
+ * Says nothing about the glyph being edited — whether *that* has a claim on the
+ * point is the caller's question, and it is the one that has to be asked first,
+ * because a glyph may overshoot well outside its own sidebearings and what is
+ * drawn there is still the thing being drawn.
+ */
+export function neighbourAt(neighbours: readonly NeighbourGlyph[], p: Vec2): NeighbourGlyph | null {
+  for (const neighbour of neighbours) {
+    if (p.x >= neighbour.x && p.x <= neighbour.x + neighbour.glyph.advance) return neighbour;
+  }
+  return null;
+}
+
+/**
+ * Whether a point is within the drawing of the glyph being edited.
+ *
+ * Its ink rather than its advance, and the box round that ink rather than the
+ * ink itself: an overshoot, a swash or an accent leaning over the next letter is
+ * still this glyph, and a double-click there means what it means everywhere
+ * else on it.
+ */
+export function withinGlyph(glyph: Glyph, p: Vec2): boolean {
+  const box = glyphBounds(glyph);
+  if (box === null) return false;
+  return p.x >= box.minX && p.x <= box.maxX && p.y >= box.minY && p.y <= box.maxY;
 }
 
 /**

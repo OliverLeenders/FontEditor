@@ -5,8 +5,10 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
-const { handlesAutoHidden, neighboursFor, sceneFor } = await import("../src/scene.js");
+const { handlesAutoHidden, neighbourAt, neighboursFor, sceneFor, withinGlyph } =
+  await import("../src/scene.js");
 const { setActiveTool } = await import("@fonteditor/tools");
+const { glyphBounds } = await import("@fonteditor/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
 
@@ -52,6 +54,23 @@ describe("neighboursFor", () => {
 
   it("shows nothing for an empty text", () => {
     expect(neighboursFor(doc(), "o", "")).toEqual([]);
+  });
+
+  it("finds the neighbour a point falls in, by its advance", () => {
+    const around = neighboursFor(doc(), "l", "hello");
+    const e = around.find((n) => n.glyph.name === "e")!;
+
+    // Anywhere in the band the letter occupies in the line, at any height: a
+    // comma should be as easy to reach as an `m`.
+    expect(neighbourAt(around, { x: e.x + 1, y: 0 })?.glyph.name).toBe("e");
+    expect(neighbourAt(around, { x: e.x + e.glyph.advance - 1, y: 900 })?.glyph.name).toBe("e");
+    expect(neighbourAt(around, { x: e.x - 1, y: 0 })?.glyph.name).not.toBe("e");
+  });
+
+  it("finds nothing in the band of the glyph being edited", () => {
+    const around = neighboursFor(doc(), "l", "hello");
+    expect(neighbourAt(around, { x: 10, y: 100 })).toBeNull();
+    expect(neighbourAt([], { x: 10, y: 100 })).toBeNull();
   });
 
   it("reaches no further than it is asked to", () => {
@@ -158,5 +177,42 @@ describe("sceneFor", () => {
 
     store.toggleNeighbours();
     expect(sceneFor(store.getState(), SIZE).neighbours).toEqual([]);
+  });
+});
+
+describe("what belongs to the glyph being edited", () => {
+  let store: Store;
+  beforeEach(() => {
+    store = new EditorStore();
+  });
+
+  it("counts the box round its drawing, which is not its advance", () => {
+    const glyph = store.editor.document.glyphs["o"]!;
+    const box = glyphBounds(glyph)!;
+
+    expect(withinGlyph(glyph, { x: (box.minX + box.maxX) / 2, y: (box.minY + box.maxY) / 2 })).toBe(
+      true,
+    );
+    // Above the drawing but inside the advance: not the glyph.
+    expect(withinGlyph(glyph, { x: (box.minX + box.maxX) / 2, y: box.maxY + 50 })).toBe(false);
+  });
+
+  it("counts an overshoot outside the sidebearings", () => {
+    // The part of a drawing that hangs over the next letter is still this
+    // letter, and a second click there means what it means anywhere on it.
+    const glyph = store.editor.document.glyphs["o"]!;
+    const wide = {
+      ...glyph,
+      contours: glyph.contours.map((c) => ({
+        ...c,
+        nodes: c.nodes.map((n) => ({ ...n, pt: { ...n.pt, x: n.pt.x + glyph.advance } })),
+      })),
+    };
+    expect(withinGlyph(wide, { x: glyph.advance + 100, y: 200 })).toBe(true);
+  });
+
+  it("says no for a glyph with nothing drawn in it", () => {
+    const empty = { ...store.editor.document.glyphs["o"]!, contours: [] };
+    expect(withinGlyph(empty, { x: 0, y: 0 })).toBe(false);
   });
 });
