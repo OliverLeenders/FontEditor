@@ -794,21 +794,34 @@ export function Inspector(): React.JSX.Element | null {
             much there is of it, so the curve leans without swelling. The middle
             is where the two are equal, which is what balancing a segment does. */}
         <Field label="Pan">
-          <input
-            className={styles.slider}
-            type="range"
-            min={-PAN_REACH}
-            max={PAN_REACH}
-            step={0.01}
-            aria-label="Pan the curve between its two handles"
-            title="Lengthen one handle by as much as the other shortens; the middle is balanced"
-            disabled={!curveReady}
-            value={curveReady ? panValue : 0}
-            onChange={(event) => movePan(Number(event.target.value))}
-            onPointerUp={endPan}
-            onKeyUp={endPan}
-            onBlur={endPan}
-          />
+          <div className={styles.panTrack}>
+            {/* Behind the slider, so the thumb covers it exactly when the pan
+                is where the mark says. */}
+            <span className={styles.centre} aria-hidden="true" />
+            <input
+              className={styles.slider}
+              type="range"
+              min={-PAN_REACH}
+              max={PAN_REACH}
+              step={0.01}
+              aria-label="Pan the curve between its two handles"
+              title="Lengthen one handle by as much as the other shortens; the middle is balanced — double-click to go there"
+              disabled={!curveReady}
+              value={curveReady ? panValue : 0}
+              onChange={(event) => movePan(Number(event.target.value))}
+              onPointerUp={endPan}
+              onKeyUp={endPan}
+              onBlur={endPan}
+              // Back to balanced, which is where the mark on the track is. The
+              // same gesture as double-clicking the Tunni point on the canvas,
+              // and for the same reason: the middle is a place aimed for often
+              // enough that hitting it by hand is a nuisance.
+              onDoubleClick={() => {
+                movePan(0);
+                endPan();
+              }}
+            />
+          </div>
         </Field>
 
         <div className={styles.rule} />

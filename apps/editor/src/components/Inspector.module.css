@@ -237,13 +237,37 @@
 
 /* The pan slider. Drawn from the tokens for the reason the steppers are: the
    platform's own is a control nothing in the theme reaches. */
+/*
+ * The pan slider, and the mark at the middle of its travel.
+ *
+ * The mark is a sibling behind the input rather than part of the track: the
+ * track is three pixels of rail drawn by the browser, which leaves nowhere to
+ * put anything, and the tick reads better standing proud of it anyway — a
+ * detent either side of the rail, at the one position on this slider that means
+ * something on its own.
+ */
+.panTrack {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.centre {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  /* A shade stronger than the rail it crosses, or it reads as more rail. */
+  background: var(--ink-3);
+  pointer-events: none;
+}
+
 .slider {
+  position: relative;
   width: 100%;
-  height: 1.1rem;
   margin: 0;
-  background: none;
-  accent-color: var(--accent);
-  cursor: pointer;
 }
 .slider:disabled {
   opacity: 0.38;
