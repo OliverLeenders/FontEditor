@@ -1,13 +1,5 @@
 import { vec } from "@fonteditor/geometry";
-import {
-  component,
-  contour,
-  counterIds,
-  fontDocument,
-  glyph,
-  node,
-  reverseContour,
-} from "@fonteditor/font-model";
+import { component, contour, counterIds, fontDocument, glyph, node } from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";
@@ -96,16 +88,35 @@ describe("overlapping shapes on the way into a font", () => {
     expect(area(counter!)).toBeLessThan(0);
   });
 
-  it("says so when two edges lie along each other and it cannot join them", () => {
-    // No crossings to split at, so it refuses rather than reshaping the letter —
-    // and the overlap really is in the file, which is worth being told.
-    const flush = glyph("t", {
+  it("joins shapes that share edges rather than crossing them", () => {
+    // Two rectangles from the same corner: they overlap, and every edge of the
+    // overlap lies along an edge of one of them, so there is no crossing to
+    // split at. This used to be refused and warned about; the ends of the shared
+    // stretch are the answer.
+    const ell = glyph("t", {
       advance: 600,
-      contours: [box(0, 0, 300, 300), reverseContour(box(300, 0, 600, 300))],
+      contours: [box(0, 0, 400, 150), box(0, 0, 150, 400)],
     });
 
-    const { warnings } = exportFont(fontDocument([flush]), counterIds("e"));
-    expect(warnings.join(" ")).toMatch(/t: contours overlap/);
+    const { warnings } = exportFont(fontDocument([ell]), counterIds("e"));
+    expect(warnings).toEqual([]);
+
+    const out = roundTrip(fontDocument([ell])).glyphs["t"]!;
+    expect(out.contours).toHaveLength(1);
+    // An L: six corners, and nothing left in the middle of the straight runs.
+    expect(out.contours[0]!.nodes).toHaveLength(6);
+  });
+
+  it("leaves shapes that merely touch alone", () => {
+    // Sharing a boundary line is not an overlap: there is no area in common, so
+    // there is nothing to join and no seam for a rasteriser to find.
+    const touching = glyph("u", {
+      advance: 600,
+      contours: [box(0, 0, 300, 300), box(300, 0, 600, 300)],
+    });
+
+    const out = roundTrip(fontDocument([touching])).glyphs["u"]!;
+    expect(out.contours).toHaveLength(2);
   });
 
   it("leaves a glyph with nothing overlapping exactly as it was", () => {

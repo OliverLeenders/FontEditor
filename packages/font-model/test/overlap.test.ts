@@ -61,6 +61,9 @@ describe("removing overlap", () => {
   });
 
   it("makes an L when the two do share an edge", () => {
+    // Their bottom-left corners coincide and their edges run along each other,
+    // which has no crossing points to split at. The ends of the shared stretch
+    // are the answer instead: this used to be refused.
     const shared = glyph("a", {
       advance: 600,
       contours: [
@@ -68,11 +71,21 @@ describe("removing overlap", () => {
         rectContour(ids, { minX: 0, minY: 0, maxX: 150, maxY: 400 }),
       ],
     });
-    // Their bottom-left corners coincide and their edges run along each other,
-    // which has no crossing points to split at. Refused rather than guessed —
-    // and `null` says that, where an untouched glyph would have said the
-    // opposite.
-    expect(removeOverlap(shared, ids)).toBeNull();
+
+    const out = removeOverlap(shared, ids)!;
+    expect(out.glyph.contours).toHaveLength(1);
+    expect(glyphBounds(out.glyph)).toEqual({ minX: 0, minY: 0, maxX: 400, maxY: 400 });
+
+    // Six corners, which is what an L has: nothing of the shared edge is left in
+    // the middle of it.
+    expect(segmentCount(out.glyph.contours[0]!)).toBe(6);
+    const at = (x: number, y: number) =>
+      out.glyph.contours[0]!.nodes.some(
+        (n) => Math.abs(n.pt.x - x) < 0.1 && Math.abs(n.pt.y - y) < 0.1,
+      );
+    expect(at(150, 150)).toBe(true);
+    expect(at(400, 150)).toBe(true);
+    expect(at(150, 400)).toBe(true);
   });
 
   it("drops no part of the boundary", () => {
@@ -156,6 +169,59 @@ const knot = () =>
       ),
     ],
   });
+
+describe("shapes that touch rather than cross", () => {
+  /** A stem, and a curve that springs from its right edge along it. */
+  const springing = () => {
+    const stem = rectContour(ids, { minX: 0, minY: 0, maxX: 100, maxY: 700 });
+    const arch = contour(
+      ids.contour(),
+      [
+        // Leaves the stem's edge going straight up, which is the tangency: the
+        // two run along each other for a moment before parting.
+        node(ids.node(), { x: 100, y: 300 }, { type: "smooth", out: { x: 100, y: 450 } }),
+        node(ids.node(), { x: 300, y: 600 }, { in: { x: 200, y: 600 } }),
+        node(ids.node(), { x: 300, y: 200 }),
+        node(ids.node(), { x: 60, y: 200 }),
+      ],
+      true,
+    );
+    return glyph("n", { advance: 400, contours: [stem, arch] });
+  };
+
+  it("resolves a curve that leaves a straight edge along it", () => {
+    // The case that sent a font out with a notch in it: the search reports the
+    // contact as a smear of crossings down the shared stretch, and splitting at
+    // every one of them leaves a dust of pieces that will not chain. This was
+    // refused outright before.
+    const out = removeOverlap(springing(), ids)!;
+    expect(out.crossings).toBeGreaterThan(0);
+    expect(glyphBounds(out.glyph)).toEqual({ minX: 0, minY: 0, maxX: 300, maxY: 700 });
+  });
+
+  it("leaves nothing behind to find a second time", () => {
+    // The test that matters for any of this: run it again and there is nothing
+    // left over — no crossings, and no seam anywhere for a rasteriser to find.
+    const out = removeOverlap(springing(), ids)!;
+    expect(removeOverlap(out.glyph, ids)?.crossings).toBe(0);
+  });
+
+  it("keeps the curve curved", () => {
+    const out = removeOverlap(springing(), ids)!;
+    const nodes = out.glyph.contours.flatMap((c) => c.nodes);
+    expect(nodes.some((n) => n.out !== null || n.in !== null)).toBe(true);
+  });
+
+  it("hands back contours that meet at the touch rather than one that pinches", () => {
+    // Where the two shapes touch, the boundary of what they cover together
+    // touches itself. Two contours meeting there is the honest way to write
+    // that down: neither of them crosses itself, and together they fill exactly
+    // the same ink.
+    const out = removeOverlap(springing(), ids)!;
+    expect(out.glyph.contours.length).toBeGreaterThanOrEqual(1);
+    expect(out.glyph.contours.every((c) => c.closed)).toBe(true);
+  });
+});
 
 describe("a contour that crosses itself", () => {
   it("finds the crossing", () => {

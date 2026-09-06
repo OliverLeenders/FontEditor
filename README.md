@@ -26,7 +26,7 @@ OTF and UFO in both directions. Everything autosaves.
 | 7     | Spacing and kerning                 | done                                                              |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS — see below             |
 | 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1576 tests, run on CI; preferences persist       |
+| 10    | Production polish                   | lint, format and 1581 tests, run on CI; preferences persist       |
 
 ### What the table is hiding
 
@@ -50,9 +50,8 @@ The gaps worth naming, in the order they would bite someone using this:
   they cross. Most rasterisers are lenient and fill by winding anyway, which is why a font
   with overlaps looks perfect in a browser and comes out of a Windows preview with a notch
   where a stem crosses a shoulder. So the exporter takes the union, and the drawing is left
-  as drawn. Where the boolean refuses — two edges lying exactly along each other, or a
-  tangency it cannot chain — the overlap goes into the font and the glyph is named in the
-  export warnings. The UFO is written as drawn, overlaps and all: it is source, and the
+  as drawn. Where the boolean refuses — a boundary that will not close — the overlap goes
+  into the font and the glyph is named in the export warnings. The UFO is written as drawn, overlaps and all: it is source, and the
   tools that read it remove overlaps themselves.
 
 - **Contour directions are corrected where the font is compiled, not in the drawing.**
@@ -64,10 +63,15 @@ The gaps worth naming, in the order they would bite someone using this:
   which is why what you see is what the file draws. The UFO is written as drawn: it is
   the source, and another tool may have its own view.
 
-- **Overlap removal declines edges that lie along each other.** Two shapes sharing a
-  whole edge have no crossing points to split at, so it refuses rather than guesses,
-  which is the right failure for a shape a designer will really draw. A contour that
-  crosses itself is handled, including a single curve that loops.
+- **Overlap removal handles what a designer actually draws.** Shapes that cross, shapes
+  that share an edge, a curve springing from a straight edge along it, and a contour that
+  crosses itself, including a single curve that loops. The three hard cases are the ones
+  that produce no clean crossing to split at: a shared edge is cut where the sharing
+  begins and ends, a tangency's smear of near-identical hits is gathered into the points
+  where the two really meet and part, and the boundary is then walked by _angle_ rather
+  than by which piece starts nearest, which is the only thing that can answer a point
+  where four pieces meet. Refusal is still the last resort when a boundary will not
+  close; a real 822-glyph font now goes through without one.
 - **The UFO is checked against fontTools on every push.** A proof font covering curves,
   components, composites, case-colliding names, groups, class kerning and features is
   exported, read by `fontTools.ufoLib` with validation on, compiled by `feaLib`, written

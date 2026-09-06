@@ -872,14 +872,18 @@ describe("removing overlap", () => {
     expect(result.state).toBe(s);
   });
 
-  it("tells a refusal apart from a clean glyph", () => {
-    // Two rectangles sharing their bottom-left corner: edges along each other,
-    // which cannot be resolved, and is not the same answer as "nothing to do".
+  it("resolves two rectangles that share their edges rather than crossing them", () => {
+    // Two rectangles from the same corner: they overlap, and every edge of the
+    // overlap lies along an edge of one of them. There is no crossing to split
+    // at, so the ends of the shared stretch are used — this used to be refused.
     const s = withContours(
       { minX: 0, minY: 0, maxX: 400, maxY: 150 },
       { minX: 0, minY: 0, maxX: 150, maxY: 400 },
     );
-    expect(overlapAt(s, "a", ids).outcome).toBe("refused");
+    const { outcome, result } = overlapAt(s, "a", ids);
+
+    expect(outcome).not.toBe("refused");
+    expect(result.state.document.glyphs["a"]!.contours).toHaveLength(1);
   });
 
   it("calls a glyph that is not there clean rather than refusing", () => {

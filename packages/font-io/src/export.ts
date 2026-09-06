@@ -106,9 +106,14 @@ function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Con
  * exactly as it was drawn — the same arrangement every font tool has, where a
  * designer keeps the pieces apart and the compiler joins them.
  *
- * Refused rather than guessed when two edges lie along each other: there are no
- * crossings to split at, and a guess would silently reshape the letter. That is
- * worth a warning, because it is a glyph to go and look at.
+ * Taken *after* the directions are put right, because what the union is depends
+ * on them: two shapes running opposite ways enclose the difference between them
+ * rather than the whole of both, and the answer would be a shape nobody drew.
+ * What comes out is already oriented — the boundary is walked with the ink on
+ * its left — so nothing needs correcting afterwards.
+ *
+ * Refused rather than guessed when the boundary will not close. That is worth a
+ * warning, because it is a glyph to go and look at.
  */
 function unioned(
   g: Glyph,
@@ -216,7 +221,7 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
     } = {
       name: g.name,
       advanceWidth: Math.max(0, Math.round(g.advance)),
-      path: pathFor(g, directed(unioned(g, flatten(g, document, ids), ids, warnings)), warnings),
+      path: pathFor(g, unioned(g, directed(flatten(g, document, ids)), ids, warnings), warnings),
     };
 
     // Several code points can map to one glyph, and dropping the extras would
