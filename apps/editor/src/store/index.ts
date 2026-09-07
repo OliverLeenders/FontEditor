@@ -8,7 +8,7 @@ import {
   undoLabelOf,
   apply as applyToSession,
 } from "@fonteditor/edit-core";
-import { type Glyph, type GlyphName, setFeatures } from "@fonteditor/font-model";
+import { type FontDocument, type Glyph, type GlyphName, setFeatures } from "@fonteditor/font-model";
 import {
   type EditorState,
   type ToolId,
@@ -64,6 +64,16 @@ export type { StoreState } from "./state.js";
 export type { ImportReport } from "./fonts.js";
 
 /**
+ * How long the font has to be worked on before another copy of it is kept.
+ *
+ * Long enough that the copies are worth having and few enough to keep — twenty
+ * of them at five minutes covers the best part of two hours of work, which is
+ * about as far back as anyone reaches before reaching for the file they
+ * exported.
+ */
+const SNAPSHOT_EVERY_MS = 5 * 60 * 1000;
+
+/**
  * The editor's state, held outside React.
  *
  * The reason is the canvas. A drag produces pointer events at sixty to a hundred
@@ -92,6 +102,15 @@ export class EditorStore {
    * passing it costs nothing.
    */
   private readonly host: FontHost;
+  /**
+   * When the last copy of the whole font was kept, and of what.
+   *
+   * The document as well as the time: nothing is worth copying twice, and a
+   * font left open in a window that is not being touched should not accumulate
+   * identical copies of itself.
+   */
+  private snapshotAt = 0;
+  private snapshotted: FontDocument | null = null;
 
   constructor() {
     // The preferences are read before the state is built, so the very first
@@ -104,6 +123,7 @@ export class EditorStore {
         this.patch(changes);
       },
       disk: this.disk,
+      keepSnapshot: () => this.snapshot(),
       showGlyph: (name) => {
         this.setCurrentGlyph(name);
       },
@@ -153,7 +173,10 @@ export class EditorStore {
    */
   applyTool(outcome: ToolResult): void {
     const session = applyToSession(this.state.session, outcome);
-    if (session.pending === null) this.disk.commit(session.editor.document);
+    if (session.pending === null) {
+      this.disk.commit(session.editor.document);
+      this.considerSnapshot(session.editor.document);
+    }
     // One patch, not two: each one wakes every listener, and a drag would
     // otherwise redraw and re-run every selector twice per pointer event.
     this.patch(
@@ -161,6 +184,69 @@ export class EditorStore {
         ? { session }
         : { session, saveStatus: this.disk.status },
     );
+  }
+
+  // ---- snapshots ---------------------------------------------------------
+
+  /**
+   * Keep a copy of the whole font now and then, while it is being worked on.
+   *
+   * Undo is a session's memory and dies with the tab; autosave keeps up with
+   * what just happened, which is exactly no help when what just happened is the
+   * thing you want back. A copy every so often is the difference between "an
+   * hour ago" being a place you can return to and a thing you remember.
+   *
+   * Time rather than edit count, and only when the document has actually moved:
+   * a font is a megabyte or two of JSON, and the point is to have a few useful
+   * copies rather than a thousand identical ones.
+   */
+  private considerSnapshot(document: FontDocument): void {
+    if (document === this.snapshotted) return;
+    if (Date.now() - this.snapshotAt < SNAPSHOT_EVERY_MS) return;
+    void this.snapshot(document);
+  }
+
+  /**
+   * Keep a copy now, whatever the clock says.
+   *
+   * Called before anything that replaces the whole font — opening one, starting
+   * a new one, restoring an older copy — because that is the moment a way back
+   * is worth most and the moment the editor is about to stop having one.
+   */
+  async snapshot(document: FontDocument = this.editor.document): Promise<void> {
+    this.snapshotAt = Date.now();
+    this.snapshotted = document;
+    const entries = await this.disk.snapshot(document, this.snapshotAt);
+    this.patch({ snapshots: entries });
+  }
+
+  /** Read the list back from disk, for whatever is about to show it. */
+  async refreshSnapshots(): Promise<void> {
+    this.patch({ snapshots: await this.disk.snapshots() });
+  }
+
+  /**
+   * Put an older copy of the font back on screen and on disk.
+   *
+   * A copy of what is open is kept first, so restoring is itself something you
+   * can come back from — which is the whole reason to trust the button at all.
+   *
+   * Not undoable, for the reason opening a font is not: a single ctrl-Z that
+   * silently swapped the whole font back would be alarming, and the history it
+   * restored would describe glyphs that are no longer open.
+   */
+  async restoreSnapshot(
+    at: number,
+  ): Promise<{ glyphs: number; problems: readonly string[] } | null> {
+    const found = await this.disk.readSnapshot(at);
+    if (found === null) return null;
+
+    await this.snapshot();
+    showDocument(this.host, found.document, false);
+    await this.disk.replaceAll(found.document);
+    await this.refreshSnapshots();
+
+    return { glyphs: found.document.glyphOrder.length, problems: found.problems };
   }
 
   /** Change something that is not the document — the camera, or which glyph. */

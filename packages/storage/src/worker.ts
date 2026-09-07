@@ -17,6 +17,7 @@ import {
 
 import type { FileStore } from "./file-store.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
+import { listSnapshots, pruneSnapshots, readSnapshot, writeSnapshot } from "./snapshots.js";
 import {
   FONT_INFO_PATH,
   KERNING_PATH,
@@ -193,6 +194,20 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
       await appendJournal(required(), decoded.value, request.at);
       return null;
     }
+
+    case "snapshot": {
+      await writeSnapshot(required(), request.snapshot);
+      // Pruned here rather than on a timer: the moment a new copy exists is the
+      // moment the oldest one stops being worth keeping.
+      await pruneSnapshots(required());
+      return await listSnapshots(required());
+    }
+
+    case "snapshots":
+      return await listSnapshots(required());
+
+    case "readSnapshot":
+      return await readSnapshot(required(), request.at);
 
     case "clearJournal":
       await clearJournal(required());

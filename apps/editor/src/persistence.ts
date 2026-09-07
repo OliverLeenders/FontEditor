@@ -3,6 +3,7 @@ import {
   Autosave,
   type AutosaveStatus,
   type LoadedProject,
+  type SnapshotEntry,
   ProjectLock,
   StorageClient,
   browserLocks,
@@ -212,6 +213,33 @@ export class Persistence {
 
   flush(): void {
     void this.autosave.flush();
+  }
+
+  /**
+   * Keep a copy of the whole font as it is now.
+   *
+   * Refused without the lock, like every other write. Returns the copies there
+   * are afterwards, or an empty list where there is no store — the editor works
+   * without one, and so does this, by keeping nothing and saying so.
+   */
+  async snapshot(
+    document: FontDocument,
+    at: number = Date.now(),
+  ): Promise<readonly SnapshotEntry[]> {
+    const client = this.client;
+    if (client === null || !this.owner) return [];
+    return await client.snapshot(document, at);
+  }
+
+  async snapshots(): Promise<readonly SnapshotEntry[]> {
+    return (await this.client?.snapshots()) ?? [];
+  }
+
+  /** One snapshot as a document again, or `null` where it has gone. */
+  async readSnapshot(
+    at: number,
+  ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
+    return (await this.client?.readSnapshot(at)) ?? null;
   }
 
   /** Give up on storage, saying why. The editor keeps working without it. */

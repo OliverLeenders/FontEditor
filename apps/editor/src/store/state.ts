@@ -1,7 +1,7 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import { type EditSession, session as newSession } from "@fonteditor/edit-core";
 import { editorState } from "@fonteditor/tools";
-import type { AutosaveStatus } from "@fonteditor/storage";
+import type { AutosaveStatus, SnapshotEntry } from "@fonteditor/storage";
 
 import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
 import type { Ownership, StorageState } from "../persistence.js";
@@ -28,6 +28,14 @@ export type StoreState = {
   readonly storage: StorageState;
   readonly storageDetail: string;
   readonly recovered: boolean;
+  /**
+   * The copies of the whole font kept beside it, newest first.
+   *
+   * Read on demand rather than watched: the list is what someone looks at while
+   * deciding whether they have lost something, and until they ask there is
+   * nothing to show.
+   */
+  readonly snapshots: readonly SnapshotEntry[];
   /** Only the owning tab writes. A second tab shows the font and saves nothing. */
   readonly ownership: Ownership;
   /** What the glyph strip is showing, as typed. */
@@ -102,6 +110,7 @@ export function initialState(preferences: Preferences): StoreState {
     storage: "connecting",
     storageDetail: "",
     recovered: false,
+    snapshots: [],
     ownership: "owner",
     stripText: "hello",
     catalogQuery: DEFAULT_QUERY,

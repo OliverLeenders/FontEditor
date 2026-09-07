@@ -276,3 +276,18 @@ describe("the starter font", () => {
     }
   });
 });
+
+describe("keeping copies of the font", () => {
+  it("keeps none while there is no storage to keep them in", async () => {
+    // The editor works without a store, and so does this: it keeps nothing and
+    // says so, rather than failing the edit that asked for it.
+    const store = freshStore();
+    await store.snapshot();
+    expect(store.getState().snapshots).toEqual([]);
+  });
+
+  it("has nothing to restore from a copy that is not there", async () => {
+    const store = freshStore();
+    expect(await store.restoreSnapshot(1)).toBeNull();
+  });
+});

@@ -19,6 +19,7 @@ import { ExportFont } from "./ExportFont.js";
 import { NewFont } from "./NewFont.js";
 import { FontInfoPanel } from "./FontInfoPanel.js";
 import { RoundCoordinates } from "./RoundCoordinates.js";
+import { Snapshots } from "./Snapshots.js";
 import { NewGlyph } from "./NewGlyph.js";
 import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
@@ -288,6 +289,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           <ExportFont />
           <NewGlyph />
           <FontInfoPanel />
+          <Snapshots />
           <RoundCoordinates />
           <input
             type="search"

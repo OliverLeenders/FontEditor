@@ -78,3 +78,15 @@ export { StorageClient } from "./client.js";
 export { OpfsFileStore, requestPersistence } from "./opfs.js";
 
 export { AT_ONCE, inParallel } from "./parallel.js";
+
+export type { SnapshotEntry, StoredSnapshot } from "./snapshots.js";
+export {
+  KEEP,
+  SNAPSHOTS_PREFIX,
+  documentOf,
+  listSnapshots,
+  pruneSnapshots,
+  readSnapshot,
+  snapshotOf,
+  writeSnapshot,
+} from "./snapshots.js";

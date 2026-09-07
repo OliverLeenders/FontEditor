@@ -1,4 +1,5 @@
 import type { StoredKerning, StoredFontInfo, StoredGlyph } from "./schema.js";
+import type { StoredSnapshot } from "./snapshots.js";
 
 /**
  * What the main thread and the storage worker say to each other.
@@ -55,6 +56,15 @@ export type StorageRequest =
       readonly at: number;
     }
   | { readonly id: number; readonly kind: "clearJournal" }
+  /**
+   * Keep a copy of the whole font, and drop the oldest copies.
+   *
+   * The whole document in one message, unlike a save, which sends only what
+   * changed: a snapshot is a copy of everything or it is not a copy.
+   */
+  | { readonly id: number; readonly kind: "snapshot"; readonly snapshot: StoredSnapshot }
+  | { readonly id: number; readonly kind: "snapshots" }
+  | { readonly id: number; readonly kind: "readSnapshot"; readonly at: number }
   | { readonly id: number; readonly kind: "wipe" };
 
 export type LoadedPayload = {

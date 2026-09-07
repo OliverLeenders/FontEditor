@@ -316,3 +316,45 @@ describe("the conversation itself", () => {
     }).not.toThrow();
   });
 });
+
+describe("snapshots across the wire", () => {
+  it("keeps a copy and hands it back as the document it was", async () => {
+    const { client } = await open();
+    const before = setKerning(document(), setKern(EMPTY_KERNING, "o", "v", -40));
+
+    const entries = await client.snapshot(before, 1000);
+    expect(entries.map((e) => e.at)).toEqual([1000]);
+    expect(entries[0]!.glyphs).toBe(2);
+
+    const back = await client.readSnapshot(1000);
+    expect(back).not.toBeNull();
+    expect(back!.problems).toEqual([]);
+    expect(back!.document).toEqual(before);
+  });
+
+  it("keeps the copies apart from the project it copied", async () => {
+    // A snapshot must not be loadable as glyphs of the font, or restoring one
+    // would double every glyph in it.
+    const { client } = await open();
+    await client.replaceAll(document());
+    await client.snapshot(document(), 1000);
+
+    const loaded = await client.load();
+    expect(loaded.kind).toBe("loaded");
+    if (loaded.kind === "loaded") expect(loaded.document.glyphOrder).toEqual(["o", "v"]);
+  });
+
+  it("lists what there is, newest first", async () => {
+    const { client } = await open();
+    await client.snapshot(document(), 1000);
+    await client.snapshot(document(), 3000);
+    await client.snapshot(document(), 2000);
+
+    expect((await client.snapshots()).map((e) => e.at)).toEqual([3000, 2000, 1000]);
+  });
+
+  it("says nothing is there for a copy that has gone", async () => {
+    const { client } = await open();
+    expect(await client.readSnapshot(1000)).toBeNull();
+  });
+});

@@ -2,6 +2,7 @@ import type { FontDocument, Glyph } from "@fonteditor/font-model";
 import { fontDocument, setFeatures, setGlyphOrder, setKerning } from "@fonteditor/font-model";
 
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
+import { type SnapshotEntry, type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";
 import {
   decodeFontInfo,
   decodeGlyph,
@@ -134,6 +135,36 @@ export class StorageClient {
       kerning: encodeKerning(document.kerning),
     });
     return result as { written: number; removed: number };
+  }
+
+  /**
+   * Keep a copy of the whole font, and return the copies there are now.
+   *
+   * The one call here that sends everything: a snapshot is a copy of the whole
+   * document or it is not a copy. It is also the one whose cost is worth
+   * thinking about — a large font is a megabyte or two of JSON — which is why
+   * the caller decides when, not this.
+   */
+  async snapshot(document: FontDocument, at: number): Promise<readonly SnapshotEntry[]> {
+    const entries = await this.send({ kind: "snapshot", snapshot: snapshotOf(document, at) });
+    return entries as readonly SnapshotEntry[];
+  }
+
+  async snapshots(): Promise<readonly SnapshotEntry[]> {
+    return (await this.send({ kind: "snapshots" })) as readonly SnapshotEntry[];
+  }
+
+  /**
+   * One snapshot, as a document again, or `null` where it has gone.
+   *
+   * Glyphs that will not decode are named rather than thrown: most of a font
+   * back is the whole point.
+   */
+  async readSnapshot(
+    at: number,
+  ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
+    const stored = (await this.send({ kind: "readSnapshot", at })) as StoredSnapshot | null;
+    return stored === null ? null : documentOf(stored);
   }
 
   async saveKerning(document: FontDocument): Promise<void> {

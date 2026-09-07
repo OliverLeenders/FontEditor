@@ -26,6 +26,8 @@ import type { StoreHost } from "./state.js";
 /** What opening a font needs of the store beyond reading and patching state. */
 export type FontHost = StoreHost & {
   readonly disk: Persistence;
+  /** Keep a copy of the font as it is now, before replacing it. */
+  keepSnapshot: () => Promise<void>;
   /** The glyph to open once the font is on screen, and the camera to frame it. */
   showGlyph: (name: GlyphName) => void;
   setCatalogQuery: (changes: Partial<CatalogQuery>) => void;
@@ -113,6 +115,11 @@ async function readUfo(
  * appended to, for the reason `importFont` gives.
  */
 async function adoptDocument(host: FontHost, document: FontDocument): Promise<void> {
+  // A copy of what is open before it stops being open. Opening a font is the
+  // most destructive thing this editor does — it replaces every glyph on disk —
+  // and it is exactly the moment someone discovers they meant the other file.
+  await host.keepSnapshot();
+
   showDocument(host, document, false);
   host.setCatalogQuery(DEFAULT_QUERY);
   await host.disk.replaceAll(document);

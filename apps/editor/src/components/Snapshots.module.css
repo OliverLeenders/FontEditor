@@ -1,0 +1,121 @@
+/*
+ * The list of copies, hanging under its button.
+ *
+ * Shaped like the kerning-groups panel: a button in the bar, and a panel that
+ * opens beneath it rather than a dialog over the work. What is being asked here
+ * — "is the thing I lost in one of these" — is answered by reading a list, and a
+ * list is easier to read next to the font than on top of it.
+ */
+.holder {
+  position: relative;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 20;
+  width: 20rem;
+  padding: 0.55rem 0.6rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.keep {
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.keep:hover:not(:disabled) {
+  color: var(--ink);
+}
+.keep:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.empty {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  max-height: 16rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+
+.when {
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+
+.size {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.restore {
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.restore:hover:not(:disabled) {
+  color: var(--ink);
+}
+.restore:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.said {
+  margin: 0.45rem 0 0;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+}
