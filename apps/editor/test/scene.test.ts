@@ -135,9 +135,9 @@ describe("sceneFor", () => {
     expect(scene.viewport).toBe(SIZE);
   });
 
-  it("draws guides from the font's own metrics", () => {
+  it("draws the lines the font's own metrics define", () => {
     const { ascender, descender, xHeight, capHeight } = store.editor.document.info;
-    const ys = sceneFor(store.getState(), SIZE).guides.map((g) => g.y);
+    const ys = sceneFor(store.getState(), SIZE).metricLines.map((g) => g.y);
 
     expect(ys).toContain(0);
     expect(ys).toContain(ascender);

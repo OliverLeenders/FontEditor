@@ -1,5 +1,7 @@
 import { type Vec2, handleIntersection } from "@fonteditor/geometry";
 import {
+  type Guide,
+  guideDirection,
   type Contour,
   type Glyph,
   type Node,
@@ -48,7 +50,8 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   ctx.globalAlpha = 1;
 
   clearBackground(ctx, s);
-  drawGuides(ctx, s);
+  drawMetricLines(ctx, s);
+  drawDesignGuides(ctx, s);
   // Neighbours and margins sit under the glyph being edited: they are context,
   // and context that draws over your work is a distraction rather than a help.
   drawNeighbours(ctx, s);
@@ -93,11 +96,11 @@ export function clearBackground(ctx: Canvas2D, s: Scene): void {
 /** How near two labels may come, in pixels, before the lower one is dropped. */
 const LABEL_CLEARANCE = 16;
 
-export function drawGuides(ctx: Canvas2D, s: Scene): void {
+export function drawMetricLines(ctx: Canvas2D, s: Scene): void {
   ctx.lineWidth = 1;
   const drawn: number[] = [];
 
-  for (const guide of s.guides) {
+  for (const guide of s.metricLines) {
     // Half-pixel offset so a one-pixel line lands on a pixel rather than
     // straddling two and rendering as a soft two-pixel smear.
     const y = Math.round(toScreen(s.view, { x: 0, y: guide.y }).y) + 0.5;
@@ -124,6 +127,98 @@ export function drawGuides(ctx: Canvas2D, s: Scene): void {
     // a name sitting on the outline would be one more thing to read past.
     ctx.fillText(guide.label, 6, y - 3);
   }
+}
+
+/**
+ * The lines the designer put there.
+ *
+ * Drawn after the metric lines and before the outline: they belong to the same
+ * layer of the picture — things to draw against rather than things drawn — and
+ * they must never be mistaken for ink.
+ *
+ * A guide is infinite, so what is drawn is where it crosses the viewport. The
+ * arithmetic is the same for every angle, which is why an angle is stored
+ * rather than a kind: a vertical guide is not a special case here.
+ */
+export function drawDesignGuides(ctx: Canvas2D, s: Scene): void {
+  if (s.guides.length === 0) return;
+
+  for (const { guide, scope } of s.guides) {
+    const span = acrossViewport(s, guide);
+    if (span === null) continue;
+
+    const selected = guide.id === s.selectedGuide;
+    const hovered = guide.id === s.hoveredGuide;
+    ctx.strokeStyle = selected || hovered ? s.palette.designGuideSelected : s.palette.designGuide;
+    ctx.lineWidth = selected ? 1.5 : 1;
+
+    // A font's guide is dashed and a glyph's is solid: the font's are in every
+    // glyph, so they are the background of the work rather than part of it.
+    ctx.setLineDash(scope === "font" ? [6, 4] : []);
+    ctx.beginPath();
+    ctx.moveTo(span[0].x, span[0].y);
+    ctx.lineTo(span[1].x, span[1].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (guide.name === "") continue;
+    label(ctx, s, guide, span);
+  }
+}
+
+/** The name, laid along the line at the end it leaves the viewport by. */
+function label(ctx: Canvas2D, s: Scene, guide: Guide, span: readonly [Vec2, Vec2]): void {
+  ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+  ctx.fillStyle = s.palette.guideLabel;
+  ctx.textBaseline = "alphabetic";
+
+  // Along the line, reading left to right whichever way the line runs: a name
+  // upside down is a name nobody reads.
+  const [from, to] = span[0].x <= span[1].x ? span : [span[1], span[0]];
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+
+  ctx.save();
+  ctx.translate(from.x, from.y);
+  ctx.rotate(angle);
+  ctx.textAlign = "left";
+  ctx.fillText(guide.name, 8, -4);
+  ctx.restore();
+}
+
+/**
+ * Where a guide crosses the viewport, or `null` when it does not.
+ *
+ * Both edges rather than a long segment through the middle: a line drawn from
+ * far outside the viewport to far outside it is the same picture and much more
+ * arithmetic for the canvas to clip.
+ */
+function acrossViewport(s: Scene, guide: Guide): readonly [Vec2, Vec2] | null {
+  const on = toScreen(s.view, guide.pt);
+  const d = guideDirection(guide);
+  // Screen y runs the other way from design y, so the direction flips with it.
+  const dir = { x: d.x, y: -d.y };
+
+  const { width, height } = s.viewport;
+  const hits: Vec2[] = [];
+
+  if (Math.abs(dir.x) > 1e-9) {
+    for (const x of [0, width]) {
+      const t = (x - on.x) / dir.x;
+      const y = on.y + dir.y * t;
+      if (y >= -1 && y <= height + 1) hits.push({ x, y });
+    }
+  }
+  if (Math.abs(dir.y) > 1e-9) {
+    for (const y of [0, height]) {
+      const t = (y - on.y) / dir.y;
+      const x = on.x + dir.x * t;
+      if (x >= -1 && x <= width + 1) hits.push({ x, y });
+    }
+  }
+
+  if (hits.length < 2) return null;
+  const [one, two] = hits;
+  return one === undefined || two === undefined ? null : [one, two];
 }
 
 /**

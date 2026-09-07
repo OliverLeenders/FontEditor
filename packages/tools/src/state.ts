@@ -1,6 +1,7 @@
 import type { Rect, Vec2 } from "@fonteditor/geometry";
 import {
   type AnchorId,
+  type GuideId,
   type ComponentId,
   type ContourId,
   type FontDocument,
@@ -143,6 +144,22 @@ export type Gesture =
       readonly snapped: SnapHold;
     }
   | {
+      /**
+       * Dragging one guide.
+       *
+       * Its own gesture for the reason an anchor's is: a guide is not in the
+       * selection and has no contour or node for `Selection` to name. The whole
+       * document is kept rather than the glyph, because the guide may belong to
+       * the font rather than to the letter in front of you.
+       */
+      readonly kind: "dragGuide";
+      readonly origin: Vec2;
+      readonly guideId: GuideId;
+      readonly before: FontDocument;
+      readonly moved: boolean;
+      readonly snapped: SnapHold;
+    }
+  | {
       readonly kind: "marquee";
       readonly origin: Vec2;
       readonly current: Vec2;
@@ -251,6 +268,16 @@ export type EditorState = {
    * exactly what would happen if anchors joined the box round the selection.
    */
   readonly selectedAnchor: AnchorId | null;
+  /**
+   * The guide being worked on, if one is.
+   *
+   * Beside the point selection rather than in it, as the anchor is, and for the
+   * same reason: a guide is not part of the shape, so a command that transforms
+   * a selection must never see one.
+   */
+  readonly selectedGuide: GuideId | null;
+  /** The guide under the pointer, for the highlight that says it can be grabbed. */
+  readonly hoveredGuide: GuideId | null;
   readonly hoveredAnchor: AnchorId | null;
   /**
    * The component being worked on.
@@ -314,6 +341,8 @@ export function editorState(init: EditorStateInit): EditorState {
     view: init.view,
     selection: init.selection ?? [],
     selectedAnchor: null,
+    selectedGuide: null,
+    hoveredGuide: null,
     hoveredAnchor: null,
     selectedComponent: null,
     hoveredSegment: init.hoveredSegment ?? null,

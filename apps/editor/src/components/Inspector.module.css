@@ -286,6 +286,33 @@
   border-color: var(--accent);
 }
 
+/* A guide row carries one more number than an anchor — the angle — and the
+   scope, which is a button because it is also how the scope is changed. */
+.guideRow {
+  display: grid;
+  grid-template-columns: 1fr 3rem 3rem 2.6rem auto 1.1rem;
+  align-items: center;
+  gap: 0.25rem;
+}
+.guideRow[data-selected="true"] .input {
+  border-color: var(--accent);
+}
+
+.guideScope {
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  cursor: pointer;
+}
+.guideScope[aria-pressed="true"] {
+  color: var(--ink-2);
+  border-color: var(--rule-strong);
+}
+
 /* The base name in a component row: a link to that glyph, not a label. */
 .componentOpen {
   padding: 0.2rem 0.3rem;

@@ -3,6 +3,7 @@ import {
   type FontInfo,
   type Glyph,
   type IdFactory,
+  type Guide,
   type Kerning,
   type PlainValue,
   type StyleMapStyle,
@@ -10,9 +11,11 @@ import {
   EMPTY_KERNING,
   fontDocument,
   groupKey,
+  guide,
   setFeatures,
   setKern,
   setKernGroup,
+  setGuides,
   setKept,
   setKerning,
   STYLE_MAP_STYLES,
@@ -92,7 +95,7 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
 
   const at = (path: string): string | null => fileText(files, `${root}${path}`);
 
-  const { info, kept: keptInfo } = readFontInfo(at("fontinfo.plist"), warn);
+  const { info, guides, kept: keptInfo } = readFontInfo(at("fontinfo.plist"), ids, warn);
   const layer = defaultLayer(at("layercontents.plist"));
   const contents = parsePlistDict(at(`${layer}/contents.plist`) ?? "");
   const entries = stringEntries(contents);
@@ -145,10 +148,10 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
   const features = at("features.fea") ?? "";
 
   return {
-    document: setKept(setFeatures(setKerning(fontDocument(ordered, info), kerning), features), {
-      fontInfo: keptInfo,
-      lib: keptLib,
-    }),
+    document: setKept(
+      setGuides(setFeatures(setKerning(fontDocument(ordered, info), kerning), features), guides),
+      { fontInfo: keptInfo, lib: keptLib },
+    ),
     warnings,
   };
 }
@@ -217,11 +220,12 @@ function defaultLayer(source: string | null): string {
 
 function readFontInfo(
   source: string | null,
+  ids: IdFactory,
   warn: (glyph: string | null, message: string) => void,
-): { info: FontInfo; kept: Readonly<Record<string, PlainValue>> } {
+): { info: FontInfo; guides: readonly Guide[]; kept: Readonly<Record<string, PlainValue>> } {
   if (source === null) {
     warn(null, "no fontinfo.plist: the font's metrics are the defaults");
-    return { info: DEFAULT_FONT_INFO, kept: {} };
+    return { info: DEFAULT_FONT_INFO, guides: [], kept: {} };
   }
 
   const dict = parsePlistDict(source);
@@ -271,7 +275,37 @@ function readFontInfo(
     styleMapStyleName: styleMapStyle(plistString(dict, "styleMapStyleName")),
   };
 
-  return { info, kept: unmodelled(dict, Object.keys(DEFAULT_FONT_INFO)) };
+  // `guidelines` is read into the model rather than kept, so it must not also
+  // be carried as something unmodelled — it would be written twice.
+  const modelled = [...Object.keys(DEFAULT_FONT_INFO), "guidelines"];
+  return { info, guides: readGuides(dict, ids), kept: unmodelled(dict, modelled) };
+}
+
+/**
+ * The font's own guides, from `fontinfo.plist`.
+ *
+ * Dictionaries rather than the glif's attributes, and the same three ways of
+ * saying a line: `x` alone is vertical, `y` alone level, both with an angle is
+ * anything else.
+ */
+function readGuides(dict: PlistDict, ids: IdFactory): Guide[] {
+  const listed = dict["guidelines"];
+  if (!Array.isArray(listed)) return [];
+
+  const out: Guide[] = [];
+  for (const entry of listed) {
+    if (!isDict(entry)) continue;
+    const x = plistNumber(entry, "x");
+    const y = plistNumber(entry, "y");
+    const angle = plistNumber(entry, "angle");
+    const name = plistString(entry, "name") ?? "";
+    const color = plistString(entry, "color");
+
+    if (x !== null && y !== null) out.push(guide(ids.guide(), { x, y }, angle ?? 0, name, color));
+    else if (x !== null) out.push(guide(ids.guide(), { x, y: 0 }, 90, name, color));
+    else if (y !== null) out.push(guide(ids.guide(), { x: 0, y }, 0, name, color));
+  }
+  return out;
 }
 
 /** The four names this key is allowed to have, and the default for anything else. */

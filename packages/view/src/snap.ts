@@ -8,7 +8,7 @@ import type { Vec2 } from "@fonteditor/geometry";
  * holding across frames — the lines are rebuilt every move, so identity has to
  * be a value rather than a reference.
  */
-export type SnapSource = "metric" | "origin" | "advance" | "extreme" | "neighbour";
+export type SnapSource = "metric" | "origin" | "advance" | "extreme" | "neighbour" | "guide";
 
 export type SnapLine = {
   /** The coordinate, on whichever axis this line belongs to. */

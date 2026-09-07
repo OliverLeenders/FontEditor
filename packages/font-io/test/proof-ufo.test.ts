@@ -1,4 +1,5 @@
 import {
+  verticalGuide,
   glyphNamed,
   DEFAULT_FONT_INFO,
   addAnchor,
@@ -170,8 +171,10 @@ function proof(): FontDocument {
         unicodes: [0x61],
         advance: 560,
         contours: [ring(60, 500, 520, 0)],
+        // Modelled, so it travels through the model rather than through what was
+        // kept, and fontTools is asked whether we wrote a line it understands.
+        guides: [verticalGuide("proofg1", 120, "stem")],
         kept: [
-          '\t<guideline x="120" name="stem"/>',
           "\t<note>the join wants looking at</note>",
           "\t<lib><dict><key>com.tunni.proof</key><string>kept</string></dict></lib>",
         ],
@@ -336,9 +339,16 @@ describe("the proof font", () => {
     expect(after.kept.lib["com.tunni.proof"]).toEqual({ written: "by the proof", version: 2 });
 
     const keptOnA = (glyphNamed(after, "a")?.kept ?? []).join("\n");
-    expect(keptOnA).toContain('name="stem"');
     expect(keptOnA).toContain("the join wants looking at");
     expect(keptOnA).toContain("com.tunni.proof");
+
+    // The guide is modelled now, so it comes back as one rather than as text —
+    // written by us, rewritten by fontTools, and read here as the same line.
+    const guidesOnA = glyphNamed(after, "a")?.guides ?? [];
+    expect(guidesOnA).toHaveLength(1);
+    expect(guidesOnA[0]?.name).toBe("stem");
+    expect(guidesOnA[0]?.pt.x).toBe(120);
+    expect(guidesOnA[0]?.angle).toBe(90);
 
     expect(after.kerning.firstGroups).toEqual(before.kerning.firstGroups);
     expect(after.kerning.secondGroups).toEqual(before.kerning.secondGroups);

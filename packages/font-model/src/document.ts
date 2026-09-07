@@ -1,4 +1,5 @@
 import type { Glyph } from "./glyph.js";
+import type { Guide } from "./guide.js";
 import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js";
 
 export type GlyphName = string;
@@ -187,6 +188,15 @@ export type FontDocument = {
    */
   readonly features: string;
   /**
+   * Lines drawn in every glyph.
+   *
+   * The typeface's own decisions — the x-height, the overshoot, the angle an
+   * italic leans at — as against a glyph's guides, which are about that letter.
+   * Half of drawing a typeface is making separate letters agree, and these are
+   * where the agreement is written down.
+   */
+  readonly guides: readonly Guide[];
+  /**
    * What the font it was read from carried that this editor cannot model.
    *
    * Undoable along with everything else here, which is right: it is written
@@ -212,6 +222,7 @@ export function fontDocument(
     glyphs: map,
     kerning: EMPTY_KERNING,
     features: "",
+    guides: [],
     kept: NOTHING_KEPT,
   };
 }
@@ -371,6 +382,16 @@ export function glyphsForString(document: FontDocument, text: string): Array<Gly
 /** Replace the font's feature source, leaving everything else alone. */
 export function setFeatures(document: FontDocument, features: string): FontDocument {
   return document.features === features ? document : { ...document, features };
+}
+
+/**
+ * Replace the font's own guides.
+ *
+ * Wholesale rather than one at a time, because that is what every caller wants:
+ * a panel that has just edited a list, and a reader that has just read one.
+ */
+export function setGuides(document: FontDocument, guides: readonly Guide[]): FontDocument {
+  return document.guides === guides ? document : { ...document, guides };
 }
 
 /** Replace what the font carries that this editor does not model. */

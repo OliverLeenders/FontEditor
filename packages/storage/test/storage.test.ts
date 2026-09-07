@@ -1,5 +1,9 @@
 import { IDENTITY_AFFINE, vec } from "@fonteditor/geometry";
 import {
+  setGuides,
+  horizontalGuide,
+  verticalGuide,
+  addGuide,
   setKept,
   type Contour,
   type FontDocument,
@@ -179,6 +183,29 @@ describe("what the font carries and this editor does not model", () => {
     const encoded: Record<string, unknown> = { ...encodeFontInfo(document()) };
     expect("kept" in encoded).toBe(false);
     expect("kept" in { ...encodeGlyph(glyph("a")) }).toBe(false);
+  });
+
+  it("carries the font's guides and a glyph's through a save and a load", async () => {
+    const store = new MemoryFileStore();
+    const guided = setGuides(document(), [horizontalGuide("fg1", 512, "x-height")]);
+    const withGlyphGuide = putGlyph(
+      guided,
+      addGuide(guided.glyphs["o"]!, verticalGuide("gg1", 60, "stem")),
+    );
+    await saveDocument(store, withGlyphGuide);
+
+    const result = await loadDocument(store);
+    expect(result.kind).toBe("loaded");
+    if (result.kind !== "loaded") return;
+
+    expect(result.document.guides).toEqual([horizontalGuide("fg1", 512, "x-height")]);
+    expect(result.document.glyphs["o"]?.guides).toEqual([verticalGuide("gg1", 60, "stem")]);
+  });
+
+  it("writes no guides for a font that has none", () => {
+    const encoded: Record<string, unknown> = { ...encodeFontInfo(document()) };
+    expect("guides" in encoded).toBe(false);
+    expect("guides" in { ...encodeGlyph(glyph("a")) }).toBe(false);
   });
 
   it("survives a file that says something absurd about it", () => {

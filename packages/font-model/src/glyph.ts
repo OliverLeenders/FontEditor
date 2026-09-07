@@ -1,9 +1,10 @@
 import type { Rect } from "@fonteditor/geometry";
 
 import { type Anchor, movedAnchor, renamedAnchor } from "./anchor.js";
+import type { Guide } from "./guide.js";
 import type { Component } from "./component.js";
 import { type Contour, type Segment, contourBounds, segments, unionRect } from "./contour.js";
-import type { AnchorId, ComponentId, ContourId } from "./ids.js";
+import type { AnchorId, ComponentId, ContourId, GuideId } from "./ids.js";
 
 /**
  * A single glyph.
@@ -40,6 +41,14 @@ export type Glyph = {
    */
   readonly anchors: readonly Anchor[];
   /**
+   * Lines to draw against, belonging to this letter.
+   *
+   * The font's guides say what the typeface has decided; these say what this
+   * letter has — where its diagonal wants to sit, how far its bowl overshoots.
+   * Drawn and snapped to, never exported into an outline.
+   */
+  readonly guides: readonly Guide[];
+  /**
    * What the glyph's own file carried that this editor cannot model.
    *
    * Guidelines, a note, an image, a `lib` — each one an element of the `.glif`
@@ -58,6 +67,7 @@ export type GlyphInit = {
   readonly contours?: readonly Contour[];
   readonly components?: readonly Component[];
   readonly anchors?: readonly Anchor[];
+  readonly guides?: readonly Guide[];
   readonly kept?: readonly string[];
 };
 
@@ -69,6 +79,7 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     contours: init.contours ?? [],
     components: init.components ?? [],
     anchors: init.anchors ?? [],
+    guides: init.guides ?? [],
     kept: init.kept ?? [],
   };
 }
@@ -113,6 +124,40 @@ export function moveAnchorTo(g: Glyph, id: AnchorId, pt: { x: number; y: number 
   return updateAnchor(g, id, (a) =>
     a.pt.x === pt.x && a.pt.y === pt.y ? a : { ...a, pt: { x: pt.x, y: pt.y } },
   );
+}
+
+// ---------------------------------------------------------------------------
+// guides
+// ---------------------------------------------------------------------------
+
+/**
+ * The glyph's own guides.
+ *
+ * Kept beside the outline, exactly as anchors are, and for the same reason: a
+ * guide is not part of the shape and must never be drawn, transformed or
+ * exported as though it were. It moves when it is moved.
+ */
+export function addGuide(g: Glyph, guide: Guide): Glyph {
+  return { ...g, guides: [...g.guides, guide] };
+}
+
+export function removeGuide(g: Glyph, id: GuideId): Glyph | null {
+  const kept = g.guides.filter((x) => x.id !== id);
+  return kept.length === g.guides.length ? null : { ...g, guides: kept };
+}
+
+export function guideNamed(g: Glyph, id: GuideId): Guide | null {
+  return g.guides.find((x) => x.id === id) ?? null;
+}
+
+export function updateGuide(g: Glyph, id: GuideId, change: (x: Guide) => Guide): Glyph | null {
+  const i = g.guides.findIndex((x) => x.id === id);
+  if (i < 0) return null;
+  const next = change(g.guides[i]!);
+  if (next === g.guides[i]) return g;
+  const guides = g.guides.slice();
+  guides[i] = next;
+  return { ...g, guides };
 }
 
 /**

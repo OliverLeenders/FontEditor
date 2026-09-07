@@ -3,6 +3,7 @@ import {
   type Contour,
   type FontDocument,
   type Glyph,
+  type Guide,
   type PlainValue,
   glyphFileName,
   groupNameOf,
@@ -236,7 +237,11 @@ export function glif(g: Glyph): string {
     );
   }
 
-  // Last, and unread: guidelines, a note, an image, a lib — whatever this glyph
+  // Before the outline, which is where the format lists them and where a
+  // reader that cares about order expects to find them.
+  for (const line of g.guides) lines.push(`	${guideline(line)}`);
+
+  // Last, and unread: a note, an image, a lib — whatever this glyph
   // was read carrying that the model has no field for. Written back exactly as
   // it arrived, because saving a font must not take things out of it.
   for (const element of g.kept) lines.push(element);
@@ -314,7 +319,15 @@ function fontInfoPairs(document: FontDocument): Array<readonly [string, string]>
   text("styleMapFamilyName", info.styleMapFamilyName);
   pairs.push(["styleMapStyleName", str(info.styleMapStyleName)]);
 
+  if (document.guides.length > 0) {
+    pairs.push(["guidelines", array(document.guides.map(guideDict))]);
+  }
+
   const mine = new Set(pairs.map(([key]) => key));
+  // `guidelines` is written above when there are any, and is the model's either
+  // way: a font whose guides were all deleted must not have them come back from
+  // what was kept.
+  mine.add("guidelines");
   for (const [key, value] of Object.entries(document.kept.fontInfo)) {
     if (mine.has(key)) continue;
     const written = plistValue(value);
@@ -351,10 +364,43 @@ function plistValue(value: PlainValue): string | null {
   return null;
 }
 
+/** One of the font's guides, as `fontinfo.plist` holds it. */
+function guideDict(g: Guide): string {
+  const pairs: Array<readonly [string, string]> = [
+    ["x", real(g.pt.x)],
+    ["y", real(g.pt.y)],
+    ["angle", real(g.angle)],
+  ];
+  if (g.name !== "") pairs.push(["name", str(g.name)]);
+  if (g.color !== null) pairs.push(["color", str(g.color)]);
+  return dict(pairs);
+}
+
 /** A number that is not a whole one. Plists distinguish the two. */
 function real(value: number): string {
   return `<real>${String(value)}</real>`;
 }
+
+/**
+ * One guide as the format writes it.
+ *
+ * All three attributes always, rather than the shorthand a vertical or level
+ * line may use. The shorthand says the same thing and reads more nicely by
+ * hand; writing it would mean deciding, per guide, whether an angle that is
+ * exactly ninety was meant as one — and a guide nudged off ninety by a drag
+ * would silently change spelling.
+ */
+export function guideline(g: Guide): string {
+  const name = g.name === "" ? "" : ` name="${escapeXml(g.name)}"`;
+  const color = g.color === null ? "" : ` color="${escapeXml(g.color)}"`;
+  return (
+    `<guideline x="${number(g.pt.x)}" y="${number(g.pt.y)}" angle="${number(g.angle)}"` +
+    `${name}${color}/>`
+  );
+}
+
+/** A coordinate as an attribute: whole where it is whole, and short where not. */
+const number = (n: number): string => String(Math.round(n * 1000) / 1000);
 
 export function ufoFiles(document: FontDocument): ZipEntry[] {
   const entries: ZipEntry[] = [

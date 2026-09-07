@@ -76,6 +76,12 @@ describe("context menu", () => {
       // Named for the anchor it would make, which is the first usual name the
       // glyph is not already using.
       "Add anchor here (top)",
+      // Level and upright, in both scopes: which scope a guide is in is the
+      // decision, so the menu asks rather than guessing.
+      "Guide across here",
+      "Guide up here",
+      "Guide across here, for the whole font",
+      "Guide up here, for the whole font",
       "Round selection",
       "Round this glyph",
     ]);

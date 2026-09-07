@@ -21,6 +21,7 @@ import {
   scene as buildScene,
 } from "@fonteditor/render";
 import {
+  guidesInForce,
   type EditorState,
   knifeStroke,
   marqueeRect,
@@ -44,6 +45,7 @@ const EMPTY: Glyph = {
   contours: [],
   components: [],
   anchors: [],
+  guides: [],
   kept: [],
 };
 
@@ -190,7 +192,7 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
     // preference, so only the stroke is overridden.
     metrics: { ...DEFAULT_METRICS, outlineWidth: state.outlineWidth },
     // The names come with the lines; the renderer writes them at the edge.
-    guides: metricLines(editor.document.info).map((line) => ({
+    metricLines: metricLines(editor.document.info).map((line) => ({
       y: line.y,
       // Spread rather than assigned: an absent `emphasis` and one set to
       // `undefined` are different types here, and only the first is a guide
@@ -198,6 +200,12 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
       ...(line.emphasis === true ? { emphasis: true } : {}),
       label: line.name,
     })),
+    // The lines the designer put there, the font's and the glyph's together.
+    // Off with the rest of the furniture while space is held: previewing means
+    // seeing the shape, and a guide is not part of it.
+    guides: state.previewing ? [] : guidesInForce(editor),
+    hoveredGuide: editor.hoveredGuide,
+    selectedGuide: editor.selectedGuide,
     snapGuides: snapGuidesFor(editor),
     ...combParts(state, glyph),
     hoveredAnchor: editor.hoveredAnchor,

@@ -23,6 +23,13 @@ export interface Canvas2D {
 
   save(): void;
   restore(): void;
+  /**
+   * Move and turn the coordinate system, for the one thing that needs it: a
+   * label laid along a line that is not level. Everything else is drawn in
+   * screen pixels and has no use for a transform.
+   */
+  translate(x: number, y: number): void;
+  rotate(radians: number): void;
 
   beginPath(): void;
   closePath(): void;

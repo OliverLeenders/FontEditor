@@ -18,7 +18,7 @@ export { glyphFileName, glyphNameForCodePoint } from "./names.js";
 export type { Anchor } from "./anchor.js";
 export { anchor, isMarkAnchor, movedAnchor, pairedName, renamedAnchor } from "./anchor.js";
 
-export type { AnchorId, ComponentId, ContourId, IdFactory, NodeId } from "./ids.js";
+export type { AnchorId, ComponentId, ContourId, GuideId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";
 
 export type { HandleLock, Node, NodeInit, NodeType } from "./node.js";
@@ -164,6 +164,7 @@ export {
   setFontInfo,
   setGlyphOrder,
   setFeatures,
+  setGuides,
   setKept,
   setKerning,
   updateGlyph,
@@ -173,6 +174,7 @@ export type { Glyph, GlyphInit } from "./glyph.js";
 export {
   addContour,
   addAnchor,
+  addGuide,
   addGlyphComponent,
   decomposedGlyph,
   anchorById,
@@ -181,6 +183,9 @@ export {
   moveAnchorBy,
   moveAnchorTo,
   removeAnchor,
+  removeGuide,
+  guideNamed,
+  updateGuide,
   renameAnchor,
   removeGlyphComponent,
   updateGlyphComponent,
@@ -211,3 +216,19 @@ export { measureAngle, measureNormal, sectionAcross } from "./measure.js";
 
 export type { OverlapResult } from "./overlap.js";
 export { removeOverlap } from "./overlap.js";
+
+export type { Guide } from "./guide.js";
+export {
+  distanceToGuide,
+  guide,
+  guideDirection,
+  horizontalGuide,
+  isHorizontal,
+  isVertical,
+  movedGuide,
+  nearestOnGuide,
+  normalAngle,
+  renamedGuide,
+  turnedGuide,
+  verticalGuide,
+} from "./guide.js";

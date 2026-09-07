@@ -1,11 +1,23 @@
 import type { Cubic, Rect, Vec2 } from "@fonteditor/geometry";
-import type { AnchorId, Contour, Glyph } from "@fonteditor/font-model";
+import type { AnchorId, Contour, Glyph, Guide, GuideId } from "@fonteditor/font-model";
 import type { BoxFrame, Comb, Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
 import type { RenderPalette } from "./palette.js";
 
 /** A horizontal metric line: baseline, x-height, cap-height and so on. */
-export type HorizontalGuide = {
+/**
+ * A guide as the canvas needs it: the line, and where it came from.
+ *
+ * The scope is carried because it is the one thing about a guide that changes
+ * how it is drawn — a font's guide appears in every glyph and is a heavier
+ * commitment than one belonging to the letter in front of you.
+ */
+export type SceneGuide = {
+  readonly guide: Guide;
+  readonly scope: "font" | "glyph";
+};
+
+export type MetricLine = {
   /** Position in design units. */
   readonly y: number;
   /** Drawn heavier. The baseline usually wants this; x-height usually does not. */
@@ -120,7 +132,18 @@ export type Scene = {
   readonly palette: RenderPalette;
   readonly metrics: RenderMetrics;
   readonly options: RenderOptions;
-  readonly guides: readonly HorizontalGuide[];
+  readonly metricLines: readonly MetricLine[];
+  /**
+   * The lines the designer put there: the font's and this glyph's together.
+   *
+   * Flattened into one list on the way in, because drawing does not care which
+   * scope a line came from — only what it is called and whether it is the one
+   * being dragged.
+   */
+  readonly guides: readonly SceneGuide[];
+  /** The guide under the pointer, and the one selected, by id. */
+  readonly hoveredGuide: GuideId | null;
+  readonly selectedGuide: GuideId | null;
   /** Lines the drag in progress is caught on. Empty when nothing is caught. */
   readonly snapGuides: readonly SnapGuide[];
   /**
@@ -263,7 +286,10 @@ export type SceneInit = {
   readonly palette: RenderPalette;
   readonly metrics?: RenderMetrics;
   readonly options?: Partial<RenderOptions>;
-  readonly guides?: readonly HorizontalGuide[];
+  readonly metricLines?: readonly MetricLine[];
+  readonly guides?: readonly SceneGuide[];
+  readonly hoveredGuide?: GuideId | null;
+  readonly selectedGuide?: GuideId | null;
   readonly snapGuides?: readonly SnapGuide[];
   readonly comb?: readonly Comb[];
   readonly section?: Scene["section"];
@@ -291,7 +317,10 @@ export function scene(init: SceneInit): Scene {
     palette: init.palette,
     metrics: init.metrics ?? DEFAULT_METRICS,
     options: { ...DEFAULT_OPTIONS, ...init.options },
+    metricLines: init.metricLines ?? [],
     guides: init.guides ?? [],
+    hoveredGuide: init.hoveredGuide ?? null,
+    selectedGuide: init.selectedGuide ?? null,
     snapGuides: init.snapGuides ?? [],
     comb: init.comb ?? [],
     section: init.section ?? null,

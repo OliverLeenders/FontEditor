@@ -355,7 +355,7 @@ describe("guides", () => {
   it("draws one line per guide, spanning the viewport", () => {
     const ctx = render({
       ...base(ring()),
-      guides: [{ y: 0, emphasis: true }, { y: 500 }],
+      metricLines: [{ y: 0, emphasis: true }, { y: 500 }],
     });
     const emphasised = ctx.strokedIn(LIGHT_PALETTE.guideEmphasis);
     const plain = ctx.strokedIn(LIGHT_PALETTE.guide);
@@ -367,7 +367,7 @@ describe("guides", () => {
   });
 
   it("puts a guide at the right height", () => {
-    const ctx = render({ ...base(ring()), guides: [{ y: 500 }] });
+    const ctx = render({ ...base(ring()), metricLines: [{ y: 500 }] });
     const expected = Math.round(toScreen(VIEW, vec(0, 500)).y) + 0.5;
     const move = ctx.all("moveTo").find((o) => o.args[0] === 0 && o.args[1] === expected);
     expect(move).toBeDefined();
@@ -376,7 +376,7 @@ describe("guides", () => {
   it("writes the name of a line that has one", () => {
     const ctx = render({
       ...base(ring()),
-      guides: [
+      metricLines: [
         { y: 0, emphasis: true, label: "baseline" },
         { y: 500, label: "x-height" },
       ],
@@ -385,7 +385,7 @@ describe("guides", () => {
   });
 
   it("says nothing about a guide with no name", () => {
-    const ctx = render({ ...base(ring()), guides: [{ y: 500 }] });
+    const ctx = render({ ...base(ring()), metricLines: [{ y: 500 }] });
     expect(ctx.texts()).toEqual([]);
   });
 
@@ -394,7 +394,7 @@ describe("guides", () => {
     // and two names on top of one another read as neither.
     const ctx = render({
       ...base(ring()),
-      guides: [
+      metricLines: [
         { y: 700, label: "cap height" },
         { y: 700, label: "ascender" },
       ],
@@ -405,7 +405,7 @@ describe("guides", () => {
   it("keeps both when they are far enough apart", () => {
     const ctx = render({
       ...base(ring()),
-      guides: [
+      metricLines: [
         { y: 700, label: "cap height" },
         { y: 0, label: "baseline" },
       ],
@@ -414,7 +414,7 @@ describe("guides", () => {
   });
 
   it("writes the name above its line, not on it", () => {
-    const ctx = render({ ...base(ring()), guides: [{ y: 500, label: "x-height" }] });
+    const ctx = render({ ...base(ring()), metricLines: [{ y: 500, label: "x-height" }] });
     const line = Math.round(toScreen(VIEW, vec(0, 500)).y) + 0.5;
     const text = ctx.all("fillText")[0];
     expect(text?.args[1]).toBeLessThan(line);

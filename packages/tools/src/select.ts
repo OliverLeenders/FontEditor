@@ -30,8 +30,10 @@ import {
   reverseSelectedContour,
   selectContour,
 } from "./commands/index.js";
+import { deleteSelectedGuide, moveGuideBy, pickGuide } from "./commands/guides.js";
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import {
+  startGuideDrag,
   EMPTY_GLYPH,
   type GestureOptions,
   continueGesture,
@@ -200,6 +202,12 @@ export function pointerDown(
     if (box !== null && !input.modifiers.shift && boxContains(box, input.point)) {
       return startSelectionDrag(base, input);
     }
+
+    // Only where nothing on the outline is: a guide runs the width of the
+    // canvas and would otherwise steal every click that crossed it.
+    const guide = pickGuide(state, input.point);
+    if (guide !== null) return startGuideDrag(base, input, guide);
+
     return startMarquee(base, input);
   }
 
@@ -210,7 +218,7 @@ export function pointerDown(
       // An outline grab puts the anchor down: the two are separate things and
       // only one of them can be what the next arrow key or Backspace means.
       return startItemDrag(
-        { ...base, selectedAnchor: null, selectedComponent: null },
+        { ...base, selectedAnchor: null, selectedComponent: null, selectedGuide: null },
         input,
         target,
       );
@@ -248,6 +256,9 @@ export function pointerMove(
       // and a name that appeared because the cursor was vaguely nearby would
       // be one more label over the drawing.
       hoveredAnchor: over?.kind === "anchor" ? over.anchorId : null,
+      // Same rule as picking one up: a guide lights up only where nothing on
+      // the outline is under the pointer.
+      hoveredGuide: over === null ? pickGuide(state, input.point) : null,
       hoveredSegment: hoveredSegment(
         currentGlyph(state) ?? EMPTY_GLYPH,
         input.point,
@@ -356,6 +367,7 @@ export function keyDown(
       // An anchor is selected on its own, so it is what Backspace means while
       // one is — and the point selection is empty then anyway.
       if (state.selectedAnchor !== null) return deleteSelectedAnchor(state);
+      if (state.selectedGuide !== null) return deleteSelectedGuide(state);
       if (state.selectedComponent !== null) return deleteSelectedComponent(state);
       return deleteSelectedPoints(state);
     }
@@ -366,12 +378,18 @@ export function keyDown(
 
   const step = NUDGES[input.key];
   if (step === undefined) return result(state);
-  if (state.selection.length === 0) return result(state);
   if (state.gesture !== null) return result(state);
 
   const size = input.modifiers.shift
     ? (options.largeNudge ?? DEFAULT_LARGE_NUDGE)
     : (options.nudge ?? DEFAULT_NUDGE);
+
+  // A selected guide is what the arrows move, for the reason Backspace means
+  // it: the point selection is empty while one is selected.
+  if (state.selectedGuide !== null) {
+    return moveGuideBy(state, state.selectedGuide, step.x * size, step.y * size);
+  }
+  if (state.selection.length === 0) return result(state);
 
   const document = editCurrentGlyph(state, (g) =>
     translateSelection(g, state.selection, { x: step.x * size, y: step.y * size }),

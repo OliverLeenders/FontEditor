@@ -102,6 +102,15 @@ import {
   transformOriginPoint,
   transformSelection,
   unroundedCount,
+  addGuideAt,
+  guideById,
+  guidesInForce,
+  moveGuideBy,
+  moveGuideToScope,
+  pickGuide,
+  removeGuideAt,
+  renameGuideTo,
+  turnGuideTo,
 } from "../src/commands/index.js";
 import { keyInput } from "../src/input.js";
 import { keyDown, selectionBox } from "../src/select.js";
@@ -1797,5 +1806,83 @@ describe("harmonising", () => {
     const { s, c } = arch();
     expect(nodeCanHarmonise(s, c.id, c.nodes[1]!.id)).toBe(true);
     expect(nodeCanHarmonise(s, c.id, c.nodes[0]!.id)).toBe(false);
+  });
+});
+
+describe("guides", () => {
+  const ids = counterIds("gt");
+
+  /** One glyph, at unit scale so pixels and design units are the same thing. */
+  const state = () =>
+    editorState({
+      document: fontDocument([glyph("a", { advance: 500 })], DEFAULT_FONT_INFO),
+      view: { scale: 1, tx: 0, ty: 0 },
+    });
+
+  it("puts one down in the glyph, selected and on the grid", () => {
+    const out = addGuideAt(state(), { x: 120.4, y: 0 }, 90, "glyph", ids);
+    const glyph = out.state.document.glyphs[out.state.currentGlyph];
+
+    expect(glyph?.guides).toHaveLength(1);
+    expect(glyph?.guides[0]?.pt.x).toBe(120);
+    expect(out.state.selectedGuide).toBe(glyph?.guides[0]?.id);
+    // The point selection goes: only one of the two can be what Backspace means.
+    expect(out.state.selection).toEqual([]);
+  });
+
+  it("puts one down in the font, where every glyph sees it", () => {
+    const out = addGuideAt(state(), { x: 0, y: 512 }, 0, "font", ids);
+
+    expect(out.state.document.guides).toHaveLength(1);
+    expect(out.state.document.glyphs[out.state.currentGlyph]?.guides).toEqual([]);
+  });
+
+  it("moves one wherever it lives", () => {
+    for (const scope of ["glyph", "font"] as const) {
+      const added = addGuideAt(state(), { x: 0, y: 500 }, 0, scope, ids).state;
+      const id = added.selectedGuide!;
+
+      const moved = moveGuideBy(added, id, 0, 12).state;
+      expect(guideById(moved, id)?.guide.pt.y).toBe(512);
+    }
+  });
+
+  it("takes one away, and forgets it was selected", () => {
+    const added = addGuideAt(state(), { x: 0, y: 500 }, 0, "glyph", ids).state;
+    const gone = removeGuideAt(added, added.selectedGuide!).state;
+
+    expect(guidesInForce(gone)).toEqual([]);
+    expect(gone.selectedGuide).toBeNull();
+  });
+
+  it("hands one to the font and takes it back, keeping what it says", () => {
+    const added = addGuideAt(state(), { x: 60, y: 0 }, 90, "glyph", ids).state;
+    const id = added.selectedGuide!;
+    const named = renameGuideTo(added, id, "stem").state;
+
+    const toFont = moveGuideToScope(named, id, "font").state;
+    expect(toFont.document.guides).toHaveLength(1);
+    expect(toFont.document.glyphs[toFont.currentGlyph]?.guides).toEqual([]);
+    expect(guideById(toFont, id)?.guide.name).toBe("stem");
+
+    const back = moveGuideToScope(toFont, id, "glyph").state;
+    expect(back.document.guides).toEqual([]);
+    expect(guideById(back, id)?.guide.name).toBe("stem");
+  });
+
+  it("finds the one under a point, and nothing where none is", () => {
+    const added = addGuideAt(state(), { x: 0, y: 500 }, 0, "glyph", ids).state;
+    const id = added.selectedGuide!;
+
+    // The view is unit scale here, so pixels and units are the same thing.
+    expect(pickGuide(added, { x: 300, y: 502 })).toBe(id);
+    expect(pickGuide(added, { x: 300, y: 540 })).toBeNull();
+  });
+
+  it("brings an angle typed into a field into range", () => {
+    const added = addGuideAt(state(), { x: 0, y: 0 }, 0, "glyph", ids).state;
+    const id = added.selectedGuide!;
+
+    expect(guideById(turnGuideTo(added, id, -12).state, id)?.guide.angle).toBe(348);
   });
 });

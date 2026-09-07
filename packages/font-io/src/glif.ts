@@ -3,12 +3,14 @@ import {
   type Component,
   type Contour,
   type Glyph,
+  type Guide,
   type IdFactory,
   type Node,
   anchor,
   component,
   contour,
   glyph,
+  guide,
   node,
 } from "@fonteditor/font-model";
 import { IDENTITY_AFFINE, type Vec2 } from "@fonteditor/geometry";
@@ -122,11 +124,51 @@ export function parseGlif(
     anchors.push(anchor(ids.anchor(), element.attributes["name"] ?? "", { x, y }));
   }
 
-  return glyph(name, { unicodes, advance, contours, components, anchors, kept: keptOf(root) });
+  const guides: Guide[] = [];
+  for (const element of childrenNamed(root, "guideline")) {
+    const read = parseGuideline(element, ids);
+    if (read === null) warn("dropped a guideline with no position");
+    else guides.push(read);
+  }
+
+  return glyph(name, {
+    unicodes,
+    advance,
+    contours,
+    components,
+    anchors,
+    guides,
+    kept: keptOf(root),
+  });
+}
+
+/**
+ * One guideline, in any of the three ways the format writes them.
+ *
+ * `x` alone is a vertical line, `y` alone a horizontal one, and the two
+ * together with an angle is a line through that point. The model keeps all
+ * three as a point and an angle, which is the same set of lines said once
+ * instead of three times.
+ */
+export function parseGuideline(element: XmlElement, ids: IdFactory): Guide | null {
+  const x = number(element.attributes["x"]);
+  const y = number(element.attributes["y"]);
+  const angle = number(element.attributes["angle"]);
+  const name = element.attributes["name"] ?? "";
+  const color = element.attributes["color"] ?? null;
+
+  if (x !== null && y !== null) {
+    // The format requires an angle alongside both coordinates. A file without
+    // one is somebody's hand edit, and level is the likelier of the two.
+    return guide(ids.guide(), { x, y }, angle ?? 0, name, color);
+  }
+  if (x !== null) return guide(ids.guide(), { x, y: 0 }, 90, name, color);
+  if (y !== null) return guide(ids.guide(), { x: 0, y }, 0, name, color);
+  return null;
 }
 
 /** The elements of a `.glif` this editor models, and therefore rewrites. */
-const MODELLED = new Set(["advance", "unicode", "outline", "anchor"]);
+const MODELLED = new Set(["advance", "unicode", "outline", "anchor", "guideline"]);
 
 /**
  * Everything else in the file, as the XML it was written as.

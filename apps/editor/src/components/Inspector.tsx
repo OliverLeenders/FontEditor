@@ -10,6 +10,13 @@ import {
   updateContour,
 } from "@fonteditor/font-model";
 import {
+  guideById,
+  guidesInForce,
+  moveGuideTo,
+  moveGuideToScope,
+  removeGuideAt,
+  renameGuideTo,
+  turnGuideTo,
   type EditorState,
   addComponent,
   begin,
@@ -117,6 +124,10 @@ export function Inspector(): React.JSX.Element | null {
       s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.anchors ?? EMPTY_ANCHORS,
   );
   const selectedAnchor = useStoreValue((s) => s.session.editor.selectedAnchor);
+  const selectedGuide = useStoreValue((s) => s.session.editor.selectedGuide);
+  // The font's and the glyph's together, as the canvas draws them: which scope
+  // a line is in is shown on its row rather than by which list it sits in.
+  const guides = useStoreValue((s) => guidesInForce(s.session.editor));
   const selectedComponent = useStoreValue((s) => s.session.editor.selectedComponent);
 
   const components = useStoreValue(
@@ -327,6 +338,17 @@ export function Inspector(): React.JSX.Element | null {
    * The other axis is read from the glyph at the moment of the commit rather
    * than from the field beside it, as the point coordinates above are.
    */
+  const commitGuide = (id: string, axis: "x" | "y", value: number): void => {
+    if (!Number.isFinite(value)) return;
+    const found = guideById(store.editor, id);
+    if (found === null) return;
+
+    const pt = found.guide.pt;
+    store.applyTool(
+      moveGuideTo(store.editor, id, axis === "x" ? { x: value, y: pt.y } : { x: pt.x, y: value }),
+    );
+  };
+
   const commitAnchor = (id: string, axis: "x" | "y", value: number): void => {
     if (!Number.isFinite(value)) return;
     const glyph = store.editor.document.glyphs[store.editor.currentGlyph];
@@ -645,6 +667,93 @@ export function Inspector(): React.JSX.Element | null {
                   title={`Remove ${a.name === "" ? "this anchor" : a.name}`}
                   aria-label={`Remove the anchor ${a.name}`}
                   onClick={() => store.applyTool(removeAnchorAt(store.editor, a.id))}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        </Field>
+
+        <div className={styles.rule} />
+
+        {/* The lines this letter is drawn against, and the font's shown with
+            them. Added from the canvas — right-click where you want one — for
+            the reason anchors are: a place is chosen by pointing at it, and what
+            a panel is for is the name and the exact numbers. */}
+        <Field label={guides.length === 0 ? "Guides" : `Guides · ${guides.length}`}>
+          <div className={styles.components}>
+            {guides.length === 0 && (
+              <span className={styles.readonly}>Right-click the canvas to add one</span>
+            )}
+            {guides.map(({ guide: g, scope }) => (
+              <div
+                key={g.id}
+                className={styles.guideRow}
+                data-selected={g.id === selectedGuide ? "true" : undefined}
+              >
+                <input
+                  className={styles.input}
+                  value={g.name}
+                  aria-label={`Name of the guide at ${String(Math.round(g.pt.x))}, ${String(Math.round(g.pt.y))}`}
+                  spellCheck={false}
+                  placeholder={scope === "font" ? "font guide" : "guide"}
+                  title="What this line is for — a stem width, an overshoot, the italic angle"
+                  onChange={(event) =>
+                    store.applyTool(renameGuideTo(store.editor, g.id, event.target.value))
+                  }
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label={`X of the guide ${g.name}`}
+                  value={shown(g.pt.x)}
+                  onChange={(event) => commitGuide(g.id, "x", Number(event.target.value))}
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label={`Y of the guide ${g.name}`}
+                  value={shown(g.pt.y)}
+                  onChange={(event) => commitGuide(g.id, "y", Number(event.target.value))}
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label={`Angle of the guide ${g.name}`}
+                  title="Degrees counter-clockwise: 0 lies flat, 90 stands up"
+                  value={shown(g.angle)}
+                  onChange={(event) =>
+                    store.applyTool(turnGuideTo(store.editor, g.id, Number(event.target.value)))
+                  }
+                />
+                {/* Which scope it is in, and the way to change it. A line drawn
+                    while working on one letter often turns out to be about the
+                    whole alphabet, and finding that out should not mean typing
+                    it again somewhere else. */}
+                <button
+                  type="button"
+                  className={styles.guideScope}
+                  aria-pressed={scope === "font"}
+                  title={
+                    scope === "font"
+                      ? "In every glyph. Click to keep it in this one."
+                      : "In this glyph only. Click to give it to the whole font."
+                  }
+                  onClick={() =>
+                    store.applyTool(
+                      moveGuideToScope(store.editor, g.id, scope === "font" ? "glyph" : "font"),
+                    )
+                  }
+                >
+                  {scope === "font" ? "font" : "glyph"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.componentRemove}
+                  title={`Remove ${g.name === "" ? "this guide" : g.name}`}
+                  aria-label={`Remove the guide ${g.name}`}
+                  onClick={() => store.applyTool(removeGuideAt(store.editor, g.id))}
                 >
                   ×
                 </button>
@@ -994,6 +1103,7 @@ const EMPTY_GLYPH = {
   contours: [],
   components: [],
   anchors: [],
+  guides: [],
   kept: [],
 };
 const EMPTY_CODES: readonly number[] = [];

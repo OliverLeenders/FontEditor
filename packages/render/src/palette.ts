@@ -19,6 +19,9 @@ export type RenderPalette = {
    * cannot be read at all.
    */
   readonly guideLabel: string;
+  /** The lines the designer put there, as against the font's own metrics. */
+  readonly designGuide: string;
+  readonly designGuideSelected: string;
   readonly outline: string;
   /** Fill for the glyph preview. Expected to carry its own alpha. */
   readonly fill: string;
@@ -93,6 +96,8 @@ export const LIGHT_PALETTE: RenderPalette = {
   guide: "#E8EDF3",
   guideEmphasis: "#C2CDD8",
   guideLabel: "#7C8896",
+  designGuide: "#7FA8D6",
+  designGuideSelected: "#2C6DAF",
   outline: "#131922",
   fill: "rgba(44,109,175,0.10)",
   node: "#2C6DAF",
@@ -129,6 +134,8 @@ export const DARK_PALETTE: RenderPalette = {
   guide: "#1E2833",
   guideEmphasis: "#33404E",
   guideLabel: "#8B99A8",
+  designGuide: "#4E7BA8",
+  designGuideSelected: "#7FB4EE",
   outline: "#E5EBF2",
   fill: "rgba(116,174,226,0.13)",
   node: "#74AEE2",

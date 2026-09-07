@@ -1,5 +1,10 @@
 import { contourById, randomIds, segmentAt } from "@fonteditor/font-model";
 import {
+  addGuideAt,
+  guideById,
+  moveGuideToScope,
+  pickGuide,
+  removeGuideAt,
   addAnchorAt,
   attachComponent,
   harmoniseSelection,
@@ -69,6 +74,7 @@ const EMPTY_GLYPH = {
   contours: [],
   components: [],
   anchors: [],
+  guides: [],
   kept: [],
 };
 
@@ -100,6 +106,11 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     },
   ];
 
+  // A guide is picked up only where nothing on the outline is, and the same
+  // rule decides whether this menu is about one.
+  const overGuide = target === null ? pickGuide(editor, request.point) : null;
+  if (overGuide !== null) return guideItems(store, overGuide);
+
   if (target === null) {
     return [
       {
@@ -114,6 +125,30 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: `Add anchor here (${freeAnchorName(editor.document.glyphs[editor.currentGlyph] ?? EMPTY_GLYPH)})`,
         run: () => store.applyTool(addAnchorAt(editor, request.point, ids)),
+      },
+      { kind: "separator" },
+      // Level and upright, which is what almost every guide is, and both scopes
+      // because the scope is the decision: the x-height belongs to the typeface
+      // and this letter's diagonal belongs to the letter.
+      {
+        kind: "item",
+        label: "Guide across here",
+        run: () => store.applyTool(addGuideAt(editor, request.point, 0, "glyph", ids)),
+      },
+      {
+        kind: "item",
+        label: "Guide up here",
+        run: () => store.applyTool(addGuideAt(editor, request.point, 90, "glyph", ids)),
+      },
+      {
+        kind: "item",
+        label: "Guide across here, for the whole font",
+        run: () => store.applyTool(addGuideAt(editor, request.point, 0, "font", ids)),
+      },
+      {
+        kind: "item",
+        label: "Guide up here, for the whole font",
+        run: () => store.applyTool(addGuideAt(editor, request.point, 90, "font", ids)),
       },
       { kind: "separator" },
       ...rounding,
@@ -528,4 +563,34 @@ export function ContextMenu({
   onClose: () => void;
 }): React.JSX.Element | null {
   return <Menu x={request.x} y={request.y} items={itemsFor(store, request)} onClose={onClose} />;
+}
+
+/**
+ * The menu for a guide: where it belongs, and taking it away.
+ *
+ * Short on purpose. Moving one is a drag, naming it is the inspector, and the
+ * only two things worth a menu are the two that are awkward anywhere else —
+ * changing its scope, and deleting a line you cannot select by clicking through.
+ */
+function guideItems(store: EditorStore, id: string): Item[] {
+  const editor = store.editor;
+  const found = guideById(editor, id);
+  if (found === null) return [];
+  return [
+    {
+      kind: "item",
+      label:
+        found.scope === "glyph"
+          ? "Give this guide to the whole font"
+          : "Keep this guide in this glyph",
+      run: () =>
+        store.applyTool(moveGuideToScope(editor, id, found.scope === "glyph" ? "font" : "glyph")),
+    },
+    { kind: "separator" },
+    {
+      kind: "item",
+      label: "Delete guide",
+      run: () => store.applyTool(removeGuideAt(editor, id)),
+    },
+  ];
 }

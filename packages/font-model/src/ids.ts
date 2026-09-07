@@ -15,12 +15,14 @@ export type NodeId = string;
 export type ContourId = string;
 export type ComponentId = string;
 export type AnchorId = string;
+export type GuideId = string;
 
 export type IdFactory = {
   node(): NodeId;
   contour(): ContourId;
   component(): ComponentId;
   anchor(): AnchorId;
+  guide(): GuideId;
 };
 
 /**
@@ -32,11 +34,13 @@ export function counterIds(prefix = ""): IdFactory {
   let contours = 0;
   let components = 0;
   let anchors = 0;
+  let guides = 0;
   return {
     node: () => `${prefix}n${++nodes}`,
     contour: () => `${prefix}c${++contours}`,
     component: () => `${prefix}k${++components}`,
     anchor: () => `${prefix}a${++anchors}`,
+    guide: () => `${prefix}g${++guides}`,
   };
 }
 

@@ -7,6 +7,7 @@ import {
   type FontDocument,
   type FontInfo,
   type Glyph,
+  type Guide,
   type HandleLock,
   type Kept,
   type PlainValue,
@@ -21,6 +22,7 @@ import {
   component,
   contour,
   glyph,
+  guide,
   node,
 } from "@fonteditor/font-model";
 import type { Vec2 } from "@fonteditor/geometry";
@@ -90,12 +92,23 @@ export type StoredGlyph = {
   readonly components?: readonly StoredComponent[];
   /** Optional on the way in, for the same reason components are. */
   readonly anchors?: readonly StoredAnchor[];
+  /** The glyph's own guides. Optional on the way in, as anchors are. */
+  readonly guides?: readonly StoredGuide[];
   /**
    * The parts of the glyph's own `.glif` this editor cannot model, verbatim.
    *
    * Written only when there are any, which is never for a glyph drawn here.
    */
   readonly kept?: readonly string[];
+};
+
+/** A guide: a point, an angle, and what it is called. */
+export type StoredGuide = {
+  readonly id: string;
+  readonly at: StoredPoint;
+  readonly angle: number;
+  readonly name?: string;
+  readonly color?: string;
 };
 
 export type StoredFontInfo = {
@@ -111,6 +124,8 @@ export type StoredFontInfo = {
   readonly capHeight: number;
   /** Feature source. Omitted when empty, which is most fonts most of the time. */
   readonly features?: string;
+  /** The font's own guides, drawn in every glyph. Omitted when there are none. */
+  readonly guides?: readonly StoredGuide[];
   /**
    * `fontinfo` and `lib` keys this editor does not model, as they were found.
    *
@@ -145,6 +160,7 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     contours: g.contours.map(encodeContour),
     components: g.components.map(encodeComponent),
     anchors: g.anchors.map((a) => ({ id: a.id, name: a.name, at: point(a.pt) })),
+    ...(g.guides.length === 0 ? {} : { guides: g.guides.map(encodeGuide) }),
     ...(g.kept.length === 0 ? {} : { kept: [...g.kept] }),
   };
 }
@@ -184,9 +200,20 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
     schema: SCHEMA_VERSION,
     glyphOrder: [...document.glyphOrder],
     ...document.info,
+    ...(document.guides.length === 0 ? {} : { guides: document.guides.map(encodeGuide) }),
     ...(nothingKept(document.kept) ? {} : { kept: document.kept }),
   };
   return document.features === "" ? base : { ...base, features: document.features };
+}
+
+function encodeGuide(g: Guide): StoredGuide {
+  return {
+    id: g.id,
+    at: point(g.pt),
+    angle: g.angle,
+    ...(g.name === "" ? {} : { name: g.name }),
+    ...(g.color === null ? {} : { color: g.color }),
+  };
 }
 
 const nothingKept = (kept: Kept): boolean =>
@@ -203,10 +230,17 @@ export function decodeFontInfo(raw: unknown): {
   info: FontInfo;
   glyphOrder: readonly string[];
   features: string;
+  guides: readonly Guide[];
   kept: Kept;
 } {
   if (!isRecord(raw)) {
-    return { info: DEFAULT_FONT_INFO, glyphOrder: [], features: "", kept: NOTHING_KEPT };
+    return {
+      info: DEFAULT_FONT_INFO,
+      glyphOrder: [],
+      features: "",
+      guides: [],
+      kept: NOTHING_KEPT,
+    };
   }
 
   return {
@@ -215,6 +249,7 @@ export function decodeFontInfo(raw: unknown): {
       ? raw["glyphOrder"].filter((n): n is string => typeof n === "string")
       : [],
     features: typeof raw["features"] === "string" ? raw["features"] : "",
+    guides: readGuides(raw["guides"]),
     kept: readKept(raw["kept"]),
   };
 }
@@ -255,6 +290,34 @@ function readInfo(raw: Record<string, unknown>): FontInfo {
  * exactly what a `PlainValue` is. Nothing here inspects it — the two records
  * are somebody else's data, and the only question is whether they are records.
  */
+/**
+ * Guides back from a file, dropping any that says nothing.
+ *
+ * A guide is a line to draw against and nothing depends on it, so one that
+ * cannot be read is skipped rather than being a reason to fail the load.
+ */
+function readGuides(raw: unknown): Guide[] {
+  if (!Array.isArray(raw)) return [];
+
+  const out: Guide[] = [];
+  for (const entry of raw) {
+    if (!isRecord(entry)) continue;
+    const at = decodePoint(entry["at"]);
+    if (at === null || typeof entry["id"] !== "string") continue;
+
+    out.push(
+      guide(
+        entry["id"],
+        at,
+        typeof entry["angle"] === "number" ? entry["angle"] : 0,
+        typeof entry["name"] === "string" ? entry["name"] : "",
+        typeof entry["color"] === "string" ? entry["color"] : null,
+      ),
+    );
+  }
+  return out;
+}
+
 function readKept(raw: unknown): Kept {
   if (!isRecord(raw)) return NOTHING_KEPT;
   const fontInfo = raw["fontInfo"];
@@ -396,7 +459,17 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
     ? source["kept"].filter((k): k is string => typeof k === "string")
     : [];
 
-  return ok(glyph(source["name"], { unicodes, advance, contours, components, anchors, kept }));
+  return ok(
+    glyph(source["name"], {
+      unicodes,
+      advance,
+      contours,
+      components,
+      anchors,
+      guides: readGuides(source["guides"]),
+      kept,
+    }),
+  );
 }
 
 function decodeAnchor(raw: unknown): Anchor | null {

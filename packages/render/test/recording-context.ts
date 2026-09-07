@@ -58,6 +58,14 @@ export class RecordingContext implements Canvas2D {
     });
   }
 
+  translate(x: number, y: number): void {
+    this.record("translate", [x, y]);
+  }
+
+  rotate(radians: number): void {
+    this.record("rotate", [radians]);
+  }
+
   save(): void {
     this.stack.push({
       fillStyle: this.fillStyle,

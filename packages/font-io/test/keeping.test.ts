@@ -124,7 +124,7 @@ describe("what the font carries and this editor does not model", () => {
     expect(lib.match(/public\.glyphOrder/g)?.length).toBe(1);
   });
 
-  it("keeps a glyph's guidelines, note, image and lib", () => {
+  it("keeps a glyph's note, image and lib, and models its guidelines", () => {
     const glif = [
       '<?xml version="1.0"?>',
       '<glyph name="a" format="2">',
@@ -141,6 +141,8 @@ describe("what the font carries and this editor does not model", () => {
     const written = through(ufo([], glif));
     const a = written.get("glyphs/a.glif") ?? "";
 
+    // The guideline is read into the model and written back from it, so it
+    // comes out spelt in full rather than in the shorthand it went in as.
     expect(a).toContain('<guideline x="120" y="0" angle="90" name="stem"/>');
     expect(a).toContain("needs work on the join");
     expect(a).toContain('fileName="a.png"');

@@ -1,5 +1,8 @@
 import { type Vec2, about, add, keepsAxes, rotation, sub } from "@fonteditor/geometry";
 import {
+  type GuideId,
+  isHorizontal,
+  isVertical,
   type AnchorId,
   type ComponentId,
   type ContourId,
@@ -29,6 +32,7 @@ import {
   type SegmentRef,
   type Selection,
   type SelectionItem,
+  type SnapLine,
   type Snapping,
   NO_HOLD,
   NO_SNAPPING,
@@ -55,6 +59,7 @@ import {
 
 import { type ToolResult, begin, result } from "./effects.js";
 import type { PointerInput } from "./input.js";
+import { movedGuideIn } from "./commands/guides.js";
 import { type EditorState, type Gesture, currentGlyph } from "./state.js";
 import { transformedDocument } from "./transform.js";
 
@@ -76,6 +81,7 @@ export const EMPTY_GLYPH: Glyph = {
   contours: [],
   components: [],
   anchors: [],
+  guides: [],
   kept: [],
 };
 
@@ -288,6 +294,36 @@ export function startAnchorDrag(
   );
 }
 
+/**
+ * Pick a guide up.
+ *
+ * The point selection goes, as it does for an anchor: only one of the two can
+ * be what the next arrow key or Backspace means.
+ */
+export function startGuideDrag(
+  state: EditorState,
+  input: PointerInput,
+  guideId: GuideId,
+): ToolResult {
+  return result(
+    {
+      ...state,
+      selection: [],
+      selectedAnchor: null,
+      selectedGuide: guideId,
+      gesture: {
+        kind: "dragGuide",
+        origin: input.point,
+        guideId,
+        before: state.document,
+        moved: false,
+        snapped: NO_HOLD,
+      },
+    },
+    [begin("Move guide")],
+  );
+}
+
 export function startTunniDrag(
   state: EditorState,
   input: PointerInput,
@@ -493,6 +529,17 @@ export function snappingFor(
     neighbours: options.snapNeighbours ?? false,
   });
 
+  // The lines the designer put there, font's and glyph's together. Only the
+  // level and upright ones: the snapping machinery below catches a coordinate
+  // on an axis, and an angled guide is not one. An italic guide is drawn and
+  // measured against by eye until that machinery understands a line.
+  const upright: SnapLine[] = [];
+  const level: SnapLine[] = [];
+  for (const g of [...state.document.guides, ...(glyph?.guides ?? [])]) {
+    if (isVertical(g)) upright.push(metricLine(g.pt.x, "guide"));
+    else if (isHorizontal(g)) level.push(metricLine(g.pt.y, "guide"));
+  }
+
   const pixels = options.snapPixels ?? SNAP_PIXELS;
   return {
     // Font lines first: where a stem edge happens to sit exactly on the cap
@@ -501,9 +548,14 @@ export function snappingFor(
     xs: [
       metricLine(0, "origin"),
       ...(glyph === null ? [] : [metricLine(glyph.advance, "advance")]),
+      ...upright,
       ...alignment.xs,
     ],
-    ys: [...metricLines(state.document.info).map((line) => metricLine(line.y)), ...alignment.ys],
+    ys: [
+      ...metricLines(state.document.info).map((line) => metricLine(line.y)),
+      ...level,
+      ...alignment.ys,
+    ],
     enter: screenTolerance(state.view, pixels),
     stay: screenTolerance(state.view, options.snapStayPixels ?? SNAP_STAY_PIXELS),
     stickiness: options.snapStickiness ?? SNAP_STICKINESS,
@@ -643,6 +695,27 @@ const CONTINUE: Continuations = {
     return {
       ...state,
       document: document ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta), snapped: snapped.hold },
+    };
+  },
+
+  dragGuide: (state, gesture, input, delta, options) => {
+    // Snapped like an anchor and against the same lines. A guide is placed
+    // against the drawing — level with an overshoot, up the edge of a stem —
+    // which is exactly what those lines are.
+    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const snapping = snappingFor(state, input, options, started, []);
+    const snapped = snapPoint(input.point, snapping, gesture.snapped);
+
+    const moved = movedGuideIn(
+      { ...state, document: gesture.before },
+      gesture.guideId,
+      snapped.point,
+    );
+
+    return {
+      ...state,
+      document: moved ?? gesture.before,
       gesture: { ...gesture, moved: gesture.moved || budged(delta), snapped: snapped.hold },
     };
   },

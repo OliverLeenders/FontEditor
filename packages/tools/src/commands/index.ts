@@ -39,6 +39,22 @@ export {
   renameAnchorTo,
 } from "./anchors.js";
 
+export type { GuideScope } from "./guides.js";
+export {
+  addGuideAt,
+  deleteSelectedGuide,
+  guideById,
+  guidesInForce,
+  moveGuideBy,
+  moveGuideTo,
+  moveGuideToScope,
+  movedGuideIn,
+  pickGuide,
+  removeGuideAt,
+  renameGuideTo,
+  turnGuideTo,
+} from "./guides.js";
+
 export {
   balanceSegmentAt,
   convertSegment,
