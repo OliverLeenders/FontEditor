@@ -347,6 +347,10 @@ export class EditorStore {
     this.remember({ showAnchors: !this.state.showAnchors });
   }
 
+  toggleCurvature(): void {
+    this.remember({ showCurvature: !this.state.showCurvature });
+  }
+
   toggleApplyFeatures(): void {
     this.remember({ applyFeatures: !this.state.applyFeatures });
   }

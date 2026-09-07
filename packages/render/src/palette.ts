@@ -77,6 +77,15 @@ export type RenderPalette = {
    */
   readonly section: string;
   readonly sectionInk: string;
+  /**
+   * The curvature comb: its hairs, and the envelope joining their tips.
+   *
+   * The hairs are faint and the envelope is not. What is read is the envelope —
+   * a step in it is a curvature break — and a hundred hairs at the same weight
+   * would be a hedge with a line hidden in it.
+   */
+  readonly comb: string;
+  readonly combEdge: string;
 };
 
 export const LIGHT_PALETTE: RenderPalette = {
@@ -111,6 +120,8 @@ export const LIGHT_PALETTE: RenderPalette = {
   componentSelected: "#A96F22",
   section: "#7C8896",
   sectionInk: "#A96F22",
+  comb: "rgba(44,109,175,0.30)",
+  combEdge: "#2C6DAF",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -145,4 +156,6 @@ export const DARK_PALETTE: RenderPalette = {
   componentSelected: "#D6A05A",
   section: "#8B99A8",
   sectionInk: "#D6A05A",
+  comb: "rgba(116,174,226,0.30)",
+  combEdge: "#74AEE2",
 };

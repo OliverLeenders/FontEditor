@@ -32,6 +32,7 @@ export function PreferencesPanel(): React.JSX.Element {
   const snapPoints = useStoreValue((s) => s.snapPoints);
   const neighbours = useStoreValue((s) => s.showNeighbours);
   const anchors = useStoreValue((s) => s.showAnchors);
+  const curvature = useStoreValue((s) => s.showCurvature);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -124,6 +125,12 @@ export function PreferencesPanel(): React.JSX.Element {
             hint="The places accents attach, named on hover"
             on={anchors}
             onChange={() => store.toggleAnchors()}
+          />
+          <Switch
+            label="Curvature comb"
+            hint="How tightly the outline turns · a step at a join is a break"
+            on={curvature}
+            onChange={() => store.toggleCurvature()}
           />
 
           <div className={styles.footer}>

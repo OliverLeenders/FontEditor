@@ -57,6 +57,10 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   if (s.options.showFilledPreview) drawFilledPreview(ctx, s);
   drawOutline(ctx, s);
 
+  // Under the controls and over the outline: it is a reading of the shape, and
+  // it must not hide the points that change it.
+  drawCurvatureComb(ctx, s);
+
   if (s.options.showControls) {
     // Under the controls, so a node is never hidden by the guide pointing at it
     // — and the ring is wider than a node, so it reads as a halo rather than a
@@ -1027,6 +1031,56 @@ export function drawSection(ctx: Canvas2D, s: Scene): void {
     ctx.strokeText(text, middle.x, middle.y);
     ctx.fillStyle = span.ink ? s.palette.sectionInk : s.palette.section;
     ctx.fillText(text, middle.x, middle.y);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * The curvature comb: a hair square to the outline every few pixels, as long as
+ * the curvature there, with the tips joined.
+ *
+ * The hairs are signed, so the comb stands on one side of the curve and crosses
+ * to the other at an inflection — which is exactly where a designer wants to be
+ * told there is one. The envelope is drawn per contour and broken between them,
+ * since joining the last hair of one shape to the first of the next would draw a
+ * line across the letter that means nothing.
+ */
+export function drawCurvatureComb(ctx: Canvas2D, s: Scene): void {
+  if (!s.options.showCurvature || s.combScale === 0) return;
+
+  ctx.save();
+
+  for (const comb of s.comb) {
+    if (comb.hairs.length === 0) continue;
+
+    const tips = comb.hairs.map((hair) => {
+      const reach = hair.k * s.combScale;
+      return toScreen(s.view, {
+        x: hair.at.x + hair.normal.x * reach,
+        y: hair.at.y + hair.normal.y * reach,
+      });
+    });
+
+    ctx.strokeStyle = s.palette.comb;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const [i, hair] of comb.hairs.entries()) {
+      const foot = toScreen(s.view, hair.at);
+      const tip = tips[i]!;
+      ctx.moveTo(foot.x, foot.y);
+      ctx.lineTo(tip.x, tip.y);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = s.palette.combEdge;
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    for (const [i, tip] of tips.entries()) {
+      if (i === 0) ctx.moveTo(tip.x, tip.y);
+      else ctx.lineTo(tip.x, tip.y);
+    }
+    ctx.stroke();
   }
 
   ctx.restore();

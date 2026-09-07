@@ -40,7 +40,7 @@ for.
 | **Anchors and mark attachment**            | done        | Not a phase at all, and it belongs to two: a glyph carries them, and they compile. Placing accents by hand is the thing this replaces.                                                                                                                                                                   |
 | **Not dropping what we do not understand** | half done   | Twice now a reader has quietly discarded what it had no field for — anchors from a `.glif`, then anchors from our own autosave. Both are fixed; guidelines, notes, glyph `lib` and every `fontinfo` key beyond seven are still discarded, and a UFO from another tool comes back poorer than it went in. |
 | **Font metadata**                          | not started | The info model holds seven fields. A released font also needs a version, a licence, a designer, an italic angle, weight and width classes, a vendor id, and typographic family names — without which an italic does not announce itself as one and a family of more than four styles groups wrongly.     |
-| **Curve quality**                          | not started | The Tunni line says what one segment is doing. Nothing yet says whether two segments agree — curvature combs, and the harmonising that follows from reading one.                                                                                                                                         |
+| **Curve quality**                          | half done   | The curvature comb is in, and says whether two segments agree at their join. What follows from reading one is not: no curvature readout at a node, and no harmonise command to put right what the comb shows.                                                                                            |
 | **Guides, and something to trace**         | not started | A glyph holds no guides of its own, and there is no way to put a scan or a reference letter behind the drawing.                                                                                                                                                                                          |
 | **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                           |
 | **A file on disk**                         | not started | Work lives in the browser's private filesystem and leaves it only as an export. Opening and saving a project where the user can see it is not the same thing.                                                                                                                                            |
@@ -178,6 +178,16 @@ in the inspector and lands on its anchors where both glyphs have a matching pair
 `acute` carrying `_top` on a letter carrying `top` — and at the origin otherwise. Drag one
 by the shape it draws, type its offset, right-click it to open the glyph it refers to,
 put it back where the anchors say, or decompose the glyph and keep the outlines.
+
+**The curvature comb** is off by default and turned on in the preferences. It stands a
+hair square to the outline every few pixels, as long as the curvature there, and joins the
+tips: what is read is that envelope, where a step at a node is a curvature break — a join
+smooth to the eye and not to the light falling on it — a pinch is a flat spot, and a
+crossing to the other side is an inflection. It is the one instrument here that says
+whether two segments _agree_; the Tunni line describes one segment and has nothing to say
+about the join. The hairs are spaced in screen pixels, so the comb is as readable zoomed
+in as out, and their length is normalised across the whole glyph, so a tight counter and a
+wide bowl can be compared rather than each being flattered separately.
 
 **Two rulers.** Hold `M` and point at a stem: the reading is taken square to the outline,
 which is what a stem width is — a straight line dragged across a round letter measures a

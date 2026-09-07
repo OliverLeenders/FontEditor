@@ -1,6 +1,6 @@
 import type { Cubic, Rect, Vec2 } from "@fonteditor/geometry";
 import type { AnchorId, Contour, Glyph } from "@fonteditor/font-model";
-import type { BoxFrame, Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
+import type { BoxFrame, Comb, Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
 import type { RenderPalette } from "./palette.js";
 
@@ -87,6 +87,8 @@ export type RenderOptions = {
   readonly showHandleIntersection: boolean;
   /** The anchors of the glyph being edited. */
   readonly showAnchors: boolean;
+  /** The curvature comb along the outline. Off by default: it is an instrument. */
+  readonly showCurvature: boolean;
 };
 
 export const DEFAULT_OPTIONS: RenderOptions = {
@@ -94,6 +96,7 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   showControls: true,
   showHandleIntersection: false,
   showAnchors: true,
+  showCurvature: false,
   margins: true,
   autoHideHandles: false,
 };
@@ -120,6 +123,16 @@ export type Scene = {
   readonly guides: readonly HorizontalGuide[];
   /** Lines the drag in progress is caught on. Empty when nothing is caught. */
   readonly snapGuides: readonly SnapGuide[];
+  /**
+   * The curvature comb, one entry per contour, and how long a hair is per unit
+   * of curvature.
+   *
+   * Built where the view transform is known, since the hairs are spaced in
+   * screen pixels and normalised across the whole glyph — see `combFor` in the
+   * view package.
+   */
+  readonly comb: readonly Comb[];
+  readonly combScale: number;
   /**
    * The anchor the pointer is over, and the one being worked on.
    *
@@ -253,6 +266,8 @@ export type SceneInit = {
   readonly options?: Partial<RenderOptions>;
   readonly guides?: readonly HorizontalGuide[];
   readonly snapGuides?: readonly SnapGuide[];
+  readonly comb?: readonly Comb[];
+  readonly combScale?: number;
   readonly section?: Scene["section"];
   readonly hoveredAnchor?: AnchorId | null;
   readonly selectedAnchor?: AnchorId | null;
@@ -280,6 +295,8 @@ export function scene(init: SceneInit): Scene {
     options: { ...DEFAULT_OPTIONS, ...init.options },
     guides: init.guides ?? [],
     snapGuides: init.snapGuides ?? [],
+    comb: init.comb ?? [],
+    combScale: init.combScale ?? 0,
     section: init.section ?? null,
     hoveredAnchor: init.hoveredAnchor ?? null,
     selectedAnchor: init.selectedAnchor ?? null,

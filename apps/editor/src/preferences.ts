@@ -54,6 +54,14 @@ export type Preferences = {
   /** Draw the glyph's anchors, and let them be grabbed. */
   readonly showAnchors: boolean;
   /**
+   * Draw the curvature comb along the outline.
+   *
+   * Off by default. It is an instrument rather than part of the drawing: it
+   * covers the letter in hairs, which is exactly what you want while judging a
+   * join and never while judging a shape.
+   */
+  readonly showCurvature: boolean;
+  /**
    * Apply the font's own features to the spacing line and the proof.
    *
    * On, because a proof is judged as it would be set. Off is for the moment you
@@ -80,6 +88,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   snapPoints: true,
   showNeighbours: true,
   showAnchors: true,
+  showCurvature: false,
   applyFeatures: true,
   spacingSize: 128,
   proofSize: 32,
@@ -128,6 +137,7 @@ export function loadPreferences(): Preferences {
     snapPoints: boolean(raw["snapPoints"], DEFAULT_PREFERENCES.snapPoints),
     showNeighbours: boolean(raw["showNeighbours"], DEFAULT_PREFERENCES.showNeighbours),
     showAnchors: boolean(raw["showAnchors"], DEFAULT_PREFERENCES.showAnchors),
+    showCurvature: boolean(raw["showCurvature"], DEFAULT_PREFERENCES.showCurvature),
     applyFeatures: boolean(raw["applyFeatures"], DEFAULT_PREFERENCES.applyFeatures),
     spacingSize: number(raw["spacingSize"], DEFAULT_PREFERENCES.spacingSize, {
       min: MIN_SPACING_SIZE,

@@ -11,7 +11,7 @@ import {
   segmentTunniPoint,
   setHandle,
 } from "@fonteditor/font-model";
-import { type ViewTransform, toScreen } from "@fonteditor/view";
+import { type ViewTransform, combFor, combScale, toScreen } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import { drawScene } from "../src/draw.js";
@@ -718,5 +718,69 @@ describe("a tangent node's triangle", () => {
     const apexNorth = north.reduce((best, p) => (p.y < best.y ? p : best));
     expect(apexNorth.y).toBeLessThan(at.y);
     expect(Math.abs(apexNorth.x - at.x)).toBeLessThan(0.001);
+  });
+});
+
+describe("the curvature comb", () => {
+  const ring = () => {
+    const ids = counterIds("cc");
+    const k = 140;
+    return contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 250), { type: "smooth", in: vec(-k, 250), out: vec(k, 250) }),
+        node(ids.node(), vec(250, 0), { type: "smooth", in: vec(250, k), out: vec(250, -k) }),
+        node(ids.node(), vec(0, -250), { type: "smooth", in: vec(k, -250), out: vec(-k, -250) }),
+        node(ids.node(), vec(-250, 0), { type: "smooth", in: vec(-250, -k), out: vec(-250, k) }),
+      ],
+      true,
+    );
+  };
+
+  const combed = (extra: Record<string, unknown> = {}) => {
+    const c = ring();
+    const comb = combFor([c], VIEW);
+    return {
+      ...base(c),
+      comb,
+      combScale: combScale(comb, VIEW),
+      options: { showCurvature: true },
+      ...extra,
+    };
+  };
+
+  it("draws nothing unless it is asked for", () => {
+    // Off by default: it is an instrument, and it covers the letter in hairs.
+    const ctx = render({ ...combed(), options: { showCurvature: false } });
+    expect(ctx.all("stroke")).toHaveLength(
+      render({ ...base(ring()), options: { showCurvature: false } }).all("stroke").length,
+    );
+  });
+
+  it("draws a hair from the outline outward, and an envelope through the tips", () => {
+    const ctx = render(combed());
+    const comb = combFor([ring()], VIEW);
+    const scale = combScale(comb, VIEW);
+    const hair = comb[0]!.hairs[0]!;
+
+    const foot = toScreen(VIEW, hair.at);
+    const tip = toScreen(VIEW, {
+      x: hair.at.x + hair.normal.x * hair.k * scale,
+      y: hair.at.y + hair.normal.y * hair.k * scale,
+    });
+
+    const near = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+      Math.hypot(a.x - b.x, a.y - b.y) < 0.001;
+
+    const moves = ctx.all("moveTo").map((o) => ({ x: o.args[0]!, y: o.args[1]! }));
+    const lines = ctx.all("lineTo").map((o) => ({ x: o.args[0]!, y: o.args[1]! }));
+
+    expect(moves.some((p) => near(p, foot))).toBe(true);
+    expect(lines.some((p) => near(p, tip))).toBe(true);
+    // The envelope passes through the same tip, so it appears twice: once as the
+    // end of its hair and once as a point on the line joining them.
+    expect(
+      lines.filter((p) => near(p, tip)).length + moves.filter((p) => near(p, tip)).length,
+    ).toBeGreaterThan(1);
   });
 });

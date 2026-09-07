@@ -32,6 +32,7 @@ import {
   snapHold,
   tunniSegments,
 } from "@fonteditor/tools";
+import { type Comb, combFor, combScale } from "@fonteditor/view";
 
 import { isDarkNow } from "./scheme.js";
 import type { StoreState } from "./store/index.js";
@@ -197,6 +198,7 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
       label: line.name,
     })),
     snapGuides: snapGuidesFor(editor),
+    ...combParts(state, glyph),
     hoveredAnchor: editor.hoveredAnchor,
     selectedAnchor: editor.selectedAnchor,
     tunniSegments: tunniSegments(editor),
@@ -215,6 +217,7 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
       : [],
     options: {
       showControls: !state.previewing,
+      showCurvature: state.showCurvature,
       autoHideHandles: handlesAutoHidden(state),
       showAnchors: state.showAnchors,
     },
@@ -230,6 +233,22 @@ function resolvedComponents(
   const chosen = glyph.components.filter(wanted);
   if (chosen.length === 0) return [];
   return resolveGlyphComponents(source, glyph.name, chosen, outlineIds);
+}
+
+/**
+ * The curvature comb, and how long a hair is worth.
+ *
+ * Both or neither: the scale is normalised across everything the comb covers, so
+ * the two are one answer computed in one place. Nothing at all when the comb is
+ * turned off, which is the default — building it costs a walk along every
+ * outline, and nobody should pay for an instrument they are not reading.
+ */
+function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[]; combScale: number } {
+  if (!state.showCurvature) return { comb: [], combScale: 0 };
+
+  const view = state.session.editor.view;
+  const comb = combFor(glyph.contours, view);
+  return { comb, combScale: combScale(comb, view) };
 }
 
 /**

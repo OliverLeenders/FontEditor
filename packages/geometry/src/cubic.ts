@@ -71,6 +71,49 @@ export function tangent(s: Cubic, t: number): Vec2 | null {
   return { x: d.x / len, y: d.y / len };
 }
 
+/**
+ * The second derivative at `t`, in Bernstein form.
+ *
+ * Differentiated symbolically rather than by sampling the first derivative
+ * twice: a difference quotient on a curve this small is dominated by its own
+ * step size, and curvature — which divides by the cube of a length — makes that
+ * noise visible immediately.
+ */
+export function secondDerivative(s: Cubic, t: number): Vec2 {
+  const u = 1 - t;
+  return {
+    x: 6 * (u * (s.c2.x - 2 * s.c1.x + s.a.x) + t * (s.b.x - 2 * s.c2.x + s.c1.x)),
+    y: 6 * (u * (s.c2.y - 2 * s.c1.y + s.a.y) + t * (s.b.y - 2 * s.c2.y + s.c1.y)),
+  };
+}
+
+/**
+ * Signed curvature at `t`: how tightly the curve turns, and which way.
+ *
+ * `(x'y" - y'x") / (x'^2 + y'^2)^{3/2}` — the standard expression for a
+ * parametric curve. It is the reciprocal of the radius of the circle that best
+ * fits there, so a circle of radius 100 reads 0.01 everywhere and a straight
+ * line reads zero.
+ *
+ * Signed, because the sign is half of what it is for: it says which side of the
+ * curve the centre of that circle lies on, so a comb drawn along it flips at an
+ * inflection instead of folding over and hiding one.
+ *
+ * `null` where the derivative vanishes — a cusp, or a handle retracted onto its
+ * anchor. Curvature genuinely does not exist there, and a very large number
+ * would be a lie of the kind that draws a spike through the letter.
+ */
+export function curvature(s: Cubic, t: number): number | null {
+  const d = derivative(s, t);
+  const dd = secondDerivative(s, t);
+
+  const speed = Math.hypot(d.x, d.y);
+  if (speed === 0 || !Number.isFinite(speed)) return null;
+
+  const k = (d.x * dd.y - d.y * dd.x) / (speed * speed * speed);
+  return Number.isFinite(k) ? k : null;
+}
+
 /** Split at `t` into the two sub-curves, by de Casteljau. */
 export function split(s: Cubic, t: number): readonly [Cubic, Cubic] {
   const p01 = lerp(s.a, s.c1, t);

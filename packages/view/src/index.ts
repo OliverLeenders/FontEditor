@@ -69,6 +69,9 @@ export {
   placedAt,
 } from "./run.js";
 
+export type { Comb, CombHair, CombOptions } from "./comb.js";
+export { combFor, combScale } from "./comb.js";
+
 export type { CellBox, GridLayout, GridOptions } from "./grid.js";
 export {
   DEFAULT_GRID,
