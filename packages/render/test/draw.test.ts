@@ -11,7 +11,7 @@ import {
   segmentTunniPoint,
   setHandle,
 } from "@fonteditor/font-model";
-import { type ViewTransform, combFor, combScale, toScreen } from "@fonteditor/view";
+import { type ViewTransform, combFor, toScreen } from "@fonteditor/view";
 import { describe, expect, it } from "vitest";
 
 import { drawScene } from "../src/draw.js";
@@ -739,11 +739,9 @@ describe("the curvature comb", () => {
 
   const combed = (extra: Record<string, unknown> = {}) => {
     const c = ring();
-    const comb = combFor([c], VIEW);
     return {
       ...base(c),
-      comb,
-      combScale: combScale(comb, VIEW),
+      comb: combFor([c], VIEW),
       options: { showCurvature: true },
       ...extra,
     };
@@ -759,18 +757,13 @@ describe("the curvature comb", () => {
 
   it("draws a hair from the outline outward, and an envelope through the tips", () => {
     const ctx = render(combed());
-    const comb = combFor([ring()], VIEW);
-    const scale = combScale(comb, VIEW);
-    const hair = comb[0]!.hairs[0]!;
+    const hair = combFor([ring()], VIEW)[0]!.hairs[0]!;
 
     const foot = toScreen(VIEW, hair.at);
-    // The hair stands out of the ink, so its length is the size of the
-    // curvature and its direction is the normal — the sign does not turn it
-    // round.
-    const reach = Math.abs(hair.k) * scale;
+    // The hair stands out of the ink: along the normal, as far as it was told.
     const tip = toScreen(VIEW, {
-      x: hair.at.x + hair.normal.x * reach,
-      y: hair.at.y + hair.normal.y * reach,
+      x: hair.at.x + hair.normal.x * hair.reach,
+      y: hair.at.y + hair.normal.y * hair.reach,
     });
 
     const near = (a: { x: number; y: number }, b: { x: number; y: number }) =>

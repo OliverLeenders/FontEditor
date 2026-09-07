@@ -124,15 +124,14 @@ export type Scene = {
   /** Lines the drag in progress is caught on. Empty when nothing is caught. */
   readonly snapGuides: readonly SnapGuide[];
   /**
-   * The curvature comb, one entry per contour, and how long a hair is per unit
-   * of curvature.
+   * The curvature comb, one entry per contour, each hair carrying how long to
+   * draw it.
    *
    * Built where the view transform is known, since the hairs are spaced in
-   * screen pixels and normalised across the whole glyph — see `combFor` in the
-   * view package.
+   * screen pixels and their length is normalised across the whole glyph — see
+   * `combFor` in the view package.
    */
   readonly comb: readonly Comb[];
-  readonly combScale: number;
   /**
    * The anchor the pointer is over, and the one being worked on.
    *
@@ -267,7 +266,6 @@ export type SceneInit = {
   readonly guides?: readonly HorizontalGuide[];
   readonly snapGuides?: readonly SnapGuide[];
   readonly comb?: readonly Comb[];
-  readonly combScale?: number;
   readonly section?: Scene["section"];
   readonly hoveredAnchor?: AnchorId | null;
   readonly selectedAnchor?: AnchorId | null;
@@ -296,7 +294,6 @@ export function scene(init: SceneInit): Scene {
     guides: init.guides ?? [],
     snapGuides: init.snapGuides ?? [],
     comb: init.comb ?? [],
-    combScale: init.combScale ?? 0,
     section: init.section ?? null,
     hoveredAnchor: init.hoveredAnchor ?? null,
     selectedAnchor: init.selectedAnchor ?? null,

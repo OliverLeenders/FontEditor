@@ -2,7 +2,7 @@ import { curvature, cubic, vec } from "@fonteditor/geometry";
 import { contour, counterIds, node, reverseContour } from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
-import { combFor, combScale } from "../src/comb.js";
+import { combFor } from "../src/comb.js";
 import type { ViewTransform } from "../src/transform.js";
 
 /**
@@ -98,18 +98,56 @@ describe("the comb", () => {
     expect(near[0]!.hairs.length).toBeGreaterThan(far[0]!.hairs.length * 3);
   });
 
-  it("scales so the sharpest turn in the glyph is the longest hair", () => {
-    const combs = combFor([circle(50), circle(200)], VIEW, { spacingPixels: 20 });
-    const scale = combScale(combs, VIEW, { depthPixels: 40 });
+  it("draws the tighter turn longer, in proportion", () => {
+    const combs = combFor([circle(50), circle(200)], VIEW, {
+      spacingPixels: 20,
+      depthPixels: 40,
+    });
 
-    // The tighter circle turns four times as hard, and gets the full depth; the
-    // wider one is drawn to scale beside it rather than normalised to itself.
-    const sharpest = Math.max(...combs.flatMap((c) => c.hairs.map((h) => Math.abs(h.k))));
-    expect(sharpest * scale).toBeCloseTo(40, 6);
+    // Found by the radius each one turns at, allowing for the ripple a Bézier
+    // circle has: 1/k is 50 on one and 200 on the other.
+    const radiusOf = (c: (typeof combs)[number]) => 1 / Math.abs(c.hairs[0]!.k);
+    const tight = combs.find((c) => Math.abs(radiusOf(c) - 50) < 5)!;
+    const wide = combs.find((c) => Math.abs(radiusOf(c) - 200) < 20)!;
 
-    const gentlest = Math.min(...combs.flatMap((c) => c.hairs.map((h) => Math.abs(h.k))));
-    expect(gentlest * scale).toBeGreaterThan(9.5);
-    expect(gentlest * scale).toBeLessThan(10.5);
+    // Four times the curvature, four times the hair: the two are drawn to one
+    // scale, which is what lets them be compared.
+    expect(tight.hairs[0]!.reach / wide.hairs[0]!.reach).toBeCloseTo(4, 1);
+  });
+
+  it("is not flattened by one corner far sharper than the rest", () => {
+    // A wide bowl with a tight spur in it, which is every letter with a join.
+    // Scaling by the sharpest hair would leave the bowl a hair high; scaling by
+    // the typical one keeps the bowl readable and clamps the spur.
+    const combs = combFor([circle(400), circle(8)], VIEW, {
+      spacingPixels: 20,
+      depthPixels: 40,
+    });
+
+    const bowl = combs.find((c) => Math.abs(1 / Math.abs(c.hairs[0]!.k) - 400) < 40)!;
+    expect(bowl.hairs[0]!.reach).toBeGreaterThan(4);
+
+    // And nothing is drawn longer than the depth asked for.
+    for (const comb of combs) {
+      for (const hair of comb.hairs) expect(hair.reach).toBeLessThanOrEqual(40.0001);
+    }
+  });
+
+  it("leaves out a curve too gentle to count as one", () => {
+    // A circle whose radius is a hundred times the size of the thing drawn: a
+    // stem edge with a whisper of curvature in it. Drawing a hair there puts a
+    // second line beside the stem, parallel to it, which reads as an outline
+    // rather than as a measurement.
+    const gentle = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { type: "smooth", out: vec(100, 0.02) }),
+        node(ids.node(), vec(300, 0), { type: "smooth", in: vec(200, 0.02) }),
+      ],
+      false,
+    );
+
+    expect(combFor([gentle], VIEW, { spacingPixels: 20 })).toEqual([]);
   });
 
   it("has nothing to draw for a glyph of straight lines", () => {
@@ -124,9 +162,8 @@ describe("the comb", () => {
       true,
     );
 
-    const combs = combFor([square], VIEW, { spacingPixels: 20 });
-    // No curvature anywhere, so no scale — and the renderer draws nothing.
-    expect(combScale(combs, VIEW)).toBe(0);
+    // No curvature anywhere, so no comb at all.
+    expect(combFor([square], VIEW, { spacingPixels: 20 })).toEqual([]);
   });
 
   it("turns the hairs the other way on a hole, which is still out of the ink", () => {

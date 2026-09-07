@@ -1,5 +1,12 @@
-import { type Vec2, curvature, derivative, evaluate } from "@fonteditor/geometry";
-import { type Contour, segmentAt, segmentCount, segmentCubic } from "@fonteditor/font-model";
+import { type Rect, type Vec2, curvature, derivative, evaluate } from "@fonteditor/geometry";
+import {
+  type Contour,
+  contourBounds,
+  segmentAt,
+  segmentCount,
+  segmentCubic,
+  unionRect,
+} from "@fonteditor/font-model";
 
 import type { ViewTransform } from "./transform.js";
 
@@ -10,7 +17,7 @@ import type { ViewTransform } from "./transform.js";
  * the tips joined into an envelope. What is read is the envelope rather than the
  * hairs: a step in it at a node is a curvature break — the join is smooth to the
  * eye and not to the light falling on it — a pinch is a flat spot, and where the
- * comb crosses to the other side is an inflection.
+ * comb pinches to nothing and grows again is an inflection.
  *
  * This is the one instrument that says whether two segments *agree*. The Tunni
  * line describes one segment; it has nothing to say about the join.
@@ -41,6 +48,8 @@ export type CombHair = {
   readonly normal: Vec2;
   /** Signed curvature: the reciprocal of the radius of the circle fitting here. */
   readonly k: number;
+  /** How long to draw it, in design units. Scaled and clamped; see {@link combFor}. */
+  readonly reach: number;
 };
 
 /** One contour's worth of hairs, kept apart so the envelope is not joined across a gap. */
@@ -52,7 +61,7 @@ export type Comb = {
 export type CombOptions = {
   /** How far apart the hairs stand, in screen pixels. */
   readonly spacingPixels?: number;
-  /** How long the longest hair in the glyph is drawn, in screen pixels. */
+  /** How long an ordinary hair may grow, in screen pixels. */
   readonly depthPixels?: number;
 };
 
@@ -61,6 +70,27 @@ const DEPTH = 44;
 
 /** How finely each segment is walked while measuring arc length along it. */
 const STEPS = 96;
+
+/**
+ * Where the scale is taken from, as a fraction of the hairs sorted by length.
+ *
+ * Not the longest. A letter usually has one corner far tighter than anything
+ * else in it — the spur of an `a`, the join of a stem to a shoulder — and
+ * dividing by that flattens the whole letter to nothing so the one corner can
+ * fit. Nine hairs in ten below the depth, the tenth clamped to it, keeps the
+ * comb about the curves it was opened to look at.
+ */
+const TYPICAL = 0.9;
+
+/**
+ * How straight is straight, as a multiple of the letter's own size.
+ *
+ * A curve whose radius is ten times the size of the letter is straight as far as
+ * that letter is concerned: over the length of a stem it departs from a line by
+ * a fraction of a unit. Drawing a hair there puts a line beside the stem
+ * parallel to it, which reads as a second outline rather than as a measurement.
+ */
+const STRAIGHT = 10;
 
 /**
  * The comb for a glyph's contours, at the current zoom.
@@ -79,43 +109,65 @@ export function combFor(
   options: CombOptions = {},
 ): Comb[] {
   const spacing = (options.spacingPixels ?? SPACING) / Math.max(view.scale, 1e-6);
+  const depth = (options.depthPixels ?? DEPTH) / Math.max(view.scale, 1e-6);
 
-  const combs: Comb[] = [];
+  const raw: { id: string; hairs: Omit<CombHair, "reach">[] }[] = [];
   for (const c of contours) {
     const hairs = hairsOf(c, spacing);
-    if (hairs.length > 0) combs.push({ contourId: c.id, hairs });
+    if (hairs.length > 0) raw.push({ id: c.id, hairs });
   }
-  return combs;
+  if (raw.length === 0) return [];
+
+  const flat = 1 / (STRAIGHT * sizeOf(contours));
+  const curving = raw.map(({ id, hairs }) => ({
+    id,
+    hairs: hairs.filter((hair) => Math.abs(hair.k) > flat),
+  }));
+
+  const scale = scaleFor(
+    curving.flatMap((c) => c.hairs.map((h) => Math.abs(h.k))),
+    depth,
+  );
+  if (scale === 0) return [];
+
+  return curving
+    .filter((c) => c.hairs.length > 0)
+    .map(({ id, hairs }) => ({
+      contourId: id,
+      hairs: hairs.map((hair) => ({
+        ...hair,
+        // Clamped, not compressed: a corner sharper than the rest is drawn at
+        // full depth and says so, without dragging every other hair down with it.
+        reach: Math.min(Math.abs(hair.k) * scale, depth),
+      })),
+    }));
 }
 
-/**
- * How many design units of hair one unit of curvature is worth.
- *
- * Normalised across the whole glyph rather than per segment or by a fixed gain:
- * curvature spans orders of magnitude between a bowl and a tight corner, so a
- * fixed scale either flattens the letter or sends the corner off the canvas —
- * and normalising per segment would make each segment look the same, which is
- * precisely the comparison the comb exists to allow.
- *
- * Zero when nothing curves, which is a glyph of straight lines and no comb.
- */
-export function combScale(
-  combs: readonly Comb[],
-  view: ViewTransform,
-  options: CombOptions = {},
-): number {
-  let sharpest = 0;
-  for (const comb of combs) {
-    for (const hair of comb.hairs) sharpest = Math.max(sharpest, Math.abs(hair.k));
+/** How big the letter is, for deciding what counts as straight within it. */
+function sizeOf(contours: readonly Contour[]): number {
+  let box: Rect | null = null;
+  for (const c of contours) {
+    const own = contourBounds(c);
+    if (own !== null) box = unionRect(box, own);
   }
-  if (sharpest === 0) return 0;
+  if (box === null) return 1;
 
-  const depth = (options.depthPixels ?? DEPTH) / Math.max(view.scale, 1e-6);
-  return depth / sharpest;
+  const size = Math.hypot(box.maxX - box.minX, box.maxY - box.minY);
+  return size > 0 ? size : 1;
 }
 
-function hairsOf(c: Contour, spacing: number): CombHair[] {
-  const hairs: CombHair[] = [];
+/** Design units of hair per unit of curvature, from the typical hair rather than the longest. */
+function scaleFor(curvatures: readonly number[], depth: number): number {
+  if (curvatures.length === 0) return 0;
+
+  const sorted = [...curvatures].sort((l, r) => l - r);
+  const at = Math.min(sorted.length - 1, Math.floor(sorted.length * TYPICAL));
+  const typical = sorted[at]!;
+  return typical > 0 ? depth / typical : 0;
+}
+
+function hairsOf(c: Contour, spacing: number): Omit<CombHair, "reach">[] {
+  const hairs: Omit<CombHair, "reach">[] = [];
   // Carried across segments so the hairs do not restart at every node: a comb
   // that began again at each join would show a gap there whatever the curve did.
   let since = spacing;
@@ -149,7 +201,7 @@ function hairsOf(c: Contour, spacing: number): CombHair[] {
   return hairs;
 }
 
-function hairAt(cubic: Parameters<typeof curvature>[0], t: number): CombHair | null {
+function hairAt(cubic: Parameters<typeof curvature>[0], t: number): Omit<CombHair, "reach"> | null {
   const k = curvature(cubic, t);
   if (k === null) return null;
 

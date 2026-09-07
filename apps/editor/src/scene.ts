@@ -32,7 +32,7 @@ import {
   snapHold,
   tunniSegments,
 } from "@fonteditor/tools";
-import { type Comb, combFor, combScale } from "@fonteditor/view";
+import { type Comb, combFor } from "@fonteditor/view";
 
 import { isDarkNow } from "./scheme.js";
 import type { StoreState } from "./store/index.js";
@@ -236,21 +236,18 @@ function resolvedComponents(
 }
 
 /**
- * The curvature comb, and how long a hair is worth.
+ * The curvature comb, with each hair's length already worked out.
  *
- * Both or neither: the scale is normalised across everything the comb covers, so
- * the two are one answer computed in one place. Nothing at all when the comb is
- * turned off, which is the default — building it costs a walk along every
- * outline, and nobody should pay for an instrument they are not reading.
+ * Nothing at all when the comb is turned off, which is the default — building it
+ * costs a walk along every outline, and nobody should pay for an instrument they
+ * are not reading.
  */
-function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[]; combScale: number } {
-  if (!state.showCurvature) return { comb: [], combScale: 0 };
+function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[] } {
+  if (!state.showCurvature) return { comb: [] };
 
-  const view = state.session.editor.view;
   // The filled contours, not the drawn ones: the hairs point out of the ink, and
   // only the corrected winding says which side that is.
-  const comb = combFor(filledContours(glyph), view);
-  return { comb, combScale: combScale(comb, view) };
+  return { comb: combFor(filledContours(glyph), state.session.editor.view) };
 }
 
 /**

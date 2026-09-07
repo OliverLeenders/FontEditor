@@ -1055,7 +1055,7 @@ export function drawSection(ctx: Canvas2D, s: Scene): void {
 const STRAIGHT_PIXELS = 0.75;
 
 export function drawCurvatureComb(ctx: Canvas2D, s: Scene): void {
-  if (!s.options.showCurvature || s.combScale === 0) return;
+  if (!s.options.showCurvature) return;
 
   ctx.save();
 
@@ -1067,7 +1067,7 @@ export function drawCurvatureComb(ctx: Canvas2D, s: Scene): void {
     let run: { foot: Vec2; tip: Vec2 }[] = [];
 
     for (const hair of comb.hairs) {
-      const reach = Math.abs(hair.k) * s.combScale;
+      const reach = hair.reach;
       if (reach * s.view.scale < STRAIGHT_PIXELS) {
         if (run.length > 1) runs.push(run);
         run = [];

@@ -70,7 +70,7 @@ export {
 } from "./run.js";
 
 export type { Comb, CombHair, CombOptions } from "./comb.js";
-export { combFor, combScale } from "./comb.js";
+export { combFor } from "./comb.js";
 
 export type { CellBox, GridLayout, GridOptions } from "./grid.js";
 export {
