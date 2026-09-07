@@ -9,24 +9,26 @@ derives from the reverse-engineering write-up in
 
 ## Status
 
-**A font drawn here can be exported and installed.** Five workspaces — Font, Glyph,
-Spacing, Features, Proof — around a canvas with select, pen, knife, rectangle, ellipse
-and measure tools, snapping, boolean union, anchors and components, kerning, a `.fea` subset, and
-OTF and UFO in both directions. Everything autosaves.
+**A font drawn here can be kept on disk, exported and installed.** Five workspaces —
+Font, Glyph, Spacing, Features, Proof — around a canvas with select, pen, knife,
+rectangle, ellipse, measure and section tools, snapping, boolean union, anchors and
+components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF and UFO in
+both directions. A UFO folder on disk is opened and saved back to; everything autosaves
+to the browser's own store besides, and copies of the whole font are kept as you work.
 
-| Phase |                                     | Status                                                            |
-| ----- | ----------------------------------- | ----------------------------------------------------------------- |
-| 0     | Foundations and the geometry kernel | done                                                              |
-| 1     | The editing surface                 | done                                                              |
-| 2     | Undo, redo, persistence             | done                                                              |
-| 3     | From paths to a glyph               | done, and anchors with it                                         |
-| 4     | From a glyph to a font              | done                                                              |
-| 5     | Binary import and export            | done: OTF and UFO both ways; UFO output unverified by other tools |
-| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                  |
-| 7     | Spacing and kerning                 | done                                                              |
-| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks   |
-| 9     | Variable fonts                      | not started                                                       |
-| 10    | Production polish                   | lint, format and 1674 tests, run on CI; preferences persist       |
+| Phase |                                     | Status                                                          |
+| ----- | ----------------------------------- | --------------------------------------------------------------- |
+| 0     | Foundations and the geometry kernel | done                                                            |
+| 1     | The editing surface                 | done                                                            |
+| 2     | Undo, redo, persistence             | done                                                            |
+| 3     | From paths to a glyph               | done, and anchors with it                                       |
+| 4     | From a glyph to a font              | done                                                            |
+| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways |
+| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                |
+| 7     | Spacing and kerning                 | done                                                            |
+| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks |
+| 9     | Variable fonts                      | not started                                                     |
+| 10    | Production polish                   | lint, format and 1747 tests, run on CI; preferences persist     |
 
 ### What the table missed
 
@@ -35,22 +37,34 @@ work. These are the things that turned out to be missing from the plan rather th
 from the code — some now done, the rest in roughly the order they would be reached
 for.
 
-| What is missing                            | State       | Why it is missing                                                                                                                                                                                                                                                                                        |
-| ------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Anchors and mark attachment**            | done        | Not a phase at all, and it belongs to two: a glyph carries them, and they compile. Placing accents by hand is the thing this replaces.                                                                                                                                                                   |
-| **Not dropping what we do not understand** | half done   | Twice now a reader has quietly discarded what it had no field for — anchors from a `.glif`, then anchors from our own autosave. Both are fixed; guidelines, notes, glyph `lib` and every `fontinfo` key beyond seven are still discarded, and a UFO from another tool comes back poorer than it went in. |
-| **Font metadata**                          | not started | The info model holds seven fields. A released font also needs a version, a licence, a designer, an italic angle, weight and width classes, a vendor id, and typographic family names — without which an italic does not announce itself as one and a family of more than four styles groups wrongly.     |
-| **Curve quality**                          | done        | The curvature comb reads a join, the inspector gives the radius either side of a node and how far apart they are, and harmonising moves the node to where they agree.                                                                                                                                    |
-| **Guides, and something to trace**         | not started | A glyph holds no guides of its own, and there is no way to put a scan or a reference letter behind the drawing.                                                                                                                                                                                          |
-| **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                           |
-| **A file on disk**                         | done        | A UFO folder is opened, saved back to, and remembered for next time, through the File System Access API. Saving is manual: the working store autosaves, and a folder the user chose is somewhere the editor is a guest.                                                                                  |
-| **`glyf` outlines**                        | not started | Everything written is CFF. A TrueType flavour is what hinting and most web pipelines want, and it is also the outline format that permits the overlaps this removes.                                                                                                                                     |
-| **Preflight**                              | not started | Open contours, duplicate points, off-grid coordinates, a composite whose base is missing, an accent with no anchor to land on: all findable, none reported anywhere.                                                                                                                                     |
-| **Testing the interface**                  | not started | Every package below `apps/editor` is tested; the React in it is not, for want of a DOM testing library.                                                                                                                                                                                                  |
+| What is missing                            | State       | Why it is missing                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Anchors and mark attachment**            | done        | Not a phase at all, and it belongs to two: a glyph carries them, and they compile. Placing accents by hand is the thing this replaces.                                                                                                                                                                                                                     |
+| **Not dropping what we do not understand** | **urgent**  | Twice a reader quietly discarded what it had no field for — anchors from a `.glif`, then anchors from our own autosave. Both are fixed; guidelines, notes, glyph `lib` and every `fontinfo` key beyond seven are still discarded. This used to cost a poorer export. Now that Save writes a folder the user keeps, it costs them the original — see below. |
+| **Font metadata**                          | not started | The info model holds seven fields. A released font also needs a version, a licence, a designer, an italic angle, weight and width classes, a vendor id, and typographic family names — without which an italic does not announce itself as one and a family of more than four styles groups wrongly.                                                       |
+| **Curve quality**                          | done        | The curvature comb reads a join, the inspector gives the radius either side of a node and how far apart they are, and harmonising moves the node to where they agree.                                                                                                                                                                                      |
+| **Guides, and something to trace**         | not started | A glyph holds no guides of its own, and there is no way to put a scan or a reference letter behind the drawing.                                                                                                                                                                                                                                            |
+| **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                                                                             |
+| **A file on disk**                         | done        | A UFO folder is opened, saved back to, and remembered for next time, through the File System Access API. Saving is manual: the working store autosaves, and a folder the user chose is somewhere the editor is a guest.                                                                                                                                    |
+| **`glyf` outlines**                        | not started | Everything written is CFF. A TrueType flavour is what hinting and most web pipelines want, and it is also the outline format that permits the overlaps this removes.                                                                                                                                                                                       |
+| **Preflight**                              | not started | Open contours, duplicate points, off-grid coordinates, a composite whose base is missing, an accent with no anchor to land on: all findable, none reported anywhere.                                                                                                                                                                                       |
+| **Testing the interface**                  | not started | Every package below `apps/editor` is tested; the React in it is not, for want of a DOM testing library.                                                                                                                                                                                                                                                    |
 
 ### What the table is hiding
 
 The gaps worth naming, in the order they would bite someone using this:
+
+- **Saving to a folder writes the font this editor models, not the file that was
+  opened.** The UFO writer emits seven `fontinfo` keys, one layer, and per glyph its
+  outlines, components, anchors and unicodes. Everything else a real source carries —
+  version, licence, designer, italic angle, the OS/2 and PostScript keys, font and glyph
+  `lib`, guidelines, notes, images, any layer but the default — is not in the model, so it
+  is not written. Opening someone's UFO and pressing Save therefore _removes_ those things
+  from their file. Deleting is otherwise careful: only `.glif` files the previous save
+  listed are removed, files this editor never wrote are left alone, and a non-default
+  layer stays on disk though `layercontents.plist` stops listing it. None of that helps
+  with the keys, and until the reader keeps what it does not understand, Save belongs on
+  fonts this editor started.
 
 - **Positioning in `.fea` is the single adjustment only.** `pos @caps <10 0 20 0>;`
   compiles and merges into the same GPOS the kerning is written to. A pair adjustment is

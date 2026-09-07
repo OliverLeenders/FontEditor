@@ -84,7 +84,8 @@ export async function writeFolder(
   const layer = defaultLayer(await textAt(folder, "layercontents.plist"));
   if (layer !== null && layer !== "glyphs") {
     notes.push(
-      `the font's default layer was ${layer}; it is now glyphs, and ${layer} was left alone`,
+      `the font's default layer was ${layer}; the glyphs are in glyphs/ now, and ${layer}/ ` +
+        `is still on disk but no longer listed in layercontents.plist`,
     );
   }
 
