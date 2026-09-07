@@ -40,6 +40,19 @@ export function ExportFont(): React.JSX.Element {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
+  const attemptAsync = async (
+    run: () => Promise<{ file: string; warnings: readonly string[] }>,
+  ): Promise<void> => {
+    try {
+      setStatus({ kind: "done", ...(await run()) });
+    } catch (error) {
+      setStatus({
+        kind: "failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   const attempt = (run: () => { file: string; warnings: readonly string[] }): void => {
     try {
       setStatus({ kind: "done", ...run() });
@@ -61,9 +74,11 @@ export function ExportFont(): React.JSX.Element {
     });
 
   const ufo = (): void =>
-    attempt(() => {
+    void attemptAsync(async () => {
       const document = store.editor.document;
-      const { bytes, fileName } = exportUfo(document);
+      // The pictures too, which is why this one is the async of the pair: they
+      // are read from the working store rather than held in the document.
+      const { bytes, fileName } = exportUfo(document, await store.allImages());
       // Sliced to a plain ArrayBuffer: a Uint8Array view is not a BlobPart, and
       // a view over a larger buffer would carry more than the archive.
       download(bytes.slice().buffer, fileName, "application/zip");

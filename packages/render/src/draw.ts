@@ -50,6 +50,8 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   ctx.globalAlpha = 1;
 
   clearBackground(ctx, s);
+  // Under everything, because it is what everything else is drawn against.
+  drawTracingImage(ctx, s);
   drawMetricLines(ctx, s);
   drawDesignGuides(ctx, s);
   // Neighbours and margins sit under the glyph being edited: they are context,
@@ -127,6 +129,47 @@ export function drawMetricLines(ctx: Canvas2D, s: Scene): void {
     // a name sitting on the outline would be one more thing to read past.
     ctx.fillText(guide.label, 6, y - 3);
   }
+}
+
+/**
+ * The picture the glyph is being traced from.
+ *
+ * The transform is composed rather than the corners being projected, because a
+ * placement may shear and a sheared rectangle is not a rectangle — projecting
+ * its corners and drawing into the box they bound would quietly straighten the
+ * picture. So the canvas is given the whole transform and asked to draw the
+ * image at its natural size into it.
+ *
+ * Three transforms in a row, which is why this is worth writing out. Image
+ * pixels have their origin at the bottom left and y running up; the canvas has
+ * it at the top left with y running down; and between them sits the placement
+ * the designer chose and the camera the editor is looking through.
+ */
+export function drawTracingImage(ctx: Canvas2D, s: Scene): void {
+  const image = s.image;
+  if (image === null || image.opacity <= 0) return;
+
+  const t = image.transform;
+  const view = s.view;
+
+  ctx.save();
+  ctx.globalAlpha = image.opacity;
+
+  // The camera: design units to screen pixels, with y flipped.
+  const origin = toScreen(view, { x: 0, y: 0 });
+  ctx.translate(origin.x, origin.y);
+  ctx.transform(view.scale, 0, 0, -view.scale, 0, 0);
+
+  // The placement, in design units.
+  ctx.transform(t.xScale, t.xyScale, t.yxScale, t.yScale, t.xOffset, t.yOffset);
+
+  // And the picture's own flip: its rows run down from the top, where
+  // everything above this runs up from the bottom.
+  ctx.transform(1, 0, 0, -1, 0, image.height);
+  ctx.drawImage(image.bitmap, 0, 0, image.width, image.height);
+
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 /**

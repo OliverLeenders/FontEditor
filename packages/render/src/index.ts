@@ -28,6 +28,8 @@ export { DARK_PALETTE, LIGHT_PALETTE } from "./palette.js";
 
 export type {
   MetricLine,
+  SceneGuide,
+  SceneImage,
   SnapGuide,
   NeighbourGlyph,
   RenderMetrics,

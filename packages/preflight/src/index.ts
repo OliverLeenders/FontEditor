@@ -2,7 +2,7 @@ import type { FontDocument, Glyph } from "@fonteditor/font-model";
 import { orderedGlyphs } from "@fonteditor/font-model";
 
 import { type CheckId, type Finding, type Severity, SEVERITIES } from "./finding.js";
-import { fontFindings } from "./font.js";
+import { fontFindings, imageFindings } from "./font.js";
 import { glyphFindings } from "./glyphs.js";
 
 /**
@@ -31,6 +31,14 @@ export { CHECKS, SEVERITIES, checkNamed } from "./finding.js";
 export type PreflightOptions = {
   /** Checks not to run. What somebody has decided they do not want told about. */
   readonly skip?: readonly CheckId[];
+  /**
+   * The pictures the font actually holds, by name.
+   *
+   * Passed in because they are not in the document: a glyph names an image and
+   * the bytes live beside the font, so only the caller knows which names are
+   * really there. Left out, the check is skipped rather than guessing.
+   */
+  readonly images?: ReadonlySet<string>;
 };
 
 /**
@@ -47,6 +55,7 @@ export function preflight(document: FontDocument, options: PreflightOptions = {}
 
   for (const g of orderedGlyphs(document)) found.push(...glyphFindings(document, g));
   found.push(...fontFindings(document));
+  if (options.images !== undefined) found.push(...imageFindings(document, options.images));
 
   const place = placesOf(document);
   return found

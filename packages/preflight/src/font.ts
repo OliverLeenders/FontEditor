@@ -143,6 +143,24 @@ function markFindings(document: FontDocument): Finding[] {
   return out;
 }
 
+/**
+ * Glyphs tracing from a picture the font does not have.
+ *
+ * Only asked where the caller knows what the font holds: the images live beside
+ * the document rather than in it, so a check that guessed would report every
+ * tracing in a font whose pictures simply were not handed over.
+ */
+export function imageFindings(document: FontDocument, images: ReadonlySet<string>): Finding[] {
+  const out: Finding[] = [];
+  for (const g of orderedGlyphs(document)) {
+    if (g.image === null || images.has(g.image.name)) continue;
+    out.push(
+      finding("missing-image", g.name, `It traces from ${g.image.name}, which is not here.`),
+    );
+  }
+  return out;
+}
+
 const hex = (code: number): string => `U+${code.toString(16).toUpperCase().padStart(4, "0")}`;
 
 const list = (names: readonly string[]): string =>

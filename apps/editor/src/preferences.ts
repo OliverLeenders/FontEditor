@@ -62,6 +62,16 @@ export type Preferences = {
    */
   readonly showCurvature: boolean;
   /**
+   * Show the picture a glyph is traced from, and how strongly.
+   *
+   * On, because a tracing you have set up is one you meant to see. The strength
+   * is a preference and not a property of the picture: how far it should show
+   * through depends on what you are doing to the outline over it, and changes
+   * several times an hour.
+   */
+  readonly showImage: boolean;
+  readonly imageOpacity: number;
+  /**
    * Apply the font's own features to the spacing line and the proof.
    *
    * On, because a proof is judged as it would be set. Off is for the moment you
@@ -89,6 +99,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   showNeighbours: true,
   showAnchors: true,
   showCurvature: false,
+  showImage: true,
+  imageOpacity: 0.5,
   applyFeatures: true,
   spacingSize: 128,
   proofSize: 32,
@@ -138,6 +150,11 @@ export function loadPreferences(): Preferences {
     showNeighbours: boolean(raw["showNeighbours"], DEFAULT_PREFERENCES.showNeighbours),
     showAnchors: boolean(raw["showAnchors"], DEFAULT_PREFERENCES.showAnchors),
     showCurvature: boolean(raw["showCurvature"], DEFAULT_PREFERENCES.showCurvature),
+    showImage: boolean(raw["showImage"], DEFAULT_PREFERENCES.showImage),
+    imageOpacity: number(raw["imageOpacity"], DEFAULT_PREFERENCES.imageOpacity, {
+      min: 0.05,
+      max: 1,
+    }),
     applyFeatures: boolean(raw["applyFeatures"], DEFAULT_PREFERENCES.applyFeatures),
     spacingSize: number(raw["spacingSize"], DEFAULT_PREFERENCES.spacingSize, {
       min: MIN_SPACING_SIZE,

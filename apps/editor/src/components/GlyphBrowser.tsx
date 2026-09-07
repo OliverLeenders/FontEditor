@@ -21,7 +21,9 @@ import { NewFont } from "./NewFont.js";
 import { Preflight } from "./Preflight.js";
 import { FontInfoPanel } from "./FontInfoPanel.js";
 import { RoundCoordinates } from "./RoundCoordinates.js";
+import { Sheet } from "./Sheet.js";
 import { Snapshots } from "./Snapshots.js";
+import { Tracing } from "./Tracing.js";
 import { NewGlyph } from "./NewGlyph.js";
 import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
@@ -294,6 +296,8 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           <FontInfoPanel />
           <Snapshots />
           <Preflight />
+          <Tracing />
+          <Sheet />
           <RoundCoordinates />
           <input
             type="search"

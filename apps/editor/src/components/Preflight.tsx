@@ -27,13 +27,27 @@ import open from "./OpenFont.module.css";
 export function Preflight(): React.JSX.Element {
   const store = useEditorStore();
   const document = useStoreValue((s) => s.session.editor.document);
+  // The pictures the font really holds, so a glyph naming one that has gone is
+  // found. Not in the document, so the check cannot ask for itself.
+  const images = useStoreValue((s) => s.images);
   const [open_, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   // Only while the panel is up. A font of a few thousand glyphs is a walk over
   // every point in it, and nothing is looking at the answer until then.
-  const findings = useMemo(() => (open_ ? preflight(document) : []), [open_, document]);
+  const findings = useMemo(
+    () =>
+      open_ ? preflight(document, { images: new Set(images.map((entry) => entry.name)) }) : [],
+    [open_, document, images],
+  );
   const counted = useMemo(() => countBySeverity(findings), [findings]);
+
+  // The list of pictures is read on demand, so it has to be asked for before
+  // the check that needs it runs.
+  useEffect(() => {
+    if (!open_) return;
+    void store.refreshImages();
+  }, [open_, store]);
 
   useEffect(() => {
     if (!open_) return;

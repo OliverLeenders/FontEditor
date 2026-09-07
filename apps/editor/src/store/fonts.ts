@@ -29,6 +29,8 @@ export type FontHost = StoreHost & {
   readonly disk: Persistence;
   /** Keep a copy of the font as it is now, before replacing it. */
   keepSnapshot: () => Promise<void>;
+  /** Let go of a decoded picture, because the bytes behind it have changed. */
+  forgetImage: (name: string) => void;
   /** The folder on disk this font came from, if it came from one. */
   folder: () => DiskFolder | null;
   setFolder: (folder: DiskFolder | null, name?: string) => void;
@@ -81,6 +83,7 @@ export async function importFont(
         const parsed = parseFontFile(bytes, randomIds());
         return {
           document: parsed.document,
+          images: new Map<string, Uint8Array>(),
           warnings: parsed.warnings.map((w) =>
             w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
           ),
@@ -88,6 +91,7 @@ export async function importFont(
       })();
 
   await adoptDocument(host, read.document);
+  await adoptImages(host, read.images);
 
   const { info, glyphOrder } = read.document;
   return {
@@ -97,9 +101,11 @@ export async function importFont(
   };
 }
 
-async function readUfo(
-  bytes: ArrayBuffer,
-): Promise<{ document: FontDocument; warnings: string[] }> {
+async function readUfo(bytes: ArrayBuffer): Promise<{
+  document: FontDocument;
+  warnings: string[];
+  images: ReadonlyMap<string, Uint8Array>;
+}> {
   const out = await importUfo(bytes, randomIds());
   // A UFO that cannot be read is reported rather than half-adopted: there is
   // no partial font to fall back on the way a damaged glyph has one.
@@ -107,8 +113,26 @@ async function readUfo(
 
   return {
     document: out.document,
+    images: out.images,
     warnings: out.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
   };
+}
+
+/**
+ * Put the pictures a font arrived with into the store.
+ *
+ * After the document, not before: an image belongs to a font, and writing them
+ * first would leave a store holding pictures for a font that failed to open.
+ */
+export async function adoptImages(
+  host: FontHost,
+  images: ReadonlyMap<string, Uint8Array>,
+): Promise<void> {
+  for (const [name, bytes] of images) {
+    host.forgetImage(name);
+    await host.disk.putImage(name, bytes);
+  }
+  host.patch({ images: await host.disk.images() });
 }
 
 /**

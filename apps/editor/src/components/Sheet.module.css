@@ -1,0 +1,114 @@
+/*
+ * The picture whole, with a box round each letter found in it.
+ *
+ * Wider than the other panels because the whole point is seeing the sheet: a
+ * scan of an alphabet in a twenty-rem panel is a row of specks.
+ */
+.holder {
+  position: relative;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 30;
+  width: min(46rem, 80vw);
+  padding: 0.55rem 0.6rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+
+.hint {
+  flex: 1;
+  color: var(--ink-3);
+  font-family: var(--font-sans, inherit);
+  font-size: 0.74rem;
+}
+
+.close {
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.close:hover {
+  color: var(--ink);
+}
+
+.sheet {
+  position: relative;
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--ground);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  /* A crosshair says the surface is for drawing on, which is the whole
+     instruction this view needs to give. */
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.picture {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.waiting {
+  margin: 0;
+  padding: 2rem 1rem;
+  color: var(--ink-3);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+/* A letter already found in the sheet. Outlined rather than filled: what is
+   underneath is the thing being looked at. */
+.mark {
+  position: absolute;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  pointer-events: none;
+}
+.mark[data-here="true"] {
+  border-width: 2px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.markName {
+  position: absolute;
+  top: -1.15rem;
+  left: -1px;
+  padding: 0 0.2rem;
+  background: var(--accent);
+  color: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+/* The box being drawn now. Dashed, as every provisional thing in this editor
+   is, so it reads as something that has not happened yet. */
+.drawing {
+  position: absolute;
+  border: 1px dashed var(--ink-2);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  pointer-events: none;
+}

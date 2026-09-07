@@ -10,12 +10,15 @@ import {
   updateContour,
 } from "@fonteditor/font-model";
 import {
+  fitImageToGlyph,
   guideById,
   guidesInForce,
   moveGuideTo,
+  moveImageTo,
   moveGuideToScope,
   removeGuideAt,
   renameGuideTo,
+  scaleImageTo,
   turnGuideTo,
   type EditorState,
   addComponent,
@@ -125,6 +128,9 @@ export function Inspector(): React.JSX.Element | null {
   );
   const selectedAnchor = useStoreValue((s) => s.session.editor.selectedAnchor);
   const selectedGuide = useStoreValue((s) => s.session.editor.selectedGuide);
+  const image = useStoreValue(
+    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.image ?? null,
+  );
   // The font's and the glyph's together, as the canvas draws them: which scope
   // a line is in is shown on its row rather than by which list it sits in.
   const guides = useStoreValue((s) => guidesInForce(s.session.editor));
@@ -338,6 +344,17 @@ export function Inspector(): React.JSX.Element | null {
    * The other axis is read from the glyph at the moment of the commit rather
    * than from the field beside it, as the point coordinates above are.
    */
+  const commitImage = (axis: "x" | "y", value: number): void => {
+    if (!Number.isFinite(value) || image === null) return;
+    const t = image.transform;
+    store.applyTool(
+      moveImageTo(store.editor, {
+        x: axis === "x" ? value : t.xOffset,
+        y: axis === "y" ? value : t.yOffset,
+      }),
+    );
+  };
+
   const commitGuide = (id: string, axis: "x" | "y", value: number): void => {
     if (!Number.isFinite(value)) return;
     const found = guideById(store.editor, id);
@@ -676,6 +693,60 @@ export function Inspector(): React.JSX.Element | null {
         </Field>
 
         <div className={styles.rule} />
+
+        {/* Where the picture behind this letter sits. Added and chosen in the
+            Tracing panel, and picked off a sheet in the Sheet view; what these
+            are for is the nudge afterwards. */}
+        {image === null ? null : (
+          <>
+            <Field label="Tracing">
+              <div className={styles.imageRow}>
+                <span className={styles.imageName} title={image.name}>
+                  {image.name}
+                </span>
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="X of the picture"
+                  title="Where its lower-left corner sits"
+                  value={shown(image.transform.xOffset)}
+                  onChange={(event) => commitImage("x", Number(event.target.value))}
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="Y of the picture"
+                  value={shown(image.transform.yOffset)}
+                  onChange={(event) => commitImage("y", Number(event.target.value))}
+                />
+                <input
+                  className={styles.input}
+                  type="number"
+                  step={0.01}
+                  aria-label="Scale of the picture"
+                  title="How many design units to a pixel"
+                  value={shown(image.transform.xScale)}
+                  onChange={(event) =>
+                    store.applyTool(scaleImageTo(store.editor, Number(event.target.value)))
+                  }
+                />
+                <button
+                  type="button"
+                  className={styles.imageFit}
+                  title="Lay it across the glyph, descender to ascender, keeping its proportions"
+                  onClick={() => {
+                    const decoded = store.picture(image.name);
+                    if (decoded !== null) store.applyTool(fitImageToGlyph(store.editor, decoded));
+                  }}
+                >
+                  Fit
+                </button>
+              </div>
+            </Field>
+
+            <div className={styles.rule} />
+          </>
+        )}
 
         {/* The lines this letter is drawn against, and the font's shown with
             them. Added from the canvas — right-click where you want one — for

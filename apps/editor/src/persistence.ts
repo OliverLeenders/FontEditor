@@ -1,5 +1,6 @@
 import type { FontDocument } from "@fonteditor/font-model";
 import {
+  type ImageEntry,
   Autosave,
   type AutosaveStatus,
   type LoadedProject,
@@ -240,6 +241,43 @@ export class Persistence {
     at: number,
   ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
     return (await this.client?.readSnapshot(at)) ?? null;
+  }
+
+  // ---- the pictures a font is traced from --------------------------------
+
+  /**
+   * Put an image in the font, or replace one of the same name.
+   *
+   * Refused without the lock, as every other write is: a tab that is only
+   * reading somebody else's project must not add megabytes to it.
+   */
+  async putImage(name: string, bytes: Uint8Array): Promise<ImageEntry | null> {
+    const client = this.client;
+    if (client === null || !this.owner) return null;
+    return await client.putImage(name, bytes);
+  }
+
+  async getImage(name: string): Promise<Uint8Array | null> {
+    return (await this.client?.getImage(name)) ?? null;
+  }
+
+  async images(): Promise<readonly ImageEntry[]> {
+    return (await this.client?.images()) ?? [];
+  }
+
+  /** Every picture in the font, for handing it to something that wants it whole. */
+  async allImages(): Promise<Map<string, Uint8Array>> {
+    const out = new Map<string, Uint8Array>();
+    for (const entry of await this.images()) {
+      const bytes = await this.getImage(entry.name);
+      if (bytes !== null) out.set(entry.name, bytes);
+    }
+    return out;
+  }
+
+  async removeImage(name: string): Promise<void> {
+    if (this.client === null || !this.owner) return;
+    await this.client.removeImage(name);
   }
 
   /** Give up on storage, saying why. The editor keeps working without it. */

@@ -2,7 +2,7 @@ import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import { type EditSession, session as newSession } from "@fonteditor/edit-core";
 import { editorState } from "@fonteditor/tools";
 import type { FontDocument } from "@fonteditor/font-model";
-import type { AutosaveStatus, SnapshotEntry } from "@fonteditor/storage";
+import type { AutosaveStatus, ImageEntry, SnapshotEntry } from "@fonteditor/storage";
 
 import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
 import type { Ownership, StorageState } from "../persistence.js";
@@ -39,6 +39,17 @@ export type StoreState = {
   readonly snapshots: readonly SnapshotEntry[];
   /** The font's own folder on the user's disk, and where saving it stands. */
   readonly folder: FolderState;
+  /**
+   * The pictures the font is traced from, as the store holds them.
+   *
+   * Names and sizes only — the bytes are in the working store and the decoded
+   * bitmaps are in a cache beside this. Read when something is about to show
+   * the list, which is the only time anybody wants it.
+   */
+  readonly images: readonly ImageEntry[];
+  /** Draw the picture behind the glyph at all, and how strongly. */
+  readonly showImage: boolean;
+  readonly imageOpacity: number;
   /** Only the owning tab writes. A second tab shows the font and saves nothing. */
   readonly ownership: Ownership;
   /** What the glyph strip is showing, as typed. */
@@ -150,6 +161,9 @@ export function initialState(preferences: Preferences): StoreState {
     recovered: false,
     snapshots: [],
     folder: NO_FOLDER,
+    images: [],
+    showImage: preferences.showImage,
+    imageOpacity: preferences.imageOpacity,
     ownership: "owner",
     stripText: "hello",
     catalogQuery: DEFAULT_QUERY,

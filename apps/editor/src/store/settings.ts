@@ -21,6 +21,8 @@ export function preferencesOf(s: StoreState): Preferences {
     showNeighbours: s.showNeighbours,
     showAnchors: s.showAnchors,
     showCurvature: s.showCurvature,
+    showImage: s.showImage,
+    imageOpacity: s.imageOpacity,
     applyFeatures: s.applyFeatures,
     spacingSize: s.spacingSize,
     proofSize: s.proofSize,

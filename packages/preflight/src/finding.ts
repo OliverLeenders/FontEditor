@@ -41,7 +41,8 @@ export type CheckId =
   | "unnamed-anchor"
   | "duplicate-anchor"
   | "two-mark-anchors"
-  | "mark-without-base";
+  | "mark-without-base"
+  | "missing-image";
 
 /** One thing wrong, or possibly wrong, in one place. */
 export type Finding = {
@@ -155,6 +156,12 @@ export const CHECKS: readonly Check[] = [
     severity: "warning",
     title: "A mark that attaches two ways",
     why: "Mark attachment gives a glyph one class, so only one of its attaching anchors reaches the compiled font.",
+  },
+  {
+    id: "missing-image",
+    severity: "warning",
+    title: "Tracing from a picture that is not here",
+    why: "The glyph names an image the font does not contain, so there is nothing behind it to draw against — usually a picture removed after the letter was set up to trace from it.",
   },
   {
     id: "off-grid",

@@ -11,7 +11,7 @@ import {
 import { readUfo, ufoFiles } from "@fonteditor/font-io";
 import { type FontDocument, randomIds } from "@fonteditor/font-model";
 
-import { type FontHost, adoptDocument } from "./fonts.js";
+import { type FontHost, adoptDocument, adoptImages } from "./fonts.js";
 
 /**
  * The font as a folder on the user's disk.
@@ -80,6 +80,7 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
   if ("reason" in read) throw new Error(`${folder.name}: ${read.reason}`);
 
   await adoptDocument(host, read.document);
+  await adoptImages(host, read.images);
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
 
@@ -132,7 +133,9 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
   host.patch({ folder: { ...host.state().folder, busy: true, problem: null } });
   try {
     const document = host.state().session.editor.document;
-    const written = await writeFolder(folder, ufoFiles(document));
+    // The pictures go with it: a folder holding a font that names images it
+    // does not contain is a font that opens blank in every other tool.
+    const written = await writeFolder(folder, ufoFiles(document, await host.disk.allImages()));
 
     host.patch({
       folder: {

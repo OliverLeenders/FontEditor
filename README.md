@@ -15,7 +15,7 @@ rectangle, ellipse, measure and section tools, snapping, boolean union, anchors 
 components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF and UFO in
 both directions. A UFO folder on disk is opened and saved back to; everything autosaves
 to the browser's own store besides, and copies of the whole font are kept as you work.
-Before it goes out, seventeen checks say what is wrong with it.
+Guides and a picture to trace from sit behind the drawing; before it goes out, eighteen checks say what is wrong with it.
 
 | Phase |                                     | Status                                                          |
 | ----- | ----------------------------------- | --------------------------------------------------------------- |
@@ -29,7 +29,7 @@ Before it goes out, seventeen checks say what is wrong with it.
 | 7     | Spacing and kerning                 | done                                                            |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks |
 | 9     | Variable fonts                      | not started                                                     |
-| 10    | Production polish                   | lint, format and 1817 tests, run on CI; preferences persist     |
+| 10    | Production polish                   | lint, format and 1860 tests, run on CI; preferences persist     |
 
 ### What the table missed
 
@@ -44,7 +44,7 @@ for.
 | **Not dropping what we do not understand** | done        | The reader keeps what it cannot model — every `fontinfo` key the model has no field for, every `lib` entry but the glyph order, and per glyph its guidelines, note, image and `lib` — and the writer puts them back. Autosave and the snapshots carry them too, so a reload does not undo it. Proved through fontTools in CI: it rewrites the proof font, we read what it wrote, and the keys neither of us models are still there. |
 | **Font metadata**                          | done        | Two dozen fields: version, copyright, trademark, designer, manufacturer, licence, description, italic angle, weight and width classes, a vendor id, and both naming schemes — the four-slot one an operating system groups by, and the typographic one for families of more than four styles.                                                                                                                                       |
 | **Curve quality**                          | done        | The curvature comb reads a join, the inspector gives the radius either side of a node and how far apart they are, and harmonising moves the node to where they agree.                                                                                                                                                                                                                                                               |
-| **Guides, and something to trace**         | half done   | Guides are in: a point and an angle, in two scopes — the font's are drawn in every glyph, a glyph's in that one — dragged on the canvas, snapped to where they are level or upright, and read and written as UFO's `guideline`. Something to trace behind the drawing is next.                                                                                                                                                      |
+| **Guides, and something to trace**         | done        | Guides are a point and an angle in two scopes, dragged on the canvas and snapped to where they are level or upright. Tracing follows UFO: the picture belongs to the font and the placement to the glyph, so one scan of an alphabet is one file and each letter is picked off it with a box drawn in the sheet view.                                                                                                               |
 | **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                                                                                                                                                      |
 | **A file on disk**                         | done        | A UFO folder is opened, saved back to, and remembered for next time, through the File System Access API. Saving is manual: the working store autosaves, and a folder the user chose is somewhere the editor is a guest.                                                                                                                                                                                                             |
 | **`glyf` outlines**                        | not started | Everything written is CFF. A TrueType flavour is what hinting and most web pipelines want, and it is also the outline format that permits the overlaps this removes.                                                                                                                                                                                                                                                                |

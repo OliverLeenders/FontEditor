@@ -8,7 +8,14 @@ import {
   undoLabelOf,
   apply as applyToSession,
 } from "@fonteditor/edit-core";
-import { type FontDocument, type Glyph, type GlyphName, setFeatures } from "@fonteditor/font-model";
+import {
+  type FontDocument,
+  type Glyph,
+  type GlyphName,
+  putGlyph,
+  setFeatures,
+  setGlyphImage,
+} from "@fonteditor/font-model";
 import {
   type EditorState,
   type ToolId,
@@ -23,6 +30,7 @@ import type { ViewTransform } from "@fonteditor/view";
 import type { DiskFolder } from "@fonteditor/disk";
 
 import { frameGlyph } from "../framing.js";
+import { type Decoded, ImageCache } from "../images.js";
 import {
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
@@ -51,6 +59,7 @@ import {
   saveFolderAs,
 } from "./folder.js";
 import { type FontHost, type ImportReport, importFont, newFont, showDocument } from "./fonts.js";
+import { type AddedImage, addImage, refreshImages, setImageOn } from "./images.js";
 import { defaults, remember, within } from "./settings.js";
 import { NO_FOLDER, type StoreState, initialState } from "./state.js";
 
@@ -132,6 +141,22 @@ export class EditorStore {
    * handle out here also means a render can never accidentally hold one open.
    */
   private folderHandle: DiskFolder | null = null;
+  /**
+   * The pictures, decoded.
+   *
+   * Outside the state for the reason the folder handle is: a bitmap is not
+   * something the interface reads, and a render holding one would keep a
+   * twenty-megapixel scan alive after the font that used it was closed.
+   */
+  private readonly pictures = new ImageCache(
+    (name) => this.disk.getImage(name),
+    () => {
+      // A picture that has finished decoding changes what the canvas should be
+      // showing without changing the document, so the listeners are woken
+      // directly rather than through a patch.
+      for (const listener of this.listeners) listener();
+    },
+  );
 
   constructor() {
     // The preferences are read before the state is built, so the very first
@@ -145,6 +170,9 @@ export class EditorStore {
       },
       disk: this.disk,
       keepSnapshot: () => this.snapshot(),
+      forgetImage: (name) => {
+        this.pictures.forget(name);
+      },
       folder: () => this.folderHandle,
       setFolder: (folder, name) => {
         this.folderHandle = folder;
@@ -412,6 +440,63 @@ export class EditorStore {
     await noteRememberedFolder(this.host);
   }
 
+  // ---- the pictures a font is traced from --------------------------------
+
+  /** The decoded picture behind a name, or `null` while it is being read. */
+  picture(name: string): Decoded | null {
+    return this.pictures.get(name);
+  }
+
+  /** Whether a picture is in the font but cannot be shown. */
+  pictureBroken(name: string): boolean {
+    return this.pictures.broken(name);
+  }
+
+  /** Put a file in the font's pictures, replacing one of the same name. */
+  async addImage(file: File): Promise<AddedImage> {
+    return await addImage(this.host, file);
+  }
+
+  /** Every picture in the font, for an export that has to carry them. */
+  async allImages(): Promise<Map<string, Uint8Array>> {
+    return await this.disk.allImages();
+  }
+
+  /** Read the list of pictures back from the store. */
+  async refreshImages(): Promise<void> {
+    await refreshImages(this.host);
+  }
+
+  /** Put a picture behind the current glyph, or take away the one there. */
+  setImage(name: string | null): void {
+    const next = setImageOn(this.editor, name);
+    if (next === null) return;
+    this.applyTool(result(next, [begin("Trace from a picture"), commit]));
+  }
+
+  /**
+   * Take a picture out of the font.
+   *
+   * Every glyph tracing from it stops, in the same step, because a glyph
+   * pointing at a file that is not there would draw nothing and say nothing.
+   */
+  async removeImage(name: string): Promise<void> {
+    let editor = this.editor;
+    for (const glyph of editor.document.glyphOrder) {
+      const found = editor.document.glyphs[glyph];
+      if (found?.image?.name !== name) continue;
+      const document = putGlyph(editor.document, setGlyphImage(found, null));
+      editor = { ...editor, document };
+    }
+    if (editor !== this.editor) {
+      this.applyTool(result(editor, [begin("Remove a picture"), commit]));
+    }
+
+    await this.disk.removeImage(name);
+    this.pictures.forget(name);
+    await this.refreshImages();
+  }
+
   // ---- settings ----------------------------------------------------------
 
   setCatalogQuery(changes: Partial<CatalogQuery>): void {
@@ -490,6 +575,15 @@ export class EditorStore {
 
   toggleAnchors(): void {
     this.remember({ showAnchors: !this.state.showAnchors });
+  }
+
+  toggleImage(): void {
+    this.remember({ showImage: !this.state.showImage });
+  }
+
+  setImageOpacity(value: number): void {
+    const opacity = within(value, 0.05, 1);
+    if (opacity !== null) this.remember({ imageOpacity: opacity });
   }
 
   toggleCurvature(): void {

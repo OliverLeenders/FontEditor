@@ -1,4 +1,5 @@
 import {
+  imageRef,
   DEFAULT_FONT_INFO,
   EMPTY_KERNING,
   addAnchor,
@@ -306,3 +307,25 @@ describe("the report itself", () => {
 });
 
 const rank = (s: string): number => ["error", "warning", "note"].indexOf(s);
+
+describe("pictures a glyph traces from", () => {
+  it("finds a glyph naming one the font does not have", () => {
+    const document = font(
+      glyph("a", { advance: 500, image: imageRef("gone.png") }),
+      glyph("b", { advance: 500, image: imageRef("sheet.png") }),
+    );
+
+    const found = preflight(document, { images: new Set(["sheet.png"]) });
+    const missing = found.filter((f) => f.check === "missing-image");
+
+    expect(missing).toHaveLength(1);
+    expect(missing[0]?.glyph).toBe("a");
+  });
+
+  it("says nothing at all when it was not told what the font holds", () => {
+    // The pictures live beside the document, so a check that guessed would
+    // report every tracing in a font whose images simply were not handed over.
+    const document = font(glyph("a", { advance: 500, image: imageRef("gone.png") }));
+    expect(tripped(document).has("missing-image")).toBe(false);
+  });
+});

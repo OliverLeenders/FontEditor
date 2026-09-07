@@ -78,7 +78,10 @@ export function GlyphCanvas({
 
     const surface = new CanvasSurface(canvas, (ctx, size) => {
       store.setViewport(size.width, size.height);
-      drawScene(ctx, sceneFor(store.getState(), size));
+      drawScene(
+        ctx,
+        sceneFor(store.getState(), size, (name) => store.picture(name)),
+      );
     });
     surfaceRef.current = surface;
     surface.start();

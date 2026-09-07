@@ -30,6 +30,20 @@ export interface Canvas2D {
    */
   translate(x: number, y: number): void;
   rotate(radians: number): void;
+  /**
+   * Scale and shear, for the one thing that needs a full transform: a picture
+   * laid behind a glyph, which is placed by an affine somebody chose.
+   */
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void;
+
+  /**
+   * Draw a decoded picture into a rectangle of the canvas.
+   *
+   * Typed as unknown because the renderer must not know what an `ImageBitmap`
+   * is: this package runs in a test under Node, where that type does not exist,
+   * and the only thing drawing needs of it is that the canvas accepts it.
+   */
+  drawImage(image: unknown, x: number, y: number, width: number, height: number): void;
 
   beginPath(): void;
   closePath(): void;

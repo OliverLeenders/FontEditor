@@ -1,4 +1,4 @@
-import type { Cubic, Rect, Vec2 } from "@fonteditor/geometry";
+import type { Affine, Cubic, Rect, Vec2 } from "@fonteditor/geometry";
 import type { AnchorId, Contour, Glyph, Guide, GuideId } from "@fonteditor/font-model";
 import type { BoxFrame, Comb, Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
 
@@ -12,6 +12,25 @@ import type { RenderPalette } from "./palette.js";
  * how it is drawn — a font's guide appears in every glyph and is a heavier
  * commitment than one belonging to the letter in front of you.
  */
+/** A decoded picture, where it goes, and how strongly it shows through. */
+export type SceneImage = {
+  /**
+   * Whatever the canvas will draw — an `ImageBitmap` in a browser.
+   *
+   * Unknown here on purpose: this package is tested in Node, where that type
+   * does not exist, and the only thing drawing asks of it is that the canvas
+   * accepts it.
+   */
+  readonly bitmap: unknown;
+  /** Its size in its own pixels, which the transform is written against. */
+  readonly width: number;
+  readonly height: number;
+  /** Image pixels to design units. */
+  readonly transform: Affine;
+  /** 0 to 1. A tracing you cannot see through is a tracing you draw over. */
+  readonly opacity: number;
+};
+
 export type SceneGuide = {
   readonly guide: Guide;
   readonly scope: "font" | "glyph";
@@ -140,6 +159,14 @@ export type Scene = {
    * scope a line came from — only what it is called and whether it is the one
    * being dragged.
    */
+  /**
+   * The picture behind the glyph, decoded and placed.
+   *
+   * The bitmap is passed in rather than fetched: decoding is asynchronous and
+   * belongs to whoever owns the images, and a renderer that could wait for one
+   * would be a renderer that sometimes draws a frame late.
+   */
+  readonly image: SceneImage | null;
   readonly guides: readonly SceneGuide[];
   /** The guide under the pointer, and the one selected, by id. */
   readonly hoveredGuide: GuideId | null;
@@ -287,6 +314,7 @@ export type SceneInit = {
   readonly metrics?: RenderMetrics;
   readonly options?: Partial<RenderOptions>;
   readonly metricLines?: readonly MetricLine[];
+  readonly image?: SceneImage | null;
   readonly guides?: readonly SceneGuide[];
   readonly hoveredGuide?: GuideId | null;
   readonly selectedGuide?: GuideId | null;
@@ -318,6 +346,7 @@ export function scene(init: SceneInit): Scene {
     metrics: init.metrics ?? DEFAULT_METRICS,
     options: { ...DEFAULT_OPTIONS, ...init.options },
     metricLines: init.metricLines ?? [],
+    image: init.image ?? null,
     guides: init.guides ?? [],
     hoveredGuide: init.hoveredGuide ?? null,
     selectedGuide: init.selectedGuide ?? null,

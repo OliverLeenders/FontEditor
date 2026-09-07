@@ -66,6 +66,14 @@ export class RecordingContext implements Canvas2D {
     this.record("rotate", [radians]);
   }
 
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): void {
+    this.record("transform", [a, b, c, d, e, f]);
+  }
+
+  drawImage(_image: unknown, x: number, y: number, width: number, height: number): void {
+    this.record("drawImage", [x, y, width, height]);
+  }
+
   save(): void {
     this.stack.push({
       fillStyle: this.fillStyle,

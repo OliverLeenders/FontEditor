@@ -286,6 +286,37 @@
   border-color: var(--accent);
 }
 
+/* The tracing row: which picture, where its corner is, how big, and the one
+   button worth having — lay it across the glyph and nudge from there. */
+.imageRow {
+  display: grid;
+  grid-template-columns: 1fr 3rem 3rem 3rem auto;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.imageName {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imageFit {
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.imageFit:hover {
+  color: var(--ink);
+}
+
 /* A guide row carries one more number than an anchor — the angle — and the
    scope, which is a button because it is also how the scope is changed. */
 .guideRow {

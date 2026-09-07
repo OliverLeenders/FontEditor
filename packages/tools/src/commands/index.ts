@@ -40,6 +40,18 @@ export {
 } from "./anchors.js";
 
 export type { GuideScope } from "./guides.js";
+
+export {
+  currentImage,
+  fitImageToGlyph,
+  glyphBox,
+  imagePlacement,
+  moveImageBy,
+  moveImageTo,
+  placeImageByCrop,
+  scaleImageTo,
+  shownImageCrop,
+} from "./images.js";
 export {
   addGuideAt,
   deleteSelectedGuide,

@@ -11,7 +11,7 @@ import {
   randomIds,
   resolveGlyphComponents,
 } from "@fonteditor/font-model";
-import type { NeighbourGlyph, SnapGuide } from "@fonteditor/render";
+import type { NeighbourGlyph, SceneImage, SnapGuide } from "@fonteditor/render";
 import {
   DARK_PALETTE,
   DEFAULT_METRICS,
@@ -35,6 +35,7 @@ import {
 } from "@fonteditor/tools";
 import { type Comb, combFor } from "@fonteditor/view";
 
+import type { Decoded } from "./images.js";
 import { isDarkNow } from "./scheme.js";
 import type { StoreState } from "./store/index.js";
 
@@ -164,7 +165,11 @@ export function handlesAutoHidden(state: StoreState): boolean {
  * A pure function of the state and the canvas size, which is what lets the
  * canvas redraw straight from a subscription without React being involved.
  */
-export function sceneFor(state: StoreState, size: { width: number; height: number }): Scene {
+export function sceneFor(
+  state: StoreState,
+  size: { width: number; height: number },
+  picture: (name: string) => Decoded | null = () => null,
+): Scene {
   const editor = state.session.editor;
   const glyph = editor.document.glyphs[editor.currentGlyph] ?? EMPTY;
 
@@ -204,6 +209,10 @@ export function sceneFor(state: StoreState, size: { width: number; height: numbe
     // The lines the designer put there, the font's and the glyph's together.
     // Off with the rest of the furniture while space is held: previewing means
     // seeing the shape, and a guide is not part of it.
+    // The picture this letter is traced from, if it has one and it has been
+    // decoded. Absent while it is still being read, which costs one frame and
+    // is the price of a renderer that never waits.
+    image: state.previewing ? null : tracingFor(state, glyph, picture),
     guides: state.previewing ? [] : guidesInForce(editor),
     hoveredGuide: editor.hoveredGuide,
     selectedGuide: editor.selectedGuide,
@@ -258,6 +267,33 @@ function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[] } {
   // The filled contours, not the drawn ones: the hairs point out of the ink, and
   // only the corrected winding says which side that is.
   return { comb: combFor(filledContours(glyph), state.session.editor.view) };
+}
+
+/**
+ * The picture behind the glyph, ready to draw.
+ *
+ * Everything the renderer needs and nothing it has to ask for: the bitmap, its
+ * own size, the placement, and how strongly it shows through. The strength is a
+ * preference rather than part of the picture, because how far a tracing should
+ * show depends on what you are doing over it.
+ */
+function tracingFor(
+  state: StoreState,
+  glyph: Glyph,
+  picture: (name: string) => Decoded | null,
+): SceneImage | null {
+  if (!state.showImage || glyph.image === null) return null;
+
+  const decoded = picture(glyph.image.name);
+  if (decoded === null) return null;
+
+  return {
+    bitmap: decoded.bitmap,
+    width: decoded.width,
+    height: decoded.height,
+    transform: glyph.image.transform,
+    opacity: state.imageOpacity,
+  };
 }
 
 /**
