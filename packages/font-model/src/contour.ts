@@ -6,6 +6,8 @@ import {
   type Vec2,
   balance,
   addScaled,
+  curvature,
+  harmonisedJoin,
   bounds,
   distance,
   dot,
@@ -687,6 +689,90 @@ export function segmentLambdas(c: Contour, index: number): HandleScales | null {
 /** Place both handles at the given scales. The write to {@link segmentLambdas}. */
 export function setSegmentLambdas(c: Contour, index: number, scales: HandleScales): Contour | null {
   return applyToSegment(c, index, (geometry) => setLambdas(geometry, scales));
+}
+
+/**
+ * The two segments meeting at a node, as cubics, or `null` where they are not
+ * two curves.
+ *
+ * The pair everything about a join is asked of: the curvature either side of it,
+ * and whether it can be harmonised.
+ */
+export function segmentsAround(
+  c: Contour,
+  id: NodeId,
+): { readonly before: Cubic; readonly after: Cubic } | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+
+  const count = segmentCount(c);
+  if (count === 0) return null;
+
+  // The segment arriving is the one before this node, which wraps on a closed
+  // contour and does not exist at the start of an open one.
+  const arriving = i === 0 ? (c.closed ? count - 1 : -1) : i - 1;
+  const leaving = i < count ? i : -1;
+  if (arriving < 0 || leaving < 0) return null;
+
+  const before = segmentAt(c, arriving);
+  const after = segmentAt(c, leaving);
+  if (before === null || after === null) return null;
+  if (before.kind === "line" || after.kind === "line") return null;
+
+  return { before: segmentCubic(before), after: segmentCubic(after) };
+}
+
+/**
+ * The curvature either side of a node: how tightly the outline turns as it
+ * arrives, and as it leaves.
+ *
+ * Two numbers rather than one, because the whole question at a join is whether
+ * they are the same. `null` where the node is not between two curves, or where
+ * a curve has no curvature there to speak of — a cusp, a retracted handle.
+ */
+export function curvatureAround(
+  c: Contour,
+  id: NodeId,
+): { readonly before: number; readonly after: number } | null {
+  const pair = segmentsAround(c, id);
+  if (pair === null) return null;
+
+  const before = curvature(pair.before, 1);
+  const after = curvature(pair.after, 0);
+  return before === null || after === null ? null : { before, after };
+}
+
+/**
+ * Move a node to where the curvature either side of it agrees.
+ *
+ * Harmonising: the node slides along the line between its own two handles,
+ * which leaves both segments the directions they were drawn with and lands the
+ * node exactly smooth as well as curvature-continuous. See `harmonisedJoin` for
+ * why that line is the one place it can go.
+ *
+ * The node becomes smooth, because after the move it is: its handles are
+ * collinear through it by construction, and saying so keeps the next drag from
+ * quietly breaking what was just fixed.
+ *
+ * `null` where there is nothing to do — a node between anything but two curves,
+ * a straight side, or a node already where it belongs.
+ */
+export function harmoniseNode(c: Contour, id: NodeId): Contour | null {
+  const pair = segmentsAround(c, id);
+  if (pair === null) return null;
+
+  const point = harmonisedJoin(pair.before, pair.after);
+  if (point === null) return null;
+
+  const i = nodeIndex(c, id);
+  const existing = c.nodes[i];
+  if (existing === undefined) return null;
+  if (existing.pt.x === point.x && existing.pt.y === point.y) return null;
+
+  // The point alone. `setNodePoint` takes the handles along with it, which is
+  // what dragging a node means and the opposite of what this means: the handles
+  // are the two curves' own, they stay, and the point slides between them.
+  return settled(replaceNode(c, i, { ...existing, pt: point, type: "smooth" }));
 }
 
 export function balanceSegment(c: Contour, index: number): Contour | null {

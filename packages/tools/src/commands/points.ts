@@ -7,6 +7,8 @@ import {
   NO_LOCK,
   canBeTangent,
   contourById,
+  curvatureAround,
+  harmoniseNode,
   extendHandle,
   extendSegmentHandles,
   isHalfHandled,
@@ -91,6 +93,67 @@ export function selectedNode(
   const found = c === null ? null : nodeById(c, item.nodeId);
   if (found === null) return null;
   return { contourId: item.contourId, nodeId: item.nodeId, node: found };
+}
+
+/**
+ * The curvature either side of the one selected node, and what it means.
+ *
+ * `radius` rather than curvature itself, because a radius is a length in the
+ * units the letter is drawn in — "this side turns as if on a circle of 320" —
+ * where curvature is a number with no size anybody has a feel for. The ratio is
+ * the reading that matters: one is a join the light crosses without a crease.
+ */
+export function selectedCurvature(state: EditorState): {
+  readonly before: number;
+  readonly after: number;
+  readonly ratio: number;
+} | null {
+  const found = selectedNode(state);
+  const glyph = currentGlyph(state);
+  const c = found === null || glyph === null ? null : contourById(glyph, found.contourId);
+  if (found === null || c === null) return null;
+
+  const k = curvatureAround(c, found.nodeId);
+  if (k === null) return null;
+
+  const before = Math.abs(k.before);
+  const after = Math.abs(k.after);
+  if (before === 0 || after === 0) return null;
+
+  // The larger over the smaller, so the number reads the same whichever side is
+  // tighter: 1 is agreement and 3 is a join three times sharper on one side.
+  const ratio = before > after ? before / after : after / before;
+  return { before: 1 / before, after: 1 / after, ratio };
+}
+
+/**
+ * Move every selected node to where the curvature either side of it agrees.
+ *
+ * Nodes that cannot be harmonised are passed over rather than refused: a
+ * selection is usually a whole shape, and "some of these are corners" is not a
+ * reason to leave the rest crooked.
+ */
+export function harmoniseSelection(state: EditorState): ToolResult {
+  let editor = state;
+  for (const item of state.selection) {
+    if (item.part !== "point") continue;
+    const document = editCurrentGlyph(editor, (g) =>
+      updateContour(g, item.contourId, (c) => harmoniseNode(c, item.nodeId)),
+    );
+    if (document !== null) editor = { ...editor, document };
+  }
+  return done(state, editor === state ? null : editor, "Harmonise");
+}
+
+/** Whether a node is one harmonising would move, for the menu to offer it. */
+export function nodeCanHarmonise(
+  state: EditorState,
+  contourId: ContourId,
+  nodeId: NodeId,
+): boolean {
+  const glyph = currentGlyph(state);
+  const c = glyph === null ? null : contourById(glyph, contourId);
+  return c !== null && harmoniseNode(c, nodeId) !== null;
 }
 
 /** Whether every selected point could be tangent, for the inspector's button. */

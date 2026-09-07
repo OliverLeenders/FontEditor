@@ -6,6 +6,7 @@ import {
   add,
   addScaled,
   coincident,
+  cross,
   distanceSq,
   isFinitePoint,
   lerp,
@@ -705,4 +706,60 @@ export function selfIntersection(s: Cubic): CurveMeeting | null {
   if (Math.hypot(other.x - point.x, other.y - point.y) > 1e-6 * size) return null;
 
   return { t1, t2, point };
+}
+
+/**
+ * Where the point joining two curves has to sit for their curvatures to agree.
+ *
+ * Harmonisation. Two segments meeting smoothly are tangent-continuous — the
+ * light travelling along one arrives at the same angle it leaves at — but the
+ * *rate* of turn can jump, and that jump is what the curvature comb shows as a
+ * step at the node. The eye finds it too: it is the faint crease that makes a
+ * bowl look assembled rather than drawn.
+ *
+ * What can be moved to fix it is the shared point, along the line between its
+ * two handles. The handles stay where they are, so both segments keep the
+ * directions they were given, and the point lands where it makes the node
+ * exactly smooth as well as curvature-continuous.
+ *
+ * The arithmetic is short because curvature at the end of a cubic depends on
+ * only two things: how far the last handle is from the point, and how far the
+ * handle before it stands off the line they lie on. Sliding the point along that
+ * line leaves both stand-off distances untouched — they are measured to a line
+ * whose direction is fixed — so the two curvatures become `h₁/d₁²` and `h₂/d₂²`
+ * with `d₁ + d₂` the whole distance between the handles. Setting them equal
+ * gives `d₁/d₂ = √h₁/√h₂`, and the point that divides the line in that ratio is
+ * the answer.
+ *
+ * `null` where there is nothing to solve: a handle sitting on the point it
+ * belongs to, both handles in the same place, or a side that is already straight
+ * — a straight side has no curvature to match, and moving the point to pretend
+ * otherwise would bend it.
+ */
+export function harmonisedJoin(before: Cubic, after: Cubic): Vec2 | null {
+  const from = before.c2;
+  const to = after.c1;
+
+  const span = { x: to.x - from.x, y: to.y - from.y };
+  const length = Math.hypot(span.x, span.y);
+  if (length === 0 || !Number.isFinite(length)) return null;
+
+  const unit = { x: span.x / length, y: span.y / length };
+  // How far each outer handle stands off the line the inner two lie on. That is
+  // the whole of what its curvature depends on, once the point is on the line.
+  const offOne = Math.abs(cross({ x: before.c1.x - from.x, y: before.c1.y - from.y }, unit));
+  const offTwo = Math.abs(cross({ x: after.c2.x - to.x, y: after.c2.y - to.y }, unit));
+
+  // A side standing on the line is straight at the join: it has no curvature to
+  // agree with, and solving anyway would put the point on top of a handle and
+  // flatten the curve rather than harmonise it.
+  const flat = length * 1e-9;
+  if (offOne <= flat || offTwo <= flat) return null;
+
+  const one = Math.sqrt(offOne);
+  const two = Math.sqrt(offTwo);
+
+  const at = one / (one + two);
+  const point = { x: from.x + span.x * at, y: from.y + span.y * at };
+  return isFinitePoint(point) ? point : null;
 }

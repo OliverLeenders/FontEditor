@@ -25,7 +25,19 @@ import type { ViewTransform } from "./transform.js";
 export type CombHair = {
   /** Where on the outline it stands, in design units. */
   readonly at: Vec2;
-  /** Unit normal, to the left of the direction of travel. */
+  /**
+   * Unit normal pointing out of the ink.
+   *
+   * Out, always — not along the sign of the curvature. A comb that followed the
+   * sign stands inside the letter wherever the outline turns the other way,
+   * which on an `a` fills the counter with hairs and hides the very join being
+   * judged. Away from the ink it is always readable, and an inflection shows as
+   * the comb pinching to nothing and growing again rather than as a crossing.
+   *
+   * This is why the contours have to arrive with their directions corrected:
+   * which side the ink is on is a fact about winding, and a contour drawn the
+   * wrong way round would grow its comb inwards.
+   */
   readonly normal: Vec2;
   /** Signed curvature: the reciprocal of the radius of the circle fitting here. */
   readonly k: number;
@@ -56,6 +68,10 @@ const STEPS = 96;
  * The zoom is not decoration here: the spacing is in pixels, so a letter zoomed
  * in gets more hairs rather than the same hairs further apart, which is what
  * makes the envelope readable at both sizes.
+ *
+ * The contours must be the *filled* ones — `filledContours` in the model — since
+ * the hairs point out of the ink and only the corrected winding says which side
+ * that is.
  */
 export function combFor(
   contours: readonly Contour[],
@@ -141,9 +157,13 @@ function hairAt(cubic: Parameters<typeof curvature>[0], t: number): CombHair | n
   const speed = Math.hypot(d.x, d.y);
   if (speed === 0) return null;
 
+  // The right-hand normal. With the directions corrected, the ink is to the
+  // left of travel on an outer contour and to the left again on a hole — a hole
+  // runs the other way, so its enclosed side is the counter — which makes the
+  // right-hand normal the way out of the ink in both cases.
   return {
     at: evaluate(cubic, t),
-    normal: { x: -d.y / speed, y: d.x / speed },
+    normal: { x: d.y / speed, y: -d.x / speed },
     k,
   };
 }

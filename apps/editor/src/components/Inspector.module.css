@@ -320,3 +320,15 @@
   opacity: 0.38;
   cursor: default;
 }
+
+/* The curvature readout: the two radii, how far apart they are, and the button
+   that closes the gap. */
+.curvature {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.25rem 0.4rem;
+}
+.curvature .align {
+  grid-column: 1 / -1;
+}

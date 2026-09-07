@@ -29,8 +29,10 @@ import {
   renameCurrentGlyph,
   renameRefusal,
   result,
+  harmoniseSelection,
   selectedCanBeTangent,
   selectedCoordinate,
+  selectedCurvature,
   selectedNode,
   setSegmentTension,
 } from "@fonteditor/tools";
@@ -97,6 +99,14 @@ export function Inspector(): React.JSX.Element | null {
   const inAngle = useStoreValue((s) => handlePolar(s.session.editor, "in")?.angle ?? null);
   const outLength = useStoreValue((s) => handlePolar(s.session.editor, "out")?.length ?? null);
   const outAngle = useStoreValue((s) => handlePolar(s.session.editor, "out")?.angle ?? null);
+
+  // The curvature either side of the selected node, as radii, and how far apart
+  // they are. Three scalars rather than the object, for the reason the
+  // coordinate above is three: a fresh object every notification re-renders the
+  // panel through every drag.
+  const radiusIn = useStoreValue((s) => selectedCurvature(s.session.editor)?.before ?? null);
+  const radiusOut = useStoreValue((s) => selectedCurvature(s.session.editor)?.after ?? null);
+  const curvatureRatio = useStoreValue((s) => selectedCurvature(s.session.editor)?.ratio ?? null);
 
   const tensionIn = useStoreValue((s) => focusedSegmentScales(s.session.editor)?.lambda1 ?? null);
   const tensionOut = useStoreValue((s) => focusedSegmentScales(s.session.editor)?.lambda2 ?? null);
@@ -787,6 +797,35 @@ export function Inspector(): React.JSX.Element | null {
                 onChange={(event) => commitTension("out", Number(event.target.value))}
               />
             </Stepper>
+          </div>
+        </Field>
+
+        {/* What the curvature comb shows at this node, as a number: the radius
+            of the circle fitting each side, and how far apart the two are. One
+            is a join the light crosses without a crease, and harmonising is
+            what puts a join there. */}
+        <Field label="Curvature">
+          <div className={styles.curvature}>
+            <span className={styles.readonly}>
+              {radiusIn === null || radiusOut === null
+                ? "—"
+                : `r ${String(Math.round(radiusIn))} · ${String(Math.round(radiusOut))}`}
+            </span>
+            <span
+              className={styles.readonly}
+              title="The sharper side over the gentler; 1.00 is a join with no curvature break"
+            >
+              {curvatureRatio === null ? "" : `× ${curvatureRatio.toFixed(2)}`}
+            </span>
+            <button
+              type="button"
+              className={styles.align}
+              disabled={pointCount === 0}
+              title="Move the selected points to where the curvature either side of them agrees"
+              onClick={() => store.applyTool(harmoniseSelection(store.editor))}
+            >
+              Harmonise
+            </button>
           </div>
         </Field>
 

@@ -247,7 +247,9 @@ function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[]; co
   if (!state.showCurvature) return { comb: [], combScale: 0 };
 
   const view = state.session.editor.view;
-  const comb = combFor(glyph.contours, view);
+  // The filled contours, not the drawn ones: the hairs point out of the ink, and
+  // only the corrected winding says which side that is.
+  const comb = combFor(filledContours(glyph), view);
   return { comb, combScale: combScale(comb, view) };
 }
 

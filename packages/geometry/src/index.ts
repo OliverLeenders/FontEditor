@@ -75,6 +75,7 @@ export {
   bounds,
   controlBounds,
   curvature,
+  harmonisedJoin,
   cubic,
   derivative,
   evaluate,

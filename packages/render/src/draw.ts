@@ -1046,39 +1046,65 @@ export function drawSection(ctx: Canvas2D, s: Scene): void {
  * since joining the last hair of one shape to the first of the next would draw a
  * line across the letter that means nothing.
  */
+/**
+ * How long a hair has to be, in screen pixels, before it is worth drawing.
+ *
+ * Below this the outline is straight as far as anyone can see, and the comb
+ * should say so by not being there.
+ */
+const STRAIGHT_PIXELS = 0.75;
+
 export function drawCurvatureComb(ctx: Canvas2D, s: Scene): void {
   if (!s.options.showCurvature || s.combScale === 0) return;
 
   ctx.save();
 
   for (const comb of s.comb) {
-    if (comb.hairs.length === 0) continue;
+    // A straight stretch has no curvature and grows no comb. Drawn anyway, its
+    // envelope lies along the outline and doubles it, which reads as a fault in
+    // the drawing rather than as the absence of one.
+    const runs: { foot: Vec2; tip: Vec2 }[][] = [];
+    let run: { foot: Vec2; tip: Vec2 }[] = [];
 
-    const tips = comb.hairs.map((hair) => {
-      const reach = hair.k * s.combScale;
-      return toScreen(s.view, {
-        x: hair.at.x + hair.normal.x * reach,
-        y: hair.at.y + hair.normal.y * reach,
+    for (const hair of comb.hairs) {
+      const reach = Math.abs(hair.k) * s.combScale;
+      if (reach * s.view.scale < STRAIGHT_PIXELS) {
+        if (run.length > 1) runs.push(run);
+        run = [];
+        continue;
+      }
+      run.push({
+        foot: toScreen(s.view, hair.at),
+        tip: toScreen(s.view, {
+          x: hair.at.x + hair.normal.x * reach,
+          y: hair.at.y + hair.normal.y * reach,
+        }),
       });
-    });
+    }
+    if (run.length > 1) runs.push(run);
+    if (runs.length === 0) continue;
 
     ctx.strokeStyle = s.palette.comb;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (const [i, hair] of comb.hairs.entries()) {
-      const foot = toScreen(s.view, hair.at);
-      const tip = tips[i]!;
-      ctx.moveTo(foot.x, foot.y);
-      ctx.lineTo(tip.x, tip.y);
+    for (const each of runs) {
+      for (const { foot, tip } of each) {
+        ctx.moveTo(foot.x, foot.y);
+        ctx.lineTo(tip.x, tip.y);
+      }
     }
     ctx.stroke();
 
+    // One envelope per run, so it is never drawn across the straight stretch
+    // between two curved ones.
     ctx.strokeStyle = s.palette.combEdge;
     ctx.lineWidth = 1.25;
     ctx.beginPath();
-    for (const [i, tip] of tips.entries()) {
-      if (i === 0) ctx.moveTo(tip.x, tip.y);
-      else ctx.lineTo(tip.x, tip.y);
+    for (const each of runs) {
+      for (const [i, { tip }] of each.entries()) {
+        if (i === 0) ctx.moveTo(tip.x, tip.y);
+        else ctx.lineTo(tip.x, tip.y);
+      }
     }
     ctx.stroke();
   }

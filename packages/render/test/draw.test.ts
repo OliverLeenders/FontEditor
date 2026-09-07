@@ -764,9 +764,13 @@ describe("the curvature comb", () => {
     const hair = comb[0]!.hairs[0]!;
 
     const foot = toScreen(VIEW, hair.at);
+    // The hair stands out of the ink, so its length is the size of the
+    // curvature and its direction is the normal — the sign does not turn it
+    // round.
+    const reach = Math.abs(hair.k) * scale;
     const tip = toScreen(VIEW, {
-      x: hair.at.x + hair.normal.x * hair.k * scale,
-      y: hair.at.y + hair.normal.y * hair.k * scale,
+      x: hair.at.x + hair.normal.x * reach,
+      y: hair.at.y + hair.normal.y * reach,
     });
 
     const near = (a: { x: number; y: number }, b: { x: number; y: number }) =>

@@ -2,6 +2,8 @@ import { contourById, randomIds, segmentAt } from "@fonteditor/font-model";
 import {
   addAnchorAt,
   attachComponent,
+  harmoniseSelection,
+  nodeCanHarmonise,
   attachmentFor,
   balanceSegmentAt,
   centreCurrentGlyph,
@@ -121,6 +123,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
 
   if (target.kind === "node") {
     const { contourId, nodeId } = target;
+    const harmonises = nodeCanHarmonise(editor, contourId, nodeId);
     const locked = nodeHvLocked(editor, contourId, nodeId);
     items.push(
       {
@@ -147,6 +150,24 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
               kind: "item" as const,
               label: "Tangent",
               run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
+            },
+          ]
+        : []),
+      // Offered only where it would move the point. A join between anything but
+      // two curves has no two curvatures to reconcile, and one already
+      // harmonious is already where this would put it.
+      ...(harmonises
+        ? [
+            {
+              kind: "item" as const,
+              label: "Harmonise",
+              run: () =>
+                store.applyTool(
+                  harmoniseSelection({
+                    ...editor,
+                    selection: [{ contourId, nodeId, part: "point" }],
+                  }),
+                ),
             },
           ]
         : []),

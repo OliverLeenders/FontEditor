@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   balanceSegment,
   canBeTangent,
+  curvatureAround,
+  harmoniseNode,
   contour,
   enforceTangents,
   contourBounds,
@@ -819,5 +821,71 @@ describe("tangent nodes", () => {
   it("hands back the same contour when everything is already true", () => {
     const c = stem();
     expect(enforceTangents(c)).toBe(c);
+  });
+});
+
+describe("harmonising", () => {
+  /** Two curves meeting at a node placed deliberately off the harmonious spot. */
+  function join() {
+    const ids = counterIds("h");
+    return contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { type: "corner", out: vec(0, 90) }),
+        node(ids.node(), vec(120, 150), {
+          type: "smooth",
+          in: vec(40, 140),
+          out: vec(220, 165),
+        }),
+        node(ids.node(), vec(320, 0), { type: "corner", in: vec(320, 90) }),
+      ],
+      false,
+    );
+  }
+
+  it("reads the curvature either side of a node", () => {
+    const c = join();
+    const k = curvatureAround(c, c.nodes[1]!.id)!;
+
+    expect(k).not.toBeNull();
+    // Placed off the harmonious point, so the two sides disagree.
+    expect(Math.abs(k.before)).not.toBeCloseTo(Math.abs(k.after), 6);
+  });
+
+  it("moves the node until the two sides agree", () => {
+    const c = join();
+    const id = c.nodes[1]!.id;
+    const out = harmoniseNode(c, id)!;
+
+    expect(out).not.toBeNull();
+    const k = curvatureAround(out, id)!;
+    expect(Math.abs(k.before)).toBeCloseTo(Math.abs(k.after), 9);
+
+    // The handles stayed exactly where they were: only the point moved.
+    expect(out.nodes[1]!.in).toEqual(c.nodes[1]!.in);
+    expect(out.nodes[1]!.out).toEqual(c.nodes[1]!.out);
+    expect(out.nodes[1]!.pt).not.toEqual(c.nodes[1]!.pt);
+    // And it is smooth afterwards, because it now is.
+    expect(out.nodes[1]!.type).toBe("smooth");
+  });
+
+  it("does nothing to a node already where it belongs", () => {
+    const once = harmoniseNode(join(), join().nodes[1]!.id)!;
+    expect(harmoniseNode(once, once.nodes[1]!.id)).toBeNull();
+  });
+
+  it("has nothing to say about a node that is not between two curves", () => {
+    const t = triangleContour();
+    expect(curvatureAround(t, t.nodes[0]!.id)).toBeNull();
+    expect(harmoniseNode(t, t.nodes[0]!.id)).toBeNull();
+
+    // Nor the end of an open contour, which has only one side.
+    const open = openContour();
+    expect(harmoniseNode(open, open.nodes[0]!.id)).toBeNull();
+  });
+
+  it("reaches round a closed contour, where the first node has two sides", () => {
+    const ring = ringContour();
+    expect(curvatureAround(ring, ring.nodes[0]!.id)).not.toBeNull();
   });
 });

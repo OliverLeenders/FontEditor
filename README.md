@@ -40,7 +40,7 @@ for.
 | **Anchors and mark attachment**            | done        | Not a phase at all, and it belongs to two: a glyph carries them, and they compile. Placing accents by hand is the thing this replaces.                                                                                                                                                                   |
 | **Not dropping what we do not understand** | half done   | Twice now a reader has quietly discarded what it had no field for — anchors from a `.glif`, then anchors from our own autosave. Both are fixed; guidelines, notes, glyph `lib` and every `fontinfo` key beyond seven are still discarded, and a UFO from another tool comes back poorer than it went in. |
 | **Font metadata**                          | not started | The info model holds seven fields. A released font also needs a version, a licence, a designer, an italic angle, weight and width classes, a vendor id, and typographic family names — without which an italic does not announce itself as one and a family of more than four styles groups wrongly.     |
-| **Curve quality**                          | half done   | The curvature comb is in, and says whether two segments agree at their join. What follows from reading one is not: no curvature readout at a node, and no harmonise command to put right what the comb shows.                                                                                            |
+| **Curve quality**                          | done        | The curvature comb reads a join, the inspector gives the radius either side of a node and how far apart they are, and harmonising moves the node to where they agree.                                                                                                                                    |
 | **Guides, and something to trace**         | not started | A glyph holds no guides of its own, and there is no way to put a scan or a reference letter behind the drawing.                                                                                                                                                                                          |
 | **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                           |
 | **A file on disk**                         | not started | Work lives in the browser's private filesystem and leaves it only as an export. Opening and saving a project where the user can see it is not the same thing.                                                                                                                                            |
@@ -183,11 +183,23 @@ put it back where the anchors say, or decompose the glyph and keep the outlines.
 hair square to the outline every few pixels, as long as the curvature there, and joins the
 tips: what is read is that envelope, where a step at a node is a curvature break — a join
 smooth to the eye and not to the light falling on it — a pinch is a flat spot, and a
-crossing to the other side is an inflection. It is the one instrument here that says
+pinch to nothing and grow again is an inflection. It is the one instrument here that says
 whether two segments _agree_; the Tunni line describes one segment and has nothing to say
-about the join. The hairs are spaced in screen pixels, so the comb is as readable zoomed
-in as out, and their length is normalised across the whole glyph, so a tight counter and a
-wide bowl can be compared rather than each being flattered separately.
+about the join. The hairs always stand out of the ink — which is why the comb is built
+from the _filled_ contours, since only the corrected winding says which side that is — and
+they are spaced in screen pixels, so the comb is as readable zoomed in as out. Their
+length is normalised across the whole glyph, so a tight counter and a wide bowl can be
+compared rather than each being flattered separately. Where the outline is straight there
+is nothing to draw and nothing is drawn, envelope included.
+
+**What the comb shows, the inspector measures and one command fixes.** Select a point and
+the Curvature line gives the radius of the circle fitting each side of it and how far
+apart the two are: `× 1.00` is a join the light crosses without a crease. **Harmonise** —
+the button there, or the right-click menu on a node — slides the point along the line
+between its own two handles to where the two curvatures agree. The handles do not move, so
+both segments keep the directions they were drawn with, and the node lands exactly smooth
+as well as curvature-continuous. It is offered only where it would do something: a corner,
+a straight side or an already harmonious join has nothing to reconcile.
 
 **Two rulers.** Hold `M` and point at a stem: the reading is taken square to the outline,
 which is what a stem width is — a straight line dragged across a round letter measures a

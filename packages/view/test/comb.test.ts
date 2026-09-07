@@ -1,5 +1,5 @@
 import { curvature, cubic, vec } from "@fonteditor/geometry";
-import { contour, counterIds, node } from "@fonteditor/font-model";
+import { contour, counterIds, node, reverseContour } from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
 import { combFor, combScale } from "../src/comb.js";
@@ -80,10 +80,12 @@ describe("the comb", () => {
     expect(comb!.hairs.length).toBeLessThan(36);
 
     for (const hair of comb!.hairs) {
-      // Every hair is a unit vector, and on a circle it points at the centre.
       expect(Math.hypot(hair.normal.x, hair.normal.y)).toBeCloseTo(1, 9);
       expect(Math.hypot(hair.at.x, hair.at.y)).toBeCloseTo(100, 1);
       expect(hair.k).toBeCloseTo(1 / 100, 3);
+      // And it points out of the ink: this circle runs anticlockwise, which is
+      // an outer contour, so away from the ink is away from the centre.
+      expect(hair.normal.x * hair.at.x + hair.normal.y * hair.at.y).toBeGreaterThan(0);
     }
   });
 
@@ -125,6 +127,17 @@ describe("the comb", () => {
     const combs = combFor([square], VIEW, { spacingPixels: 20 });
     // No curvature anywhere, so no scale — and the renderer draws nothing.
     expect(combScale(combs, VIEW)).toBe(0);
+  });
+
+  it("turns the hairs the other way on a hole, which is still out of the ink", () => {
+    // A counter runs clockwise. Away from the ink is then *into* the counter,
+    // which is the direction that keeps the comb clear of the letter.
+    const hole = reverseContour(circle(100));
+    const [comb] = combFor([hole], VIEW, { spacingPixels: 20 });
+
+    for (const hair of comb!.hairs) {
+      expect(hair.normal.x * hair.at.x + hair.normal.y * hair.at.y).toBeLessThan(0);
+    }
   });
 
   it("keeps each contour's hairs apart, so no envelope crosses the letter", () => {

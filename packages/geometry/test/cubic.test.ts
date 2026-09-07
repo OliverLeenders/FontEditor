@@ -5,7 +5,9 @@ import {
   bounds,
   controlBounds,
   cubic,
+  curvature,
   derivative,
+  harmonisedJoin,
   evaluate,
   extrema,
   flatten,
@@ -186,5 +188,78 @@ describe("the control box", () => {
         project(s, p).distance + 1e-9,
       );
     }
+  });
+});
+
+describe("harmonising a join", () => {
+  /** Curvature at the end of a cubic, which is what a join has to agree on. */
+  const at = (c: ReturnType<typeof cubic>, t: number) => Math.abs(curvature(c, t)!);
+
+  it("puts the point where the two curvatures meet", () => {
+    // Two segments sharing a point, with the point deliberately in the wrong
+    // place: the curvatures either side of it differ by a factor of three.
+    const from = vec(0, 0);
+    const c1 = vec(60, 90);
+    const c2 = vec(140, 120);
+    const c3 = vec(220, 120);
+    const c4 = vec(320, 60);
+    const to = vec(380, 0);
+
+    const point = harmonisedJoin(
+      cubic(from, c1, c2, vec(180, 120)),
+      cubic(vec(180, 120), c3, c4, to),
+    )!;
+    expect(point).not.toBeNull();
+
+    const before = cubic(from, c1, c2, point);
+    const after = cubic(point, c3, c4, to);
+    expect(at(before, 1)).toBeCloseTo(at(after, 0), 9);
+  });
+
+  it("lands on the line between the two handles, which is what keeps it smooth", () => {
+    const before = cubic(vec(0, 0), vec(40, 80), vec(120, 110), vec(170, 110));
+    const after = cubic(vec(170, 110), vec(230, 110), vec(300, 70), vec(340, 0));
+
+    const point = harmonisedJoin(before, after)!;
+    const span = { x: after.c1.x - before.c2.x, y: after.c1.y - before.c2.y };
+    const off = { x: point.x - before.c2.x, y: point.y - before.c2.y };
+
+    // On the line, and between the two handles rather than beyond either.
+    expect(Math.abs(span.x * off.y - span.y * off.x)).toBeCloseTo(0, 6);
+    const along = (off.x * span.x + off.y * span.y) / (span.x * span.x + span.y * span.y);
+    expect(along).toBeGreaterThan(0);
+    expect(along).toBeLessThan(1);
+  });
+
+  it("leaves an already harmonious join where it is", () => {
+    // An arch, symmetric about its apex: the two sides already agree, and the
+    // answer is the apex, which is where the point already sits.
+    const apex = vec(100, 100);
+    const before = cubic(vec(0, 0), vec(0, 60), vec(40, 100), apex);
+    const after = cubic(apex, vec(160, 100), vec(200, 60), vec(200, 0));
+
+    const point = harmonisedJoin(before, after)!;
+    expect(point.x).toBeCloseTo(apex.x, 6);
+    expect(point.y).toBeCloseTo(apex.y, 6);
+  });
+
+  it("has nothing to match where a side is straight", () => {
+    // A straight side has no curvature; moving the point to agree with it would
+    // bend the curve to zero rather than harmonise anything.
+    const middle = vec(100, 100);
+    const straight = cubic(vec(0, 100), vec(40, 100), vec(60, 100), middle);
+    const curved = cubic(middle, vec(160, 100), vec(200, 60), vec(200, 0));
+    expect(harmonisedJoin(straight, curved)).toBeNull();
+  });
+
+  it("declines where there is nothing to solve", () => {
+    // Both inner handles in the same place: no line to slide along.
+    const same = vec(100, 100);
+    expect(
+      harmonisedJoin(
+        cubic(vec(0, 0), vec(20, 60), same, same),
+        cubic(same, same, vec(180, 60), vec(200, 0)),
+      ),
+    ).toBeNull();
   });
 });

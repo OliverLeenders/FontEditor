@@ -44,6 +44,9 @@ import {
   nudgeKern,
   addAnchorAt,
   addComponent,
+  harmoniseSelection,
+  nodeCanHarmonise,
+  selectedCurvature,
   attachComponent,
   attachmentFor,
   balanceSegmentAt,
@@ -1718,5 +1721,81 @@ describe("components", () => {
   it("does nothing to a glyph with no components", () => {
     const s = parts();
     expect(decomposeCurrentGlyph(s, counterIds("d")).state).toBe(s);
+  });
+});
+
+describe("harmonising", () => {
+  /** An arch whose apex sits off the point where the two curvatures agree. */
+  const arch = (): { s: EditorState; c: Contour } => {
+    const ids = counterIds("hz");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { type: "corner", out: vec(0, 90) }),
+        node(ids.node(), vec(120, 150), { type: "smooth", in: vec(40, 140), out: vec(220, 165) }),
+        node(ids.node(), vec(320, 0), { type: "corner", in: vec(320, 90) }),
+      ],
+      false,
+    );
+    return { s: start(c).s, c };
+  };
+
+  const pointOf = (s: EditorState, i: number) =>
+    firstGlyph(s.document).contours[0]!.nodes[i]!.pt;
+
+  it("reads the curvature either side of the selected node, as radii", () => {
+    const { s, c } = arch();
+    const chosen = selectPoint(s, c, 1);
+    const reading = selectedCurvature(chosen)!;
+
+    expect(reading).not.toBeNull();
+    // Off the harmonious point, so the two radii differ and the ratio says so.
+    expect(reading.ratio).toBeGreaterThan(1.2);
+    expect(reading.before).toBeGreaterThan(0);
+  });
+
+  it("moves the selected node until they agree, in one step", () => {
+    const { s, c } = arch();
+    const out = harmoniseSelection(selectPoint(s, c, 1));
+
+    expect(pointOf(out.state, 1)).not.toEqual(vec(120, 150));
+    expect(selectedCurvature(out.state)!.ratio).toBeCloseTo(1, 6);
+    expect(out.effects).toEqual([
+      { kind: "beginTransaction", label: "Harmonise", coalesce: false },
+      { kind: "commitTransaction" },
+    ]);
+  });
+
+  it("passes over what it cannot harmonise rather than refusing the lot", () => {
+    const { s, c } = arch();
+    // The whole contour: two corners with a straight side and the apex.
+    const all: EditorState = {
+      ...s,
+      selection: c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+    };
+
+    const out = harmoniseSelection(all);
+    expect(pointOf(out.state, 1)).not.toEqual(vec(120, 150));
+    // The ends are untouched: neither has two curves to reconcile.
+    expect(pointOf(out.state, 0)).toEqual(vec(0, 0));
+    expect(pointOf(out.state, 2)).toEqual(vec(320, 0));
+  });
+
+  it("does nothing at all when there is nothing to move", () => {
+    const { s, c } = arch();
+    const once = harmoniseSelection(selectPoint(s, c, 1)).state;
+    const again = selectPoint(once, c, 1);
+    const twice = harmoniseSelection(again);
+
+    // The very same state back, and no step in the history: a node already
+    // where it belongs is not an edit.
+    expect(twice.state).toBe(again);
+    expect(twice.effects).toEqual([]);
+  });
+
+  it("offers itself only where it would move the point", () => {
+    const { s, c } = arch();
+    expect(nodeCanHarmonise(s, c.id, c.nodes[1]!.id)).toBe(true);
+    expect(nodeCanHarmonise(s, c.id, c.nodes[0]!.id)).toBe(false);
   });
 });
