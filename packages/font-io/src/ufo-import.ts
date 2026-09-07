@@ -62,7 +62,19 @@ export async function importUfo(
 ): Promise<UfoImport | UfoImportError> {
   const files = await unzip(source);
   if (!Array.isArray(files)) return { reason: files.reason };
+  return readUfo(files, ids);
+}
 
+/**
+ * Read a UFO that is already a list of files.
+ *
+ * The same reader as `importUfo`, minus the unzipping. A UFO is a directory,
+ * and once the File System Access API can hand one over there is no archive in
+ * the way — the files arrive as files. Both callers want exactly this, so the
+ * archive is a detail of where the bytes came from rather than part of what a
+ * UFO is.
+ */
+export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | UfoImportError {
   const root = findRoot(files);
   if (root === null) {
     return { reason: "no metainfo.plist: this does not look like a UFO" };

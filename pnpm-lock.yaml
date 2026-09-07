@@ -44,6 +44,9 @@ importers:
       '@fonteditor/catalog':
         specifier: workspace:*
         version: link:../../packages/catalog
+      '@fonteditor/disk':
+        specifier: workspace:*
+        version: link:../../packages/disk
       '@fonteditor/edit-core':
         specifier: workspace:*
         version: link:../../packages/edit-core
@@ -90,6 +93,15 @@ importers:
 
   packages/catalog:
     dependencies:
+      '@fonteditor/font-model':
+        specifier: workspace:*
+        version: link:../font-model
+
+  packages/disk:
+    dependencies:
+      '@fonteditor/font-io':
+        specifier: workspace:*
+        version: link:../font-io
       '@fonteditor/font-model':
         specifier: workspace:*
         version: link:../font-model

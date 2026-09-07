@@ -1,4 +1,5 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
+import type { DiskFolder } from "@fonteditor/disk";
 import { session as newSession } from "@fonteditor/edit-core";
 import { importFont as parseFontFile, importUfo, looksLikeUfo } from "@fonteditor/font-io";
 import {
@@ -28,6 +29,9 @@ export type FontHost = StoreHost & {
   readonly disk: Persistence;
   /** Keep a copy of the font as it is now, before replacing it. */
   keepSnapshot: () => Promise<void>;
+  /** The folder on disk this font came from, if it came from one. */
+  folder: () => DiskFolder | null;
+  setFolder: (folder: DiskFolder | null, name?: string) => void;
   /** The glyph to open once the font is on screen, and the camera to frame it. */
   showGlyph: (name: GlyphName) => void;
   setCatalogQuery: (changes: Partial<CatalogQuery>) => void;
@@ -114,7 +118,7 @@ async function readUfo(
  * in where the document came from. The history is replaced rather than
  * appended to, for the reason `importFont` gives.
  */
-async function adoptDocument(host: FontHost, document: FontDocument): Promise<void> {
+export async function adoptDocument(host: FontHost, document: FontDocument): Promise<void> {
   // A copy of what is open before it stops being open. Opening a font is the
   // most destructive thing this editor does — it replaces every glyph on disk —
   // and it is exactly the moment someone discovers they meant the other file.
@@ -122,6 +126,10 @@ async function adoptDocument(host: FontHost, document: FontDocument): Promise<vo
 
   showDocument(host, document, false);
   host.setCatalogQuery(DEFAULT_QUERY);
+  // Whatever folder on disk was open held the *previous* font. Forgetting it
+  // here means Save can never quietly write this font over that one; opening a
+  // folder sets the link again straight afterwards.
+  host.setFolder(null);
   await host.disk.replaceAll(document);
 }
 

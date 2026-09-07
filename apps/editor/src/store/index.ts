@@ -20,6 +20,7 @@ import {
   setActiveTool,
 } from "@fonteditor/tools";
 import type { ViewTransform } from "@fonteditor/view";
+import type { DiskFolder } from "@fonteditor/disk";
 
 import { frameGlyph } from "../framing.js";
 import {
@@ -39,9 +40,19 @@ import {
   loadPreferences,
 } from "../preferences.js";
 import { Persistence, type PersistenceReport } from "../persistence.js";
+import {
+  type FolderReport,
+  type SaveReport,
+  forgetOpenFolder,
+  noteRememberedFolder,
+  openFolder,
+  reopenFolder,
+  saveFolder,
+  saveFolderAs,
+} from "./folder.js";
 import { type FontHost, type ImportReport, importFont, newFont, showDocument } from "./fonts.js";
 import { defaults, remember, within } from "./settings.js";
-import { type StoreState, initialState } from "./state.js";
+import { NO_FOLDER, type StoreState, initialState } from "./state.js";
 
 // Re-exported so the panels that already read these from the store keep working;
 // they live in `limits.ts` because the preferences need them too, and preferences
@@ -60,8 +71,10 @@ export {
 export { DEFAULT_PREFERENCES } from "../preferences.js";
 export type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
 export type { Ownership, StorageState } from "../persistence.js";
-export type { StoreState } from "./state.js";
+export type { FolderState, StoreState } from "./state.js";
 export type { ImportReport } from "./fonts.js";
+export type { FolderReport, SaveReport } from "./folder.js";
+export { unsaved } from "./folder.js";
 
 /**
  * How long the font has to be worked on before another copy of it is kept.
@@ -111,6 +124,14 @@ export class EditorStore {
    */
   private snapshotAt = 0;
   private snapshotted: FontDocument | null = null;
+  /**
+   * The folder on disk the font is being kept in, if it is.
+   *
+   * Not in the state: it is a live capability rather than something the
+   * interface reads, and the interface reads its name, which is. Keeping the
+   * handle out here also means a render can never accidentally hold one open.
+   */
+  private folderHandle: DiskFolder | null = null;
 
   constructor() {
     // The preferences are read before the state is built, so the very first
@@ -124,6 +145,12 @@ export class EditorStore {
       },
       disk: this.disk,
       keepSnapshot: () => this.snapshot(),
+      folder: () => this.folderHandle,
+      setFolder: (folder, name) => {
+        this.folderHandle = folder;
+        if (folder === null) this.patch({ folder: NO_FOLDER });
+        else this.patch({ folder: { ...this.state.folder, name: name ?? folder.name } });
+      },
       showGlyph: (name) => {
         this.setCurrentGlyph(name);
       },
@@ -351,6 +378,38 @@ export class EditorStore {
   /** Replace the document with a font read from a file. */
   async importFont(bytes: ArrayBuffer, fileName = ""): Promise<ImportReport> {
     return await importFont(this.host, bytes, fileName);
+  }
+
+  // ---- the font's folder on disk -----------------------------------------
+
+  /** Open a UFO folder the user picks, replacing what is open. */
+  async openFolder(): Promise<FolderReport | null> {
+    return await openFolder(this.host);
+  }
+
+  /** Open the folder this editor was last working in. */
+  async reopenFolder(): Promise<FolderReport | null> {
+    return await reopenFolder(this.host);
+  }
+
+  /** Write the font back to its folder. */
+  async saveFolder(): Promise<SaveReport> {
+    return await saveFolder(this.host);
+  }
+
+  /** Write the font to a folder the user picks, and work there from now on. */
+  async saveFolderAs(): Promise<SaveReport | null> {
+    return await saveFolderAs(this.host);
+  }
+
+  /** Stop pointing at a folder, and stop remembering it. */
+  async forgetFolder(): Promise<void> {
+    await forgetOpenFolder(this.host);
+  }
+
+  /** On the way in: say which folder this editor was last working in. */
+  async noteRememberedFolder(): Promise<void> {
+    await noteRememberedFolder(this.host);
   }
 
   // ---- settings ----------------------------------------------------------

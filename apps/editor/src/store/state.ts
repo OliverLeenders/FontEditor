@@ -1,6 +1,7 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import { type EditSession, session as newSession } from "@fonteditor/edit-core";
 import { editorState } from "@fonteditor/tools";
+import type { FontDocument } from "@fonteditor/font-model";
 import type { AutosaveStatus, SnapshotEntry } from "@fonteditor/storage";
 
 import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
@@ -36,6 +37,8 @@ export type StoreState = {
    * nothing to show.
    */
   readonly snapshots: readonly SnapshotEntry[];
+  /** The font's own folder on the user's disk, and where saving it stands. */
+  readonly folder: FolderState;
   /** Only the owning tab writes. A second tab shows the font and saves nothing. */
   readonly ownership: Ownership;
   /** What the glyph strip is showing, as typed. */
@@ -97,6 +100,41 @@ export type StoreState = {
 };
 
 /**
+ * Where the font stands with respect to a folder on the user's disk.
+ *
+ * Separate from `saveStatus`, which is the working store's, because the two
+ * answer different questions and mean different things. Autosave says "your
+ * work is safe in this browser"; this says "the file other tools can read is
+ * this far behind", and only a person pressing Save moves it.
+ */
+export type FolderState = {
+  /** The folder being worked in, once one is open. */
+  readonly name: string | null;
+  /** A folder this editor worked in before, waiting to be opened again. */
+  readonly remembered: string | null;
+  /**
+   * The document as it was last written there.
+   *
+   * The document itself rather than a flag: it is immutable, so comparing it
+   * with the one on screen answers "has anything changed since the save"
+   * exactly, and survives an undo back to what was saved.
+   */
+  readonly saved: FontDocument | null;
+  readonly savedAt: number | null;
+  readonly busy: boolean;
+  readonly problem: string | null;
+};
+
+export const NO_FOLDER: FolderState = {
+  name: null,
+  remembered: null,
+  saved: null,
+  savedAt: null,
+  busy: false,
+  problem: null,
+};
+
+/**
  * The state a store opens with: the starter font, and the reader's own settings.
  *
  * The preferences are read before this rather than inside it, so the very first
@@ -111,6 +149,7 @@ export function initialState(preferences: Preferences): StoreState {
     storageDetail: "",
     recovered: false,
     snapshots: [],
+    folder: NO_FOLDER,
     ownership: "owner",
     stripText: "hello",
     catalogQuery: DEFAULT_QUERY,

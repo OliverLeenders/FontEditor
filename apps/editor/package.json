@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@fonteditor/catalog": "workspace:*",
+    "@fonteditor/disk": "workspace:*",
     "@fonteditor/edit-core": "workspace:*",
     "@fonteditor/font-io": "workspace:*",
     "@fonteditor/font-model": "workspace:*",

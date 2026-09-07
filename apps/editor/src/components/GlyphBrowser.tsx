@@ -16,6 +16,7 @@ import { isDarkNow, watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import { ExportFont } from "./ExportFont.js";
+import { FontFile } from "./FontFile.js";
 import { NewFont } from "./NewFont.js";
 import { FontInfoPanel } from "./FontInfoPanel.js";
 import { RoundCoordinates } from "./RoundCoordinates.js";
@@ -286,6 +287,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         <div className={styles.bar}>
           <OpenFont />
           <NewFont />
+          <FontFile />
           <ExportFont />
           <NewGlyph />
           <FontInfoPanel />

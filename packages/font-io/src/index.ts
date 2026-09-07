@@ -40,7 +40,7 @@ export type { ImportResult, ImportWarning } from "./import.js";
 export { documentFrom, importFont } from "./import.js";
 
 export type { UfoImport, UfoImportError, UfoWarning } from "./ufo-import.js";
-export { importUfo, looksLikeUfo } from "./ufo-import.js";
+export { importUfo, looksLikeUfo, readUfo } from "./ufo-import.js";
 export type { ZipFile } from "./unzip.js";
 export { fileText, unzip } from "./unzip.js";
 
