@@ -175,6 +175,7 @@ export {
   addContour,
   addAnchor,
   addGuide,
+  setGlyphImage,
   addGlyphComponent,
   decomposedGlyph,
   anchorById,
@@ -232,3 +233,6 @@ export {
   turnedGuide,
   verticalGuide,
 } from "./guide.js";
+
+export type { ImageRef } from "./image.js";
+export { imagePoint, imageRef, invertAffine, placeCrop, shownCrop } from "./image.js";

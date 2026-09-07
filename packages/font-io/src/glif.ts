@@ -4,6 +4,7 @@ import {
   type Contour,
   type Glyph,
   type Guide,
+  type ImageRef,
   type IdFactory,
   type Node,
   anchor,
@@ -11,6 +12,7 @@ import {
   contour,
   glyph,
   guide,
+  imageRef,
   node,
 } from "@fonteditor/font-model";
 import { IDENTITY_AFFINE, type Vec2 } from "@fonteditor/geometry";
@@ -138,6 +140,7 @@ export function parseGlif(
     components,
     anchors,
     guides,
+    image: parseImage(childNamed(root, "image")),
     kept: keptOf(root),
   });
 }
@@ -168,7 +171,35 @@ export function parseGuideline(element: XmlElement, ids: IdFactory): Guide | nul
 }
 
 /** The elements of a `.glif` this editor models, and therefore rewrites. */
-const MODELLED = new Set(["advance", "unicode", "outline", "anchor", "guideline"]);
+const MODELLED = new Set(["advance", "unicode", "outline", "anchor", "guideline", "image"]);
+
+/**
+ * The picture this glyph is traced from, if it names one.
+ *
+ * The six numbers are the same transform a component carries and default the
+ * same way, so an image with only a `fileName` sits on the baseline at one
+ * pixel to the unit — which is what UFO says an untransformed image means.
+ */
+export function parseImage(element: XmlElement | null): ImageRef | null {
+  if (element === null) return null;
+
+  const name = element.attributes["fileName"];
+  if (name === undefined || name === "") return null;
+
+  const at = (key: string, fallback: number): number => number(element.attributes[key]) ?? fallback;
+  return imageRef(
+    name,
+    {
+      xScale: at("xScale", 1),
+      xyScale: at("xyScale", 0),
+      yxScale: at("yxScale", 0),
+      yScale: at("yScale", 1),
+      xOffset: at("xOffset", 0),
+      yOffset: at("yOffset", 0),
+    },
+    element.attributes["color"] ?? null,
+  );
+}
 
 /**
  * Everything else in the file, as the XML it was written as.

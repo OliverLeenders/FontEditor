@@ -65,6 +65,21 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "snapshot"; readonly snapshot: StoredSnapshot }
   | { readonly id: number; readonly kind: "snapshots" }
   | { readonly id: number; readonly kind: "readSnapshot"; readonly at: number }
+  /**
+   * The pictures a font is traced from.
+   *
+   * Bytes rather than text, and posted as `ArrayBuffer` because that is what
+   * crosses a thread boundary without being copied twice.
+   */
+  | {
+      readonly id: number;
+      readonly kind: "putImage";
+      readonly name: string;
+      readonly bytes: ArrayBuffer;
+    }
+  | { readonly id: number; readonly kind: "getImage"; readonly name: string }
+  | { readonly id: number; readonly kind: "images" }
+  | { readonly id: number; readonly kind: "removeImage"; readonly name: string }
   | { readonly id: number; readonly kind: "wipe" };
 
 export type LoadedPayload = {

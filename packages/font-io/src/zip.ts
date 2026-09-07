@@ -13,11 +13,28 @@
  * directory starts.
  */
 
+/**
+ * One file to put in an archive: text, or bytes.
+ *
+ * Text for everything the format is made of, which is XML; bytes for the one
+ * thing that is not, which is an image somebody is tracing from. Two shapes
+ * rather than making every caller encode its own plists, and rather than
+ * pretending a PNG is a string.
+ */
 export type ZipEntry = {
   /** Path inside the archive, with forward slashes. */
   readonly path: string;
-  readonly text: string;
-};
+} & ({ readonly text: string } | { readonly bytes: Uint8Array });
+
+/** The text of an entry, decoding bytes where that is what it holds. */
+export function entryText(entry: ZipEntry): string {
+  return "text" in entry ? entry.text : new TextDecoder().decode(entry.bytes);
+}
+
+/** The bytes of an entry, whichever way it was given. */
+export function entryBytes(entry: ZipEntry): Uint8Array {
+  return "text" in entry ? new TextEncoder().encode(entry.text) : entry.bytes;
+}
 
 const LOCAL_HEADER = 0x04034b50;
 const CENTRAL_HEADER = 0x02014b50;
@@ -118,7 +135,7 @@ export function zip(entries: readonly ZipEntry[]): Uint8Array {
 
   for (const entry of entries) {
     const path = encoder.encode(entry.path);
-    const data = encoder.encode(entry.text);
+    const data = entryBytes(entry);
     const crc = crc32(data);
     const offset = out.offset;
 

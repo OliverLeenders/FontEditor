@@ -11,6 +11,8 @@ import {
 } from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
+import { entryText } from "../src/zip.js";
+
 import { contourPoints, exportUfo, glif, ufoFiles } from "../src/ufo.js";
 
 const ids = counterIds();
@@ -156,7 +158,7 @@ describe("glif", () => {
 });
 
 describe("ufoFiles", () => {
-  const files = () => new Map(ufoFiles(sample()).map((f) => [f.path, f.text]));
+  const files = () => new Map(ufoFiles(sample()).map((f) => [f.path, entryText(f)]));
 
   it("writes the four files a UFO must have, plus one glif per glyph", () => {
     const map = files();

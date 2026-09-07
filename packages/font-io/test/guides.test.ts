@@ -12,6 +12,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { ufoFiles } from "../src/ufo.js";
+import { entryText } from "../src/zip.js";
 import { readUfo } from "../src/ufo-import.js";
 import type { ZipFile } from "../src/unzip.js";
 
@@ -62,7 +63,7 @@ function read(files: readonly ZipFile[]) {
 }
 
 const written = (document: ReturnType<typeof read>): Map<string, string> =>
-  new Map(ufoFiles(document).map((e) => [e.path, e.text]));
+  new Map(ufoFiles(document).map((e) => [e.path, entryText(e)]));
 
 describe("a glyph's guides", () => {
   it("reads a vertical one written as x alone", () => {

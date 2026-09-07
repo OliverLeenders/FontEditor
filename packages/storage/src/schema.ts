@@ -9,6 +9,7 @@ import {
   type Glyph,
   type Guide,
   type HandleLock,
+  type ImageRef,
   type Kept,
   type PlainValue,
   type Node,
@@ -23,6 +24,7 @@ import {
   contour,
   glyph,
   guide,
+  imageRef,
   node,
 } from "@fonteditor/font-model";
 import type { Vec2 } from "@fonteditor/geometry";
@@ -95,6 +97,18 @@ export type StoredGlyph = {
   /** The glyph's own guides. Optional on the way in, as anchors are. */
   readonly guides?: readonly StoredGuide[];
   /**
+   * The picture it is traced from: the file's name, and where it sits.
+   *
+   * The name only — the bytes are under `images/` in the same store, for the
+   * reason the model gives: a scan in a document is a scan in every step of the
+   * undo stack.
+   */
+  readonly image?: {
+    readonly name: string;
+    readonly transform: readonly number[];
+    readonly color?: string;
+  };
+  /**
    * The parts of the glyph's own `.glif` this editor cannot model, verbatim.
    *
    * Written only when there are any, which is never for a glyph drawn here.
@@ -161,6 +175,7 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     components: g.components.map(encodeComponent),
     anchors: g.anchors.map((a) => ({ id: a.id, name: a.name, at: point(a.pt) })),
     ...(g.guides.length === 0 ? {} : { guides: g.guides.map(encodeGuide) }),
+    ...(g.image === null ? {} : { image: encodeImage(g.image) }),
     ...(g.kept.length === 0 ? {} : { kept: [...g.kept] }),
   };
 }
@@ -204,6 +219,38 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
     ...(nothingKept(document.kept) ? {} : { kept: document.kept }),
   };
   return document.features === "" ? base : { ...base, features: document.features };
+}
+
+function encodeImage(image: ImageRef): NonNullable<StoredGlyph["image"]> {
+  const t = image.transform;
+  // An array, as a component's transform is, and in the same order every font
+  // format writes it.
+  return {
+    name: image.name,
+    transform: [t.xScale, t.xyScale, t.yxScale, t.yScale, t.xOffset, t.yOffset],
+    ...(image.color === null ? {} : { color: image.color }),
+  };
+}
+
+function decodeImage(raw: unknown): ImageRef | null {
+  if (!isRecord(raw) || typeof raw["name"] !== "string") return null;
+
+  const t = raw["transform"];
+  if (!Array.isArray(t) || t.length !== 6 || t.some((n) => typeof n !== "number")) return null;
+  const [xScale, xyScale, yxScale, yScale, xOffset, yOffset] = t as number[];
+
+  return imageRef(
+    raw["name"],
+    {
+      xScale: xScale ?? 1,
+      xyScale: xyScale ?? 0,
+      yxScale: yxScale ?? 0,
+      yScale: yScale ?? 1,
+      xOffset: xOffset ?? 0,
+      yOffset: yOffset ?? 0,
+    },
+    typeof raw["color"] === "string" ? raw["color"] : null,
+  );
 }
 
 function encodeGuide(g: Guide): StoredGuide {
@@ -467,6 +514,7 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
       components,
       anchors,
       guides: readGuides(source["guides"]),
+      image: decodeImage(source["image"]),
       kept,
     }),
   );

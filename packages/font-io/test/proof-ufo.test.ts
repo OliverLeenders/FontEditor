@@ -27,6 +27,8 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { entryText } from "../src/zip.js";
+
 import { exportUfo, ufoFiles } from "../src/ufo.js";
 import { importUfo } from "../src/ufo-import.js";
 
@@ -292,7 +294,7 @@ describe("the proof font", () => {
     for (const entry of ufoFiles(proof())) {
       const path = join(root, entry.path);
       mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, entry.text, "utf8");
+      writeFileSync(path, entryText(entry), "utf8");
     }
   });
 

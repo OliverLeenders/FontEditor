@@ -75,6 +75,7 @@ const EMPTY_GLYPH = {
   components: [],
   anchors: [],
   guides: [],
+  image: null,
   kept: [],
 };
 

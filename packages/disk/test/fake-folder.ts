@@ -92,7 +92,7 @@ export class FakeFolder implements DiskFolder {
       createWritable: (): Promise<DiskWritable> => {
         let written = "";
         return Promise.resolve({
-          write: (data: string | BufferSource) => {
+          write: (data: string | Uint8Array | ArrayBuffer) => {
             written += typeof data === "string" ? data : new TextDecoder().decode(data);
             return Promise.resolve();
           },

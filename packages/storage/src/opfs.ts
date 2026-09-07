@@ -43,6 +43,35 @@ export class OpfsFileStore implements FileStore {
     }
   }
 
+  async readBytes(path: string): Promise<Uint8Array | null> {
+    const handle = await this.fileHandle(path, false);
+    if (handle === null) return null;
+
+    const access = await handle.createSyncAccessHandle();
+    try {
+      const size = access.getSize();
+      const buffer = new Uint8Array(size);
+      if (size > 0) access.read(buffer, { at: 0 });
+      return buffer;
+    } finally {
+      access.close();
+    }
+  }
+
+  async writeBytes(path: string, contents: Uint8Array): Promise<void> {
+    const handle = await this.fileHandle(path, true);
+    if (handle === null) throw new Error(`Could not open ${path} for writing.`);
+
+    const access = await handle.createSyncAccessHandle();
+    try {
+      access.truncate(0);
+      access.write(contents, { at: 0 });
+      access.flush();
+    } finally {
+      access.close();
+    }
+  }
+
   async write(path: string, contents: string): Promise<void> {
     const handle = await this.fileHandle(path, true);
     if (handle === null) throw new Error(`Could not open ${path} for writing.`);

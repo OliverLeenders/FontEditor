@@ -4,6 +4,7 @@ import {
   type FontDocument,
   type Glyph,
   type Guide,
+  type ImageRef,
   type PlainValue,
   glyphFileName,
   groupNameOf,
@@ -237,6 +238,10 @@ export function glif(g: Glyph): string {
     );
   }
 
+  // The picture before the lines drawn against it, which is the order the
+  // format lists them in and the order they are looked at in.
+  if (g.image !== null) lines.push(`\t${imageElement(g.image)}`);
+
   // Before the outline, which is where the format lists them and where a
   // reader that cares about order expects to find them.
   for (const line of g.guides) lines.push(`	${guideline(line)}`);
@@ -382,6 +387,25 @@ function real(value: number): string {
 }
 
 /**
+ * The picture a glyph is traced from, as the format writes it.
+ *
+ * All six numbers, for the reason a guide is written in full: the shorthand
+ * says the same thing, and choosing per attribute whether a value is "really"
+ * the default is a decision that goes wrong the first time somebody nudges the
+ * image by a unit.
+ */
+export function imageElement(image: ImageRef): string {
+  const t = image.transform;
+  const color = image.color === null ? "" : ` color="${escapeXml(image.color)}"`;
+  return (
+    `<image fileName="${escapeXml(image.name)}"` +
+    ` xScale="${number(t.xScale)}" xyScale="${number(t.xyScale)}"` +
+    ` yxScale="${number(t.yxScale)}" yScale="${number(t.yScale)}"` +
+    ` xOffset="${number(t.xOffset)}" yOffset="${number(t.yOffset)}"${color}/>`
+  );
+}
+
+/**
  * One guide as the format writes it.
  *
  * All three attributes always, rather than the shorthand a vertical or level
@@ -402,7 +426,10 @@ export function guideline(g: Guide): string {
 /** A coordinate as an attribute: whole where it is whole, and short where not. */
 const number = (n: number): string => String(Math.round(n * 1000) / 1000);
 
-export function ufoFiles(document: FontDocument): ZipEntry[] {
+export function ufoFiles(
+  document: FontDocument,
+  images: ReadonlyMap<string, Uint8Array> = new Map(),
+): ZipEntry[] {
   const entries: ZipEntry[] = [
     {
       path: "metainfo.plist",
@@ -507,6 +534,14 @@ export function ufoFiles(document: FontDocument): ZipEntry[] {
   }
   if (lib.length > 0) entries.push({ path: "lib.plist", text: plist(dict(lib)) });
 
+  // The pictures, in the directory the format keeps them in. Passed in rather
+  // than held on the document: they are megabytes that never change, and a
+  // model that carried them would make undo cost a scan.
+  for (const [name, bytes] of images) {
+    if (name.includes("/") || name === "") continue;
+    entries.push({ path: `images/${name}`, bytes });
+  }
+
   return entries;
 }
 
@@ -516,7 +551,10 @@ export type UfoExport = {
   readonly files: number;
 };
 
-export function exportUfo(document: FontDocument): UfoExport {
+export function exportUfo(
+  document: FontDocument,
+  images: ReadonlyMap<string, Uint8Array> = new Map(),
+): UfoExport {
   const clean = (s: string): string => s.replace(/[^A-Za-z0-9]/g, "");
   const family = clean(document.info.familyName) || "Untitled";
   const style = clean(document.info.styleName) || "Regular";
@@ -524,9 +562,9 @@ export function exportUfo(document: FontDocument): UfoExport {
 
   // Everything sits inside a folder named for the font, so unzipping produces a
   // `.ufo` directory rather than scattering plists into wherever you unzipped.
-  const files = ufoFiles(document).map((entry) => ({
+  const files = ufoFiles(document, images).map((entry) => ({
+    ...entry,
     path: `${root}/${entry.path}`,
-    text: entry.text,
   }));
 
   return { bytes: zip(files), fileName: `${root}.zip`, files: files.length };

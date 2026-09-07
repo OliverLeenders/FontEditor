@@ -2,6 +2,7 @@ import type { Rect } from "@fonteditor/geometry";
 
 import { type Anchor, movedAnchor, renamedAnchor } from "./anchor.js";
 import type { Guide } from "./guide.js";
+import type { ImageRef } from "./image.js";
 import type { Component } from "./component.js";
 import { type Contour, type Segment, contourBounds, segments, unionRect } from "./contour.js";
 import type { AnchorId, ComponentId, ContourId, GuideId } from "./ids.js";
@@ -49,6 +50,13 @@ export type Glyph = {
    */
   readonly guides: readonly Guide[];
   /**
+   * A picture to trace from, and where it sits behind this letter.
+   *
+   * One, as the format allows one. The file it names belongs to the font, so a
+   * scanned alphabet is a single image with a different transform per glyph.
+   */
+  readonly image: ImageRef | null;
+  /**
    * What the glyph's own file carried that this editor cannot model.
    *
    * Guidelines, a note, an image, a `lib` — each one an element of the `.glif`
@@ -68,6 +76,7 @@ export type GlyphInit = {
   readonly components?: readonly Component[];
   readonly anchors?: readonly Anchor[];
   readonly guides?: readonly Guide[];
+  readonly image?: ImageRef | null;
   readonly kept?: readonly string[];
 };
 
@@ -80,6 +89,7 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     components: init.components ?? [],
     anchors: init.anchors ?? [],
     guides: init.guides ?? [],
+    image: init.image ?? null,
     kept: init.kept ?? [],
   };
 }
@@ -124,6 +134,11 @@ export function moveAnchorTo(g: Glyph, id: AnchorId, pt: { x: number; y: number 
   return updateAnchor(g, id, (a) =>
     a.pt.x === pt.x && a.pt.y === pt.y ? a : { ...a, pt: { x: pt.x, y: pt.y } },
   );
+}
+
+/** Put a picture behind this glyph, or take the one that is there away. */
+export function setGlyphImage(g: Glyph, image: ImageRef | null): Glyph {
+  return g.image === image ? g : { ...g, image };
 }
 
 // ---------------------------------------------------------------------------

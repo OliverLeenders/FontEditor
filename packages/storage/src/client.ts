@@ -1,6 +1,7 @@
 import type { FontDocument, Glyph } from "@fonteditor/font-model";
 import { fontDocument, setFeatures, setGlyphOrder, setKerning } from "@fonteditor/font-model";
 
+import type { ImageEntry } from "./images.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import { type SnapshotEntry, type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";
 import {
@@ -165,6 +166,34 @@ export class StorageClient {
   ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
     const stored = (await this.send({ kind: "readSnapshot", at })) as StoredSnapshot | null;
     return stored === null ? null : documentOf(stored);
+  }
+
+  // ---- the pictures a font is traced from --------------------------------
+
+  /**
+   * Put an image in the font, or replace one of the same name.
+   *
+   * Replacing by name is how a scan is swapped for a better one: every glyph
+   * that traces from it follows, because the name is the whole of the link.
+   */
+  async putImage(name: string, bytes: Uint8Array): Promise<ImageEntry> {
+    // Copied out of whatever buffer it is a view on: a shared one cannot be
+    // posted, and a view over a larger buffer would carry more than the image.
+    const buffer = new Uint8Array(bytes).buffer;
+    return (await this.send({ kind: "putImage", name, bytes: buffer })) as ImageEntry;
+  }
+
+  async getImage(name: string): Promise<Uint8Array | null> {
+    const buffer = (await this.send({ kind: "getImage", name })) as ArrayBuffer | null;
+    return buffer === null ? null : new Uint8Array(buffer);
+  }
+
+  async images(): Promise<readonly ImageEntry[]> {
+    return (await this.send({ kind: "images" })) as readonly ImageEntry[];
+  }
+
+  async removeImage(name: string): Promise<void> {
+    await this.send({ kind: "removeImage", name });
   }
 
   async saveKerning(document: FontDocument): Promise<void> {

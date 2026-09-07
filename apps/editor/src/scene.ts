@@ -46,6 +46,7 @@ const EMPTY: Glyph = {
   components: [],
   anchors: [],
   guides: [],
+  image: null,
   kept: [],
 };
 

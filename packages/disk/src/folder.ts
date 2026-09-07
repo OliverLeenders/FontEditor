@@ -1,4 +1,4 @@
-import type { ZipEntry, ZipFile } from "@fonteditor/font-io";
+import { type ZipEntry, type ZipFile, entryBytes } from "@fonteditor/font-io";
 
 import type { DiskFile, DiskFolder } from "./handles.js";
 
@@ -89,7 +89,7 @@ export async function writeFolder(
     );
   }
 
-  for (const entry of entries) await writeFile(folder, entry.path, entry.text);
+  for (const entry of entries) await writeFile(folder, entry.path, entryBytes(entry));
 
   const now = new Set(
     entries
@@ -117,7 +117,7 @@ export async function writeFolder(
 }
 
 /** Write one file, making the directories on the way to it. */
-async function writeFile(folder: DiskFolder, path: string, text: string): Promise<void> {
+async function writeFile(folder: DiskFolder, path: string, data: Uint8Array): Promise<void> {
   const parts = path.split("/");
   const name = parts.pop();
   if (name === undefined || name === "") throw new Error(`not a file path: ${path}`);
@@ -127,7 +127,7 @@ async function writeFile(folder: DiskFolder, path: string, text: string): Promis
 
   const handle = await at.getFileHandle(name, { create: true });
   const writable = await handle.createWritable();
-  await writable.write(text);
+  await writable.write(data);
   await writable.close();
 }
 

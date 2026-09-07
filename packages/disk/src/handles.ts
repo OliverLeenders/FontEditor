@@ -15,7 +15,7 @@
 
 /** Somewhere to put bytes. */
 export interface DiskWritable {
-  write: (data: string | BufferSource) => Promise<void>;
+  write: (data: string | Uint8Array | ArrayBuffer) => Promise<void>;
   close: () => Promise<void>;
 }
 

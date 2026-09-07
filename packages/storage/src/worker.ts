@@ -18,6 +18,7 @@ import {
 import type { FileStore } from "./file-store.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import { listSnapshots, pruneSnapshots, readSnapshot, writeSnapshot } from "./snapshots.js";
+import { listImages, readImage, removeImage, writeImage } from "./images.js";
 import {
   FONT_INFO_PATH,
   KERNING_PATH,
@@ -201,6 +202,25 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
       // moment the oldest one stops being worth keeping.
       await pruneSnapshots(required());
       return await listSnapshots(required());
+    }
+
+    case "putImage":
+      return await writeImage(required(), request.name, new Uint8Array(request.bytes));
+
+    case "getImage": {
+      const bytes = await readImage(required(), request.name);
+      // The buffer itself, so the main thread can decode it without a copy.
+      // Copied out: the store may hand back a view over a larger buffer, and
+      // posting that would carry the rest of it across the thread.
+      return bytes === null ? null : new Uint8Array(bytes).buffer;
+    }
+
+    case "images":
+      return await listImages(required());
+
+    case "removeImage": {
+      await removeImage(required(), request.name);
+      return null;
     }
 
     case "snapshots":

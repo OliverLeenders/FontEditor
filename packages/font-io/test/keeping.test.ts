@@ -2,6 +2,7 @@ import { counterIds, glyphNamed } from "@fonteditor/font-model";
 import { describe, expect, it } from "vitest";
 
 import { ufoFiles } from "../src/ufo.js";
+import { entryText } from "../src/zip.js";
 import { readUfo } from "../src/ufo-import.js";
 import type { ZipFile } from "../src/unzip.js";
 
@@ -59,7 +60,7 @@ function ufoWith(...extra: ZipFile[]): ZipFile[] {
 function through(files: readonly ZipFile[]): Map<string, string> {
   const read = readUfo(files, ids);
   if ("reason" in read) throw new Error(read.reason);
-  return new Map(ufoFiles(read.document).map((e) => [e.path, e.text]));
+  return new Map(ufoFiles(read.document).map((e) => [e.path, entryText(e)]));
 }
 
 describe("what the font carries and this editor does not model", () => {
@@ -95,7 +96,7 @@ describe("what the font carries and this editor does not model", () => {
 
     const changed = { ...read.document, info: { ...read.document.info, unitsPerEm: 2048 } };
     const info =
-      new Map(ufoFiles(changed).map((e) => [e.path, e.text])).get("fontinfo.plist") ?? "";
+      new Map(ufoFiles(changed).map((e) => [e.path, entryText(e)])).get("fontinfo.plist") ?? "";
 
     expect(info).toContain("<integer>2048</integer>");
     expect(info).not.toContain("<integer>1000</integer>");

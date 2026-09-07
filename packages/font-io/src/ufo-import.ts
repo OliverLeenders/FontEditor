@@ -50,6 +50,14 @@ import { type ZipFile, fileText, unzip } from "./unzip.js";
 export type UfoImport = {
   readonly document: FontDocument;
   readonly warnings: readonly UfoWarning[];
+  /**
+   * The pictures the font was carrying, by name.
+   *
+   * Beside the document rather than in it, for the reason the model gives: they
+   * are megabytes that never change, and history keeps a copy of the document
+   * on every edit. The caller puts them wherever it keeps such things.
+   */
+  readonly images: ReadonlyMap<string, Uint8Array>;
 };
 
 export type UfoWarning = {
@@ -147,7 +155,19 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
   // opening a file a way to lose work.
   const features = at("features.fea") ?? "";
 
+  // Everything under `images/`, whatever it is. Nothing here decodes them: a
+  // format we cannot read is still the designer's file, and the browser will
+  // say so plainly when it fails to draw one.
+  const images = new Map<string, Uint8Array>();
+  for (const f of files) {
+    const prefix = `${root}images/`;
+    if (!f.path.startsWith(prefix)) continue;
+    const name = f.path.slice(prefix.length);
+    if (name !== "" && !name.includes("/")) images.set(name, f.bytes);
+  }
+
   return {
+    images,
     document: setKept(
       setGuides(setFeatures(setKerning(fontDocument(ordered, info), kerning), features), guides),
       { fontInfo: keptInfo, lib: keptLib },

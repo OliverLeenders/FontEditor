@@ -79,6 +79,18 @@ export { OpfsFileStore, requestPersistence } from "./opfs.js";
 
 export { AT_ONCE, inParallel } from "./parallel.js";
 
+export type { ImageEntry } from "./images.js";
+export {
+  IMAGES_PREFIX,
+  allImages,
+  listImages,
+  pruneImages,
+  readImage,
+  removeImage,
+  usableImageName,
+  writeImage,
+} from "./images.js";
+
 export type { SnapshotEntry, StoredSnapshot } from "./snapshots.js";
 export {
   KEEP,
