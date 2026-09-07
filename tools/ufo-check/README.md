@@ -17,7 +17,9 @@ reason there is a directory of Python in a TypeScript repository.
    half-handled segment, a composite with an offset component, `A` and `a` (whose files
    collide on a filesystem that does not care about case), a name that has to be escaped,
    a glyph with no outline, fractional coordinates, groups on both sides, a class pair, a
-   glyph against a class, an exception, and a feature file.
+   glyph against a class, an exception, a feature file, the identity keys that make a file
+   a released font, and — the point of the round trip below — real `fontinfo`, `lib` and
+   glyph-level keys this editor does not model and carries anyway.
 2. `check_ufo.py` reads it with validation turned on everywhere it can be, cross-checks
    that kerning and groups refer to glyphs that exist, and compiles `features.fea` with
    `feaLib`.
