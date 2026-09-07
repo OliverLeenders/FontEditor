@@ -1060,28 +1060,22 @@ export function drawCurvatureComb(ctx: Canvas2D, s: Scene): void {
   ctx.save();
 
   for (const comb of s.comb) {
-    // A straight stretch has no curvature and grows no comb. Drawn anyway, its
-    // envelope lies along the outline and doubles it, which reads as a fault in
-    // the drawing rather than as the absence of one.
-    const runs: { foot: Vec2; tip: Vec2 }[][] = [];
-    let run: { foot: Vec2; tip: Vec2 }[] = [];
-
-    for (const hair of comb.hairs) {
-      const reach = hair.reach;
-      if (reach * s.view.scale < STRAIGHT_PIXELS) {
-        if (run.length > 1) runs.push(run);
-        run = [];
-        continue;
-      }
-      run.push({
-        foot: toScreen(s.view, hair.at),
-        tip: toScreen(s.view, {
-          x: hair.at.x + hair.normal.x * reach,
-          y: hair.at.y + hair.normal.y * reach,
-        }),
-      });
-    }
-    if (run.length > 1) runs.push(run);
+    // The runs come already broken wherever the outline stops curving — see
+    // `Comb` in the view package. Drawn as one line instead, the envelope leaps
+    // those gaps and lays a straight line alongside the straight edges.
+    const runs = comb.runs
+      .map((run) =>
+        run
+          .filter((hair) => hair.reach * s.view.scale >= STRAIGHT_PIXELS)
+          .map((hair) => ({
+            foot: toScreen(s.view, hair.at),
+            tip: toScreen(s.view, {
+              x: hair.at.x + hair.normal.x * hair.reach,
+              y: hair.at.y + hair.normal.y * hair.reach,
+            }),
+          })),
+      )
+      .filter((run) => run.length > 1);
     if (runs.length === 0) continue;
 
     ctx.strokeStyle = s.palette.comb;

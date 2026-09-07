@@ -52,10 +52,19 @@ export type CombHair = {
   readonly reach: number;
 };
 
-/** One contour's worth of hairs, kept apart so the envelope is not joined across a gap. */
+/**
+ * One contour's comb, in unbroken runs.
+ *
+ * Runs, not one list, and this is the whole of why: the envelope is a line
+ * through the tips, and a contour's hairs stop wherever the outline goes
+ * straight. Joined end to end, the envelope leaps that gap and draws a straight
+ * line across it, alongside the straight edge and parallel to it — which reads
+ * as a second outline, and was reported as exactly that. A run ends where the
+ * hairs do.
+ */
 export type Comb = {
   readonly contourId: string;
-  readonly hairs: readonly CombHair[];
+  readonly runs: readonly (readonly CombHair[])[];
 };
 
 export type CombOptions = {
@@ -77,8 +86,15 @@ const STEPS = 96;
  * Not the longest. A letter usually has one corner far tighter than anything
  * else in it — the spur of an `a`, the join of a stem to a shoulder — and
  * dividing by that flattens the whole letter to nothing so the one corner can
- * fit. Nine hairs in ten below the depth, the tenth clamped to it, keeps the
- * comb about the curves it was opened to look at.
+ * fit. The hair at nine in ten is drawn at the full depth, and the sharper ones
+ * grow past it.
+ *
+ * Grow by the square root of how much sharper they are, rather than in
+ * proportion or not at all. In proportion, one corner ten times the rest sends a
+ * spike across the letter; clamped, every hair in the corner comes out the same
+ * length and their tips draw a line parallel to the outline — the same artefact
+ * as the joined-up envelope, arrived at from the other side. The root keeps the
+ * order of things, keeps sharper visibly sharper, and keeps it on the page.
  */
 const TYPICAL = 0.9;
 
@@ -111,36 +127,24 @@ export function combFor(
   const spacing = (options.spacingPixels ?? SPACING) / Math.max(view.scale, 1e-6);
   const depth = (options.depthPixels ?? DEPTH) / Math.max(view.scale, 1e-6);
 
-  const raw: { id: string; hairs: Omit<CombHair, "reach">[] }[] = [];
+  const flat = 1 / (STRAIGHT * sizeOf(contours));
+
+  const raw: { id: string; runs: Omit<CombHair, "reach">[][] }[] = [];
   for (const c of contours) {
-    const hairs = hairsOf(c, spacing);
-    if (hairs.length > 0) raw.push({ id: c.id, hairs });
+    const runs = runsOf(c, spacing, flat);
+    if (runs.length > 0) raw.push({ id: c.id, runs });
   }
   if (raw.length === 0) return [];
 
-  const flat = 1 / (STRAIGHT * sizeOf(contours));
-  const curving = raw.map(({ id, hairs }) => ({
-    id,
-    hairs: hairs.filter((hair) => Math.abs(hair.k) > flat),
+  const typical = typicalOf(raw.flatMap((c) => c.runs.flat().map((h) => Math.abs(h.k))));
+  if (typical === 0) return [];
+
+  return raw.map(({ id, runs }) => ({
+    contourId: id,
+    runs: runs.map((run) =>
+      run.map((hair) => ({ ...hair, reach: depth * Math.sqrt(Math.abs(hair.k) / typical) })),
+    ),
   }));
-
-  const scale = scaleFor(
-    curving.flatMap((c) => c.hairs.map((h) => Math.abs(h.k))),
-    depth,
-  );
-  if (scale === 0) return [];
-
-  return curving
-    .filter((c) => c.hairs.length > 0)
-    .map(({ id, hairs }) => ({
-      contourId: id,
-      hairs: hairs.map((hair) => ({
-        ...hair,
-        // Clamped, not compressed: a corner sharper than the rest is drawn at
-        // full depth and says so, without dragging every other hair down with it.
-        reach: Math.min(Math.abs(hair.k) * scale, depth),
-      })),
-    }));
 }
 
 /** How big the letter is, for deciding what counts as straight within it. */
@@ -156,21 +160,34 @@ function sizeOf(contours: readonly Contour[]): number {
   return size > 0 ? size : 1;
 }
 
-/** Design units of hair per unit of curvature, from the typical hair rather than the longest. */
-function scaleFor(curvatures: readonly number[], depth: number): number {
+/** The curvature the depth is measured against: sharper than nine hairs in ten. */
+function typicalOf(curvatures: readonly number[]): number {
   if (curvatures.length === 0) return 0;
 
   const sorted = [...curvatures].sort((l, r) => l - r);
   const at = Math.min(sorted.length - 1, Math.floor(sorted.length * TYPICAL));
-  const typical = sorted[at]!;
-  return typical > 0 ? depth / typical : 0;
+  return sorted[at]!;
 }
 
-function hairsOf(c: Contour, spacing: number): Omit<CombHair, "reach">[] {
-  const hairs: Omit<CombHair, "reach">[] = [];
-  // Carried across segments so the hairs do not restart at every node: a comb
-  // that began again at each join would show a gap there whatever the curve did.
+/**
+ * One contour's hairs, in runs that break wherever there are none.
+ *
+ * A run carries on across a node — a comb that began again at every join would
+ * show a gap there whatever the curve did, which is the opposite of what the
+ * instrument is for — and ends where the outline stops curving: a straight
+ * segment, a stretch too gentle to count as one, or a place with no curvature at
+ * all.
+ */
+function runsOf(c: Contour, spacing: number, flat: number): Omit<CombHair, "reach">[][] {
+  const runs: Omit<CombHair, "reach">[][] = [];
+  let run: Omit<CombHair, "reach">[] = [];
+  // Carried across segments so the hairs do not restart at every node.
   let since = spacing;
+
+  const end = (): void => {
+    if (run.length > 0) runs.push(run);
+    run = [];
+  };
 
   for (let i = 0; i < segmentCount(c); i++) {
     const segment = segmentAt(c, i);
@@ -178,6 +195,7 @@ function hairsOf(c: Contour, spacing: number): Omit<CombHair, "reach">[] {
       // A straight segment has no curvature to draw, but it still has length,
       // and swallowing it would shift every hair after it.
       if (segment !== null) since += chord(segment.a, segment.b);
+      end();
       continue;
     }
 
@@ -194,11 +212,33 @@ function hairsOf(c: Contour, spacing: number): Omit<CombHair, "reach">[] {
       since = 0;
 
       const hair = hairAt(cubic, t);
-      if (hair !== null) hairs.push(hair);
+      if (hair === null || Math.abs(hair.k) <= flat) end();
+      else run.push(hair);
     }
   }
 
-  return hairs;
+  end();
+
+  // A closed contour's comb starts and ends at the same place, so a run that
+  // began at the top of the loop belongs to the one that ended at the bottom.
+  if (c.closed && runs.length > 1 && wraps(c)) {
+    const first = runs.shift()!;
+    runs[runs.length - 1] = [...runs[runs.length - 1]!, ...first];
+  }
+  return runs;
+}
+
+/**
+ * Whether the comb ran past the point the walk began at without a break.
+ *
+ * A closed contour is a loop, and the walk has to start somewhere. If the
+ * outline curves through that place, the run that began there and the run that
+ * ended there are one run, and the envelope belongs joined.
+ */
+function wraps(c: Contour): boolean {
+  const first = segmentAt(c, 0);
+  const last = segmentAt(c, segmentCount(c) - 1);
+  return first !== null && last !== null && first.kind !== "line" && last.kind !== "line";
 }
 
 function hairAt(cubic: Parameters<typeof curvature>[0], t: number): Omit<CombHair, "reach"> | null {

@@ -757,7 +757,7 @@ describe("the curvature comb", () => {
 
   it("draws a hair from the outline outward, and an envelope through the tips", () => {
     const ctx = render(combed());
-    const hair = combFor([ring()], VIEW)[0]!.hairs[0]!;
+    const hair = combFor([ring()], VIEW)[0]!.runs[0]![0]!;
 
     const foot = toScreen(VIEW, hair.at);
     // The hair stands out of the ink: along the normal, as far as it was told.

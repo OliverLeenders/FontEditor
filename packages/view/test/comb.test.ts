@@ -74,12 +74,17 @@ describe("the comb", () => {
     const [comb] = combFor([circle(100)], VIEW, { spacingPixels: 20 });
     expect(comb).toBeDefined();
 
+    // One unbroken run: a circle curves the whole way round, including past the
+    // place the walk began.
+    expect(comb!.runs).toHaveLength(1);
+
     // A circle of radius 100 is about 628 units round, so a hair every 20 gives
     // about thirty of them.
-    expect(comb!.hairs.length).toBeGreaterThan(24);
-    expect(comb!.hairs.length).toBeLessThan(36);
+    const hairs = comb!.runs.flat();
+    expect(hairs.length).toBeGreaterThan(24);
+    expect(hairs.length).toBeLessThan(36);
 
-    for (const hair of comb!.hairs) {
+    for (const hair of hairs) {
       expect(Math.hypot(hair.normal.x, hair.normal.y)).toBeCloseTo(1, 9);
       expect(Math.hypot(hair.at.x, hair.at.y)).toBeCloseTo(100, 1);
       expect(hair.k).toBeCloseTo(1 / 100, 3);
@@ -95,7 +100,7 @@ describe("the comb", () => {
 
     // The spacing is in screen pixels, so the comb stays readable at both sizes
     // rather than thinning out as the letter grows.
-    expect(near[0]!.hairs.length).toBeGreaterThan(far[0]!.hairs.length * 3);
+    expect(near[0]!.runs.flat().length).toBeGreaterThan(far[0]!.runs.flat().length * 3);
   });
 
   it("draws the tighter turn longer, in proportion", () => {
@@ -106,13 +111,15 @@ describe("the comb", () => {
 
     // Found by the radius each one turns at, allowing for the ripple a Bézier
     // circle has: 1/k is 50 on one and 200 on the other.
-    const radiusOf = (c: (typeof combs)[number]) => 1 / Math.abs(c.hairs[0]!.k);
+    const radiusOf = (c: (typeof combs)[number]) => 1 / Math.abs(c.runs[0]![0]!.k);
     const tight = combs.find((c) => Math.abs(radiusOf(c) - 50) < 5)!;
     const wide = combs.find((c) => Math.abs(radiusOf(c) - 200) < 20)!;
 
     // Four times the curvature, four times the hair: the two are drawn to one
     // scale, which is what lets them be compared.
-    expect(tight.hairs[0]!.reach / wide.hairs[0]!.reach).toBeCloseTo(4, 1);
+    // The root of four: sharper is visibly sharper without one corner sending a
+    // spike across the letter.
+    expect(tight.runs[0]![0]!.reach / wide.runs[0]![0]!.reach).toBeCloseTo(2, 1);
   });
 
   it("is not flattened by one corner far sharper than the rest", () => {
@@ -124,13 +131,13 @@ describe("the comb", () => {
       depthPixels: 40,
     });
 
-    const bowl = combs.find((c) => Math.abs(1 / Math.abs(c.hairs[0]!.k) - 400) < 40)!;
-    expect(bowl.hairs[0]!.reach).toBeGreaterThan(4);
+    const bowl = combs.find((c) => Math.abs(1 / Math.abs(c.runs[0]![0]!.k) - 400) < 40)!;
+    expect(bowl.runs[0]![0]!.reach).toBeGreaterThan(4);
 
-    // And nothing is drawn longer than the depth asked for.
-    for (const comb of combs) {
-      for (const hair of comb.hairs) expect(hair.reach).toBeLessThanOrEqual(40.0001);
-    }
+    // The spur is drawn longer, but by the root of how much sharper it is: a
+    // corner fifty times the curvature is seven times the hair, not fifty.
+    const spur = combs.find((c) => Math.abs(1 / Math.abs(c.runs[0]![0]!.k) - 8) < 2)!;
+    expect(spur.runs[0]![0]!.reach / bowl.runs[0]![0]!.reach).toBeLessThan(12);
   });
 
   it("leaves out a curve too gentle to count as one", () => {
@@ -172,14 +179,43 @@ describe("the comb", () => {
     const hole = reverseContour(circle(100));
     const [comb] = combFor([hole], VIEW, { spacingPixels: 20 });
 
-    for (const hair of comb!.hairs) {
+    for (const hair of comb!.runs.flat()) {
       expect(hair.normal.x * hair.at.x + hair.normal.y * hair.at.y).toBeLessThan(0);
+    }
+  });
+
+  it("breaks the comb where the outline goes straight", () => {
+    // The shape that reported this: an arch, a straight stretch, another arch —
+    // the tip of an `m`'s shoulder. Joined into one run, the envelope leaps the
+    // straight part and draws a line alongside it, parallel to the edge, which
+    // reads as a second outline.
+    const arches = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { type: "corner", out: vec(0, 120) }),
+        node(ids.node(), vec(120, 200), { type: "corner", in: vec(40, 200) }),
+        // A straight run to the next node: no handles either side of it.
+        node(ids.node(), vec(220, 200), { type: "corner", out: vec(300, 200) }),
+        node(ids.node(), vec(360, 60), { type: "corner", in: vec(360, 140) }),
+      ],
+      false,
+    );
+
+    const [comb] = combFor([arches], VIEW, { spacingPixels: 20 });
+    expect(comb!.runs).toHaveLength(2);
+
+    // And each run stops before the straight part: no hair stands on it.
+    for (const run of comb!.runs) {
+      for (const hair of run) {
+        const onTheStraight = hair.at.y > 199.5 && hair.at.x > 120 && hair.at.x < 220;
+        expect(onTheStraight).toBe(false);
+      }
     }
   });
 
   it("keeps each contour's hairs apart, so no envelope crosses the letter", () => {
     const combs = combFor([circle(100), circle(40)], VIEW, { spacingPixels: 20 });
     expect(combs).toHaveLength(2);
-    expect(combs[0]!.hairs.length).toBeGreaterThan(combs[1]!.hairs.length);
+    expect(combs[0]!.runs.flat().length).toBeGreaterThan(combs[1]!.runs.flat().length);
   });
 });
