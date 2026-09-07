@@ -120,5 +120,9 @@ export function starterFont(): FontDocument {
     shortStem("i", 0x69),
     shortStem("n", 0x6e),
     blank("space", 0x20, 250),
+    // Last rather than first, though the compiled font puts it at the front:
+    // the editor opens on the first glyph, and a letter is a better thing to
+    // open on than the box shown for characters the font does not have.
+    glyph(".notdef", { advance: 500 }),
   ]);
 }

@@ -1,0 +1,108 @@
+/*
+ * The report, hanging under its button.
+ *
+ * Shaped like the history panel beside it: a list read next to the font rather
+ * than a dialog over it, because the whole point is to click one line, look at
+ * the glyph, and come back.
+ */
+.holder {
+  position: relative;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 20;
+  width: 26rem;
+  padding: 0.55rem 0.6rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.head {
+  margin-bottom: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.empty {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: 22rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 0.75rem 1fr;
+  align-items: start;
+  gap: 0.4rem;
+  padding: 0.25rem 0.1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+
+/* Severity by colour and by position in the list, never by colour alone: the
+   heading counts them, and the worst are at the top. */
+.dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.35rem;
+  border-radius: 50%;
+}
+.error {
+  background: var(--danger, #c2453d);
+}
+.warning {
+  background: var(--warn, #b4791f);
+}
+.note {
+  background: var(--ink-3);
+}
+
+.what {
+  display: grid;
+  gap: 0.05rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.what:disabled {
+  cursor: default;
+}
+.what:hover:not(:disabled) .title {
+  color: var(--accent, var(--ink));
+}
+
+.title {
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+
+.message {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  line-height: 1.35;
+}

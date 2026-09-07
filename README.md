@@ -15,6 +15,7 @@ rectangle, ellipse, measure and section tools, snapping, boolean union, anchors 
 components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF and UFO in
 both directions. A UFO folder on disk is opened and saved back to; everything autosaves
 to the browser's own store besides, and copies of the whole font are kept as you work.
+Before it goes out, seventeen checks say what is wrong with it.
 
 | Phase |                                     | Status                                                          |
 | ----- | ----------------------------------- | --------------------------------------------------------------- |
@@ -28,7 +29,7 @@ to the browser's own store besides, and copies of the whole font are kept as you
 | 7     | Spacing and kerning                 | done                                                            |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks |
 | 9     | Variable fonts                      | not started                                                     |
-| 10    | Production polish                   | lint, format and 1763 tests, run on CI; preferences persist     |
+| 10    | Production polish                   | lint, format and 1789 tests, run on CI; preferences persist     |
 
 ### What the table missed
 
@@ -47,7 +48,7 @@ for.
 | **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                                                                                                                                                      |
 | **A file on disk**                         | done        | A UFO folder is opened, saved back to, and remembered for next time, through the File System Access API. Saving is manual: the working store autosaves, and a folder the user chose is somewhere the editor is a guest.                                                                                                                                                                                                             |
 | **`glyf` outlines**                        | not started | Everything written is CFF. A TrueType flavour is what hinting and most web pipelines want, and it is also the outline format that permits the overlaps this removes.                                                                                                                                                                                                                                                                |
-| **Preflight**                              | not started | Open contours, duplicate points, off-grid coordinates, a composite whose base is missing, an accent with no anchor to land on: all findable, none reported anywhere.                                                                                                                                                                                                                                                                |
+| **Preflight**                              | done        | Seventeen checks over the whole font — a contour left open, two points in the same place, a name a font cannot carry, two glyphs claiming one character, a component with nothing to place or that places itself, kerning about a glyph that has gone, a mark with nowhere to land — reported and never repaired, because every fix is a decision.                                                                                  |
 | **Testing the interface**                  | not started | Every package below `apps/editor` is tested; the React in it is not, for want of a DOM testing library.                                                                                                                                                                                                                                                                                                                             |
 
 ### What the table is hiding
@@ -264,6 +265,7 @@ packages/
   edit-core/    Transactions, undo and redo over the document.
   storage/      Autosave to OPFS, in a worker. Local-first; nothing leaves the browser.
   disk/         The user's own UFO folder, opened, read and written where they can see it.
+  preflight/    What is findable about a font before it is exported. Reports; never repairs.
   font-io/      OTF and UFO, read and written by hand. Zip, plist, XML, GPOS, GSUB, .fea.
   catalog/      Unicode blocks and the glyph browser's query layer.
 ```

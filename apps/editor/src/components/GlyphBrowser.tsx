@@ -18,6 +18,7 @@ import { type Item, Menu } from "./ContextMenu.js";
 import { ExportFont } from "./ExportFont.js";
 import { FontFile } from "./FontFile.js";
 import { NewFont } from "./NewFont.js";
+import { Preflight } from "./Preflight.js";
 import { FontInfoPanel } from "./FontInfoPanel.js";
 import { RoundCoordinates } from "./RoundCoordinates.js";
 import { Snapshots } from "./Snapshots.js";
@@ -292,6 +293,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           <NewGlyph />
           <FontInfoPanel />
           <Snapshots />
+          <Preflight />
           <RoundCoordinates />
           <input
             type="search"

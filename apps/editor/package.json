@@ -19,6 +19,7 @@
     "@fonteditor/font-io": "workspace:*",
     "@fonteditor/font-model": "workspace:*",
     "@fonteditor/geometry": "workspace:*",
+    "@fonteditor/preflight": "workspace:*",
     "@fonteditor/render": "workspace:*",
     "@fonteditor/storage": "workspace:*",
     "@fonteditor/tools": "workspace:*",
