@@ -4,6 +4,7 @@ import {
   type FontDocument,
   type Glyph,
   type IdFactory,
+  type StyleMapStyle,
   correctDirections,
   counterIds,
   kernIndex,
@@ -189,6 +190,59 @@ function notdefFirst(document: FontDocument): { names: string[]; synthesised: bo
  * reasoning as import: refusing to produce a font over one odd contour helps
  * nobody.
  */
+
+/** The style-map style as the `name` table spells it. */
+const STYLE_NAMES: Readonly<Record<StyleMapStyle, string>> = {
+  regular: "Regular",
+  italic: "Italic",
+  bold: "Bold",
+  "bold italic": "Bold Italic",
+};
+
+/**
+ * The `OS/2` selection bits for a style-map style.
+ *
+ * Stated rather than deduced. opentype.js would work these out from the italic
+ * angle and the weight class, which is a guess that goes wrong in both
+ * directions: an upright face of a family called Bold, and an italic drawn
+ * without any slant at all.
+ */
+function selectionOf(style: StyleMapStyle): number {
+  const ITALIC = 1;
+  const BOLD = 32;
+  const REGULAR = 64;
+
+  switch (style) {
+    case "italic":
+      return ITALIC;
+    case "bold":
+      return BOLD;
+    case "bold italic":
+      return BOLD | ITALIC;
+    default:
+      return REGULAR;
+  }
+}
+
+/** Set one name record in every platform's table, as the constructor does. */
+function setName(font: { names: Record<string, unknown> }, key: string, value: string): void {
+  for (const table of platformsOf(font)) table[key] = { en: value };
+}
+
+/** Take one name out of every platform's table, so no record is written. */
+function clearName(font: { names: Record<string, unknown> }, key: string): void {
+  for (const table of platformsOf(font)) delete table[key];
+}
+
+function platformsOf(font: { names: Record<string, unknown> }): Record<string, { en: string }>[] {
+  const out: Record<string, { en: string }>[] = [];
+  for (const platform of ["unicode", "macintosh", "windows"]) {
+    const table = font.names[platform];
+    if (table !== undefined && table !== null) out.push(table as Record<string, { en: string }>);
+  }
+  return out;
+}
+
 export function exportFont(document: FontDocument, ids: IdFactory = counterIds("x")): ExportResult {
   // Checked before the synthesised .notdef is added, or a document holding
   // nothing at all would quietly export as a font holding nothing at all.
@@ -237,15 +291,62 @@ export function exportFont(document: FontDocument, ids: IdFactory = counterIds("
   }
 
   const { info } = document;
+  const family = info.familyName.trim() === "" ? "Untitled" : info.familyName;
+  const style = info.styleName.trim() === "" ? "Regular" : info.styleName;
+
+  // Names 1 and 2 are the four-slot pair every operating system falls back to,
+  // so they carry the style map rather than the real names. The real ones go in
+  // 16 and 17 below, where software that can group more than four styles looks.
+  const mapFamily = info.styleMapFamilyName.trim() === "" ? family : info.styleMapFamilyName;
+  const mapStyle = STYLE_NAMES[info.styleMapStyleName];
+
   const font = new opentype.Font({
-    familyName: info.familyName.trim() === "" ? "Untitled" : info.familyName,
-    styleName: info.styleName.trim() === "" ? "Regular" : info.styleName,
+    familyName: mapFamily,
+    styleName: mapStyle,
+    fullName: `${family} ${style}`,
+    postScriptName: `${family}-${style}`.replace(/\s/g, ""),
     unitsPerEm: Math.round(info.unitsPerEm),
     ascender: Math.round(info.ascender),
     // The format requires this to be negative, and a document can hold anything.
     descender: -Math.abs(Math.round(info.descender)),
+
+    version: `Version ${String(info.versionMajor)}.${String(info.versionMinor).padStart(3, "0")}`,
+
+    italicAngle: info.italicAngle,
+    weightClass: info.openTypeOS2WeightClass,
+    widthClass: info.openTypeOS2WidthClass,
+    fsSelection: selectionOf(info.styleMapStyleName),
+    ...(info.openTypeOS2VendorID.trim() === ""
+      ? {}
+      : { tables: { os2: { achVendID: info.openTypeOS2VendorID.slice(0, 4).padEnd(4, " ") } } }),
+
     glyphs,
   });
+
+  // What the designer filled in, and nothing where they filled in nothing.
+  // opentype.js gives every name it was not given a single space, so leaving a
+  // field out of the options is not enough — a blank record is a record, and it
+  // is one a validator complains about and a font window shows as empty.
+  for (const [key, value] of Object.entries({
+    copyright: info.copyright,
+    trademark: info.trademark,
+    designer: info.openTypeNameDesigner,
+    designerURL: info.openTypeNameDesignerURL,
+    manufacturer: info.openTypeNameManufacturer,
+    manufacturerURL: info.openTypeNameManufacturerURL,
+    license: info.openTypeNameLicense,
+    licenseURL: info.openTypeNameLicenseURL,
+    description: info.openTypeNameDescription,
+  })) {
+    if (value.trim() === "") clearName(font, key);
+    else setName(font, key, value);
+  }
+
+  // The typographic names, written only where they say something the four-slot
+  // pair does not. A name 16 identical to name 1 is noise every reader has to
+  // decide to ignore.
+  if (mapFamily !== family) setName(font, "preferredFamily", family);
+  if (mapStyle !== style) setName(font, "preferredSubfamily", style);
 
   const bytes = font.toArrayBuffer();
 

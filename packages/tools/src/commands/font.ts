@@ -46,14 +46,40 @@ export function infoProblem(info: FontInfo): string | null {
   }
   if (info.ascender <= info.descender) return "The ascender must be above the descender.";
   if (info.familyName.trim() === "") return "The font needs a family name.";
+
+  // The identity fields. Each of these has a range the format gives it, and a
+  // value outside it is not a font that behaves oddly — it is a font a
+  // validator refuses and an operating system groups wrongly.
+  if (!Number.isInteger(info.versionMajor) || info.versionMajor < 0) {
+    return "The major version must be a whole number, zero or more.";
+  }
+  if (!Number.isInteger(info.versionMinor) || info.versionMinor < 0 || info.versionMinor > 999) {
+    return "The minor version must be a whole number from 0 to 999.";
+  }
+  if (!Number.isFinite(info.italicAngle) || Math.abs(info.italicAngle) >= 90) {
+    return "The italic angle must be between -90 and 90 degrees.";
+  }
+  if (info.openTypeOS2WeightClass < 1 || info.openTypeOS2WeightClass > 1000) {
+    return "The weight class must be between 1 and 1000. Regular is 400, bold is 700.";
+  }
+  if (!Number.isInteger(info.openTypeOS2WidthClass)) {
+    return "The width class must be a whole number from 1 to 9.";
+  }
+  if (info.openTypeOS2WidthClass < 1 || info.openTypeOS2WidthClass > 9) {
+    return "The width class must be between 1 and 9. Normal is 5.";
+  }
+  if (info.openTypeOS2VendorID !== "" && info.openTypeOS2VendorID.length > 4) {
+    return "A vendor id is four characters.";
+  }
   return null;
 }
 
+/**
+ * Whether two sets of facts say the same thing.
+ *
+ * Over every key rather than the seven it used to be. The list grew to two
+ * dozen, and one written out by hand is one that silently stops noticing a
+ * field somebody added — which shows up as an edit that does nothing.
+ */
 const sameInfo = (a: FontInfo, b: FontInfo): boolean =>
-  a.familyName === b.familyName &&
-  a.styleName === b.styleName &&
-  a.unitsPerEm === b.unitsPerEm &&
-  a.ascender === b.ascender &&
-  a.descender === b.descender &&
-  a.xHeight === b.xHeight &&
-  a.capHeight === b.capHeight;
+  (Object.keys(a) as (keyof FontInfo)[]).every((key) => a[key] === b[key]);

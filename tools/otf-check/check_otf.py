@@ -40,6 +40,48 @@ if problems:
     print("\n".join(problems))
     sys.exit(1)
 
+# ------------------------------------------------------------- name and OS/2
+# What the font says it is. Written by hand into `name` and `OS/2`, which are
+# the two tables an operating system reads to decide that this file is the
+# italic of that family — and getting them wrong is invisible until a font menu
+# somewhere groups four styles into two families.
+names = {r.nameID: str(r) for r in font["name"].names if r.platformID == 3}
+
+for name_id, expected in (
+    (1, "Tunni Marks Semibold"),   # the four-slot family
+    (2, "Italic"),                 # the four-slot style
+    (16, "Tunni Marks"),           # the typographic family
+    (17, "Semibold Italic"),       # the typographic style
+    (0, "Copyright nobody at all"),
+    (9, "A Designer"),
+    (13, "Do as you like."),
+    (5, "Version 2.007"),
+):
+    got = names.get(name_id)
+    if got != expected:
+        problem("name", f"name {name_id} is {got!r}, expected {expected!r}")
+
+os2 = font["OS/2"]
+for field, expected in (
+    ("usWeightClass", 600),
+    ("usWidthClass", 5),
+    ("achVendID", "TUNN"),
+):
+    got = getattr(os2, field, None)
+    if got != expected:
+        problem("OS/2", f"{field} is {got!r}, expected {expected!r}")
+
+# The italic bit, and not the bold one: this face is a semibold, and a weight
+# class of 600 is exactly where a compiler that guesses starts calling it bold.
+ITALIC = 1
+BOLD = 32
+if not os2.fsSelection & ITALIC:
+    problem("OS/2", f"fsSelection {os2.fsSelection} does not say italic")
+if os2.fsSelection & BOLD:
+    problem("OS/2", f"fsSelection {os2.fsSelection} says bold, and this is a semibold")
+
+note(f"name and OS/2: {names.get(1)!r} {names.get(2)!r}, weight {os2.usWeightClass}")
+
 # ---------------------------------------------------------------------- GDEF
 gdef = font["GDEF"].table
 classes = getattr(gdef.GlyphClassDef, "classDefs", None)

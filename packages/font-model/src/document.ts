@@ -4,12 +4,41 @@ import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js"
 export type GlyphName = string;
 
 /**
- * The font's own measurements, in design units.
+ * Anything a plist can hold, which is anything JSON can.
  *
- * These are what the editor draws guides from and what a compiler writes into
- * `head`, `hhea` and `OS/2`. Kept deliberately small for now — the full UFO
- * `fontinfo` has upwards of eighty fields, and adding them before anything reads
- * them would be inventing work.
+ * Here so that what a font carries and this editor does not understand can be
+ * carried anyway — through the model, through autosave, and back out to the
+ * file it came from — without the model pretending to know what it means.
+ */
+export type PlainValue =
+  string | number | boolean | null | readonly PlainValue[] | { readonly [key: string]: PlainValue };
+
+/** How a family groups in the menus of software that predates typographic names. */
+export type StyleMapStyle = "regular" | "italic" | "bold" | "bold italic";
+
+/** The four of them, for anything that has to check a value it was handed. */
+export const STYLE_MAP_STYLES: readonly StyleMapStyle[] = [
+  "regular",
+  "italic",
+  "bold",
+  "bold italic",
+];
+
+/**
+ * The font's own measurements and identity.
+ *
+ * The measurements are what the editor draws guides from and what a compiler
+ * writes into `head`, `hhea` and `OS/2`. The rest is what makes a file a
+ * released font rather than a drawing: a version, who made it, what may be done
+ * with it, and the three or four numbers by which an operating system decides
+ * that this file is the bold of that one.
+ *
+ * Named as UFO names them, which is not an accident. These fields are read from
+ * and written to a `fontinfo.plist`, and a second vocabulary in between would be
+ * a translation table to maintain and a place for the two to disagree.
+ *
+ * Still not all of `fontinfo`, which runs to eighty-odd keys. What is missing is
+ * carried verbatim instead — see `Kept`.
  */
 export type FontInfo = {
   readonly familyName: string;
@@ -19,6 +48,52 @@ export type FontInfo = {
   readonly descender: number;
   readonly xHeight: number;
   readonly capHeight: number;
+
+  /**
+   * The version, as a major and a minor.
+   *
+   * Two numbers rather than a string because that is what `head.fontRevision`
+   * is, and because "1.001" and "1.1" are the same version written two ways.
+   */
+  readonly versionMajor: number;
+  readonly versionMinor: number;
+
+  /** How far the letters lean, in degrees, counter-clockwise from upright. */
+  readonly italicAngle: number;
+
+  readonly copyright: string;
+  readonly trademark: string;
+
+  readonly openTypeNameDesigner: string;
+  readonly openTypeNameDesignerURL: string;
+  readonly openTypeNameManufacturer: string;
+  readonly openTypeNameManufacturerURL: string;
+  readonly openTypeNameLicense: string;
+  readonly openTypeNameLicenseURL: string;
+  readonly openTypeNameDescription: string;
+
+  /** Four characters identifying whoever made the font, registered with MS. */
+  readonly openTypeOS2VendorID: string;
+  /** 100 to 1000: 400 is regular, 700 is bold. */
+  readonly openTypeOS2WeightClass: number;
+  /** 1 to 9: 5 is normal, 3 is condensed, 7 is expanded. */
+  readonly openTypeOS2WidthClass: number;
+
+  /**
+   * The typographic family, for software that can group more than four styles.
+   *
+   * A family of Light, Regular, Medium and Black cannot be told in `familyName`
+   * alone: the older scheme has four slots per family, so the file has to say
+   * "Acme" here and "Acme Light" there, and applications that understand this
+   * pair show one family with four members instead of two families with two.
+   * Empty means the plain family name says everything.
+   */
+  readonly openTypeNamePreferredFamilyName: string;
+  readonly openTypeNamePreferredSubfamilyName: string;
+
+  /** The four-slot family this file belongs to, for software that only has four. */
+  readonly styleMapFamilyName: string;
+  readonly styleMapStyleName: StyleMapStyle;
 };
 
 export const DEFAULT_FONT_INFO: FontInfo = {
@@ -29,7 +104,54 @@ export const DEFAULT_FONT_INFO: FontInfo = {
   descender: -250,
   xHeight: 500,
   capHeight: 700,
+
+  versionMajor: 1,
+  versionMinor: 0,
+  italicAngle: 0,
+
+  copyright: "",
+  trademark: "",
+
+  openTypeNameDesigner: "",
+  openTypeNameDesignerURL: "",
+  openTypeNameManufacturer: "",
+  openTypeNameManufacturerURL: "",
+  openTypeNameLicense: "",
+  openTypeNameLicenseURL: "",
+  openTypeNameDescription: "",
+
+  openTypeOS2VendorID: "",
+  openTypeOS2WeightClass: 400,
+  openTypeOS2WidthClass: 5,
+
+  openTypeNamePreferredFamilyName: "",
+  openTypeNamePreferredSubfamilyName: "",
+
+  styleMapFamilyName: "",
+  styleMapStyleName: "regular",
 };
+
+/**
+ * What the font carries that this editor does not understand.
+ *
+ * A UFO has eighty-odd `fontinfo` keys, a `lib` anybody may write into, and
+ * conventions this editor has never heard of. The model holds what it can act
+ * on; everything else would be discarded, and discarding it used to cost an
+ * export and now costs somebody their source file, because saving writes over
+ * the folder they opened.
+ *
+ * So the reader keeps what it could not place, as the values it found, and the
+ * writer puts them back. The model does not interpret any of it — that is the
+ * point. It is somebody's data passing through.
+ */
+export type Kept = {
+  /** `fontinfo.plist` keys the model has no field for, by key. */
+  readonly fontInfo: Readonly<Record<string, PlainValue>>;
+  /** `lib.plist` keys other than the glyph order, which the model owns. */
+  readonly lib: Readonly<Record<string, PlainValue>>;
+};
+
+export const NOTHING_KEPT: Kept = { fontInfo: {}, lib: {} };
 
 /**
  * The part of the editor's state that history versions.
@@ -64,6 +186,14 @@ export type FontDocument = {
    * rest of somebody's file on the way in.
    */
   readonly features: string;
+  /**
+   * What the font it was read from carried that this editor cannot model.
+   *
+   * Undoable along with everything else here, which is right: it is written
+   * back out on save, so it is part of what the document *is* rather than a
+   * note about where it came from.
+   */
+  readonly kept: Kept;
 };
 
 export function fontDocument(
@@ -76,7 +206,14 @@ export function fontDocument(
     if (!(g.name in map)) order.push(g.name);
     map[g.name] = g;
   }
-  return { info, glyphOrder: order, glyphs: map, kerning: EMPTY_KERNING, features: "" };
+  return {
+    info,
+    glyphOrder: order,
+    glyphs: map,
+    kerning: EMPTY_KERNING,
+    features: "",
+    kept: NOTHING_KEPT,
+  };
 }
 
 export function glyphNamed(document: FontDocument, name: GlyphName): Glyph | null {
@@ -234,6 +371,11 @@ export function glyphsForString(document: FontDocument, text: string): Array<Gly
 /** Replace the font's feature source, leaving everything else alone. */
 export function setFeatures(document: FontDocument, features: string): FontDocument {
   return document.features === features ? document : { ...document, features };
+}
+
+/** Replace what the font carries that this editor does not model. */
+export function setKept(document: FontDocument, kept: Kept): FontDocument {
+  return document.kept === kept ? document : { ...document, kept };
 }
 
 /** Replace the font's kerning, leaving the glyphs alone. */

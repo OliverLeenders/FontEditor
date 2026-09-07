@@ -5,6 +5,7 @@ import {
   type FontInfo,
   type Glyph,
   type IdFactory,
+  DEFAULT_FONT_INFO,
   fontDocument,
   EMPTY_KERNING,
   component,
@@ -82,7 +83,12 @@ function uniqueName(preferred: string, taken: Set<string>): string {
 function infoFrom(source: SourceFont): FontInfo {
   const em = source.unitsPerEm > 0 ? source.unitsPerEm : 1000;
   const usable = (value: number | null): value is number => value !== null && value > 0;
+  // The identity fields keep their defaults: this reader is given outlines and
+  // metrics by the parser and does not go looking in `name` and `OS/2` for the
+  // rest. A binary opened here is a font to draw from, not a source to save
+  // back over, so what is not read is not at risk of being written away.
   return {
+    ...DEFAULT_FONT_INFO,
     familyName: source.familyName ?? "Untitled",
     styleName: source.styleName ?? "Regular",
     unitsPerEm: em,

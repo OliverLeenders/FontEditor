@@ -5,6 +5,7 @@ import {
   glyphFileName,
   setGlyphOrder,
   setFeatures,
+  setKept,
   setKerning,
 } from "@fonteditor/font-model";
 
@@ -286,7 +287,7 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
   // is appended, so a glyph file that appeared without the index being rewritten
   // still shows up rather than vanishing.
   const rawInfo = await store.read(FONT_INFO_PATH);
-  const { info, glyphOrder, features } = decodeFontInfo(parseOrNull(rawInfo));
+  const { info, glyphOrder, features, kept } = decodeFontInfo(parseOrNull(rawInfo));
   const kerning = decodeKerning(parseOrNull(await store.read(KERNING_PATH)));
 
   const ordered: Glyph[] = [];
@@ -302,15 +303,18 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
     if (!seen.has(name)) ordered.push(g);
   }
 
-  const document = setFeatures(
-    setKerning(
-      setGlyphOrder(
-        fontDocument(ordered, info),
-        ordered.map((g) => g.name),
+  const document = setKept(
+    setFeatures(
+      setKerning(
+        setGlyphOrder(
+          fontDocument(ordered, info),
+          ordered.map((g) => g.name),
+        ),
+        kerning,
       ),
-      kerning,
+      features,
     ),
-    features,
+    kept,
   );
   return { kind: "loaded", document, recovered, problems };
 }

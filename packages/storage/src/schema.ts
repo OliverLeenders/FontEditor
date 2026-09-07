@@ -8,11 +8,15 @@ import {
   type FontInfo,
   type Glyph,
   type HandleLock,
+  type Kept,
+  type PlainValue,
   type Node,
   type NodeType,
   BOTH_LOCKED,
   DEFAULT_FONT_INFO,
   NO_LOCK,
+  NOTHING_KEPT,
+  STYLE_MAP_STYLES,
   anchor,
   component,
   contour,
@@ -86,6 +90,12 @@ export type StoredGlyph = {
   readonly components?: readonly StoredComponent[];
   /** Optional on the way in, for the same reason components are. */
   readonly anchors?: readonly StoredAnchor[];
+  /**
+   * The parts of the glyph's own `.glif` this editor cannot model, verbatim.
+   *
+   * Written only when there are any, which is never for a glyph drawn here.
+   */
+  readonly kept?: readonly string[];
 };
 
 export type StoredFontInfo = {
@@ -101,7 +111,17 @@ export type StoredFontInfo = {
   readonly capHeight: number;
   /** Feature source. Omitted when empty, which is most fonts most of the time. */
   readonly features?: string;
+  /**
+   * `fontinfo` and `lib` keys this editor does not model, as they were found.
+   *
+   * Autosave has to carry these as faithfully as the file does. A reload that
+   * dropped them would put the loss back exactly where it was taken out — the
+   * next save to disk would write a font missing what the reader kept.
+   */
+  readonly kept?: { readonly fontInfo: PlainRecord; readonly lib: PlainRecord };
 };
+
+type PlainRecord = Readonly<Record<string, PlainValue>>;
 
 /** Success, or a reason a file could not be understood. */
 export type Decoded<T> =
@@ -125,6 +145,7 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     contours: g.contours.map(encodeContour),
     components: g.components.map(encodeComponent),
     anchors: g.anchors.map((a) => ({ id: a.id, name: a.name, at: point(a.pt) })),
+    ...(g.kept.length === 0 ? {} : { kept: [...g.kept] }),
   };
 }
 
@@ -163,9 +184,13 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
     schema: SCHEMA_VERSION,
     glyphOrder: [...document.glyphOrder],
     ...document.info,
+    ...(nothingKept(document.kept) ? {} : { kept: document.kept }),
   };
   return document.features === "" ? base : { ...base, features: document.features };
 }
+
+const nothingKept = (kept: Kept): boolean =>
+  Object.keys(kept.fontInfo).length === 0 && Object.keys(kept.lib).length === 0;
 
 /**
  * Read the font's own measurements back, falling back field by field.
@@ -178,32 +203,65 @@ export function decodeFontInfo(raw: unknown): {
   info: FontInfo;
   glyphOrder: readonly string[];
   features: string;
+  kept: Kept;
 } {
-  if (!isRecord(raw)) return { info: DEFAULT_FONT_INFO, glyphOrder: [], features: "" };
-
-  const number = (key: keyof FontInfo, fallback: number): number => {
-    const value = raw[key];
-    return typeof value === "number" && Number.isFinite(value) ? value : fallback;
-  };
-  const text = (key: keyof FontInfo, fallback: string): string => {
-    const value = raw[key];
-    return typeof value === "string" ? value : fallback;
-  };
+  if (!isRecord(raw)) {
+    return { info: DEFAULT_FONT_INFO, glyphOrder: [], features: "", kept: NOTHING_KEPT };
+  }
 
   return {
-    info: {
-      familyName: text("familyName", DEFAULT_FONT_INFO.familyName),
-      styleName: text("styleName", DEFAULT_FONT_INFO.styleName),
-      unitsPerEm: number("unitsPerEm", DEFAULT_FONT_INFO.unitsPerEm),
-      ascender: number("ascender", DEFAULT_FONT_INFO.ascender),
-      descender: number("descender", DEFAULT_FONT_INFO.descender),
-      xHeight: number("xHeight", DEFAULT_FONT_INFO.xHeight),
-      capHeight: number("capHeight", DEFAULT_FONT_INFO.capHeight),
-    },
+    info: readInfo(raw),
     glyphOrder: Array.isArray(raw["glyphOrder"])
       ? raw["glyphOrder"].filter((n): n is string => typeof n === "string")
       : [],
     features: typeof raw["features"] === "string" ? raw["features"] : "",
+    kept: readKept(raw["kept"]),
+  };
+}
+
+/**
+ * Every field of the font's information, each falling back on its own.
+ *
+ * Driven off the defaults rather than written out field by field: there are
+ * two dozen of them now, the rule is the same for every one — take it if it is
+ * of the right kind, and take the default if it is not — and a list repeated in
+ * two places is a list that will disagree with itself.
+ */
+function readInfo(raw: Record<string, unknown>): FontInfo {
+  const out: Record<string, unknown> = { ...DEFAULT_FONT_INFO };
+
+  for (const [key, fallback] of Object.entries(DEFAULT_FONT_INFO)) {
+    const value = raw[key];
+    if (typeof fallback === "number") {
+      if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+    } else if (typeof value === "string") {
+      out[key] = value;
+    }
+  }
+
+  // The one field that is not any string of its type.
+  const style = out["styleMapStyleName"];
+  if (!STYLE_MAP_STYLES.some((s) => s === style)) {
+    out["styleMapStyleName"] = DEFAULT_FONT_INFO.styleMapStyleName;
+  }
+
+  return out as FontInfo;
+}
+
+/**
+ * Read back what was kept, without believing anything about it.
+ *
+ * It came out of a plist and went through JSON, so whatever survives that is
+ * exactly what a `PlainValue` is. Nothing here inspects it — the two records
+ * are somebody else's data, and the only question is whether they are records.
+ */
+function readKept(raw: unknown): Kept {
+  if (!isRecord(raw)) return NOTHING_KEPT;
+  const fontInfo = raw["fontInfo"];
+  const lib = raw["lib"];
+  return {
+    fontInfo: isRecord(fontInfo) ? (fontInfo as PlainRecord) : {},
+    lib: isRecord(lib) ? (lib as PlainRecord) : {},
   };
 }
 
@@ -332,7 +390,13 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
     }
   }
 
-  return ok(glyph(source["name"], { unicodes, advance, contours, components, anchors }));
+  // Whatever the glyph's own file held that this editor cannot model, as the
+  // reader found it. Strings only: it is XML on the way back out.
+  const kept = Array.isArray(source["kept"])
+    ? source["kept"].filter((k): k is string => typeof k === "string")
+    : [];
+
+  return ok(glyph(source["name"], { unicodes, advance, contours, components, anchors, kept }));
 }
 
 function decodeAnchor(raw: unknown): Anchor | null {

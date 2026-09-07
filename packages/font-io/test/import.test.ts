@@ -1,4 +1,4 @@
-import { counterIds, glyphForCodePoint } from "@fonteditor/font-model";
+import { DEFAULT_FONT_INFO, counterIds, glyphForCodePoint } from "@fonteditor/font-model";
 import { opentype } from "../src/opentype.js";
 import { describe, expect, it } from "vitest";
 
@@ -26,6 +26,7 @@ function buildFont(): ArrayBuffer {
   square.close();
 
   return new opentype.Font({
+    ...DEFAULT_FONT_INFO,
     familyName: "Fixture",
     styleName: "Regular",
     unitsPerEm: 1000,
@@ -81,6 +82,7 @@ describe("importFont", () => {
 /** Mapping concerns, tested on source data so no binary has to be built. */
 describe("documentFrom", () => {
   const base: SourceFont = {
+    ...DEFAULT_FONT_INFO,
     familyName: null,
     styleName: null,
     unitsPerEm: 2048,

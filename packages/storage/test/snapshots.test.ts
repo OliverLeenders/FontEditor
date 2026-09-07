@@ -1,5 +1,7 @@
 import { vec } from "@fonteditor/geometry";
 import {
+  DEFAULT_FONT_INFO,
+  setKept,
   type FontDocument,
   EMPTY_KERNING,
   addContour,
@@ -52,19 +54,12 @@ function font(): FontDocument {
       addContour(glyph("o", { unicodes: [0x6f], advance: 600 }), ring),
       glyph("space", { unicodes: [0x20], advance: 250 }),
     ],
-    {
-      familyName: "Kept",
-      styleName: "Regular",
-      unitsPerEm: 1000,
-      ascender: 750,
-      descender: -250,
-      xHeight: 500,
-      capHeight: 700,
-    },
+    { ...DEFAULT_FONT_INFO, familyName: "Kept" },
   );
 
   const kerned = setKerning(document, setKern(EMPTY_KERNING, "o", groupKey("A"), -30));
-  return setFeatures(kerned, "feature liga { sub f i by fi; } liga;");
+  const featured = setFeatures(kerned, "feature liga { sub f i by fi; } liga;");
+  return setKept(featured, { fontInfo: { note: "kept" }, lib: { "com.someone.tool": true } });
 }
 
 const at = (n: number) => 1_700_000_000_000 + n * 60_000;
@@ -84,6 +79,10 @@ describe("snapshots", () => {
     expect(document.info).toEqual(before.info);
     expect(document.features).toBe(before.features);
     expect(document.kerning).toEqual(before.kerning);
+    // Including what the font carries and this editor does not understand: a
+    // copy that came back without it would strip somebody's source the next
+    // time they saved from it.
+    expect(document.kept).toEqual(before.kept);
     expect(document.glyphs["o"]!.contours[0]!.nodes).toHaveLength(3);
   });
 

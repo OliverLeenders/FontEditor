@@ -84,12 +84,12 @@ jobs:
         run: UFO_OUT="$RUNNER_TEMP/ufo" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
 
       - name: Read it with fontTools
-        run: python tools/ufo-check/check_ufo.py "$RUNNER_TEMP/ufo/TunniProof-Regular.ufo"
+        run: python tools/ufo-check/check_ufo.py "$RUNNER_TEMP/ufo/TunniProof-SemiboldItalic.ufo"
 
       - name: Have fontTools write the whole font back
         run: >
           python tools/ufo-check/rewrite_ufo.py
-          "$RUNNER_TEMP/ufo/TunniProof-Regular.ufo"
+          "$RUNNER_TEMP/ufo/TunniProof-SemiboldItalic.ufo"
           "$RUNNER_TEMP/ufo/FromFontTools.ufo"
           "$RUNNER_TEMP/ufo/FromFontTools.ufo.zip"
 
@@ -101,4 +101,4 @@ jobs:
         run: OTF_OUT="$RUNNER_TEMP/otf" pnpm --filter @fonteditor/font-io exec vitest run proof-otf
 
       - name: Read its GPOS with fontTools
-        run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-Regular.otf"
+        run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"

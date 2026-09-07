@@ -994,6 +994,7 @@ const EMPTY_GLYPH = {
   contours: [],
   components: [],
   anchors: [],
+  kept: [],
 };
 const EMPTY_CODES: readonly number[] = [];
 

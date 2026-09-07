@@ -1,4 +1,4 @@
-import { type FontInfo } from "@fonteditor/font-model";
+import { type FontInfo, STYLE_MAP_STYLES } from "@fonteditor/font-model";
 import { infoProblem, setInfo } from "@fonteditor/tools";
 import { useEffect, useRef, useState } from "react";
 
@@ -20,24 +20,162 @@ import { Stepper } from "./Stepper.js";
  * per keystroke would put "7", "75" and "750" in the undo stack on the way to
  * typing 750, and would move the canvas rulers under a half-typed number.
  */
-const FIELDS: readonly {
+type Field = {
   readonly key: keyof FontInfo;
   readonly label: string;
-  readonly kind: "text" | "number";
+  readonly kind: "text" | "number" | "choice";
   readonly hint: string;
-}[] = [
-  { key: "familyName", label: "Family", kind: "text", hint: "The name the font is known by" },
-  { key: "styleName", label: "Style", kind: "text", hint: "Regular, Italic, Bold, and so on" },
+  /** For a choice: the values it may take, in the order they are offered. */
+  readonly options?: readonly string[];
+};
+
+/**
+ * The fields, in sections, because there are two dozen of them now.
+ *
+ * The order is the order somebody fills them in. What the font is and how big
+ * it is come first because everything else depends on them; who made it and
+ * what may be done with it come last because they are written once and then
+ * left alone. Grouping is not decoration here — a flat list of two dozen boxes
+ * is a form nobody reads.
+ */
+const SECTIONS: readonly { readonly title: string; readonly fields: readonly Field[] }[] = [
   {
-    key: "unitsPerEm",
-    label: "Units per em",
-    kind: "number",
-    hint: "The grid the design is drawn on. Changing it does not rescale the drawings.",
+    title: "Names",
+    fields: [
+      { key: "familyName", label: "Family", kind: "text", hint: "The name the font is known by" },
+      { key: "styleName", label: "Style", kind: "text", hint: "Regular, Italic, Bold, and so on" },
+      {
+        key: "openTypeNamePreferredFamilyName",
+        label: "Typographic family",
+        kind: "text",
+        hint: "For a family of more than four styles. Leave empty if the family name says everything.",
+      },
+      {
+        key: "openTypeNamePreferredSubfamilyName",
+        label: "Typographic style",
+        kind: "text",
+        hint: "The style within the typographic family — Light, Semibold, and so on",
+      },
+      {
+        key: "styleMapFamilyName",
+        label: "Menu family",
+        kind: "text",
+        hint: "The four-slot family this file belongs to. Empty means the family name.",
+      },
+      {
+        key: "styleMapStyleName",
+        label: "Menu style",
+        kind: "choice",
+        options: STYLE_MAP_STYLES,
+        hint: "Which of the four slots this is. What an operating system groups by.",
+      },
+    ],
   },
-  { key: "ascender", label: "Ascender", kind: "number", hint: "Top of a d, an h, an l" },
-  { key: "descender", label: "Descender", kind: "number", hint: "Bottom of a g, a p, a y" },
-  { key: "xHeight", label: "x-height", kind: "number", hint: "Top of an x" },
-  { key: "capHeight", label: "Cap height", kind: "number", hint: "Top of an H" },
+  {
+    title: "Metrics",
+    fields: [
+      {
+        key: "unitsPerEm",
+        label: "Units per em",
+        kind: "number",
+        hint: "The grid the design is drawn on. Changing it does not rescale the drawings.",
+      },
+      { key: "ascender", label: "Ascender", kind: "number", hint: "Top of a d, an h, an l" },
+      { key: "descender", label: "Descender", kind: "number", hint: "Bottom of a g, a p, a y" },
+      { key: "xHeight", label: "x-height", kind: "number", hint: "Top of an x" },
+      { key: "capHeight", label: "Cap height", kind: "number", hint: "Top of an H" },
+      {
+        key: "italicAngle",
+        label: "Italic angle",
+        kind: "number",
+        hint: "Degrees from upright. Negative leans to the right, as an italic does.",
+      },
+    ],
+  },
+  {
+    title: "Classification",
+    fields: [
+      {
+        key: "openTypeOS2WeightClass",
+        label: "Weight class",
+        kind: "number",
+        hint: "1 to 1000. Regular is 400, bold is 700.",
+      },
+      {
+        key: "openTypeOS2WidthClass",
+        label: "Width class",
+        kind: "number",
+        hint: "1 to 9. Normal is 5, condensed is 3, expanded is 7.",
+      },
+      {
+        key: "versionMajor",
+        label: "Version",
+        kind: "number",
+        hint: "The major version. Goes in the name table and the head table.",
+      },
+      {
+        key: "versionMinor",
+        label: "Revision",
+        kind: "number",
+        hint: "The minor version, 0 to 999",
+      },
+      {
+        key: "openTypeOS2VendorID",
+        label: "Vendor id",
+        kind: "text",
+        hint: "Four characters identifying whoever made the font",
+      },
+    ],
+  },
+  {
+    title: "Who and what",
+    fields: [
+      { key: "openTypeNameDesigner", label: "Designer", kind: "text", hint: "Who drew it" },
+      {
+        key: "openTypeNameDesignerURL",
+        label: "Designer URL",
+        kind: "text",
+        hint: "Where to find them",
+      },
+      {
+        key: "openTypeNameManufacturer",
+        label: "Manufacturer",
+        kind: "text",
+        hint: "Who published it, where that is somebody else",
+      },
+      {
+        key: "openTypeNameManufacturerURL",
+        label: "Manufacturer URL",
+        kind: "text",
+        hint: "Where to find them",
+      },
+      { key: "copyright", label: "Copyright", kind: "text", hint: "The copyright notice" },
+      {
+        key: "trademark",
+        label: "Trademark",
+        kind: "text",
+        hint: "The trademark notice, if there is one",
+      },
+      {
+        key: "openTypeNameLicense",
+        label: "Licence",
+        kind: "text",
+        hint: "What may be done with the font",
+      },
+      {
+        key: "openTypeNameLicenseURL",
+        label: "Licence URL",
+        kind: "text",
+        hint: "Where the licence is",
+      },
+      {
+        key: "openTypeNameDescription",
+        label: "Description",
+        kind: "text",
+        hint: "A sentence about the font, shown by some software",
+      },
+    ],
+  },
 ];
 
 export function FontInfoPanel(): React.JSX.Element {
@@ -79,8 +217,13 @@ export function FontInfoPanel(): React.JSX.Element {
 
       {open ? (
         <div ref={ref} className={styles.panel} role="group" aria-label="Font info">
-          {FIELDS.map((field) => (
-            <Field key={field.key} field={field} info={info} store={store} />
+          {SECTIONS.map((section) => (
+            <section key={section.title} className={styles.section}>
+              <h3 className={styles.heading}>{section.title}</h3>
+              {section.fields.map((field) => (
+                <Field key={field.key} field={field} info={info} store={store} />
+              ))}
+            </section>
           ))}
           <p className={styles.note}>
             {info.familyName} {info.styleName} &middot; {info.unitsPerEm} units per em
@@ -103,7 +246,7 @@ function Field({
   info,
   store,
 }: {
-  field: (typeof FIELDS)[number];
+  field: Field;
   info: FontInfo;
   store: ReturnType<typeof useEditorStore>;
 }): React.JSX.Element {
@@ -166,6 +309,32 @@ function Field({
     ) : (
       input
     );
+
+  // A choice writes straight through: there is no half-typed state to protect
+  // and nothing to abandon, so a draft would only delay the answer.
+  if (field.kind === "choice") {
+    return (
+      <label className={styles.field}>
+        <span className={styles.label}>{field.label}</span>
+        <select
+          className={styles.input}
+          value={String(info[field.key])}
+          title={field.hint}
+          aria-label={field.label}
+          onChange={(event) => {
+            const patch = { [field.key]: event.target.value } as Partial<FontInfo>;
+            store.applyTool(setInfo(store.editor, patch));
+          }}
+        >
+          {(field.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
 
   return (
     <label className={styles.field}>

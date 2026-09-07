@@ -69,6 +69,7 @@ const EMPTY_GLYPH = {
   contours: [],
   components: [],
   anchors: [],
+  kept: [],
 };
 
 /**

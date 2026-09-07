@@ -9,6 +9,7 @@ import {
   vec,
 } from "@fonteditor/geometry";
 import {
+  DEFAULT_FONT_INFO,
   type Contour,
   type FontDocument,
   type Kerning,
@@ -813,7 +814,7 @@ describe("font info", () => {
     });
 
   it("changes one field and leaves the rest alone", () => {
-    const out = setInfo(start(), { familyName: "Cormorant" }).state;
+    const out = setInfo(start(), { ...DEFAULT_FONT_INFO, familyName: "Cormorant" }).state;
     expect(out.document.info.familyName).toBe("Cormorant");
     expect(out.document.info.unitsPerEm).toBe(1000);
   });
@@ -841,7 +842,7 @@ describe("font info", () => {
 
   it("refuses a font with no family name", () => {
     const s = start();
-    expect(setInfo(s, { familyName: "   " }).state).toBe(s);
+    expect(setInfo(s, { ...DEFAULT_FONT_INFO, familyName: "   " }).state).toBe(s);
   });
 
   it("does not move the drawings when the em changes", () => {

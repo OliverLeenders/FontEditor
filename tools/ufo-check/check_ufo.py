@@ -52,6 +52,48 @@ if getattr(info, "styleMapStyleName", None) is not None:
     if not fontInfoStyleMapStyleNameValidator(info.styleMapStyleName):
         problem("fontinfo.plist", f"styleMapStyleName {info.styleMapStyleName!r} is not one of the four allowed")
 
+# The identity a released font needs, and the keys the editor does not model but
+# carries anyway. Both are here for the same reason: ufoLib validates every one
+# of them by type and range, so a value this editor wrote wrongly is an error
+# rather than something a designer discovers in a font menu months later.
+for key in (
+    "versionMajor",
+    "versionMinor",
+    "italicAngle",
+    "copyright",
+    "openTypeNameDesigner",
+    "openTypeNameLicense",
+    "openTypeOS2VendorID",
+    "openTypeOS2WeightClass",
+    "openTypeOS2WidthClass",
+    "openTypeNamePreferredFamilyName",
+    "openTypeNamePreferredSubfamilyName",
+    "styleMapFamilyName",
+    "styleMapStyleName",
+):
+    value = getattr(info, key, None)
+    if value is None:
+        problem("fontinfo.plist", f"{key} is missing")
+    else:
+        note(f"info {key} = {value!r}")
+
+# Keys the editor has no field for. It read these out of the file it opened and
+# wrote them back; if they are not here, saving a font took them out of it.
+for key, expected in (
+    ("note", "drawn to be read by a machine"),
+    ("openTypeOS2Panose", [2, 11, 6, 3, 2, 0, 0, 2, 0, 4]),
+    ("postscriptBlueValues", [-12, 0, 500, 512]),
+):
+    value = getattr(info, key, None)
+    if value is None:
+        problem("fontinfo.plist", f"{key} was not kept")
+    else:
+        found = list(value) if isinstance(expected, list) else value
+        if found != expected:
+            problem("fontinfo.plist", f"{key} came back as {found!r}, not {expected!r}")
+        else:
+            note(f"kept {key}")
+
 # ---------------------------------------------------------------- groups
 try:
     groups = reader.readGroups()
@@ -83,6 +125,9 @@ for name in names:
         continue
 
     drawn[name] = {
+        "note": getattr(glyph, "note", None),
+        "guidelines": getattr(glyph, "guidelines", []),
+        "lib": getattr(glyph, "lib", {}),
         "width": getattr(glyph, "width", None),
         "unicodes": getattr(glyph, "unicodes", []),
         "points": [c for c in pen.value if c[0] == "addPoint"],
@@ -94,6 +139,16 @@ for name in names:
     if getattr(glyph, "width", None) is None:
         problem(f"glyph {name}", "no advance width")
 
+# What a glyph carries that the editor does not model. It read these out of the
+# `.glif` and wrote them back; a reference reader finding them where they were is
+# the whole claim.
+a = drawn.get("a", {})
+if a.get("note") != "the join wants looking at":
+    problem("glyph a", f"the note was not kept: {a.get('note')!r}")
+if not any(g.get("name") == "stem" for g in a.get("guidelines", [])):
+    problem("glyph a", f"the guideline was not kept: {a.get('guidelines')!r}")
+if a.get("lib", {}).get("com.tunni.proof") != "kept":
+    problem("glyph a", f"the lib was not kept: {a.get('lib')!r}")
 # anchors: read back by name, and nowhere in the outline. An anchor written as
 # a one-point contour is the format-1 spelling, and reading it as a contour is
 # the mistake this asks about.

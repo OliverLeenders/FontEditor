@@ -44,6 +44,7 @@ const EMPTY: Glyph = {
   contours: [],
   components: [],
   anchors: [],
+  kept: [],
 };
 
 /** Resolved component outlines are throwaway; their ids never leave the frame. */

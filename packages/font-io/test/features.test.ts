@@ -1,4 +1,5 @@
 import {
+  DEFAULT_FONT_INFO,
   contour,
   counterIds,
   fontDocument,
@@ -32,6 +33,7 @@ const box = (name: string, code: number) =>
   });
 
 const INFO = {
+  ...DEFAULT_FONT_INFO,
   familyName: "Feature Test",
   styleName: "Regular",
   unitsPerEm: 1000,

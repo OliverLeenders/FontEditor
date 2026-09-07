@@ -17,7 +17,7 @@ check then asks for the anchors back by name and compares them with what was dra
 ```bash
 pip install -r ../ufo-check/requirements.txt
 OTF_OUT=/tmp/otf pnpm --filter @fonteditor/font-io exec vitest run proof-otf
-python check_otf.py /tmp/otf/TunniMarks-Regular.otf
+python check_otf.py /tmp/otf/TunniMarks-SemiboldItalic.otf
 ```
 
 The font it reads comes from `packages/font-io/test/proof-otf.test.ts`: a letter offering

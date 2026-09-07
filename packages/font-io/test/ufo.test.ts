@@ -1,5 +1,6 @@
 import { IDENTITY_AFFINE, translation } from "@fonteditor/geometry";
 import {
+  DEFAULT_FONT_INFO,
   type FontDocument,
   component,
   contour,
@@ -55,6 +56,7 @@ const triangle = (closed = true) =>
   );
 
 const INFO = {
+  ...DEFAULT_FONT_INFO,
   familyName: "Trip Sans",
   styleName: "Regular",
   unitsPerEm: 1000,

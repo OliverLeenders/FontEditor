@@ -3,6 +3,7 @@ import {
   type Contour,
   type FontDocument,
   type Glyph,
+  type PlainValue,
   glyphFileName,
   groupNameOf,
   isGroupKey,
@@ -235,6 +236,11 @@ export function glif(g: Glyph): string {
     );
   }
 
+  // Last, and unread: guidelines, a note, an image, a lib — whatever this glyph
+  // was read carrying that the model has no field for. Written back exactly as
+  // it arrived, because saving a font must not take things out of it.
+  for (const element of g.kept) lines.push(element);
+
   lines.push("</glyph>", "");
   return lines.join("\n");
 }
@@ -250,6 +256,106 @@ export function glif(g: Glyph): string {
  * goes wrong in a format like this is a missing index or a filename that
  * disagrees with `contents.plist`, and neither is visible through a zip.
  */
+
+/**
+ * Every key of `fontinfo.plist`, in the order a reader expects to find them.
+ *
+ * The modelled ones first, then whatever the font arrived carrying that this
+ * editor has no field for. A key the model has always wins: if a font came in
+ * with an `openTypeOS2WeightClass` and somebody has since changed the weight,
+ * what they changed it to is the answer, not what the file used to say.
+ *
+ * Empty strings are left out. UFO's own convention is that an absent key means
+ * "not stated", and writing `<string></string>` for every name the designer has
+ * not filled in says something different — it says they stated nothing on
+ * purpose, and some tools will show it.
+ */
+function fontInfoPairs(document: FontDocument): Array<readonly [string, string]> {
+  const { info } = document;
+  const pairs: Array<readonly [string, string]> = [];
+
+  const text = (key: string, value: string): void => {
+    if (value !== "") pairs.push([key, str(value)]);
+  };
+  const number = (key: string, value: number): void => {
+    pairs.push([key, int(value)]);
+  };
+
+  text("familyName", info.familyName);
+  text("styleName", info.styleName);
+  number("unitsPerEm", info.unitsPerEm);
+  number("ascender", info.ascender);
+  number("descender", -Math.abs(info.descender));
+  number("xHeight", info.xHeight);
+  number("capHeight", info.capHeight);
+
+  number("versionMajor", info.versionMajor);
+  number("versionMinor", info.versionMinor);
+  if (info.italicAngle !== 0) pairs.push(["italicAngle", real(info.italicAngle)]);
+
+  text("copyright", info.copyright);
+  text("trademark", info.trademark);
+
+  text("openTypeNameDesigner", info.openTypeNameDesigner);
+  text("openTypeNameDesignerURL", info.openTypeNameDesignerURL);
+  text("openTypeNameManufacturer", info.openTypeNameManufacturer);
+  text("openTypeNameManufacturerURL", info.openTypeNameManufacturerURL);
+  text("openTypeNameLicense", info.openTypeNameLicense);
+  text("openTypeNameLicenseURL", info.openTypeNameLicenseURL);
+  text("openTypeNameDescription", info.openTypeNameDescription);
+
+  text("openTypeOS2VendorID", info.openTypeOS2VendorID);
+  number("openTypeOS2WeightClass", info.openTypeOS2WeightClass);
+  number("openTypeOS2WidthClass", info.openTypeOS2WidthClass);
+
+  text("openTypeNamePreferredFamilyName", info.openTypeNamePreferredFamilyName);
+  text("openTypeNamePreferredSubfamilyName", info.openTypeNamePreferredSubfamilyName);
+
+  text("styleMapFamilyName", info.styleMapFamilyName);
+  pairs.push(["styleMapStyleName", str(info.styleMapStyleName)]);
+
+  const mine = new Set(pairs.map(([key]) => key));
+  for (const [key, value] of Object.entries(document.kept.fontInfo)) {
+    if (mine.has(key)) continue;
+    const written = plistValue(value);
+    if (written !== null) pairs.push([key, written]);
+  }
+
+  return pairs;
+}
+
+/**
+ * A value of any shape a plist can hold, written back out.
+ *
+ * For what was kept rather than modelled, so it has to write whatever it is
+ * handed rather than a known field. `null` for what a plist cannot express —
+ * which, since these values came out of a plist, means only the values our own
+ * reader gave up on and stored as null.
+ */
+function plistValue(value: PlainValue): string | null {
+  if (typeof value === "string") return str(value);
+  if (typeof value === "boolean") return value ? "<true/>" : "<false/>";
+  if (typeof value === "number") return Number.isInteger(value) ? int(value) : real(value);
+  if (Array.isArray(value)) {
+    const items = value.map(plistValue).filter((v): v is string => v !== null);
+    return array(items);
+  }
+  if (value !== null && typeof value === "object") {
+    const pairs: Array<readonly [string, string]> = [];
+    for (const [key, inner] of Object.entries(value as Record<string, PlainValue>)) {
+      const written = plistValue(inner);
+      if (written !== null) pairs.push([key, written]);
+    }
+    return dict(pairs);
+  }
+  return null;
+}
+
+/** A number that is not a whole one. Plists distinguish the two. */
+function real(value: number): string {
+  return `<real>${String(value)}</real>`;
+}
+
 export function ufoFiles(document: FontDocument): ZipEntry[] {
   const entries: ZipEntry[] = [
     {
@@ -276,21 +382,7 @@ export function ufoFiles(document: FontDocument): ZipEntry[] {
     },
   ];
 
-  const { info } = document;
-  entries.push({
-    path: "fontinfo.plist",
-    text: plist(
-      dict([
-        ["familyName", str(info.familyName)],
-        ["styleName", str(info.styleName)],
-        ["unitsPerEm", int(info.unitsPerEm)],
-        ["ascender", int(info.ascender)],
-        ["descender", int(-Math.abs(info.descender))],
-        ["xHeight", int(info.xHeight)],
-        ["capHeight", int(info.capHeight)],
-      ]),
-    ),
-  });
+  entries.push({ path: "fontinfo.plist", text: plist(dict(fontInfoPairs(document))) });
 
   // One filename per glyph, and the same rule the working store uses — which is
   // UFO's own, because that is where it was borrowed from.
@@ -355,12 +447,19 @@ export function ufoFiles(document: FontDocument): ZipEntry[] {
   // dictionary has no order the format promises to keep — so a reader that took
   // its order from there would be reading ours by luck. `public.glyphOrder` is
   // where the format actually writes it down, and where every other tool looks.
+  const lib: Array<readonly [string, string]> = [];
   if (contents.length > 0) {
-    entries.push({
-      path: "lib.plist",
-      text: plist(dict([["public.glyphOrder", array(contents.map(([name]) => str(name)))]])),
-    });
+    lib.push(["public.glyphOrder", array(contents.map(([name]) => str(name)))]);
   }
+  // Everything else somebody put in the lib, back where they put it. A lib is
+  // where every tool keeps what the format has no field for, so it is the one
+  // file where writing only what we understand does the most damage.
+  for (const [key, value] of Object.entries(document.kept.lib)) {
+    if (key === "public.glyphOrder") continue;
+    const written = plistValue(value);
+    if (written !== null) lib.push([key, written]);
+  }
+  if (lib.length > 0) entries.push({ path: "lib.plist", text: plist(dict(lib)) });
 
   return entries;
 }

@@ -4,6 +4,8 @@ import {
   type Glyph,
   type IdFactory,
   type Kerning,
+  type PlainValue,
+  type StyleMapStyle,
   DEFAULT_FONT_INFO,
   EMPTY_KERNING,
   fontDocument,
@@ -11,11 +13,14 @@ import {
   setFeatures,
   setKern,
   setKernGroup,
+  setKept,
   setKerning,
+  STYLE_MAP_STYLES,
 } from "@fonteditor/font-model";
 
 import { parseGlif } from "./glif.js";
 import {
+  type PlistDict,
   isDict,
   parsePlistDict,
   plistNumber,
@@ -87,7 +92,7 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
 
   const at = (path: string): string | null => fileText(files, `${root}${path}`);
 
-  const info = readFontInfo(at("fontinfo.plist"), warn);
+  const { info, kept: keptInfo } = readFontInfo(at("fontinfo.plist"), warn);
   const layer = defaultLayer(at("layercontents.plist"));
   const contents = parsePlistDict(at(`${layer}/contents.plist`) ?? "");
   const entries = stringEntries(contents);
@@ -126,7 +131,12 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
 
   if (glyphs.length === 0) return { reason: "the archive contains no readable glyphs" };
 
-  const ordered = inLibOrder(glyphs, at("lib.plist"));
+  const libSource = at("lib.plist");
+  const ordered = inLibOrder(glyphs, libSource);
+  // The glyph order is the model's; everything else somebody put in the lib is
+  // theirs, and is carried through untouched so that saving puts it back.
+  const keptLib =
+    libSource === null ? {} : unmodelled(parsePlistDict(libSource), ["public.glyphOrder"]);
 
   const kerning = readKerning(at("groups.plist"), at("kerning.plist"), warn);
   // Taken as it is, not parsed. What could not be compiled is still somebody's
@@ -135,7 +145,10 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
   const features = at("features.fea") ?? "";
 
   return {
-    document: setFeatures(setKerning(fontDocument(ordered, info), kerning), features),
+    document: setKept(setFeatures(setKerning(fontDocument(ordered, info), kerning), features), {
+      fontInfo: keptInfo,
+      lib: keptLib,
+    }),
     warnings,
   };
 }
@@ -205,10 +218,10 @@ function defaultLayer(source: string | null): string {
 function readFontInfo(
   source: string | null,
   warn: (glyph: string | null, message: string) => void,
-): FontInfo {
+): { info: FontInfo; kept: Readonly<Record<string, PlainValue>> } {
   if (source === null) {
     warn(null, "no fontinfo.plist: the font's metrics are the defaults");
-    return DEFAULT_FONT_INFO;
+    return { info: DEFAULT_FONT_INFO, kept: {} };
   }
 
   const dict = parsePlistDict(source);
@@ -218,15 +231,72 @@ function readFontInfo(
   // A descender is stored negative and is sometimes written positive by hand.
   const descender = plistNumber(dict, "descender");
 
-  return {
-    familyName: plistString(dict, "familyName") ?? DEFAULT_FONT_INFO.familyName,
-    styleName: plistString(dict, "styleName") ?? DEFAULT_FONT_INFO.styleName,
+  const text = (key: keyof FontInfo): string =>
+    plistString(dict, key) ?? (DEFAULT_FONT_INFO[key] as string);
+  const number = (key: keyof FontInfo): number =>
+    plistNumber(dict, key) ?? (DEFAULT_FONT_INFO[key] as number);
+
+  const info: FontInfo = {
+    familyName: text("familyName"),
+    styleName: text("styleName"),
     unitsPerEm: upem ?? DEFAULT_FONT_INFO.unitsPerEm,
     ascender: plistNumber(dict, "ascender") ?? DEFAULT_FONT_INFO.ascender,
     descender: descender === null ? DEFAULT_FONT_INFO.descender : -Math.abs(descender),
     xHeight: plistNumber(dict, "xHeight") ?? DEFAULT_FONT_INFO.xHeight,
     capHeight: plistNumber(dict, "capHeight") ?? DEFAULT_FONT_INFO.capHeight,
+
+    versionMajor: number("versionMajor"),
+    versionMinor: number("versionMinor"),
+    italicAngle: number("italicAngle"),
+
+    copyright: text("copyright"),
+    trademark: text("trademark"),
+
+    openTypeNameDesigner: text("openTypeNameDesigner"),
+    openTypeNameDesignerURL: text("openTypeNameDesignerURL"),
+    openTypeNameManufacturer: text("openTypeNameManufacturer"),
+    openTypeNameManufacturerURL: text("openTypeNameManufacturerURL"),
+    openTypeNameLicense: text("openTypeNameLicense"),
+    openTypeNameLicenseURL: text("openTypeNameLicenseURL"),
+    openTypeNameDescription: text("openTypeNameDescription"),
+
+    openTypeOS2VendorID: text("openTypeOS2VendorID"),
+    openTypeOS2WeightClass: number("openTypeOS2WeightClass"),
+    openTypeOS2WidthClass: number("openTypeOS2WidthClass"),
+
+    openTypeNamePreferredFamilyName: text("openTypeNamePreferredFamilyName"),
+    openTypeNamePreferredSubfamilyName: text("openTypeNamePreferredSubfamilyName"),
+
+    styleMapFamilyName: text("styleMapFamilyName"),
+    styleMapStyleName: styleMapStyle(plistString(dict, "styleMapStyleName")),
   };
+
+  return { info, kept: unmodelled(dict, Object.keys(DEFAULT_FONT_INFO)) };
+}
+
+/** The four names this key is allowed to have, and the default for anything else. */
+function styleMapStyle(value: string | null): StyleMapStyle {
+  const found = STYLE_MAP_STYLES.find((s) => s === value);
+  return found ?? DEFAULT_FONT_INFO.styleMapStyleName;
+}
+
+/**
+ * The keys of a dictionary that the model has no field for.
+ *
+ * Kept exactly as they were read, so that writing the font back out puts them
+ * where they were. Nothing here decides what they mean — deciding is what the
+ * model does, and these are the ones it cannot.
+ */
+function unmodelled(
+  dict: PlistDict,
+  modelled: readonly string[],
+): Readonly<Record<string, PlainValue>> {
+  const mine = new Set(modelled);
+  const out: Record<string, PlainValue> = {};
+  for (const [key, value] of Object.entries(dict)) {
+    if (!mine.has(key)) out[key] = value;
+  }
+  return out;
 }
 
 /**

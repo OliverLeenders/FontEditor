@@ -1,4 +1,5 @@
 import {
+  DEFAULT_FONT_INFO,
   EMPTY_KERNING,
   addAnchor,
   anchor,
@@ -28,6 +29,7 @@ const ids = counterIds();
 const at = (x: number, y: number) => ({ x, y });
 
 const INFO = {
+  ...DEFAULT_FONT_INFO,
   familyName: "Round Trip",
   styleName: "Regular",
   unitsPerEm: 1000,

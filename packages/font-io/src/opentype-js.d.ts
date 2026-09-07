@@ -80,7 +80,7 @@ declare module "opentype.js" {
     readonly ascender: number;
     readonly descender: number;
     readonly glyphs: OtGlyphSet;
-    readonly names: OtNames;
+    names: OtNames;
     readonly outlinesFormat: string;
     readonly tables: {
       readonly os2?: { readonly sxHeight?: number; readonly sCapHeight?: number };
@@ -116,7 +116,37 @@ declare module "opentype.js" {
     ascender: number;
     descender: number;
     glyphs: OtGlyph[];
+
+    /**
+     * What a released font says about itself.
+     *
+     * All optional, all verified against the installed build: the constructor
+     * turns each into a `name` record, and the three numeric ones into `OS/2`
+     * and `post`. `fsSelection` is passed explicitly because the default
+     * derives it from the italic angle and the weight, and a font's style-map
+     * style is a decision rather than a deduction.
+     */
+    fullName?: string;
+    postScriptName?: string;
+    version?: string;
+    copyright?: string;
+    trademark?: string;
+    designer?: string;
+    designerURL?: string;
+    manufacturer?: string;
+    manufacturerURL?: string;
+    license?: string;
+    licenseURL?: string;
+    description?: string;
+    italicAngle?: number;
+    weightClass?: number;
+    widthClass?: number;
+    fsSelection?: number;
+    tables?: { os2?: { achVendID?: string } };
   }
+
+  /** One name record's translations. Only English is ever written here. */
+  export type OtNameRecord = { en: string };
 
   export interface OtGlyphInit {
     name: string;

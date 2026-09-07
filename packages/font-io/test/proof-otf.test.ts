@@ -2,6 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
+  DEFAULT_FONT_INFO,
   type FontDocument,
   addAnchor,
   anchor,
@@ -81,13 +82,31 @@ export function proofFont(): FontDocument {
   );
 
   return fontDocument([glyph(".notdef", { advance: 500 }), a, acute, ogonek, macron], {
+    ...DEFAULT_FONT_INFO,
     familyName: "Tunni Marks",
-    styleName: "Regular",
+    styleName: "Semibold Italic",
     unitsPerEm: 1000,
     ascender: 780,
     descender: -220,
     xHeight: 520,
     capHeight: 700,
+
+    // An identity as well as an outline, so fontTools is asked about the name
+    // and OS/2 tables too. A semibold italic is the case the four-slot naming
+    // scheme cannot hold, which is where a compiler gets this wrong.
+    styleMapFamilyName: "Tunni Marks Semibold",
+    styleMapStyleName: "italic",
+    openTypeNamePreferredFamilyName: "Tunni Marks",
+    openTypeNamePreferredSubfamilyName: "Semibold Italic",
+    versionMajor: 2,
+    versionMinor: 7,
+    italicAngle: -12,
+    copyright: "Copyright nobody at all",
+    openTypeNameDesigner: "A Designer",
+    openTypeNameLicense: "Do as you like.",
+    openTypeOS2VendorID: "TUNN",
+    openTypeOS2WeightClass: 600,
+    openTypeOS2WidthClass: 5,
   });
 }
 
@@ -103,7 +122,7 @@ describe("the mark-attachment proof font", () => {
 
     const { bytes } = exportFont(proofFont());
     rmSync(OUT, { recursive: true, force: true });
-    const path = join(OUT, "TunniMarks-Regular.otf");
+    const path = join(OUT, "TunniMarks-SemiboldItalic.otf");
     mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, new Uint8Array(bytes));
   });

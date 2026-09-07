@@ -1,4 +1,6 @@
 import {
+  glyphNamed,
+  DEFAULT_FONT_INFO,
   addAnchor,
   anchor,
   EMPTY_KERNING,
@@ -17,6 +19,7 @@ import {
   setFeatures,
   setKern,
   setKernGroup,
+  setKept,
   setKerning,
 } from "@fonteditor/font-model";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -159,7 +162,20 @@ function proof(): FontDocument {
         glyph("A", { unicodes: [0x41], advance: 620, contours: [wedge()] }),
         anchor(ids.anchor(), "top", { x: 310, y: 720 }),
       ),
-      glyph("a", { unicodes: [0x61], advance: 560, contours: [ring(60, 500, 520, 0)] }),
+      // Everything a real source puts in a glyph that this editor has no field
+      // for. Kept on the way in and written back on the way out, so the
+      // reference implementation is asked whether what we wrote is still a
+      // glyph — and whether these are still in it.
+      glyph("a", {
+        unicodes: [0x61],
+        advance: 560,
+        contours: [ring(60, 500, 520, 0)],
+        kept: [
+          '\t<guideline x="120" name="stem"/>',
+          "\t<note>the join wants looking at</note>",
+          "\t<lib><dict><key>com.tunni.proof</key><string>kept</string></dict></lib>",
+        ],
+      }),
       glyph("a.alt", { advance: 560, contours: [halfHandled()] }),
       glyph("O", { unicodes: [0x4f], advance: 700, contours: [ring(50, 650, 720, -20)] }),
       glyph("o", { unicodes: [0x6f], advance: 580, contours: [ring(50, 530, 520, -10)] }),
@@ -190,17 +206,55 @@ function proof(): FontDocument {
       glyph("uni00A0.sc", { advance: 260 }),
     ],
     {
+      ...DEFAULT_FONT_INFO,
       familyName: "Tunni Proof",
-      styleName: "Regular",
+      styleName: "Semibold Italic",
       unitsPerEm: 1000,
       ascender: 780,
       descender: -220,
       xHeight: 520,
       capHeight: 700,
+
+      // A style the four-slot scheme cannot hold, so the typographic names and
+      // the menu names say different things — which is the case that goes wrong
+      // in a compiler and is invisible in a family of four.
+      openTypeNamePreferredFamilyName: "Tunni Proof",
+      openTypeNamePreferredSubfamilyName: "Semibold Italic",
+      styleMapFamilyName: "Tunni Proof Semibold",
+      styleMapStyleName: "italic",
+
+      versionMajor: 2,
+      versionMinor: 7,
+      italicAngle: -12.5,
+      copyright: "Copyright nobody at all",
+      trademark: "Tunni Proof is not a trademark",
+      openTypeNameDesigner: "A Designer",
+      openTypeNameDesignerURL: "https://example.invalid/designer",
+      openTypeNameManufacturer: "A Foundry",
+      openTypeNameManufacturerURL: "https://example.invalid/foundry",
+      openTypeNameLicense: "Do as you like.",
+      openTypeNameLicenseURL: "https://example.invalid/licence",
+      openTypeNameDescription: "A font that exists to be read by other software.",
+      openTypeOS2VendorID: "TUNN",
+      openTypeOS2WeightClass: 600,
+      openTypeOS2WidthClass: 5,
     },
   );
 
-  return setFeatures(setKerning(document, kerning), FEATURES);
+  // Real `fontinfo` keys this editor does not model, and a `lib` entry of the
+  // kind every tool writes. Both are carried through untouched, and the point
+  // of putting them here is that fontTools reads them, writes them back, and is
+  // then asked whether they survived the trip through us.
+  const carrying = setKept(document, {
+    fontInfo: {
+      note: "drawn to be read by a machine",
+      openTypeOS2Panose: [2, 11, 6, 3, 2, 0, 0, 2, 0, 4],
+      postscriptBlueValues: [-12, 0, 500, 512],
+    },
+    lib: { "com.tunni.proof": { written: "by the proof", version: 2 } },
+  });
+
+  return setFeatures(setKerning(carrying, kerning), FEATURES);
 }
 
 describe("the proof font", () => {
@@ -272,6 +326,19 @@ describe("the proof font", () => {
         anchors: g.anchors.map((a) => [a.name, a.pt.x, a.pt.y]),
       }));
     expect(shape(after)).toEqual(shape(before));
+
+    // What neither of us models, through both of us. fontTools read these,
+    // wrote them back, and this reads them again: what a key means to anyone is
+    // not the question, only whether it is still there.
+    expect(after.kept.fontInfo["note"]).toBe("drawn to be read by a machine");
+    expect(after.kept.fontInfo["openTypeOS2Panose"]).toEqual([2, 11, 6, 3, 2, 0, 0, 2, 0, 4]);
+    expect(after.kept.fontInfo["postscriptBlueValues"]).toEqual([-12, 0, 500, 512]);
+    expect(after.kept.lib["com.tunni.proof"]).toEqual({ written: "by the proof", version: 2 });
+
+    const keptOnA = (glyphNamed(after, "a")?.kept ?? []).join("\n");
+    expect(keptOnA).toContain('name="stem"');
+    expect(keptOnA).toContain("the join wants looking at");
+    expect(keptOnA).toContain("com.tunni.proof");
 
     expect(after.kerning.firstGroups).toEqual(before.kerning.firstGroups);
     expect(after.kerning.secondGroups).toEqual(before.kerning.secondGroups);

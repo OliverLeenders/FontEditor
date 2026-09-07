@@ -1,4 +1,5 @@
 import {
+  DEFAULT_FONT_INFO,
   EMPTY_KERNING,
   type Kerning,
   contour,
@@ -42,6 +43,7 @@ const box = (name: string, code: number) =>
   });
 
 const INFO = {
+  ...DEFAULT_FONT_INFO,
   familyName: "Kern Test",
   styleName: "Regular",
   unitsPerEm: 1000,

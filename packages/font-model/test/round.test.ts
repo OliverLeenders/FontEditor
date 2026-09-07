@@ -5,7 +5,7 @@ import { addContour, glyph } from "../src/glyph.js";
 import { component } from "../src/component.js";
 import { contour } from "../src/contour.js";
 import { counterIds } from "../src/ids.js";
-import { fontDocument } from "../src/document.js";
+import { DEFAULT_FONT_INFO, fontDocument } from "../src/document.js";
 import { node } from "../src/node.js";
 import { roundFont, roundGlyph, unroundedGlyphs } from "../src/round.js";
 
@@ -125,13 +125,9 @@ describe("roundFont", () => {
     // An x-height of 512.4 is a decision about the design, not an accident of
     // arithmetic, and "round coordinates" is a question about the drawing.
     const d = fontDocument([glyph("a")], {
-      familyName: "T",
-      styleName: "R",
-      unitsPerEm: 1000,
+      ...DEFAULT_FONT_INFO,
       ascender: 750.5,
-      descender: -250,
       xHeight: 512.4,
-      capHeight: 700,
     });
     expect(roundFont(d).info.xHeight).toBe(512.4);
     expect(roundFont(d).info.ascender).toBe(750.5);

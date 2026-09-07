@@ -4,6 +4,7 @@ import {
   orderedGlyphs,
   setFeatures,
   setGlyphOrder,
+  setKept,
   setKerning,
 } from "@fonteditor/font-model";
 
@@ -175,6 +176,11 @@ export function documentOf(snapshot: StoredSnapshot): {
   // the same reason the glyphs are there: one file, read whole.
   const features = snapshot.features ?? read.features;
   if (features !== "") document = setFeatures(document, features);
+
+  // Whatever the font carries that this editor cannot model, which rides along
+  // in the stored font info. A copy that came back without it would quietly
+  // strip somebody's source the next time they saved.
+  document = setKept(document, read.kept);
 
   return { document, problems };
 }

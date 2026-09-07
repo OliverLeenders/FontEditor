@@ -1,5 +1,6 @@
 import { IDENTITY_AFFINE, vec } from "@fonteditor/geometry";
 import {
+  setKept,
   type Contour,
   type FontDocument,
   type Glyph,
@@ -47,7 +48,14 @@ import {
   replaceDocument,
   saveDocument,
 } from "../src/project.js";
-import { SCHEMA_VERSION, decodeGlyph, encodeGlyph, migrate } from "../src/schema.js";
+import {
+  SCHEMA_VERSION,
+  decodeFontInfo,
+  decodeGlyph,
+  encodeFontInfo,
+  encodeGlyph,
+  migrate,
+} from "../src/schema.js";
 
 /** The document holds many glyphs now; these tests each work with one. */
 const firstGlyph = (d: FontDocument): Glyph => orderedGlyphs(d)[0]!;
@@ -138,6 +146,44 @@ describe("serialization", () => {
     const decoded = decodeGlyph(encoded);
     expect(decoded.ok).toBe(true);
     if (decoded.ok) expect(decoded.value.anchors).toEqual([]);
+  });
+});
+
+describe("what the font carries and this editor does not model", () => {
+  // The reader keeps it and the writer puts it back, so autosave has to carry
+  // it too: a reload that dropped it would put the loss back exactly where it
+  // was taken out, one save to disk later.
+  const kept = {
+    fontInfo: { openTypeOS2Panose: [2, 11, 5] as const, note: "on a train" },
+    lib: { "com.someone.tool": { version: "3" } },
+  };
+
+  it("carries a font's kept keys through a save and a load", async () => {
+    const store = new MemoryFileStore();
+    await saveDocument(store, setKept(document(), kept));
+
+    const result = await loadDocument(store);
+    expect(result.kind).toBe("loaded");
+    if (result.kind === "loaded") expect(result.document.kept).toEqual(kept);
+  });
+
+  it("carries a glyph's kept elements through a round trip", () => {
+    const g = glyph("a", { kept: ["	<note>hello</note>"] });
+    const decoded = decodeGlyph(JSON.parse(JSON.stringify(encodeGlyph(g))) as unknown);
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) expect(decoded.value.kept).toEqual(["	<note>hello</note>"]);
+  });
+
+  it("writes nothing for a font that has nothing to keep", () => {
+    const encoded: Record<string, unknown> = { ...encodeFontInfo(document()) };
+    expect("kept" in encoded).toBe(false);
+    expect("kept" in { ...encodeGlyph(glyph("a")) }).toBe(false);
+  });
+
+  it("survives a file that says something absurd about it", () => {
+    const info = decodeFontInfo({ familyName: "T", kept: "not a record" });
+    expect(info.kept).toEqual({ fontInfo: {}, lib: {} });
   });
 });
 

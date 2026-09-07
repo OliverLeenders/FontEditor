@@ -1,5 +1,6 @@
 import { translation } from "@fonteditor/geometry";
 import {
+  DEFAULT_FONT_INFO,
   type FontDocument,
   addAnchor,
   anchor,
@@ -77,6 +78,7 @@ const box = (name: string, code: number) =>
   });
 
 const INFO = {
+  ...DEFAULT_FONT_INFO,
   familyName: "Round Trip",
   styleName: "Regular",
   unitsPerEm: 1000,
@@ -400,5 +402,86 @@ describe("mark attachment in an OTF", () => {
     // Type 4 is mark-to-base. Reading it back is the check that the offsets
     // inside the subtable are right and not merely the byte count.
     expect(lookups.some((l: { lookupType: number }) => l.lookupType === 4)).toBe(true);
+  });
+});
+
+describe("what the font says about itself", () => {
+  /**
+   * A font with an identity: a semibold italic in a family of more than four
+   * styles, which is the case the four-slot name scheme cannot hold and the one
+   * that comes out wrong when a compiler treats the two schemes as one.
+   */
+  const identified = (): FontDocument =>
+    fontDocument(
+      [glyph(".notdef", { advance: 500 }), glyph("a", { unicodes: [0x61], advance: 500 })],
+      {
+        ...DEFAULT_FONT_INFO,
+        familyName: "Named",
+        styleName: "Semibold Italic",
+        openTypeNamePreferredFamilyName: "Named",
+        openTypeNamePreferredSubfamilyName: "Semibold Italic",
+        styleMapFamilyName: "Named Semibold",
+        styleMapStyleName: "italic",
+        versionMajor: 2,
+        versionMinor: 7,
+        italicAngle: -12,
+        copyright: "Copyright nobody",
+        openTypeNameDesigner: "A Designer",
+        openTypeNameLicense: "Do as you like.",
+        openTypeOS2VendorID: "TUNN",
+        openTypeOS2WeightClass: 600,
+        openTypeOS2WidthClass: 5,
+      },
+    );
+
+  const namesOf = (document: FontDocument): Record<string, string> => {
+    const font = opentype.parse(exportFont(document).bytes);
+    const table = font.names["windows"] ?? font.names["macintosh"] ?? {};
+    const out: Record<string, string> = {};
+    for (const [key, translations] of Object.entries(table)) {
+      const value = translations["en"];
+      if (value !== undefined) out[key] = value;
+    }
+    return out;
+  };
+
+  it("writes what the designer filled in", () => {
+    const names = namesOf(identified());
+
+    expect(names["copyright"]).toBe("Copyright nobody");
+    expect(names["designer"]).toBe("A Designer");
+    expect(names["license"]).toBe("Do as you like.");
+    expect(names["version"]).toBe("Version 2.007");
+  });
+
+  it("puts the four-slot names in 1 and 2, and the real ones in 16 and 17", () => {
+    const names = namesOf(identified());
+
+    // What an operating system groups by: this file is the italic of
+    // "Named Semibold", a family of two.
+    expect(names["fontFamily"]).toBe("Named Semibold");
+    expect(names["fontSubfamily"]).toBe("Italic");
+
+    // What software that can group more than four styles reads instead.
+    expect(names["preferredFamily"]).toBe("Named");
+    expect(names["preferredSubfamily"]).toBe("Semibold Italic");
+
+    expect(names["fullName"]).toBe("Named Semibold Italic");
+  });
+
+  it("leaves out a name nobody filled in, rather than writing a blank one", () => {
+    const plain = fontDocument([glyph(".notdef", { advance: 500 })], DEFAULT_FONT_INFO);
+    const names = namesOf(plain);
+
+    // opentype.js writes a single space where it was given nothing, so this is
+    // the difference between "not stated" and "stated to be empty".
+    expect(names["designer"]).toBeUndefined();
+    expect(names["copyright"]).toBeUndefined();
+
+    // The typographic names say nothing the four-slot pair does not, here.
+    // opentype.js writes 16 and 17 whether or not it was asked to, so this is
+    // that they agree rather than that they are absent.
+    expect(names["preferredFamily"]).toBe(names["fontFamily"]);
+    expect(names["preferredSubfamily"]).toBe(names["fontSubfamily"]);
   });
 });

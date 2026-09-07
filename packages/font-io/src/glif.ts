@@ -13,7 +13,14 @@ import {
 } from "@fonteditor/font-model";
 import { IDENTITY_AFFINE, type Vec2 } from "@fonteditor/geometry";
 
-import { type XmlElement, childNamed, childrenNamed, parseXml } from "./xml.js";
+import {
+  type XmlElement,
+  childNamed,
+  childrenNamed,
+  isElement,
+  parseXml,
+  writeXml,
+} from "./xml.js";
 
 /**
  * Reading a `.glif`: UFO's outline format, and the mirror of `glif()` beside it.
@@ -115,7 +122,30 @@ export function parseGlif(
     anchors.push(anchor(ids.anchor(), element.attributes["name"] ?? "", { x, y }));
   }
 
-  return glyph(name, { unicodes, advance, contours, components, anchors });
+  return glyph(name, { unicodes, advance, contours, components, anchors, kept: keptOf(root) });
+}
+
+/** The elements of a `.glif` this editor models, and therefore rewrites. */
+const MODELLED = new Set(["advance", "unicode", "outline", "anchor"]);
+
+/**
+ * Everything else in the file, as the XML it was written as.
+ *
+ * A `.glif` may carry guidelines, a note, an image, and a `lib` anybody may put
+ * anything in. None of it is modelled here, and none of it may be lost either:
+ * this editor now saves over the folder a font was opened from, so a glyph
+ * written back without them is a glyph that has had them taken out.
+ *
+ * Kept as text rather than parsed, deliberately. Parsing would mean deciding
+ * what these mean, and the whole point is that we do not know.
+ */
+function keptOf(root: XmlElement): string[] {
+  const out: string[] = [];
+  for (const child of root.children) {
+    if (!isElement(child) || MODELLED.has(child.name)) continue;
+    out.push(writeXml(child, "\t"));
+  }
+  return out;
 }
 
 /** A format-1 anchor: one point, of type `move`, carrying a name. */

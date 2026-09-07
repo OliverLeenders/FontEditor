@@ -76,6 +76,7 @@ export const EMPTY_GLYPH: Glyph = {
   contours: [],
   components: [],
   anchors: [],
+  kept: [],
 };
 
 // ---------------------------------------------------------------------------

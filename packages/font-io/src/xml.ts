@@ -40,6 +40,59 @@ export function textOf(parent: XmlElement): string {
   return parent.children.map((c) => (isElement(c) ? "" : c.text)).join("");
 }
 
+/**
+ * Write an element back out as XML.
+ *
+ * The inverse of the parser above, and here for one reason: a `.glif` carries
+ * elements this editor does not model — guidelines, a note, an image, a `lib` —
+ * and saving a font over somebody's source must not take them out of it. They
+ * are read into a tree and written back from it, unread.
+ *
+ * Not a faithful reproduction of the source text: attribute order is the
+ * parser's, whitespace between elements is the writer's, and entities come back
+ * as the five named ones. It is the same document, not the same bytes, which is
+ * what a plist or a glif is compared by.
+ */
+const TAB = "\t";
+const NEWLINE = "\n";
+
+export function writeXml(element: XmlElement, indent = ""): string {
+  const attributes = Object.entries(element.attributes)
+    .map(([key, value]) => ` ${key}="${escapeXml(value)}"`)
+    .join("");
+
+  const children = element.children.filter((c) => isElement(c) || c.text.trim() !== "");
+  if (children.length === 0) return `${indent}<${element.name}${attributes}/>`;
+
+  // Text and elements together is legal XML and is not something either dialect
+  // here produces, so an element with any text of its own is written as text.
+  const text = children.every((c) => !isElement(c));
+  if (text) {
+    const body = children.map((c) => (isElement(c) ? "" : escapeXml(c.text))).join("");
+    return `${indent}<${element.name}${attributes}>${body}</${element.name}>`;
+  }
+
+  const inner = children
+    .filter(isElement)
+    .map((c) => writeXml(c, indent + TAB))
+    .join(NEWLINE);
+  return (
+    `${indent}<${element.name}${attributes}>` +
+    NEWLINE +
+    inner +
+    NEWLINE +
+    `${indent}</${element.name}>`
+  );
+}
+
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 const ENTITIES: Readonly<Record<string, string>> = {
   amp: "&",
   lt: "<",

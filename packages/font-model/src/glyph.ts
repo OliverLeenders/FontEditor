@@ -39,6 +39,17 @@ export type Glyph = {
    * it is moved.
    */
   readonly anchors: readonly Anchor[];
+  /**
+   * What the glyph's own file carried that this editor cannot model.
+   *
+   * Guidelines, a note, an image, a `lib` — each one an element of the `.glif`
+   * this glyph was read from, kept as the XML it was written as. The model does
+   * not read any of it and must not: it is kept so that saving the font back
+   * over somebody's source does not quietly take these out of it.
+   *
+   * Empty for a glyph drawn here, which has nothing to preserve.
+   */
+  readonly kept: readonly string[];
 };
 
 export type GlyphInit = {
@@ -47,6 +58,7 @@ export type GlyphInit = {
   readonly contours?: readonly Contour[];
   readonly components?: readonly Component[];
   readonly anchors?: readonly Anchor[];
+  readonly kept?: readonly string[];
 };
 
 export function glyph(name: string, init: GlyphInit = {}): Glyph {
@@ -57,6 +69,7 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     contours: init.contours ?? [],
     components: init.components ?? [],
     anchors: init.anchors ?? [],
+    kept: init.kept ?? [],
   };
 }
 

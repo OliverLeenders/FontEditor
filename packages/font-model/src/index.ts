@@ -136,9 +136,19 @@ export {
   setKernGroup,
 } from "./kerning.js";
 
-export type { FontDocument, FontInfo, GlyphName, RenameProblem } from "./document.js";
+export type {
+  FontDocument,
+  FontInfo,
+  GlyphName,
+  Kept,
+  PlainValue,
+  RenameProblem,
+  StyleMapStyle,
+} from "./document.js";
 export {
   DEFAULT_FONT_INFO,
+  NOTHING_KEPT,
+  STYLE_MAP_STYLES,
   fontDocument,
   glyphCount,
   glyphForCodePoint,
@@ -154,6 +164,7 @@ export {
   setFontInfo,
   setGlyphOrder,
   setFeatures,
+  setKept,
   setKerning,
   updateGlyph,
 } from "./document.js";
