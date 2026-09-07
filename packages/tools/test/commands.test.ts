@@ -1740,8 +1740,7 @@ describe("harmonising", () => {
     return { s: start(c).s, c };
   };
 
-  const pointOf = (s: EditorState, i: number) =>
-    firstGlyph(s.document).contours[0]!.nodes[i]!.pt;
+  const pointOf = (s: EditorState, i: number) => firstGlyph(s.document).contours[0]!.nodes[i]!.pt;
 
   it("reads the curvature either side of the selected node, as radii", () => {
     const { s, c } = arch();
