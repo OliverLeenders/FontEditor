@@ -179,6 +179,32 @@ export function projectFrom(
 }
 
 /**
+ * Read every parked master into the project.
+ *
+ * Interpolation needs them all at once, and they live on disk one file each —
+ * so previewing an instance means bringing them into memory. Done when a
+ * preview is asked for rather than on opening a font: a designspace of six
+ * masters is six fonts, and five of them are of no interest until somebody
+ * wants to see between them.
+ */
+export async function loadSources(host: FontHost): Promise<void> {
+  const project = host.state().project;
+  const sources: Record<string, FontDocument> = {
+    ...project.sources,
+    // The open one is whatever is on the screen, not whatever was parked.
+    [project.current]: host.state().session.editor.document,
+  };
+
+  for (const m of project.masters) {
+    if (m.id === project.current || sources[m.id] !== undefined) continue;
+    const found = await host.disk.getMaster(m.id);
+    if (found !== null) sources[m.id] = found.document;
+  }
+
+  host.patch({ project: { ...project, sources } });
+}
+
+/**
  * Write what is open into its parked file.
  *
  * Called before leaving a master, and before anything that replaces the font.

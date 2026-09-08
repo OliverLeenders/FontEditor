@@ -20,6 +20,8 @@ export type RenderPalette = {
    */
   readonly guideLabel: string;
   /** The lines the designer put there, as against the font's own metrics. */
+  /** An instance between the masters: a reading, not a drawing. */
+  readonly instance: string;
   readonly designGuide: string;
   readonly designGuideSelected: string;
   readonly outline: string;
@@ -96,6 +98,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   guide: "#E8EDF3",
   guideEmphasis: "#C2CDD8",
   guideLabel: "#7C8896",
+  instance: "#B9A2D8",
   designGuide: "#7FA8D6",
   designGuideSelected: "#2C6DAF",
   outline: "#131922",
@@ -134,6 +137,7 @@ export const DARK_PALETTE: RenderPalette = {
   guide: "#1E2833",
   guideEmphasis: "#33404E",
   guideLabel: "#8B99A8",
+  instance: "#6E5A8C",
   designGuide: "#4E7BA8",
   designGuideSelected: "#7FB4EE",
   outline: "#E5EBF2",

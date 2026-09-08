@@ -1,7 +1,12 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import { type EditSession, session as newSession } from "@fonteditor/edit-core";
 import { editorState } from "@fonteditor/tools";
-import { type FontDocument, type FontProject, project } from "@fonteditor/font-model";
+import {
+  type FontDocument,
+  type FontProject,
+  type Location,
+  project,
+} from "@fonteditor/font-model";
 import type { AutosaveStatus, ImageEntry, SnapshotEntry } from "@fonteditor/storage";
 
 import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
@@ -46,6 +51,13 @@ export type StoreState = {
    * font starts as.
    */
   readonly project: FontProject;
+  /**
+   * Where the instance being previewed sits, or `null` for none.
+   *
+   * A place in the designspace rather than a master: the whole point of a
+   * preview is to see the weights nobody drew.
+   */
+  readonly preview: Location | null;
   /** The font's own folder on the user's disk, and where saving it stands. */
   readonly folder: FolderState;
   /**
@@ -171,6 +183,7 @@ export function initialState(preferences: Preferences): StoreState {
     recovered: false,
     snapshots: [],
     project: project(starter),
+    preview: null,
     folder: NO_FOLDER,
     images: [],
     showImage: preferences.showImage,

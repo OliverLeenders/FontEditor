@@ -59,6 +59,9 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   drawNeighbours(ctx, s);
   if (s.options.margins) drawMargins(ctx, s);
   drawComponents(ctx, s);
+  // Under the drawing: the instance is what the design says happens at another
+  // weight, and the thing being edited has to stay on top of it.
+  drawInstance(ctx, s);
   if (s.options.showFilledPreview) drawFilledPreview(ctx, s);
   drawOutline(ctx, s);
 
@@ -129,6 +132,29 @@ export function drawMetricLines(ctx: Canvas2D, s: Scene): void {
     // a name sitting on the outline would be one more thing to read past.
     ctx.fillText(guide.label, 6, y - 3);
   }
+}
+
+/**
+ * A weight nobody drew, worked out between the masters.
+ *
+ * Filled faintly rather than stroked. An outline drawn in a second colour reads
+ * as another shape to edit — there are already handles, controls and a comb on
+ * this canvas — where a wash of colour reads as what it is: where the letter
+ * goes at a weight you are not drawing.
+ */
+export function drawInstance(ctx: Canvas2D, s: Scene): void {
+  if (s.instance.length === 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = s.palette.instance;
+  ctx.beginPath();
+  for (const c of s.instance.filter((c) => c.closed && c.nodes.length >= 2)) {
+    traceContour(ctx, s.view, c);
+  }
+  ctx.fill();
+  ctx.restore();
+  ctx.globalAlpha = 1;
 }
 
 /**

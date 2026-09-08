@@ -208,6 +208,8 @@ export function Masters(): React.JSX.Element {
             })}
           </ul>
 
+          {project.masters.length > 1 && project.axes.length > 0 ? <Preview /> : null}
+
           {checked === null ? null : (
             <Report name={checked.name} found={checked.found} store={store} />
           )}
@@ -220,6 +222,60 @@ export function Masters(): React.JSX.Element {
           {failed === null && said !== null ? <p className={styles.said}>{said}</p> : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * A weight nobody drew, shown behind the one being drawn.
+ *
+ * A slider per axis, and the whole reason it is here rather than anywhere else:
+ * a designspace is only worth having if you can see between the drawings, and
+ * what shows up in between is what tells you whether the masters are right.
+ *
+ * Off until asked for. The masters have to be read in from disk to work an
+ * instance out, and a designspace of six masters is six fonts of memory for a
+ * thing nobody has asked to see.
+ */
+function Preview(): React.JSX.Element {
+  const store = useEditorStore();
+  const project = useStoreValue((s) => s.project);
+  const at = useStoreValue((s) => s.preview);
+
+  const here = project.masters.find((m) => m.id === project.current)?.location ?? {};
+  const shown = at ?? here;
+
+  return (
+    <div className={styles.preview}>
+      <label className={styles.previewOn}>
+        <input
+          type="checkbox"
+          checked={at !== null}
+          aria-label="Show an instance between the masters"
+          onChange={() => void store.setPreview(at === null ? { ...here } : null)}
+        />
+        <span>Show an instance</span>
+      </label>
+
+      {at === null
+        ? null
+        : project.axes.map((a) => (
+            <label key={a.tag} className={styles.axis}>
+              <span className={styles.axisName}>{a.name}</span>
+              <input
+                type="range"
+                min={a.min}
+                max={a.max}
+                step={1}
+                value={shown[a.tag] ?? a.default}
+                aria-label={`${a.name} of the instance`}
+                onChange={(event) =>
+                  void store.setPreview({ ...shown, [a.tag]: Number(event.target.value) })
+                }
+              />
+              <span className={styles.axisValue}>{Math.round(shown[a.tag] ?? a.default)}</span>
+            </label>
+          ))}
     </div>
   );
 }

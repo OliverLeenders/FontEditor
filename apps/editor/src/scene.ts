@@ -1,5 +1,7 @@
 import type { Vec2 } from "@fonteditor/geometry";
 import {
+  interpolateGlyph,
+  masterWeights,
   type ComponentSource,
   type Contour,
   type FontDocument,
@@ -213,6 +215,9 @@ export function sceneFor(
     // decoded. Absent while it is still being read, which costs one frame and
     // is the price of a renderer that never waits.
     image: state.previewing ? null : tracingFor(state, glyph, picture),
+    // The same letter at a weight nobody drew. Under the drawing, faint, and
+    // never while space is held: previewing means the shape by itself.
+    instance: state.previewing ? [] : instanceFor(state),
     guides: state.previewing ? [] : guidesInForce(editor),
     hoveredGuide: editor.hoveredGuide,
     selectedGuide: editor.selectedGuide,
@@ -267,6 +272,44 @@ function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[] } {
   // The filled contours, not the drawn ones: the hairs point out of the ink, and
   // only the corrected winding says which side that is.
   return { comb: combFor(filledContours(glyph), state.session.editor.view) };
+}
+
+/**
+ * The current glyph at the place being previewed, as outlines.
+ *
+ * Worked out per frame, which is cheap: one glyph, a handful of masters, a
+ * weighted sum of a few dozen points. Nothing is cached because nothing needs
+ * to be, and a cache would be one more thing to invalidate when a point moves.
+ *
+ * Empty where there is nothing to show — no preview asked for, one master, or a
+ * glyph the masters disagree about. The last is not silence: the masters panel
+ * says which glyphs cannot be worked out and why.
+ */
+function instanceFor(state: StoreState): readonly Contour[] {
+  const at = state.preview;
+  const { project } = state;
+  if (at === null || project.masters.length < 2) return [];
+
+  const editor = state.session.editor;
+  const masters = project.masters;
+  const sources = masters.map((m) =>
+    m.id === project.current ? editor.document : (project.sources[m.id] ?? null),
+  );
+  // Until every master has been read in there is nothing honest to draw.
+  if (sources.some((s) => s === null)) return [];
+
+  const weights = masterWeights(
+    project.axes,
+    masters.map((m) => m.location),
+    at,
+  );
+  const worked = interpolateGlyph(
+    sources.map((s) => s?.glyphs[editor.currentGlyph] ?? null),
+    weights,
+  );
+  // The corrected windings, as the filled preview uses: an instance is drawn
+  // filled, and a counter that runs the wrong way is a blot rather than a hole.
+  return worked === null ? [] : filledContours(worked);
 }
 
 /**

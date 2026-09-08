@@ -274,3 +274,8 @@ export {
 
 export type { Incompatibility } from "./compatible.js";
 export { glyphCompatible, glyphIncompatibilities, incompatibilities } from "./compatible.js";
+
+export type { Region, Support } from "./variation.js";
+export { masterWeights, supportScalar, supportsFor } from "./variation.js";
+
+export { interpolateFont, interpolateGlyph } from "./interpolate.js";

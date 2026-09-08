@@ -8,7 +8,7 @@ const { EditorStore } = await import("../src/store/index.js");
 const { handlesAutoHidden, neighbourAt, neighboursFor, sceneFor, withinGlyph } =
   await import("../src/scene.js");
 const { setActiveTool } = await import("@fonteditor/tools");
-const { glyphBounds } = await import("@fonteditor/font-model");
+const { WEIGHT, glyphBounds, master, updateGlyph } = await import("@fonteditor/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
 
@@ -214,5 +214,71 @@ describe("what belongs to the glyph being edited", () => {
   it("says no for a glyph with nothing drawn in it", () => {
     const empty = { ...store.editor.document.glyphs["o"]!, contours: [] };
     expect(withinGlyph(empty, { x: 0, y: 0 })).toBe(false);
+  });
+});
+
+describe("an instance between the masters", () => {
+  /** The store, with two masters and both their documents in memory. */
+  const withMasters = () => {
+    const store = new EditorStore();
+    const light = store.editor.document;
+    const black = updateGlyph(light, "o", (g) => ({ ...g, advance: g.advance + 200 }));
+    if (black === null) throw new Error("no o");
+
+    store.patch({
+      project: {
+        axes: [WEIGHT],
+        masters: [master("m1", "Regular", { wght: 400 }), master("m2", "Black", { wght: 900 })],
+        sources: { m1: light, m2: black },
+        current: "m1",
+      },
+    });
+    store.setCurrentGlyph("o");
+    return store;
+  };
+
+  it("draws nothing until one is asked for", () => {
+    const store = withMasters();
+    expect(sceneFor(store.getState(), SIZE).instance).toEqual([]);
+  });
+
+  it("draws the letter worked out at the place asked for", () => {
+    const store = withMasters();
+    store.patch({ preview: { wght: 650 } });
+
+    // Something to draw, and closed contours: an instance is filled.
+    const shown = sceneFor(store.getState(), SIZE).instance;
+    expect(shown.length).toBeGreaterThan(0);
+    expect(shown.every((c) => c.closed)).toBe(true);
+  });
+
+  it("draws nothing for a font with one master, wherever it is asked", () => {
+    const store = new EditorStore();
+    store.patch({ preview: { wght: 650 } });
+    expect(sceneFor(store.getState(), SIZE).instance).toEqual([]);
+  });
+
+  it("draws nothing while space is held", () => {
+    const store = withMasters();
+    store.patch({ preview: { wght: 650 }, previewing: true });
+
+    // Previewing the shape means the shape by itself.
+    expect(sceneFor(store.getState(), SIZE).instance).toEqual([]);
+  });
+
+  it("draws nothing for a glyph the masters disagree about", () => {
+    const store = withMasters();
+    const project = store.getState().project;
+    const black = project.sources["m2"]!;
+
+    // A contour in one master and not the other: nothing honest to draw.
+    const broken = updateGlyph(black, "o", (g) => ({ ...g, contours: [] }));
+    if (broken === null) throw new Error("no o");
+    store.patch({
+      project: { ...project, sources: { ...project.sources, m2: broken } },
+      preview: { wght: 650 },
+    });
+
+    expect(sceneFor(store.getState(), SIZE).instance).toEqual([]);
   });
 });

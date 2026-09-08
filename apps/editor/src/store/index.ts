@@ -66,6 +66,7 @@ import {
   addMaster,
   compareWith,
   moveMaster,
+  loadSources,
   parkCurrent,
   projectFrom,
   removeMaster,
@@ -456,6 +457,23 @@ export class EditorStore {
 
   async setAxes(axes: readonly Axis[]): Promise<void> {
     await setAxes(this.host, axes);
+  }
+
+  /**
+   * Show an instance at a place in the designspace, or stop showing one.
+   *
+   * The masters are read in on the way, because interpolation needs them all
+   * and they live on disk one file each. Doing it here rather than on opening a
+   * font means a designspace of six masters costs six fonts of memory only when
+   * somebody asks to see between them.
+   */
+  async setPreview(location: Record<string, number> | null): Promise<void> {
+    if (location === null) {
+      this.patch({ preview: null });
+      return;
+    }
+    await loadSources(this.host);
+    this.patch({ preview: location });
   }
 
   /** What cannot be interpolated between this master and another. */

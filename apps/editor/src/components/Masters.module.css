@@ -186,3 +186,39 @@
   color: var(--danger, #c2453d);
   font-size: 0.76rem;
 }
+
+/* The instance: a switch, and a slider per axis under it. */
+.preview {
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--rule);
+}
+
+.previewOn {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.axis {
+  display: grid;
+  grid-template-columns: 4.5rem 1fr 2.6rem;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.axisName {
+  font-size: 0.74rem;
+  color: var(--ink-3);
+}
+
+.axisValue {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-2);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

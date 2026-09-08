@@ -132,3 +132,67 @@ function withThreeRendered() {
   fireEvent.click(screen.getByRole("button", { name: /^Masters/ }));
   return store;
 }
+
+describe("previewing a weight nobody drew", () => {
+  it("is not offered to a font with one master", () => {
+    openPanel();
+    expect(screen.queryByLabelText("Show an instance between the masters")).toBeNull();
+  });
+
+  it("is offered once there are masters and an axis to move along", () => {
+    withThreeRendered();
+    expect(screen.getByLabelText("Show an instance between the masters")).toBeTruthy();
+  });
+
+  it("shows no sliders until it is asked for", () => {
+    withThreeRendered();
+    expect(screen.queryByLabelText("Weight of the instance")).toBeNull();
+  });
+
+  it("starts where you are standing, which is the master you are drawing", async () => {
+    const store = withThreeRendered();
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Show an instance between the masters"));
+      await Promise.resolve();
+    });
+
+    // Regular is the one being drawn, so the instance opens on top of it and
+    // moving the slider is what makes it a weight nobody drew.
+    expect(store.getState().preview).toEqual({ wght: 400 });
+    expect(screen.getByLabelText("Weight of the instance")).toBeTruthy();
+  });
+
+  it("moves along the axis", async () => {
+    const store = withThreeRendered();
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Show an instance between the masters"));
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Weight of the instance"), {
+        target: { value: "650" },
+      });
+      await Promise.resolve();
+    });
+
+    expect(store.getState().preview).toEqual({ wght: 650 });
+    expect(screen.getByText("650")).toBeTruthy();
+  });
+
+  it("stops showing one when it is turned off", async () => {
+    const store = withThreeRendered();
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Show an instance between the masters"));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Show an instance between the masters"));
+      await Promise.resolve();
+    });
+
+    expect(store.getState().preview).toBeNull();
+    expect(screen.queryByLabelText("Weight of the instance")).toBeNull();
+  });
+});

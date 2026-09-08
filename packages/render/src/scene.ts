@@ -167,6 +167,15 @@ export type Scene = {
    * would be a renderer that sometimes draws a frame late.
    */
   readonly image: SceneImage | null;
+  /**
+   * A weight nobody drew, worked out between the masters.
+   *
+   * Outlines rather than a glyph, because that is all drawing needs and because
+   * an instance is not something anything else may pick up, select or edit: it
+   * is a reading of the design at a place, and the points on the canvas belong
+   * to the master in front of you.
+   */
+  readonly instance: readonly Contour[];
   readonly guides: readonly SceneGuide[];
   /** The guide under the pointer, and the one selected, by id. */
   readonly hoveredGuide: GuideId | null;
@@ -315,6 +324,7 @@ export type SceneInit = {
   readonly options?: Partial<RenderOptions>;
   readonly metricLines?: readonly MetricLine[];
   readonly image?: SceneImage | null;
+  readonly instance?: readonly Contour[];
   readonly guides?: readonly SceneGuide[];
   readonly hoveredGuide?: GuideId | null;
   readonly selectedGuide?: GuideId | null;
@@ -347,6 +357,7 @@ export function scene(init: SceneInit): Scene {
     options: { ...DEFAULT_OPTIONS, ...init.options },
     metricLines: init.metricLines ?? [],
     image: init.image ?? null,
+    instance: init.instance ?? [],
     guides: init.guides ?? [],
     hoveredGuide: init.hoveredGuide ?? null,
     selectedGuide: init.selectedGuide ?? null,
