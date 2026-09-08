@@ -24,9 +24,17 @@ export function installBrowserGlobals(
       clear: () => store.clear(),
     };
 
+  // A media query list, with the two listener methods anything that *watches*
+  // the scheme calls. Without them a component that subscribes to the palette
+  // throws on mount, which is a failure about the stub rather than about the
+  // component.
   const matchMedia = (query: string) => ({
     matches: (options.dark ?? false) && query.includes("dark"),
     media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
   });
 
   // In a DOM environment there is already a window, and replacing it with three
