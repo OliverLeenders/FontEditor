@@ -50,6 +50,23 @@
 .button:hover:not(:disabled) svg {
   color: inherit;
 }
+
+/*
+ * The unsaved mark on the File button.
+ *
+ * Small and in the warning colour, and outside the menu on purpose: the state
+ * a person needs to see is the one thing that must not be behind a fold.
+ */
+.dirtyMark {
+  display: inline-flex;
+  flex: none;
+}
+.dirtyMark svg,
+.button:hover:not(:disabled) .dirtyMark svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  color: var(--warn);
+}
 .button:hover:not(:disabled) {
   border-color: var(--accent);
 }
