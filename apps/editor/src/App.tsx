@@ -229,7 +229,10 @@ export function App(): React.JSX.Element {
       ) : (
         <>
           <Toolbar />
-          <main className={styles.stage} data-dock={dock === "float" ? undefined : dock}>
+          <main
+            className={`${styles.stage} ${styles.editing}`}
+            data-dock={dock === "float" ? undefined : dock}
+          >
             {/* The canvas in a box of its own, so a docked inspector sits
                 beside it rather than over it and the drawing gets the rest. */}
             <div className={styles.drawing}>

@@ -24,19 +24,32 @@
 }
 
 /*
- * The canvas gets everything the bars do not.
+ * What a workspace gets: everything the bars do not.
  *
- * Two arrangements, and the panel decides which. Floating, it covers the
- * drawing and the stage is one thing; docked, the stage is a row and the panel
- * takes a column of its own — which is the point of docking, since a panel that
- * still covered the drawing would only be a panel that had stopped moving.
+ * A plain block, because every workspace but the glyph canvas fills it with one
+ * child that sizes itself to its parent. Making this a flex container to give
+ * the docked inspector a column took that away from all five at once — a grid
+ * of height 100% and no width is a block that fills and a flex item that
+ * shrinks to its content — so the row belongs to the one arrangement that
+ * wants it, below.
  */
 .stage {
   position: relative;
-  display: flex;
   flex: 1;
   min-height: 0;
   background: var(--canvas);
+}
+
+/*
+ * The glyph workspace, which is two things side by side rather than one.
+ *
+ * Floating, the inspector covers the drawing and this is a row of one. Docked,
+ * it takes a column and the drawing gets the rest — which is the point of
+ * docking, since a panel that still covered the drawing would only be a panel
+ * that had stopped moving.
+ */
+.editing {
+  display: flex;
 }
 
 /* Where the canvas actually goes, so the docked panel is its sibling rather
@@ -47,7 +60,7 @@
   min-width: 0;
 }
 
-.stage[data-dock="left"] {
+.editing[data-dock="left"] {
   flex-direction: row-reverse;
 }
 
