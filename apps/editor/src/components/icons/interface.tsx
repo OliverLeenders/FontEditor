@@ -264,18 +264,18 @@ export const SelectAllIcon: IconComponent = () => (
 );
 
 /** The sweeps made over the whole font at once. */
-export const SprayIcon: IconComponent = () => (
+export const MopIcon: IconComponent = () => (
   <Glyph>
-    <path d="M3 3h.01" />
-    <path d="M7 5h.01" />
-    <path d="M11 7h.01" />
-    <path d="M3 7h.01" />
-    <path d="M7 9h.01" />
-    <path d="M3 11h.01" />
-    <rect width="4" height="4" x="15" y="5" />
-    <path d="m19 9 2 2v10c0 .6-.4 1-1 1h-6c-.6 0-1-.4-1-1V11l2-2" />
-    <path d="m13 14 8-2" />
-    <path d="m13 19 8-2" />
+    <path d="M10 22a3 3 0 01-3-3" />
+    <path d="M10 22c2.761 0 5-1.79 5-4-4.42 0-4.08-5-8.5-5a4.501 4.501 0 000 9z" />
+    <path d="M10 3H8" />
+    <path d="M12.5 11.5 22 2" />
+    <path d="M20 13v4" />
+    <path d="M22 15h-4" />
+    <path d="M4 5v4" />
+    <path d="M6 7H2" />
+    <path d="m6.98 13.02 2.665-2.664a1.21 1.21 0 011.71 0l2.29 2.288a1.21 1.21 0 010 1.712l-2.088 2.087" />
+    <path d="M9 2v2" />
   </Glyph>
 );
 
@@ -285,6 +285,24 @@ export const GridIcon: IconComponent = () => (
     <path d="M12 3v18" />
     <path d="M3 12h18" />
     <rect x="3" y="3" width="18" height="18" rx="2" />
+  </Glyph>
+);
+
+/** A guide laid flat: the line, and the way the drawing parts round it. */
+export const GuideAcrossIcon: IconComponent = () => (
+  <Glyph>
+    <path d="m16 16-4 4-4-4" />
+    <path d="M3 12h18" />
+    <path d="m8 8 4-4 4 4" />
+  </Glyph>
+);
+
+/** A guide stood up. */
+export const GuideUpIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M12 3v18" />
+    <path d="m16 16 4-4-4-4" />
+    <path d="m8 8-4 4 4 4" />
   </Glyph>
 );
 
@@ -525,16 +543,12 @@ export const ImageIcon: IconComponent = () => (
   </Glyph>
 );
 
-/** The selected point, and the points either side of it. */
-export const WaypointsIcon: IconComponent = () => (
+/** The selected point: a node on the line it sits in. */
+export const PointIcon: IconComponent = () => (
   <Glyph>
-    <path d="m10.586 5.414-5.172 5.172" />
-    <path d="m18.586 13.414-5.172 5.172" />
-    <path d="M6 12h12" />
-    <circle cx="12" cy="20" r="2" />
-    <circle cx="12" cy="4" r="2" />
-    <circle cx="20" cy="12" r="2" />
-    <circle cx="4" cy="12" r="2" />
+    <circle cx="12" cy="12" r="3" />
+    <line x1="3" x2="9" y1="12" y2="12" />
+    <line x1="15" x2="21" y1="12" y2="12" />
   </Glyph>
 );
 

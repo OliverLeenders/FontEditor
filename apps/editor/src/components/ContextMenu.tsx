@@ -56,12 +56,14 @@ import {
   MinimizeIcon,
   MinusIcon,
   FrameIcon,
+  GuideAcrossIcon,
+  GuideUpIcon,
   SelectAllIcon,
   SplineIcon,
   TrashIcon,
   UngroupIcon,
   WavesIcon,
-  WaypointsIcon,
+  PointIcon,
 } from "./icons.js";
 
 export type MenuRequest = {
@@ -158,25 +160,25 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Add horizontal guide",
-        icon: FrameIcon,
+        icon: GuideAcrossIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 0, "glyph", ids)),
       },
       {
         kind: "item",
         label: "Add vertical guide",
-        icon: FrameIcon,
+        icon: GuideUpIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 90, "glyph", ids)),
       },
       {
         kind: "item",
         label: "Add horizontal guide, for the whole font",
-        icon: FrameIcon,
+        icon: GuideAcrossIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 0, "font", ids)),
       },
       {
         kind: "item",
         label: "Add vertical guide, for the whole font",
-        icon: FrameIcon,
+        icon: GuideUpIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 90, "font", ids)),
       },
       { kind: "separator" },
@@ -201,13 +203,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Corner",
-        icon: WaypointsIcon,
+        icon: PointIcon,
         run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
       },
       {
         kind: "item",
         label: "Smooth",
-        icon: WaypointsIcon,
+        icon: PointIcon,
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
       // Offered only where it would be true, which is the same rule the model
@@ -217,7 +219,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
             {
               kind: "item" as const,
               label: "Tangent",
-              icon: WaypointsIcon,
+              icon: PointIcon,
               run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
             },
           ]
@@ -320,13 +322,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Corner",
-        icon: WaypointsIcon,
+        icon: PointIcon,
         run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
       },
       {
         kind: "item",
         label: "Smooth",
-        icon: WaypointsIcon,
+        icon: PointIcon,
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
       ...(nodeCanBeTangent(editor, contourId, nodeId)
@@ -334,7 +336,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
             {
               kind: "item" as const,
               label: "Tangent",
-              icon: WaypointsIcon,
+              icon: PointIcon,
               run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
             },
           ]

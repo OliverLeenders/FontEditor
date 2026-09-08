@@ -5,7 +5,7 @@ import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import type { Item } from "./MenuItems.js";
 import styles from "./OpenFont.module.css";
-import { GridIcon, SprayIcon } from "./icons.js";
+import { GridIcon, MopIcon } from "./icons.js";
 
 /** How long the result of the last tidy stays on screen. */
 const NOTE_MS = 4000;
@@ -62,7 +62,7 @@ export function CleanUpMenu(): React.JSX.Element {
     <div className={styles.zone}>
       <BarMenu
         label="Clean up"
-        icon={SprayIcon}
+        icon={MopIcon}
         title="Edits made to the whole font at once"
         panelLabel="Clean up"
         disabled={reading}
