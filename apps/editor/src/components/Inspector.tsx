@@ -12,7 +12,6 @@ import {
 import {
   fitImageToGlyph,
   guideById,
-  guidesInForce,
   moveGuideTo,
   moveImageTo,
   moveGuideToScope,
@@ -47,7 +46,7 @@ import {
   setSegmentTension,
 } from "@fonteditor/tools";
 import type { SegmentRef } from "@fonteditor/view";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { Stepper } from "./Stepper.js";
@@ -131,9 +130,22 @@ export function Inspector(): React.JSX.Element | null {
   const image = useStoreValue(
     (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.image ?? null,
   );
-  // The font's and the glyph's together, as the canvas draws them: which scope
-  // a line is in is shown on its row rather than by which list it sits in.
-  const guides = useStoreValue((s) => guidesInForce(s.session.editor));
+  // The two lists separately, because each is a reference that lives in the
+  // state. Selecting them together would build a fresh array on every call,
+  // and `useSyncExternalStore` compares snapshots with `Object.is` — so the
+  // component would re-render for ever. See `useStoreValue`.
+  const fontGuides = useStoreValue((s) => s.session.editor.document.guides);
+  const glyphGuides = useStoreValue(
+    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.guides ?? EMPTY_GUIDES,
+  );
+  // Joined here, where a new array costs one render rather than all of them.
+  const guides = useMemo(
+    () => [
+      ...fontGuides.map((guide) => ({ guide, scope: "font" as const })),
+      ...glyphGuides.map((guide) => ({ guide, scope: "glyph" as const })),
+    ],
+    [fontGuides, glyphGuides],
+  );
   const selectedComponent = useStoreValue((s) => s.session.editor.selectedComponent);
 
   const components = useStoreValue(
@@ -1167,6 +1179,7 @@ function Field({
 const componentIds = randomIds();
 const EMPTY_COMPONENTS: readonly never[] = [];
 const EMPTY_ANCHORS: readonly never[] = [];
+const EMPTY_GUIDES: readonly never[] = [];
 const EMPTY_GLYPH = {
   name: "",
   unicodes: [],

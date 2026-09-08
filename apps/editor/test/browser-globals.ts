@@ -15,20 +15,35 @@ export function installBrowserGlobals(
   const store = new Map<string, string>();
 
   const globals = globalThis as unknown as Record<string, unknown>;
-  globals["localStorage"] = {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => void store.set(key, value),
-    removeItem: (key: string) => void store.delete(key),
-    clear: () => store.clear(),
-  };
+  // jsdom brings its own, which works and is per-test-file already.
+  if (globals["localStorage"] === undefined)
+    globals["localStorage"] = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => void store.set(key, value),
+      removeItem: (key: string) => void store.delete(key),
+      clear: () => store.clear(),
+    };
+
+  const matchMedia = (query: string) => ({
+    matches: (options.dark ?? false) && query.includes("dark"),
+    media: query,
+  });
+
+  // In a DOM environment there is already a window, and replacing it with three
+  // properties would take React's out from under it. So the missing pieces are
+  // added to whatever is there, and the whole object is only invented where
+  // there is none — which is the node tests, where nothing renders.
+  const existing = globals["window"];
+  if (existing !== undefined && existing !== null) {
+    const window = existing as Record<string, unknown>;
+    if (typeof window["matchMedia"] !== "function") window["matchMedia"] = matchMedia;
+    return;
+  }
 
   globals["window"] = {
     innerWidth: options.width ?? 1200,
     innerHeight: options.height ?? 800,
-    matchMedia: (query: string) => ({
-      matches: (options.dark ?? false) && query.includes("dark"),
-      media: query,
-    }),
+    matchMedia,
   };
 }
 

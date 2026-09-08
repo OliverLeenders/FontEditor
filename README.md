@@ -29,7 +29,7 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, e
 | 7     | Spacing and kerning                 | done                                                            |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks |
 | 9     | Variable fonts                      | not started                                                     |
-| 10    | Production polish                   | lint, format and 1860 tests, run on CI; preferences persist     |
+| 10    | Production polish                   | lint, format and 1912 tests, run on CI; preferences persist     |
 
 ### What the table missed
 
@@ -49,7 +49,7 @@ for.
 | **A file on disk**                         | done        | A UFO folder is opened, saved back to, and remembered for next time, through the File System Access API. Saving is manual: the working store autosaves, and a folder the user chose is somewhere the editor is a guest.                                                                                                                                                                                                             |
 | **`glyf` outlines**                        | not started | Everything written is CFF. A TrueType flavour is what hinting and most web pipelines want, and it is also the outline format that permits the overlaps this removes.                                                                                                                                                                                                                                                                |
 | **Preflight**                              | done        | Seventeen checks over the whole font — a contour left open, two points in the same place, a name a font cannot carry, two glyphs claiming one character, a component with nothing to place or that places itself, kerning about a glyph that has gone, a mark with nowhere to land — reported and never repaired, because every fix is a decision.                                                                                  |
-| **Testing the interface**                  | not started | Every package below `apps/editor` is tested; the React in it is not, for want of a DOM testing library.                                                                                                                                                                                                                                                                                                                             |
+| **Testing the interface**                  | done        | The panels are rendered against a real store in jsdom, and asked what a person would ask: did pressing this change the font. It found two shipped bugs on the way in — an inspector that re-rendered for ever, and an Escape that committed the value it was meant to abandon.                                                                                                                                                      |
 
 ### What the table is hiding
 

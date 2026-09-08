@@ -199,7 +199,15 @@ export class EditorStore {
 
   readonly getState = (): StoreState => this.state;
 
-  private patch(changes: Partial<StoreState>): void {
+  /**
+   * Change something that is not the document.
+   *
+   * Public because it already is: every module beside this one — opening a
+   * font, the folder on disk, the pictures — is handed exactly this function
+   * through `host`, so marking it private here only hid it from the tests that
+   * drive the same paths.
+   */
+  patch(changes: Partial<StoreState>): void {
     this.state = { ...this.state, ...changes };
     for (const listener of this.listeners) listener();
   }

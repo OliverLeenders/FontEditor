@@ -192,7 +192,14 @@ export function FontInfoPanel(): React.JSX.Element {
       if (ref.current !== null && !ref.current.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      // Not while a field has it. This listener is on the window and in the
+      // capture phase, so it runs before the field's own handler and would
+      // close the panel out from under an edit somebody was abandoning — which
+      // is two things happening for one key.
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) return;
+      setOpen(false);
     };
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("keydown", onKey, true);
@@ -253,6 +260,16 @@ function Field({
   const settled = String(info[field.key]);
   const [draft, setDraft] = useState(settled);
   const [editing, setEditing] = useState(false);
+  /**
+   * Set by Escape, read by the blur it causes.
+   *
+   * Escape puts the box back and then takes the focus off it, and taking the
+   * focus off a box is what commits it — with the draft this render closed
+   * over, which is the value being abandoned. A ref rather than state because
+   * the blur happens before React renders again, so a state flag set here would
+   * still read as false there.
+   */
+  const abandoning = useRef(false);
 
   // An undo, or a font opened while the panel is up, has to reach the box.
   useEffect(() => {
@@ -261,6 +278,11 @@ function Field({
 
   const commit = (): void => {
     setEditing(false);
+    if (abandoning.current) {
+      abandoning.current = false;
+      setDraft(settled);
+      return;
+    }
     if (draft === settled) return;
 
     const number = Number(draft);
@@ -361,6 +383,7 @@ function Field({
             // it held, and the panel stays up.
             if (event.key === "Escape") {
               event.stopPropagation();
+              abandoning.current = true;
               setDraft(settled);
               setEditing(false);
               event.currentTarget.blur();
