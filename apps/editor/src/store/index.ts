@@ -43,8 +43,11 @@ import {
   MIN_SPACING_SIZE,
 } from "../limits.js";
 import {
+  type InspectorDock,
   type InspectorPlacement,
   type ThemeChoice,
+  MAX_DOCK_WIDTH,
+  MIN_DOCK_WIDTH,
   clampInspector,
   loadPreferences,
 } from "../preferences.js";
@@ -92,7 +95,13 @@ export {
   MIN_SPACING_SIZE,
 } from "../limits.js";
 export { DEFAULT_PREFERENCES } from "../preferences.js";
-export type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
+export type {
+  InspectorDock,
+  InspectorPlacement,
+  Preferences,
+  ThemeChoice,
+} from "../preferences.js";
+export { DOCK_WIDTH, MAX_DOCK_WIDTH, MIN_DOCK_WIDTH } from "../preferences.js";
 export type { Ownership, StorageState } from "../persistence.js";
 export type { FolderState, StoreState } from "./state.js";
 export type { ImportReport } from "./fonts.js";
@@ -708,6 +717,36 @@ export class EditorStore {
     const { x, y } = clampInspector(this.state.inspector.x, this.state.inspector.y);
     if (x === this.state.inspector.x && y === this.state.inspector.y) return;
     this.placeInspector({ ...this.state.inspector, x, y });
+  }
+
+  /**
+   * Put the inspector in a column beside the drawing, or back over it.
+   *
+   * The floating position is kept while it is docked, so undocking puts it back
+   * where it was rather than in a corner.
+   */
+  /** How wide the docked column is, within what the layout will allow. */
+  resizeInspector(width: number): void {
+    const wanted = Math.round(Math.min(MAX_DOCK_WIDTH, Math.max(MIN_DOCK_WIDTH, width)));
+    if (wanted === this.state.inspector.width) return;
+    this.placeInspector({ ...this.state.inspector, width: wanted });
+  }
+
+  dockInspector(dock: InspectorDock): void {
+    if (dock === this.state.inspector.dock) return;
+    this.placeInspector({ ...this.state.inspector, dock, open: true });
+  }
+
+  /**
+   * Fold a section of the inspector, or unfold it.
+   *
+   * The *choice* is remembered rather than the state: a section nobody has
+   * touched follows the panel's own judgement, so one that starts closed opens
+   * itself when something is put in it, and one you closed stays closed.
+   */
+  toggleInspectorSection(name: string, open: boolean): void {
+    const sections = { ...this.state.inspector.sections, [name]: open };
+    this.placeInspector({ ...this.state.inspector, sections });
   }
 
   toggleInspector(): void {

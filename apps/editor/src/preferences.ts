@@ -35,10 +35,34 @@ import {
  */
 export type ThemeChoice = "system" | "light" | "dark";
 
+/**
+ * Where the inspector sits: over the drawing, or in a column beside it.
+ *
+ * Floating is right for a panel you consult; docked is right for one you work
+ * out of all day, which is what this turned out to be. Both, because which of
+ * the two a person wants depends on how wide their screen is and on whether the
+ * letter they are drawing is a `l` or a `W`.
+ */
+export type InspectorDock = "float" | "left" | "right";
+
 export type InspectorPlacement = {
+  /** Where it floats. Kept while docked, so undocking puts it back. */
   readonly x: number;
   readonly y: number;
   readonly open: boolean;
+  readonly dock: InspectorDock;
+  /** How wide the column is when docked. Ignored while floating. */
+  readonly width: number;
+  /**
+   * Which sections have been folded or unfolded by hand, by name.
+   *
+   * Only the choices somebody made. A section nobody has touched is absent, and
+   * takes whatever the panel thinks sensible — open if it is one of the three
+   * you are always using, or if it has anything in it. Storing the choices
+   * rather than the state means a section that starts closed and later has an
+   * anchor put in it opens itself, and a section you closed stays closed.
+   */
+  readonly sections: Readonly<Record<string, boolean>>;
 };
 
 export type Preferences = {
@@ -89,7 +113,19 @@ const KEY = "fonteditor.preferences";
 /** The key the inspector's position used before it moved in here. */
 const OLD_INSPECTOR_KEY = "fonteditor.inspector";
 
-export const DEFAULT_PLACEMENT: InspectorPlacement = { x: 24, y: 24, open: true };
+/** How wide a docked inspector is, in pixels, and how far it may be dragged. */
+export const DOCK_WIDTH = 264;
+export const MIN_DOCK_WIDTH = 200;
+export const MAX_DOCK_WIDTH = 460;
+
+export const DEFAULT_PLACEMENT: InspectorPlacement = {
+  x: 24,
+  y: 24,
+  open: true,
+  dock: "float",
+  width: DOCK_WIDTH,
+  sections: {},
+};
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
@@ -172,8 +208,28 @@ export function loadPreferences(): Preferences {
       x: number(inspector["x"], DEFAULT_PLACEMENT.x, {}),
       y: number(inspector["y"], DEFAULT_PLACEMENT.y, {}),
       open: boolean(inspector["open"], DEFAULT_PLACEMENT.open),
+      dock: isDock(inspector["dock"]) ? inspector["dock"] : DEFAULT_PLACEMENT.dock,
+      width: number(inspector["width"], DEFAULT_PLACEMENT.width, {
+        min: MIN_DOCK_WIDTH,
+        max: MAX_DOCK_WIDTH,
+      }),
+      sections: sectionsOf(inspector["sections"]),
     },
   };
+}
+
+const isDock = (value: unknown): value is InspectorDock =>
+  value === "float" || value === "left" || value === "right";
+
+/** The folded-by-hand choices, keeping only what this can make sense of. */
+function sectionsOf(raw: unknown): Record<string, boolean> {
+  if (typeof raw !== "object" || raw === null) return {};
+
+  const out: Record<string, boolean> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "boolean") out[name] = value;
+  }
+  return out;
 }
 
 export function savePreferences(preferences: Preferences): void {

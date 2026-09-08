@@ -36,6 +36,7 @@ export function App(): React.JSX.Element {
   viewRef.current = view;
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const inspectorOpen = useStoreValue((s) => s.inspector.open);
+  const dock = useStoreValue((s) => s.inspector.dock);
   const ownership = useStoreValue((s) => s.ownership);
   const theme = useStoreValue((s) => s.theme);
 
@@ -228,22 +229,26 @@ export function App(): React.JSX.Element {
       ) : (
         <>
           <Toolbar />
-          <main className={styles.stage}>
-            <GlyphCanvas onContextMenu={setMenu} />
+          <main className={styles.stage} data-dock={dock === "float" ? undefined : dock}>
+            {/* The canvas in a box of its own, so a docked inspector sits
+                beside it rather than over it and the drawing gets the rest. */}
+            <div className={styles.drawing}>
+              <GlyphCanvas onContextMenu={setMenu} />
+              {menu !== null ? (
+                <ContextMenu store={store} request={menu} onClose={() => setMenu(null)} />
+              ) : null}
+              {!inspectorOpen ? (
+                <button
+                  type="button"
+                  className={styles.reveal}
+                  title="Show the inspector  (I)"
+                  onClick={() => store.toggleInspector()}
+                >
+                  Inspector
+                </button>
+              ) : null}
+            </div>
             <Inspector />
-            {menu !== null ? (
-              <ContextMenu store={store} request={menu} onClose={() => setMenu(null)} />
-            ) : null}
-            {!inspectorOpen ? (
-              <button
-                type="button"
-                className={styles.reveal}
-                title="Show the inspector  (I)"
-                onClick={() => store.toggleInspector()}
-              >
-                Inspector
-              </button>
-            ) : null}
           </main>
           <GlyphStrip />
         </>

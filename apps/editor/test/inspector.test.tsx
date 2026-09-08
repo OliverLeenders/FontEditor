@@ -10,6 +10,7 @@ installBrowserGlobals();
 const { Inspector } = await import("../src/components/Inspector.js");
 const { addAnchor, addGuide, anchor, putGlyph, verticalGuide } =
   await import("@fonteditor/font-model");
+const { MIN_DOCK_WIDTH } = await import("../src/store/index.js");
 
 /**
  * The inspector, which is where a shape is edited by number rather than by
@@ -152,6 +153,85 @@ describe("guides in the inspector", () => {
 describe("what the inspector says when there is nothing to say", () => {
   it("points at the canvas rather than showing an empty list", () => {
     render(<Inspector />);
+    // Empty, so the section is folded: opening it is what somebody looking for
+    // where anchors come from would do, and the answer is there when they do.
+    fireEvent.click(screen.getByRole("button", { name: "Anchors" }));
+
     expect(screen.getAllByText("Right-click the canvas to add one").length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Folding, docking, and the fact that both are remembered.
+ *
+ * The panel outgrew the window it floats in — a dozen fields is a list somebody
+ * scrolls — so the sections fold and the whole thing can take a column of its
+ * own instead of lying on top of the letter.
+ */
+describe("folding the inspector", () => {
+  it("opens a section that has something in it and folds one that does not", () => {
+    const store = withFurniture();
+    render(<Inspector />, store);
+
+    // Both have one thing in them, so both are open without anyone saying so.
+    expect(screen.getByLabelText("X of the anchor top")).toBeTruthy();
+    expect(screen.getByLabelText("X of the guide stem")).toBeTruthy();
+    // Nothing has been transformed, and it stays out of the way until asked.
+    expect(screen.queryByLabelText("Rotate by")).toBeNull();
+  });
+
+  it("remembers the fold rather than the state", () => {
+    const store = withFurniture();
+    render(<Inspector />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Anchors/ }));
+
+    expect(store.getState().inspector.sections["anchors"]).toBe(false);
+    expect(screen.queryByLabelText("X of the anchor top")).toBeNull();
+  });
+
+  it("unfolds one that would have stayed shut", () => {
+    const store = freshStore();
+    render(<Inspector />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Transform" }));
+
+    expect(store.getState().inspector.sections["transform"]).toBe(true);
+  });
+});
+
+describe("docking the inspector", () => {
+  it("takes a side, and comes back from it", () => {
+    const store = freshStore();
+    render(<Inspector />, store);
+
+    fireEvent.click(screen.getByLabelText("Dock the inspector"));
+    expect(store.getState().inspector.dock).toBe("right");
+
+    fireEvent.click(screen.getByLabelText("Float the inspector"));
+    expect(store.getState().inspector.dock).toBe("float");
+  });
+
+  it("keeps where it floated, so undocking puts it back", () => {
+    const store = freshStore();
+    act(() => {
+      store.moveInspector(300, 200);
+    });
+    render(<Inspector />, store);
+
+    fireEvent.click(screen.getByLabelText("Dock the inspector"));
+
+    expect(store.getState().inspector.x).toBe(300);
+    expect(store.getState().inspector.y).toBe(200);
+  });
+
+  it("will not be made narrower than it can show a field in", () => {
+    const store = freshStore();
+    act(() => {
+      store.dockInspector("right");
+      store.resizeInspector(20);
+    });
+
+    expect(store.getState().inspector.width).toBe(MIN_DOCK_WIDTH);
   });
 });

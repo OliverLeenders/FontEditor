@@ -5,7 +5,7 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { MAX_OUTLINE_WIDTH, MIN_PROOF_SIZE } = await import("../src/limits.js");
-const { DEFAULT_PREFERENCES, loadPreferences, savePreferences } =
+const { DEFAULT_PLACEMENT, DEFAULT_PREFERENCES, loadPreferences, savePreferences } =
   await import("../src/preferences.js");
 const { EditorStore } = await import("../src/store/index.js");
 
@@ -68,7 +68,7 @@ describe("reading preferences", () => {
   it("adopts an inspector position left by the version before this one", () => {
     localStorage.setItem("fonteditor.inspector", JSON.stringify({ x: 120, y: 90, open: false }));
     const read = loadPreferences();
-    expect(read.inspector).toEqual({ x: 120, y: 90, open: false });
+    expect(read.inspector).toEqual({ ...DEFAULT_PLACEMENT, x: 120, y: 90, open: false });
   });
 });
 

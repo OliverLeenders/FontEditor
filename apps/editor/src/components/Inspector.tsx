@@ -49,6 +49,7 @@ import type { SegmentRef } from "@fonteditor/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { Section } from "./InspectorSection.js";
 import { Stepper } from "./Stepper.js";
 import { TransformPanel } from "./TransformPanel.js";
 import styles from "./Inspector.module.css";
@@ -66,6 +67,8 @@ export function Inspector(): React.JSX.Element | null {
   const open = useStoreValue((s) => s.inspector.open);
   const x = useStoreValue((s) => s.inspector.x);
   const y = useStoreValue((s) => s.inspector.y);
+  const dock = useStoreValue((s) => s.inspector.dock);
+  const width = useStoreValue((s) => s.inspector.width);
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const advance = useStoreValue(
     (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.advance ?? 0,
@@ -169,6 +172,7 @@ export function Inspector(): React.JSX.Element | null {
   const wrong = draftName !== glyphName && refusal !== null && refusal !== "missing";
 
   const drag = useRef<{ dx: number; dy: number } | null>(null);
+  const resizing = useRef(false);
 
   /**
    * The segment being panned and the scales it was panned from.
@@ -427,18 +431,39 @@ export function Inspector(): React.JSX.Element | null {
   return (
     <aside
       className={styles.panel}
-      style={{ left: `${x}px`, top: `${y}px` }}
+      data-dock={dock === "float" ? undefined : dock}
+      style={
+        dock === "float"
+          ? { left: `${x}px`, top: `${y}px` }
+          : { width: `${width}px`, flex: `0 0 ${width}px` }
+      }
       aria-label="Glyph inspector"
     >
       <header
         className={styles.grip}
         onPointerDown={(event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = { dx: event.clientX - x, dy: event.clientY - y };
+          // A docked panel is not where the pointer went down relative to its
+          // own left edge, so dragging one out starts from under the cursor
+          // rather than from a position it does not have.
+          drag.current =
+            dock === "float"
+              ? { dx: event.clientX - x, dy: event.clientY - y }
+              : { dx: width / 2, dy: 8 };
         }}
         onPointerMove={(event) => {
           const from = drag.current;
           if (from === null) return;
+
+          // Dragging to an edge docks, dragging away from one undocks. The
+          // panel goes where it is put, which is the gesture anybody would try
+          // first — the button in the header is for the people who would not.
+          const edge = edgeAt(event.clientX);
+          if (edge !== null) {
+            store.dockInspector(edge);
+            return;
+          }
+          if (dock !== "float") store.dockInspector("float");
           store.moveInspector(
             Math.max(0, event.clientX - from.dx),
             Math.max(0, event.clientY - from.dy),
@@ -483,6 +508,19 @@ export function Inspector(): React.JSX.Element | null {
             event.stopPropagation();
           }}
         />
+        {/* The same two states the drag reaches, for a pointer that would
+            rather press something than throw the panel at a wall. */}
+        <button
+          type="button"
+          className={styles.dock}
+          title={dock === "float" ? "Dock to the right" : "Float over the drawing"}
+          aria-label={dock === "float" ? "Dock the inspector" : "Float the inspector"}
+          aria-pressed={dock !== "float"}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => store.dockInspector(dock === "float" ? "right" : "float")}
+        >
+          {dock === "left" ? "◧" : "◨"}
+        </button>
         <button
           type="button"
           className={styles.dismiss}
@@ -494,76 +532,108 @@ export function Inspector(): React.JSX.Element | null {
         </button>
       </header>
 
+      {dock === "float" ? null : (
+        // Dragged rather than typed, because the width somebody wants is the
+        // one where their letter still fits beside it.
+        <div
+          className={styles.resizer}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Inspector width"
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            resizing.current = true;
+          }}
+          onPointerMove={(event) => {
+            if (!resizing.current) return;
+            store.resizeInspector(
+              dock === "right" ? window.innerWidth - event.clientX : event.clientX,
+            );
+          }}
+          onPointerUp={(event) => {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+            resizing.current = false;
+          }}
+        />
+      )}
+
       <div className={styles.body}>
-        <Field label="Unicode">
-          <span className={styles.readonly}>
-            {unicodes.length === 0
-              ? "—"
-              : unicodes.map((u) => `U+${u.toString(16).toUpperCase().padStart(4, "0")}`).join(" ")}
-          </span>
-        </Field>
+        <Section name="glyph" title="Glyph">
+          <Field label="Unicode">
+            <span className={styles.readonly}>
+              {unicodes.length === 0
+                ? "—"
+                : unicodes
+                    .map((u) => `U+${u.toString(16).toUpperCase().padStart(4, "0")}`)
+                    .join(" ")}
+            </span>
+          </Field>
 
-        <Field label="Advance">
-          <Stepper
-            value={Math.round(advance)}
-            label="Advance"
-            onStep={(next) => commitAdvance(next)}
-          >
-            <input
-              className={styles.input}
-              type="number"
+          <Field label="Advance">
+            <Stepper
               value={Math.round(advance)}
-              onChange={(event) => commitAdvance(Number(event.target.value))}
-            />
-          </Stepper>
-        </Field>
+              label="Advance"
+              onStep={(next) => commitAdvance(next)}
+            >
+              <input
+                className={styles.input}
+                type="number"
+                value={Math.round(advance)}
+                onChange={(event) => commitAdvance(Number(event.target.value))}
+              />
+            </Stepper>
+          </Field>
 
-        {/* Disabled rather than hidden for a glyph with no outline: a space has
+          {/* Disabled rather than hidden for a glyph with no outline: a space has
             an advance and no sidebearings, and a field that vanishes reads as a
             bug where a greyed one reads as the fact it is. */}
-        <Field label="Sidebearings">
-          <div className={styles.pair}>
-            <Stepper
-              value={leftBearing === null ? null : Math.round(leftBearing)}
-              label="left sidebearing"
-              disabled={leftBearing === null}
-              onStep={(next) => commitBearing("left", next)}
-            >
-              <input
-                className={styles.input}
-                type="number"
-                aria-label="Left sidebearing"
-                title="Left sidebearing"
+          <Field label="Sidebearings">
+            <div className={styles.pair}>
+              <Stepper
+                value={leftBearing === null ? null : Math.round(leftBearing)}
+                label="left sidebearing"
                 disabled={leftBearing === null}
-                value={leftBearing === null ? "" : Math.round(leftBearing)}
-                onChange={(event) => commitBearing("left", Number(event.target.value))}
-              />
-            </Stepper>
-            <Stepper
-              value={rightBearing === null ? null : Math.round(rightBearing)}
-              label="right sidebearing"
-              disabled={rightBearing === null}
-              onStep={(next) => commitBearing("right", next)}
-            >
-              <input
-                className={styles.input}
-                type="number"
-                aria-label="Right sidebearing"
-                title="Right sidebearing"
+                onStep={(next) => commitBearing("left", next)}
+              >
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="Left sidebearing"
+                  title="Left sidebearing"
+                  disabled={leftBearing === null}
+                  value={leftBearing === null ? "" : Math.round(leftBearing)}
+                  onChange={(event) => commitBearing("left", Number(event.target.value))}
+                />
+              </Stepper>
+              <Stepper
+                value={rightBearing === null ? null : Math.round(rightBearing)}
+                label="right sidebearing"
                 disabled={rightBearing === null}
-                value={rightBearing === null ? "" : Math.round(rightBearing)}
-                onChange={(event) => commitBearing("right", Number(event.target.value))}
-              />
-            </Stepper>
-          </div>
-        </Field>
-
-        <div className={styles.rule} />
+                onStep={(next) => commitBearing("right", next)}
+              >
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="Right sidebearing"
+                  title="Right sidebearing"
+                  disabled={rightBearing === null}
+                  value={rightBearing === null ? "" : Math.round(rightBearing)}
+                  onChange={(event) => commitBearing("right", Number(event.target.value))}
+                />
+              </Stepper>
+            </div>
+          </Field>
+        </Section>
 
         {/* Components are references, so the panel lists them and lets them be
             placed or removed. Editing what one *looks* like means opening the
             glyph it refers to, which is the entire point of using one. */}
-        <Field label={components.length === 0 ? "Components" : `Components · ${components.length}`}>
+        <Section
+          name="components"
+          title="Components"
+          note={components.length === 0 ? undefined : String(components.length)}
+          relevant={components.length > 0}
+        >
           <div className={styles.components}>
             {components.map((c) => (
               <div
@@ -648,14 +718,17 @@ export function Inspector(): React.JSX.Element | null {
               </datalist>
             </div>
           </div>
-        </Field>
-
-        <div className={styles.rule} />
+        </Section>
 
         {/* Where accents attach. Added from the canvas — right-click where you
             want one — because a place is chosen by pointing at it; what a panel
             is for is the name and the exact numbers. */}
-        <Field label={anchors.length === 0 ? "Anchors" : `Anchors · ${anchors.length}`}>
+        <Section
+          name="anchors"
+          title="Anchors"
+          note={anchors.length === 0 ? undefined : String(anchors.length)}
+          relevant={anchors.length > 0}
+        >
           <div className={styles.components}>
             {anchors.length === 0 && (
               <span className={styles.readonly}>Right-click the canvas to add one</span>
@@ -702,16 +775,14 @@ export function Inspector(): React.JSX.Element | null {
               </div>
             ))}
           </div>
-        </Field>
-
-        <div className={styles.rule} />
+        </Section>
 
         {/* Where the picture behind this letter sits. Added and chosen in the
             Tracing panel, and picked off a sheet in the Sheet view; what these
             are for is the nudge afterwards. */}
         {image === null ? null : (
-          <>
-            <Field label="Tracing">
+          <Section name="tracing" title="Tracing">
+            <Field label="Image">
               <div className={styles.imageRow}>
                 <span className={styles.imageName} title={image.name}>
                   {image.name}
@@ -755,16 +826,19 @@ export function Inspector(): React.JSX.Element | null {
                 </button>
               </div>
             </Field>
-
-            <div className={styles.rule} />
-          </>
+          </Section>
         )}
 
         {/* The lines this letter is drawn against, and the font's shown with
             them. Added from the canvas — right-click where you want one — for
             the reason anchors are: a place is chosen by pointing at it, and what
             a panel is for is the name and the exact numbers. */}
-        <Field label={guides.length === 0 ? "Guides" : `Guides · ${guides.length}`}>
+        <Section
+          name="guides"
+          title="Guides"
+          note={guides.length === 0 ? undefined : String(guides.length)}
+          relevant={guides.length > 0}
+        >
           <div className={styles.components}>
             {guides.length === 0 && (
               <span className={styles.readonly}>Right-click the canvas to add one</span>
@@ -843,221 +917,226 @@ export function Inspector(): React.JSX.Element | null {
               </div>
             ))}
           </div>
-        </Field>
+        </Section>
 
-        <div className={styles.rule} />
-
-        <Field label={pointCount === 0 ? "Point" : `Point · ${pointCount} selected`}>
-          <div className={styles.segmented}>
-            <button
-              type="button"
-              aria-pressed={pointType === "corner"}
-              disabled={pointCount === 0}
-              onClick={() => applyPointType("corner")}
-            >
-              Corner
-            </button>
-            <button
-              type="button"
-              aria-pressed={pointType === "smooth"}
-              disabled={pointCount === 0}
-              onClick={() => applyPointType("smooth")}
-            >
-              Smooth
-            </button>
-            {/* Only where it would be true: a tangent node says the curve on one
+        <Section
+          name="point"
+          title="Point"
+          note={pointCount === 0 ? undefined : `${pointCount} selected`}
+          relevant={pointCount > 0 || coordX !== null}
+        >
+          <Field label="Type">
+            <div className={styles.segmented}>
+              <button
+                type="button"
+                aria-pressed={pointType === "corner"}
+                disabled={pointCount === 0}
+                onClick={() => applyPointType("corner")}
+              >
+                Corner
+              </button>
+              <button
+                type="button"
+                aria-pressed={pointType === "smooth"}
+                disabled={pointCount === 0}
+                onClick={() => applyPointType("smooth")}
+              >
+                Smooth
+              </button>
+              {/* Only where it would be true: a tangent node says the curve on one
                 side leaves along the straight segment on the other, and a point
                 with two curves or two lines has no such arrangement. Disabled
                 rather than hidden, so the third choice is visibly a choice. */}
-            <button
-              type="button"
-              aria-pressed={pointType === "tangent"}
-              disabled={pointCount === 0 || !canTangent}
-              title={
-                canTangent
-                  ? "The curve leaves along the straight side"
-                  : "Needs a straight segment on one side and a curve on the other"
-              }
-              onClick={() => applyPointType("tangent")}
-            >
-              Tangent
-            </button>
-          </div>
-        </Field>
+              <button
+                type="button"
+                aria-pressed={pointType === "tangent"}
+                disabled={pointCount === 0 || !canTangent}
+                title={
+                  canTangent
+                    ? "The curve leaves along the straight side"
+                    : "Needs a straight segment on one side and a curve on the other"
+                }
+                onClick={() => applyPointType("tangent")}
+              >
+                Tangent
+              </button>
+            </div>
+          </Field>
 
-        {/* Only for a single selection. A coordinate shown for six selected
+          {/* Only for a single selection. A coordinate shown for six selected
             points would be one arbitrary point's, and typing into it would move
             that one alone — neither of which is what a number in a box promises.
             Disabled rather than hidden, for the reason the sidebearings are. */}
-        <Field label={coordPart === "in" || coordPart === "out" ? "Handle position" : "Position"}>
-          <div className={styles.pair}>
-            <Stepper
-              value={coordX}
-              label="x position"
-              disabled={coordX === null}
-              onStep={(next) => commitCoordinate("x", next)}
-            >
-              <input
-                className={styles.input}
-                type="number"
-                aria-label="X position"
-                title="X position"
+          <Field label={coordPart === "in" || coordPart === "out" ? "Handle position" : "Position"}>
+            <div className={styles.pair}>
+              <Stepper
+                value={coordX}
+                label="x position"
                 disabled={coordX === null}
-                value={coordX === null ? "" : shown(coordX)}
-                onChange={(event) => commitCoordinate("x", Number(event.target.value))}
-              />
-            </Stepper>
-            <Stepper
-              value={coordY}
-              label="y position"
-              disabled={coordY === null}
-              onStep={(next) => commitCoordinate("y", next)}
-            >
-              <input
-                className={styles.input}
-                type="number"
-                aria-label="Y position"
-                title="Y position"
+                onStep={(next) => commitCoordinate("x", next)}
+              >
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="X position"
+                  title="X position"
+                  disabled={coordX === null}
+                  value={coordX === null ? "" : shown(coordX)}
+                  onChange={(event) => commitCoordinate("x", Number(event.target.value))}
+                />
+              </Stepper>
+              <Stepper
+                value={coordY}
+                label="y position"
                 disabled={coordY === null}
-                value={coordY === null ? "" : shown(coordY)}
-                onChange={(event) => commitCoordinate("y", Number(event.target.value))}
-              />
-            </Stepper>
-          </div>
-        </Field>
+                onStep={(next) => commitCoordinate("y", next)}
+              >
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="Y position"
+                  title="Y position"
+                  disabled={coordY === null}
+                  value={coordY === null ? "" : shown(coordY)}
+                  onChange={(event) => commitCoordinate("y", Number(event.target.value))}
+                />
+              </Stepper>
+            </div>
+          </Field>
 
-        {/* The same handles as offsets from the point they hang off, which is
+          {/* The same handles as offsets from the point they hang off, which is
             how a handle is thought about: forty units out and level, not at
             x=346. Kept beside the absolute pair rather than replacing it — one
             says where the handle is, the other says what it does. */}
-        <Field label="Handles">
-          <div className={styles.handles}>
-            <HandleRow
-              side="in"
-              length={inLength}
-              angle={inAngle}
-              onLength={(next) => commitHandle("in", "length", next)}
-              onAngle={(next) => commitHandle("in", "angle", next)}
-            />
-            <HandleRow
-              side="out"
-              length={outLength}
-              angle={outAngle}
-              onLength={(next) => commitHandle("out", "length", next)}
-              onAngle={(next) => commitHandle("out", "angle", next)}
-            />
-          </div>
-        </Field>
-
-        <div className={styles.rule} />
+          <Field label="Handles">
+            <div className={styles.handles}>
+              <HandleRow
+                side="in"
+                length={inLength}
+                angle={inAngle}
+                onLength={(next) => commitHandle("in", "length", next)}
+                onAngle={(next) => commitHandle("in", "angle", next)}
+              />
+              <HandleRow
+                side="out"
+                length={outLength}
+                angle={outAngle}
+                onLength={(next) => commitHandle("out", "length", next)}
+                onAngle={(next) => commitHandle("out", "angle", next)}
+              />
+            </div>
+          </Field>
+        </Section>
 
         {/* The Tunni controls as numbers. Tension is each handle's reach towards
             the handle intersection, as a percentage — the proportion a designer
             already talks in, and the one thing about a curve that carries from
             one segment to the next where a length in units does not. */}
-        <Field label="Tension">
-          <div className={styles.pair}>
-            <Stepper
-              value={tensionIn === null ? null : shown(tensionIn * 100)}
-              label="tension at the start"
-              disabled={!curveReady}
-              onStep={(next) => commitTension("in", next)}
-            >
-              <input
-                className={styles.input}
-                type="number"
-                aria-label="Tension at the start of the segment"
-                title={curveHint}
+        <Section name="curve" title="Curve" relevant={curveStatus !== null}>
+          <Field label="Tension">
+            <div className={styles.pair}>
+              <Stepper
+                value={tensionIn === null ? null : shown(tensionIn * 100)}
+                label="tension at the start"
                 disabled={!curveReady}
-                value={tensionIn === null ? "" : shown(tensionIn * 100)}
-                onChange={(event) => commitTension("in", Number(event.target.value))}
-              />
-            </Stepper>
-            <Stepper
-              value={tensionOut === null ? null : shown(tensionOut * 100)}
-              label="tension at the end"
-              disabled={!curveReady}
-              onStep={(next) => commitTension("out", next)}
-            >
-              <input
-                className={styles.input}
-                type="number"
-                aria-label="Tension at the end of the segment"
-                title={curveHint}
+                onStep={(next) => commitTension("in", next)}
+              >
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="Tension at the start of the segment"
+                  title={curveHint}
+                  disabled={!curveReady}
+                  value={tensionIn === null ? "" : shown(tensionIn * 100)}
+                  onChange={(event) => commitTension("in", Number(event.target.value))}
+                />
+              </Stepper>
+              <Stepper
+                value={tensionOut === null ? null : shown(tensionOut * 100)}
+                label="tension at the end"
                 disabled={!curveReady}
-                value={tensionOut === null ? "" : shown(tensionOut * 100)}
-                onChange={(event) => commitTension("out", Number(event.target.value))}
-              />
-            </Stepper>
-          </div>
-        </Field>
+                onStep={(next) => commitTension("out", next)}
+              >
+                <input
+                  className={styles.input}
+                  type="number"
+                  aria-label="Tension at the end of the segment"
+                  title={curveHint}
+                  disabled={!curveReady}
+                  value={tensionOut === null ? "" : shown(tensionOut * 100)}
+                  onChange={(event) => commitTension("out", Number(event.target.value))}
+                />
+              </Stepper>
+            </div>
+          </Field>
 
-        {/* What the curvature comb shows at this node, as a number: the radius
+          {/* What the curvature comb shows at this node, as a number: the radius
             of the circle fitting each side, and how far apart the two are. One
             is a join the light crosses without a crease, and harmonising is
             what puts a join there. */}
-        <Field label="Curvature">
-          <div className={styles.curvature}>
-            <span className={styles.readonly}>
-              {radiusIn === null || radiusOut === null
-                ? "—"
-                : `r ${String(Math.round(radiusIn))} · ${String(Math.round(radiusOut))}`}
-            </span>
-            <span
-              className={styles.readonly}
-              title="The sharper side over the gentler; 1.00 is a join with no curvature break"
-            >
-              {curvatureRatio === null ? "" : `× ${curvatureRatio.toFixed(2)}`}
-            </span>
-            <button
-              type="button"
-              className={styles.align}
-              disabled={pointCount === 0}
-              title="Move the selected points to where the curvature either side of them agrees"
-              onClick={() => store.applyTool(harmoniseSelection(store.editor))}
-            >
-              Harmonise
-            </button>
-          </div>
-        </Field>
+          <Field label="Curvature">
+            <div className={styles.curvature}>
+              <span className={styles.readonly}>
+                {radiusIn === null || radiusOut === null
+                  ? "—"
+                  : `r ${String(Math.round(radiusIn))} · ${String(Math.round(radiusOut))}`}
+              </span>
+              <span
+                className={styles.readonly}
+                title="The sharper side over the gentler; 1.00 is a join with no curvature break"
+              >
+                {curvatureRatio === null ? "" : `× ${curvatureRatio.toFixed(2)}`}
+              </span>
+              <button
+                type="button"
+                className={styles.align}
+                disabled={pointCount === 0}
+                title="Move the selected points to where the curvature either side of them agrees"
+                onClick={() => store.applyTool(harmoniseSelection(store.editor))}
+              >
+                Harmonise
+              </button>
+            </div>
+          </Field>
 
-        {/* Pan moves length from one handle to the other without changing how
+          {/* Pan moves length from one handle to the other without changing how
             much there is of it, so the curve leans without swelling. The middle
             is where the two are equal, which is what balancing a segment does. */}
-        <Field label="Pan">
-          <div className={styles.panTrack}>
-            {/* Behind the slider, so the thumb covers it exactly when the pan
+          <Field label="Pan">
+            <div className={styles.panTrack}>
+              {/* Behind the slider, so the thumb covers it exactly when the pan
                 is where the mark says. */}
-            <span className={styles.centre} aria-hidden="true" />
-            <input
-              className={styles.slider}
-              type="range"
-              min={-PAN_REACH}
-              max={PAN_REACH}
-              step={0.01}
-              aria-label="Pan the curve between its two handles"
-              title="Lengthen one handle by as much as the other shortens; the middle is balanced — double-click to go there"
-              disabled={!curveReady}
-              value={curveReady ? panValue : 0}
-              onChange={(event) => movePan(Number(event.target.value))}
-              onPointerUp={endPan}
-              onKeyUp={endPan}
-              onBlur={endPan}
-              // Back to balanced, which is where the mark on the track is. The
-              // same gesture as double-clicking the Tunni point on the canvas,
-              // and for the same reason: the middle is a place aimed for often
-              // enough that hitting it by hand is a nuisance.
-              onDoubleClick={() => {
-                movePan(0);
-                endPan();
-              }}
-            />
-          </div>
-        </Field>
+              <span className={styles.centre} aria-hidden="true" />
+              <input
+                className={styles.slider}
+                type="range"
+                min={-PAN_REACH}
+                max={PAN_REACH}
+                step={0.01}
+                aria-label="Pan the curve between its two handles"
+                title="Lengthen one handle by as much as the other shortens; the middle is balanced — double-click to go there"
+                disabled={!curveReady}
+                value={curveReady ? panValue : 0}
+                onChange={(event) => movePan(Number(event.target.value))}
+                onPointerUp={endPan}
+                onKeyUp={endPan}
+                onBlur={endPan}
+                // Back to balanced, which is where the mark on the track is. The
+                // same gesture as double-clicking the Tunni point on the canvas,
+                // and for the same reason: the middle is a place aimed for often
+                // enough that hitting it by hand is a nuisance.
+                onDoubleClick={() => {
+                  movePan(0);
+                  endPan();
+                }}
+              />
+            </div>
+          </Field>
+        </Section>
 
-        <div className={styles.rule} />
-
-        <TransformPanel />
+        <Section name="transform" title="Transform" relevant={false}>
+          <TransformPanel />
+        </Section>
       </div>
     </aside>
   );
@@ -1071,6 +1150,21 @@ export function Inspector(): React.JSX.Element | null {
  * be a place the slider could reach and the curve could not.
  */
 const PAN_REACH = 0.98;
+
+/**
+ * How near a window edge counts as being at it, in pixels.
+ *
+ * Wide enough to hit while moving a panel about, narrow enough that dragging
+ * the panel to a corner of the drawing does not dock it by surprise.
+ */
+const EDGE = 48;
+
+/** Which side of the window a drag is at, if it is at one. */
+function edgeAt(clientX: number): "left" | "right" | null {
+  if (clientX <= EDGE) return "left";
+  if (clientX >= window.innerWidth - EDGE) return "right";
+  return null;
+}
 
 /** One handle, as the length and direction of its offset from its own node. */
 function handlePolar(

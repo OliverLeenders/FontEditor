@@ -23,13 +23,32 @@
   -webkit-user-select: text;
 }
 
-/* The canvas gets everything the bars do not, and the inspector floats over it
-   rather than taking a column of its own. */
+/*
+ * The canvas gets everything the bars do not.
+ *
+ * Two arrangements, and the panel decides which. Floating, it covers the
+ * drawing and the stage is one thing; docked, the stage is a row and the panel
+ * takes a column of its own — which is the point of docking, since a panel that
+ * still covered the drawing would only be a panel that had stopped moving.
+ */
 .stage {
   position: relative;
+  display: flex;
   flex: 1;
   min-height: 0;
   background: var(--canvas);
+}
+
+/* Where the canvas actually goes, so the docked panel is its sibling rather
+   than something on top of it. */
+.drawing {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.stage[data-dock="left"] {
+  flex-direction: row-reverse;
 }
 
 .reveal {
