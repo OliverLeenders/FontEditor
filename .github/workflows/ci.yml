@@ -109,6 +109,16 @@ jobs:
       - name: Export the mark-attachment proof font
         run: OTF_OUT="$RUNNER_TEMP/otf" pnpm --filter @fonteditor/font-io exec vitest run proof-otf
 
+      - name: Export both flavours of the proof font
+        run: TRUETYPE_OUT="$RUNNER_TEMP/ttf" pnpm --filter @fonteditor/font-io exec vitest run truetype
+
+      # A cubic cannot be written as quadratics exactly, so the only question is
+      # how close — and the arithmetic that would measure it here is the
+      # arithmetic that did the converting. fontTools draws both flavours of the
+      # same drawing and the two outlines are compared as shapes.
+      - name: Compare the quadratic outlines with the cubic ones
+        run: python tools/otf-check/check_ttf.py "$RUNNER_TEMP/ttf/Quad.ttf" "$RUNNER_TEMP/ttf/Quad.otf"
+
       - name: Export the variable proof font
         run: VARIABLE_OUT="$RUNNER_TEMP/vf" pnpm --filter @fonteditor/font-io exec vitest run variable
 

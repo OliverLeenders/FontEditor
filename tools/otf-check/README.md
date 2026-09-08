@@ -40,3 +40,18 @@ blends in the right order, its regions right, and its offsets pointing where the
 say — and getting any one of those wrong gives a font that is perfect at the
 default and wrong everywhere else, which is the failure that would otherwise
 reach somebody's screen.
+
+## The TrueType flavour
+
+`check_ttf.py` asks the one question the conversion raises. A cubic cannot be
+written as quadratics exactly, so the TrueType outlines are an approximation of
+the drawing, and how good an approximation is not something the code that made
+them can answer.
+
+So fontTools draws both flavours of the same font and the two outlines are
+compared as shapes — every point on one measured to the nearest _segment_ of the
+other, in both directions. Both directions because a curve that bulges outward
+and one that flattens are each invisible to the other test; to the segments
+rather than to sampled points because otherwise the sample spacing becomes part
+of the answer, which is how a conversion within half a unit first read as four
+and a half.

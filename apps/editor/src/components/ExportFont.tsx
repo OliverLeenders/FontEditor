@@ -2,6 +2,7 @@ import {
   exportFamily,
   exportFileName,
   exportFont,
+  exportTrueType,
   exportUfo,
   exportVariableFont,
 } from "@fonteditor/font-io";
@@ -121,6 +122,23 @@ export function ExportFont(): React.JSX.Element {
       return { file, warnings: out.warnings };
     });
 
+  /**
+   * The same font, with quadratic outlines.
+   *
+   * A conversion rather than another way of writing the same numbers: a cubic
+   * cannot be said exactly as quadratics, so this is the drawing to within a
+   * fraction of a unit rather than the drawing itself. The OTF beside it is
+   * exact, and is the one to hand to somebody who will edit it again.
+   */
+  const truetype = (): void =>
+    attempt(() => {
+      const document = store.editor.document;
+      const { bytes, warnings } = exportTrueType(document);
+      const file = exportFileName(document).replace(/\.otf$/, ".ttf");
+      download(bytes, file, "font/ttf");
+      return { file, warnings };
+    });
+
   const ufo = (): void =>
     void attemptAsync(async () => {
       const document = store.editor.document;
@@ -146,6 +164,15 @@ export function ExportFont(): React.JSX.Element {
         onClick={otf}
       >
         Export OTF
+      </button>
+      <button
+        type="button"
+        className={styles.button}
+        disabled={glyphCount === 0}
+        title="The same font with quadratic outlines — what hinting and most web pipelines want"
+        onClick={truetype}
+      >
+        Export TTF
       </button>
       <button
         type="button"

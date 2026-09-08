@@ -7,6 +7,7 @@ import {
   type StyleMapStyle,
   correctDirections,
   counterIds,
+  glyph,
   kernIndex,
   orderedGlyphs,
   removeOverlap,
@@ -118,6 +119,27 @@ function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Con
  * Refused rather than guessed when the boundary will not close. That is worth a
  * warning, because it is a glyph to go and look at.
  */
+/**
+ * Every glyph with its outlines prepared as the compiler prepares them.
+ *
+ * Components resolved, directions corrected, overlaps joined — the three things
+ * that stand between a drawing and a file, in the order they have to happen in.
+ * Exported because the TrueType flavour needs exactly the same outlines and
+ * would otherwise have its own copy of that order to get wrong.
+ */
+export function flattenedGlyphs(document: FontDocument): Glyph[] {
+  const ids = counterIds("t");
+  const warnings: string[] = [];
+
+  return notdefFirst(document).names.map((name) => {
+    const g = document.glyphs[name];
+    if (g === undefined) return glyph(name);
+
+    const contours = unioned(g, directed(flatten(g, document, ids)), ids, warnings);
+    return { ...g, components: [], contours: [...contours] };
+  });
+}
+
 function unioned(
   g: Glyph,
   contours: readonly Contour[],

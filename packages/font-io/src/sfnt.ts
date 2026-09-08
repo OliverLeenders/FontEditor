@@ -74,12 +74,38 @@ function largestPowerOfTwo(n: number): number {
  * aligned, with the padding included in each length only where the format says
  * so — which is to say, not in the recorded length, but yes in the offsets.
  */
+/**
+ * Change the four bytes that say which flavour a font is.
+ *
+ * `OTTO` for CFF outlines, a version number for TrueType ones. Everything else
+ * about the file is the same, and a reader decides which kind of outline to
+ * look for on these four bytes alone — so a font whose tables were swapped and
+ * whose version was not is a font that reads its `glyf` as a `CFF `.
+ *
+ * The checksum over the whole file changes with them, so the file is put back
+ * together rather than patched in place.
+ */
+export function withSfntVersion(font: Uint8Array, version: number): Uint8Array {
+  const { tables } = readTables(font);
+  return assemble(version, tables);
+}
+
 export function withTable(font: Uint8Array, tag: string, data: Uint8Array): Uint8Array {
   const { sfntVersion, tables } = readTables(font);
 
   const kept = tables.filter((t) => t.tag !== tag);
-  const all = data.length === 0 ? kept : [...kept, { tag, data }];
-  all.sort((a, b) => (a.tag < b.tag ? -1 : a.tag > b.tag ? 1 : 0));
+  return assemble(sfntVersion, data.length === 0 ? kept : [...kept, { tag, data }]);
+}
+
+/**
+ * Lay a set of tables out as a file.
+ *
+ * The directory sorted by tag, as the specification requires and as some
+ * readers rely on; the tables themselves in that same order, four-byte aligned,
+ * with the padding in the offsets and not in the recorded lengths.
+ */
+function assemble(sfntVersion: number, tables: readonly Table[]): Uint8Array {
+  const all = [...tables].sort((a, b) => (a.tag < b.tag ? -1 : a.tag > b.tag ? 1 : 0));
 
   const numTables = all.length;
   const directorySize = HEADER + numTables * RECORD;

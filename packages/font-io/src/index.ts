@@ -77,3 +77,7 @@ export { nameTable, readNames, withNames } from "./names.js";
 export { deltaMasters, hvarTable, itemVariationStore, regionsOf } from "./varstore.js";
 export type { VariableMaster, VariableResult } from "./variable.js";
 export { exportVariableFont } from "./variable.js";
+
+export type { GlyfResult } from "./glyf.js";
+export { glyfTable } from "./glyf.js";
+export { exportTrueType } from "./truetype.js";
