@@ -10,6 +10,7 @@ import { useMemo } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { RulerIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
 
@@ -54,6 +55,7 @@ export function GuidesSection(): React.JSX.Element {
   return (
     <Section
       name="guides"
+      icon={RulerIcon}
       title="Guides"
       note={guides.length === 0 ? undefined : String(guides.length)}
       relevant={guides.length > 0}
@@ -131,7 +133,7 @@ export function GuidesSection(): React.JSX.Element {
               aria-label={`Remove the guide ${g.name}`}
               onClick={() => store.applyTool(removeGuideAt(store.editor, g.id))}
             >
-              ×
+              <TrashIcon />
             </button>
           </div>
         ))}

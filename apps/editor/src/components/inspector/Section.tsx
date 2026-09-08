@@ -1,5 +1,6 @@
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { ChevronRightIcon, type IconComponent } from "../icons.js";
 
 /**
  * One folding section of the inspector.
@@ -19,6 +20,7 @@ import styles from "../Inspector.module.css";
 export function Section({
   name,
   title,
+  icon: Icon,
   note,
   relevant = true,
   children,
@@ -26,6 +28,15 @@ export function Section({
   /** The key the choice is remembered under. Stable, and not the title. */
   readonly name: string;
   readonly title: string;
+  /**
+   * What this section is about, as a drawing.
+   *
+   * Folded, a section is a row of small uppercase words, and eight of those
+   * are read one at a time. The icon is what makes the closed panel scannable
+   * — the anchor, the ruler, the picture — and it is the same mark wherever
+   * else in the app that thing appears.
+   */
+  readonly icon: IconComponent;
   /** A count or a word shown after the title, when there is one worth showing. */
   readonly note?: string | undefined;
   /** Whether this would open on its own, having heard nothing from anyone. */
@@ -45,8 +56,11 @@ export function Section({
           aria-expanded={open}
           onClick={() => store.toggleInspectorSection(name, !open)}
         >
-          <span className={styles.chevron} aria-hidden="true" data-open={open ? "true" : undefined}>
-            ›
+          <span className={styles.chevron} data-open={open ? "true" : undefined}>
+            <ChevronRightIcon />
+          </span>
+          <span className={styles.sectionIcon}>
+            <Icon />
           </span>
           <span className={styles.sectionTitle}>{title}</span>
           {note === undefined || note === "" ? null : (

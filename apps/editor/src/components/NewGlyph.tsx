@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
+import { SquarePlusIcon } from "./icons.js";
 
 /**
  * What someone typed, read as either a name or a character.
@@ -106,6 +107,7 @@ export function NewGlyph(): React.JSX.Element {
           title={`Create the ${String(missing.length)} glyphs of ${setLabel} this font has not got`}
           onClick={addMissing}
         >
+          <SquarePlusIcon />
           Add {missing.length} missing
         </button>
       ) : null}

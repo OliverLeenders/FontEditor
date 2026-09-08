@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Snapshots.module.css";
 import open from "./OpenFont.module.css";
+import { CameraIcon, HistoryIcon, RotateCcwIcon } from "./icons.js";
 
 /**
  * The copies of the font kept beside it, and the way back to one.
@@ -78,6 +79,7 @@ export function Snapshots(): React.JSX.Element {
         title="Copies of the whole font, kept as you work"
         onClick={() => setOpen(!open_)}
       >
+        <HistoryIcon />
         History
       </button>
 
@@ -92,6 +94,7 @@ export function Snapshots(): React.JSX.Element {
               title={reading ? "Another tab is saving this project" : "Keep one now"}
               onClick={() => void store.snapshot()}
             >
+              <CameraIcon />
               Keep one now
             </button>
           </div>
@@ -118,6 +121,7 @@ export function Snapshots(): React.JSX.Element {
                     }
                     onClick={() => void restore(entry.at)}
                   >
+                    <RotateCcwIcon />
                     Restore
                   </button>
                 </li>

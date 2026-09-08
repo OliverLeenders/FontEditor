@@ -3,6 +3,7 @@ import { useMemo } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FeaturesView.module.css";
+import { CheckIcon, CircleAlertIcon } from "./icons.js";
 
 /**
  * The features workspace: OpenType feature source, and what it compiles to.
@@ -75,6 +76,7 @@ export function FeaturesView(): React.JSX.Element {
               <ul className={styles.problems}>
                 {compiled.problems.map((problem, index) => (
                   <li key={`${String(problem.line)}-${String(index)}`}>
+                    <CircleAlertIcon />
                     <span className={styles.line}>{problem.line}</span>
                     {problem.message}
                   </li>
@@ -89,24 +91,31 @@ export function FeaturesView(): React.JSX.Element {
               out from the exported font is finding out too late. */}
           <ul className={styles.supported}>
             <li>
+              <CheckIcon />
               glyph classes — <code>@FIGS = [zero one];</code>
             </li>
             <li>
+              <CheckIcon />
               ligatures — <code>sub f i by fi;</code>
             </li>
             <li>
+              <CheckIcon />
               single substitution — <code>sub a by a.sc;</code>
             </li>
             <li>
+              <CheckIcon />
               class substitution — <code>sub @LOWER by @SMALL;</code>
             </li>
             <li>
+              <CheckIcon />
               in context — <code>sub a b&apos; c by b.alt;</code>
             </li>
             <li>
+              <CheckIcon />
               exceptions to it — <code>ignore sub f a&apos;;</code>
             </li>
             <li>
+              <CheckIcon />
               single adjustment — <code>pos @caps &lt;10 0 20 0&gt;;</code>
             </li>
           </ul>

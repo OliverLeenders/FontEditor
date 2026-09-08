@@ -36,6 +36,22 @@
   color: var(--ink-3);
 }
 
+/* The two small buttons in here carry a drawing in front of the word, so both
+   are rows rather than blocks. Their icons sit a step under the label's size:
+   these are the least important controls on the panel. */
+.keep,
+.restore {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+}
+.keep svg,
+.restore svg {
+  flex: none;
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
 .keep {
   padding: 0.15rem 0.4rem;
   border: 1px solid var(--rule-strong);

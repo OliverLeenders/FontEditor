@@ -19,7 +19,16 @@
 
 /* Unsaved is the one state here worth a colour. The rest is calm on purpose. */
 .dirty {
-  color: var(--warn, #b4791f);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: 0.35rem;
+  color: var(--warn);
+}
+.dirty svg {
+  flex: none;
+  width: 0.75rem;
+  height: 0.75rem;
 }
 
 .clean {
@@ -33,5 +42,5 @@
 
 .error {
   font-size: 0.72rem;
-  color: var(--danger, #c2453d);
+  color: var(--danger);
 }

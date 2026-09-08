@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Inspector.module.css";
+import { GripVerticalIcon, PanelLeftIcon, PanelRightIcon, ScalingIcon, XIcon } from "./icons.js";
 import { TransformPanel } from "./TransformPanel.js";
 import { AnchorsSection } from "./inspector/AnchorsSection.js";
 import { ComponentsSection } from "./inspector/ComponentsSection.js";
@@ -115,6 +116,12 @@ export function Inspector(): React.JSX.Element | null {
           drag.current = null;
         }}
       >
+        {/* The panel is dragged by its header, and nothing said so. Lucide's
+            grip, which is the mark every draggable thing in every application
+            carries. */}
+        <span className={styles.gripMark} aria-hidden="true">
+          <GripVerticalIcon />
+        </span>
         {/* The name is a reference — components place a glyph by it and kerning
             names it on both sides of a pair — so renaming is an edit rather
             than relabelling, and it belongs with the other fields that edit
@@ -160,7 +167,7 @@ export function Inspector(): React.JSX.Element | null {
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => store.dockInspector(dock === "float" ? "right" : "float")}
         >
-          {dock === "left" ? "◧" : "◨"}
+          {dock === "left" ? <PanelLeftIcon /> : <PanelRightIcon />}
         </button>
         <button
           type="button"
@@ -169,7 +176,7 @@ export function Inspector(): React.JSX.Element | null {
           aria-label="Hide the inspector"
           onClick={() => store.toggleInspector()}
         >
-          ×
+          <XIcon />
         </button>
       </header>
 
@@ -207,7 +214,7 @@ export function Inspector(): React.JSX.Element | null {
         <PointSection />
         <CurveSection />
 
-        <Section name="transform" title="Transform" relevant={false}>
+        <Section name="transform" title="Transform" icon={ScalingIcon} relevant={false}>
           <TransformPanel />
         </Section>
       </div>

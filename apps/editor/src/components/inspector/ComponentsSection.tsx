@@ -10,6 +10,7 @@ import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { ComponentIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
 
@@ -49,6 +50,7 @@ export function ComponentsSection(): React.JSX.Element {
   return (
     <Section
       name="components"
+      icon={ComponentIcon}
       title="Components"
       note={components.length === 0 ? undefined : String(components.length)}
       relevant={components.length > 0}
@@ -95,7 +97,7 @@ export function ComponentsSection(): React.JSX.Element {
               aria-label={`Remove ${c.base}`}
               onClick={() => store.applyTool(removeComponent(store.editor, c.id))}
             >
-              ×
+              <TrashIcon />
             </button>
           </div>
         ))}

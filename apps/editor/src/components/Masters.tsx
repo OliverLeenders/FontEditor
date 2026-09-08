@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Masters.module.css";
 import open from "./OpenFont.module.css";
+import { BlendIcon, CopyPlusIcon, LayersIcon, TrashIcon } from "./icons.js";
 
 /**
  * The drawings of this typeface, and moving between them.
@@ -130,6 +131,7 @@ export function Masters(): React.JSX.Element {
         title="The drawings of this typeface, and moving between them"
         onClick={() => setOpen(!open_)}
       >
+        <LayersIcon />
         {masters.length === 1 ? "Masters" : `Masters · ${currentName(project.current, masters)}`}
       </button>
 
@@ -146,6 +148,7 @@ export function Masters(): React.JSX.Element {
               }
               onClick={() => void add()}
             >
+              <CopyPlusIcon />
               Add…
             </button>
           </div>
@@ -201,7 +204,7 @@ export function Masters(): React.JSX.Element {
                       })
                     }
                   >
-                    ×
+                    <TrashIcon />
                   </button>
                 </li>
               );
@@ -254,6 +257,9 @@ function Preview(): React.JSX.Element {
           aria-label="Show an instance between the masters"
           onChange={() => void store.setPreview(at === null ? { ...here } : null)}
         />
+        <span className={styles.previewMark}>
+          <BlendIcon />
+        </span>
         <span>Show an instance</span>
       </label>
 

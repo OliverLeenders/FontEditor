@@ -14,6 +14,7 @@ import {
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
 import { Stepper } from "../Stepper.js";
+import { WaypointsIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field, shown } from "./fields.js";
 
@@ -119,6 +120,7 @@ export function PointSection(): React.JSX.Element {
   return (
     <Section
       name="point"
+      icon={WaypointsIcon}
       title="Point"
       note={pointCount === 0 ? undefined : `${pointCount} selected`}
       relevant={pointCount > 0 || coordX !== null}

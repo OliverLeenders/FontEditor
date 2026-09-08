@@ -5,6 +5,13 @@ import { unsaved } from "../store/index.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FontFile.module.css";
 import open from "./OpenFont.module.css";
+import {
+  CircleDotIcon,
+  FolderClockIcon,
+  FolderOpenIcon,
+  FolderOutputIcon,
+  SaveIcon,
+} from "./icons.js";
 
 /**
  * The font's own file: a UFO folder on the user's disk.
@@ -105,6 +112,7 @@ export function FontFile(): React.JSX.Element | null {
         title="Open a .ufo folder from your disk and work in it"
         onClick={() => void openFolder()}
       >
+        <FolderOpenIcon />
         Open folder…
       </button>
 
@@ -116,6 +124,7 @@ export function FontFile(): React.JSX.Element | null {
           title="Open the folder this editor was last working in"
           onClick={() => void reopen()}
         >
+          <FolderClockIcon />
           Reopen {folder.remembered}
         </button>
       ) : null}
@@ -129,6 +138,7 @@ export function FontFile(): React.JSX.Element | null {
             title={dirty ? `Write the font back to ${folder.name}` : "Nothing has changed"}
             onClick={() => void save()}
           >
+            <SaveIcon />
             {folder.busy ? "Saving…" : "Save"}
           </button>
           <button
@@ -138,12 +148,16 @@ export function FontFile(): React.JSX.Element | null {
             title="Write the font to another folder, and work there from now on"
             onClick={() => void saveAs()}
           >
+            <FolderOutputIcon />
             Save as…
           </button>
           <span className={styles.where} title={`The font is kept in ${folder.name}`}>
             {folder.name}
             <span className={dirty ? styles.dirty : styles.clean}>
-              {dirty ? " · unsaved changes" : since(folder.savedAt)}
+              {/* A mark as well as a colour, because "unsaved" is the one
+                  thing on this line somebody needs to see without reading. */}
+              {dirty ? <CircleDotIcon /> : null}
+              {dirty ? "unsaved changes" : since(folder.savedAt)}
             </span>
           </span>
         </>

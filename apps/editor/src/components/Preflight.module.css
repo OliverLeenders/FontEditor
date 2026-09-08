@@ -60,22 +60,31 @@
   border-bottom: 0;
 }
 
-/* Severity by colour and by position in the list, never by colour alone: the
-   heading counts them, and the worst are at the top. */
-.dot {
-  width: 0.45rem;
-  height: 0.45rem;
-  margin-top: 0.35rem;
-  border-radius: 50%;
+/*
+ * Severity by shape first and colour second.
+ *
+ * It used to be a coloured dot, with the heading's counts and the sort order as
+ * the only other clue — which is colour alone for anyone reading one row, and
+ * the one encoding a reader may not have. The drawing carries the meaning now
+ * and the colour agrees with it.
+ */
+.mark {
+  display: inline-flex;
+  flex: none;
+  margin-top: 0.12rem;
+}
+.mark svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 .error {
-  background: var(--danger, #c2453d);
+  color: var(--danger);
 }
 .warning {
-  background: var(--warn, #b4791f);
+  color: var(--warn);
 }
 .note {
-  background: var(--ink-3);
+  color: var(--ink-3);
 }
 
 .what {

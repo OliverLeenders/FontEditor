@@ -35,7 +35,11 @@
   color: var(--ink-3);
 }
 
+/* A drawing in front of the word, as the bar buttons have. */
 .add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
   padding: 0.15rem 0.4rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
@@ -52,6 +56,24 @@
 .add:disabled {
   opacity: 0.38;
   cursor: default;
+}
+
+.add svg {
+  flex: none;
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
+/* The mark on the instance switch, which is the one thing in this panel that
+   shows a shape nobody drew. */
+.previewMark {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-3);
+}
+.previewMark svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .list {
@@ -122,17 +144,23 @@
   border-color: var(--rule);
 }
 
+/* The one control in this panel that pressing again does not undo. */
 .drop {
+  display: grid;
+  place-items: center;
   padding: 0;
   border: 0;
   background: none;
   color: var(--ink-3);
-  font-size: 0.9rem;
   line-height: 1;
   cursor: pointer;
 }
+.drop svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
 .drop:hover:not(:disabled) {
-  color: var(--danger, #c2453d);
+  color: var(--danger);
 }
 .drop:disabled {
   opacity: 0.38;
@@ -183,7 +211,7 @@
 
 .error {
   margin: 0.45rem 0 0;
-  color: var(--danger, #c2453d);
+  color: var(--danger);
   font-size: 0.76rem;
 }
 

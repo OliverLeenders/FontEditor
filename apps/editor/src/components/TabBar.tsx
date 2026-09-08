@@ -1,15 +1,34 @@
 import styles from "./TabBar.module.css";
+import {
+  BracesIcon,
+  FileTextIcon,
+  GapHorizontalIcon,
+  GridIcon,
+  type IconComponent,
+  PenToolIcon,
+} from "./icons.js";
 
 export type ViewId = "glyph" | "font" | "spacing" | "features" | "proof";
 
-type Tab = { readonly id: ViewId; readonly label: string; readonly ready: boolean };
+type Tab = {
+  readonly id: ViewId;
+  readonly label: string;
+  readonly icon: IconComponent;
+  readonly ready: boolean;
+};
 
+/*
+ * Icon and label, never the icon alone. Five workspaces is few enough that the
+ * words fit, and a picture of a workspace is a thing you learn once and then
+ * recognise — which is worth having, and not worth paying for with a bar
+ * nobody can read on their first afternoon.
+ */
 const TABS: readonly Tab[] = [
-  { id: "font", label: "Font", ready: true },
-  { id: "glyph", label: "Glyph", ready: true },
-  { id: "spacing", label: "Spacing", ready: true },
-  { id: "features", label: "Features", ready: true },
-  { id: "proof", label: "Proof", ready: true },
+  { id: "font", label: "Font", icon: GridIcon, ready: true },
+  { id: "glyph", label: "Glyph", icon: PenToolIcon, ready: true },
+  { id: "spacing", label: "Spacing", icon: GapHorizontalIcon, ready: true },
+  { id: "features", label: "Features", icon: BracesIcon, ready: true },
+  { id: "proof", label: "Proof", icon: FileTextIcon, ready: true },
 ];
 
 /**
@@ -41,6 +60,7 @@ export function TabBar({
           title={tab.ready ? undefined : "Not built yet"}
           onClick={() => onSelect(tab.id)}
         >
+          <tab.icon />
           {tab.label}
           {tab.id === "glyph" && glyphName !== "" ? (
             <span className={styles.detail}>{glyphName}</span>

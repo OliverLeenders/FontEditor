@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
+import { FilePlusIcon, TriangleAlertIcon } from "./icons.js";
 
 /**
  * "New font", with the confirmation it needs.
@@ -52,6 +53,7 @@ export function NewFont(): React.JSX.Element {
             setAsking(true);
           }}
         >
+          <FilePlusIcon />
           {busy ? "Starting…" : "New font"}
         </button>
         {/* A write that failed must say so. The document on screen has already
@@ -68,7 +70,10 @@ export function NewFont(): React.JSX.Element {
 
   return (
     <div ref={ref} className={styles.confirm} role="group" aria-label="Discard this font?">
-      <span className={styles.note}>Discard this font?</span>
+      <span className={styles.note}>
+        <TriangleAlertIcon />
+        Discard this font?
+      </span>
       <button
         type="button"
         className={`${styles.button} ${styles.danger}`}

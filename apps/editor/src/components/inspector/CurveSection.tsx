@@ -16,6 +16,7 @@ import { useEffect, useRef } from "react";
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
 import { Stepper } from "../Stepper.js";
+import { SplineIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field, shown } from "./fields.js";
 
@@ -132,7 +133,7 @@ export function CurveSection(): React.JSX.Element {
           : "The handles of this segment do not make a proportion that can be typed";
 
   return (
-    <Section name="curve" title="Curve" relevant={curveStatus !== null}>
+    <Section name="curve" title="Curve" icon={SplineIcon} relevant={curveStatus !== null}>
       <Field label="Tension">
         <div className={styles.pair}>
           <Stepper

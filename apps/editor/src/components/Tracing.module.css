@@ -120,7 +120,7 @@
 }
 
 .broken {
-  color: var(--danger, #c2453d);
+  color: var(--danger);
 }
 
 .count {
@@ -156,7 +156,7 @@
   cursor: pointer;
 }
 .drop:hover:not(:disabled) {
-  color: var(--danger, #c2453d);
+  color: var(--danger);
 }
 .drop:disabled {
   opacity: 0.38;
@@ -171,6 +171,6 @@
 
 .error {
   margin: 0.45rem 0 0;
-  color: var(--danger, #c2453d);
+  color: var(--danger);
   font-size: 0.76rem;
 }

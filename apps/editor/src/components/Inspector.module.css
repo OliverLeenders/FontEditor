@@ -75,6 +75,20 @@
   cursor: grabbing;
 }
 
+/* The mark that says the header is a handle. Faint, because it is an
+   affordance rather than a control: it does nothing when pressed that the
+   header around it does not already do. */
+.gripMark {
+  display: inline-flex;
+  flex: none;
+  margin-left: -0.15rem;
+  color: var(--ink-3);
+}
+.gripMark svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
 .title {
   flex: 1;
   font-family: var(--font-mono);
@@ -94,6 +108,10 @@
   color: var(--ink-3);
   font-size: 0.9rem;
   line-height: 1;
+}
+.dock svg {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 .dock:hover {
   background: var(--surface-2);
@@ -115,6 +133,10 @@
   color: var(--ink-3);
   font-size: 0.95rem;
   line-height: 1;
+}
+.dismiss svg {
+  width: 0.95rem;
+  height: 0.95rem;
 }
 .dismiss:hover {
   background: var(--surface-2);
@@ -187,10 +209,14 @@
 }
 
 .chevron {
-  display: inline-block;
-  width: 0.6rem;
+  display: inline-flex;
+  flex: none;
   color: var(--ink-3);
   transition: transform 0.12s ease;
+}
+.chevron svg {
+  width: 0.8rem;
+  height: 0.8rem;
 }
 .chevron[data-open] {
   transform: rotate(90deg);
@@ -199,6 +225,18 @@
   .chevron {
     transition: none;
   }
+}
+
+/* What the section is about, at the size of the words beside it: the icon is
+   there to be recognised in passing, not to be looked at. */
+.sectionIcon {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-3);
+}
+.sectionIcon svg {
+  width: 0.88rem;
+  height: 0.88rem;
 }
 
 .sectionTitle {
@@ -317,6 +355,8 @@
 }
 
 .componentRemove {
+  display: grid;
+  place-items: center;
   flex: none;
   width: 1.15rem;
   height: 1.15rem;
@@ -328,8 +368,14 @@
   cursor: pointer;
   line-height: 1;
 }
+/* Small, because the row it ends is four fields wide and the button is the
+   least important thing in it — until it is the thing you want. */
+.componentRemove svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
 .componentRemove:hover {
-  color: var(--danger, #c2453d);
+  color: var(--danger);
   border-color: currentColor;
 }
 
@@ -356,7 +402,7 @@
   background: var(--canvas);
 }
 .name[data-invalid="true"] {
-  border-color: var(--warn, #b4791f);
+  border-color: var(--warn);
 }
 .name:disabled {
   color: var(--ink-2);

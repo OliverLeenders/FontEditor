@@ -116,6 +116,18 @@ describe("the check panel", () => {
     expect(row?.title).toMatch(/fill closed paths only/);
   });
 
+  it("says how bad a finding is in shape as well as in colour", () => {
+    openPanel(withAnOpenContour());
+    const row = screen.getByText("Contour left open").closest("li");
+
+    // The severity used to be a coloured dot and nothing else, which says
+    // nothing at all to a reader who cannot tell the three colours apart. The
+    // drawing carries it now, and the title says it in words.
+    const mark = row?.querySelector("[title]");
+    expect(mark?.getAttribute("title")).toMatch(/^A warning/);
+    expect(mark?.querySelector("svg")).toBeTruthy();
+  });
+
   it("keeps up with the font as it is edited", () => {
     const store = withAnOpenContour();
     openPanel(store);

@@ -9,6 +9,7 @@ import { begin, commit, editCurrentGlyph, result } from "@fonteditor/tools";
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
 import { Stepper } from "../Stepper.js";
+import { TypeIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field } from "./fields.js";
 
@@ -68,7 +69,7 @@ export function GlyphSection(): React.JSX.Element {
   };
 
   return (
-    <Section name="glyph" title="Glyph">
+    <Section name="glyph" title="Glyph" icon={TypeIcon}>
       <Field label="Unicode">
         <span className={styles.readonly}>
           {unicodes.length === 0

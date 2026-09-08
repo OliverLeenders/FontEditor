@@ -31,18 +31,28 @@
   color: var(--surface);
 }
 
-/* A fixed-width tick column, so labels line up whether or not they are checked. */
-.tick {
-  width: 0.9rem;
+/*
+ * One column before the words, holding either the item's own drawing or the
+ * tick that says a state is on.
+ *
+ * Fixed width, so the labels line up whether an item has a mark or not — the
+ * menu is read down its left edge, and a ragged one is read a line at a time.
+ */
+.mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
   flex: 0 0 auto;
-  text-align: center;
-  font-size: 0.72rem;
-  color: var(--accent);
+  color: var(--ink-3);
 }
-.item:hover .tick {
-  color: var(--surface);
+.mark svg {
+  width: 0.85rem;
+  height: 0.85rem;
 }
-
+.item:hover .mark {
+  color: inherit;
+}
 .separator {
   height: 1px;
   background: var(--rule);

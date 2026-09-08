@@ -41,6 +41,29 @@ import { useEffect, useRef } from "react";
 
 import type { EditorStore } from "../store/index.js";
 import styles from "./ContextMenu.module.css";
+import {
+  AnchorIcon,
+  CentreGlyphIcon,
+  CheckIcon,
+  CirclePlusIcon,
+  ComponentIcon,
+  DistributeCentreIcon,
+  ExternalLinkIcon,
+  GridIcon,
+  type IconComponent,
+  IterationCcwIcon,
+  LockIcon,
+  MaximizeIcon,
+  MinimizeIcon,
+  MinusIcon,
+  RulerIcon,
+  SelectAllIcon,
+  SplineIcon,
+  TrashIcon,
+  UngroupIcon,
+  WavesIcon,
+  WaypointsIcon,
+} from "./icons.js";
 
 export type MenuRequest = {
   /** Where the menu opens, in client coordinates. */
@@ -56,6 +79,15 @@ export type Item =
   | {
       readonly kind: "item";
       readonly label: string;
+      /**
+       * What the item does, as a drawing.
+       *
+       * A canvas menu is read under the pointer, in a hurry, while looking at
+       * the thing it is about. The shapes are what make that a glance rather
+       * than a read — and the column they sit in is the one the tick uses, so
+       * a checked item shows the tick instead. Nothing here needs both.
+       */
+      readonly icon?: IconComponent;
       readonly run: () => void;
       readonly checked?: boolean;
       /** Shown but not usable, for an action that is real here and not now. */
@@ -95,6 +127,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     {
       kind: "item",
       label: `Round selection${editor.selection.length === 0 ? "" : ` (${String(unroundedSelected(editor))})`}`,
+      icon: GridIcon,
       // Offered even with nothing out of place, so the menu does not change
       // shape between two glyphs that look the same.
       disabled: editor.selection.length === 0,
@@ -103,6 +136,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     {
       kind: "item",
       label: "Round this glyph",
+      icon: GridIcon,
       run: () => store.applyTool(roundGlyphAt(editor, editor.currentGlyph)),
     },
   ];
@@ -117,6 +151,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Select all points",
+        icon: SelectAllIcon,
         run: () => store.applyTool(selectAllPoints(editor)),
       },
       // Placed where the click was, which is the only thing "here" can mean —
@@ -125,6 +160,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: `Add anchor here (${freeAnchorName(editor.document.glyphs[editor.currentGlyph] ?? EMPTY_GLYPH)})`,
+        icon: AnchorIcon,
         run: () => store.applyTool(addAnchorAt(editor, request.point, ids)),
       },
       { kind: "separator" },
@@ -134,21 +170,25 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Guide across here",
+        icon: RulerIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 0, "glyph", ids)),
       },
       {
         kind: "item",
         label: "Guide up here",
+        icon: RulerIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 90, "glyph", ids)),
       },
       {
         kind: "item",
         label: "Guide across here, for the whole font",
+        icon: RulerIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 0, "font", ids)),
       },
       {
         kind: "item",
         label: "Guide up here, for the whole font",
+        icon: RulerIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 90, "font", ids)),
       },
       { kind: "separator" },
@@ -166,17 +206,20 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Select contour",
+        icon: SelectAllIcon,
         run: () => store.applyTool(selectContour(editor, contourId)),
       },
       { kind: "separator" },
       {
         kind: "item",
         label: "Corner",
+        icon: WaypointsIcon,
         run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
       },
       {
         kind: "item",
         label: "Smooth",
+        icon: WaypointsIcon,
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
       // Offered only where it would be true, which is the same rule the model
@@ -186,6 +229,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
             {
               kind: "item" as const,
               label: "Tangent",
+              icon: WaypointsIcon,
               run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
             },
           ]
@@ -198,6 +242,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
             {
               kind: "item" as const,
               label: "Harmonise",
+              icon: WavesIcon,
               run: () =>
                 store.applyTool(
                   harmoniseSelection({
@@ -217,6 +262,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       items.push({
         kind: "item",
         label: "Extract handles",
+        icon: MaximizeIcon,
         run: () => store.applyTool(extractHandles(editor, contourId, nodeId)),
       });
     }
@@ -225,6 +271,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Lock handles to axis",
+        icon: LockIcon,
         // Checked only when both are, since that is what this item sets. A node
         // with one handle locked shows unchecked, and using it locks the pair.
         checked: locked.in && locked.out,
@@ -237,11 +284,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Reverse contour",
+        icon: IterationCcwIcon,
         run: () => store.applyTool(reverseContourAt(editor, contourId)),
       },
       {
         kind: "item",
         label: "Delete point",
+        icon: TrashIcon,
         run: () => store.applyTool(deleteSelectedPoints(editor)),
       },
       { kind: "separator" },
@@ -258,12 +307,14 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Lock this handle to axis",
+        icon: LockIcon,
         checked: locked[part],
         run: () => store.applyTool(setNodeHvLock(editor, contourId, nodeId, part, !locked[part])),
       },
       {
         kind: "item",
         label: "Lock both handles to axis",
+        icon: LockIcon,
         checked: locked.in && locked.out,
         run: () =>
           store.applyTool(
@@ -274,17 +325,20 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Select contour",
+        icon: SelectAllIcon,
         run: () => store.applyTool(selectContour(editor, contourId)),
       },
       { kind: "separator" },
       {
         kind: "item",
         label: "Corner",
+        icon: WaypointsIcon,
         run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
       },
       {
         kind: "item",
         label: "Smooth",
+        icon: WaypointsIcon,
         run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
       },
       ...(nodeCanBeTangent(editor, contourId, nodeId)
@@ -292,6 +346,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
             {
               kind: "item" as const,
               label: "Tangent",
+              icon: WaypointsIcon,
               run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
             },
           ]
@@ -300,6 +355,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Retract handle",
+        icon: MinimizeIcon,
         run: () => store.applyTool(retractHandle(editor, contourId, nodeId, part)),
       },
     );
@@ -307,12 +363,14 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       items.push({
         kind: "item",
         label: "Extract handles",
+        icon: MaximizeIcon,
         run: () => store.applyTool(extractHandles(editor, contourId, nodeId)),
       });
     }
     items.push({
       kind: "item",
       label: "Reverse contour",
+      icon: IterationCcwIcon,
       run: () => store.applyTool(reverseContourAt(editor, contourId)),
     });
     return items;
@@ -329,6 +387,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: placed === undefined ? "Open glyph" : `Open ${placed.base}`,
+        icon: ExternalLinkIcon,
         disabled: placed === undefined,
         run: () => {
           if (placed !== undefined) store.setCurrentGlyph(placed.base);
@@ -337,6 +396,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Align to anchors",
+        icon: AnchorIcon,
         // Shown as unavailable rather than hidden: whether it applies is a fact
         // about the two glyphs — a letter with no `top`, an accent with no
         // `_top` — and worth being able to see the absence of.
@@ -347,11 +407,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Decompose glyph",
+        icon: UngroupIcon,
         run: () => store.applyTool(decomposeCurrentGlyph(editor, ids)),
       },
       {
         kind: "item",
         label: "Remove component",
+        icon: ComponentIcon,
         run: () => store.applyTool(removeComponent(editor, componentId)),
       },
     ];
@@ -364,6 +426,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Remove anchor",
+        icon: TrashIcon,
         run: () => store.applyTool(removeAnchorAt(editor, target.anchorId)),
       },
     ];
@@ -376,6 +439,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Centre glyph",
+        icon: CentreGlyphIcon,
         run: () => store.applyTool(centreCurrentGlyph(editor)),
       },
     ];
@@ -398,6 +462,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     {
       kind: "item",
       label: "Select contour",
+      icon: SelectAllIcon,
       run: () => store.applyTool(selectContour(editor, segment.contourId)),
     },
     { kind: "separator" },
@@ -424,6 +489,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       items.push({
         kind: "item",
         label: "Insert point here",
+        icon: CirclePlusIcon,
         run: () => store.applyTool(insertPointOnSegment(editor, segment, t, ids)),
       });
     }
@@ -432,6 +498,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
   items.push({
     kind: "item",
     label: isLine ? "Make curve" : "Make line",
+    icon: isLine ? SplineIcon : MinusIcon,
     run: () => store.applyTool(convertSegment(editor, segment, isLine ? "curve" : "line")),
   });
 
@@ -442,6 +509,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     items.push({
       kind: "item",
       label: "Extract handles",
+      icon: MaximizeIcon,
       run: () => store.applyTool(extractSegmentHandles(editor, segment)),
     });
   }
@@ -452,11 +520,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     {
       kind: "item",
       label: "Balance handles",
+      icon: DistributeCentreIcon,
       run: () => store.applyTool(balanceSegmentAt(editor, segment)),
     },
     {
       kind: "item",
       label: "Reverse contour",
+      icon: IterationCcwIcon,
       run: () => store.applyTool(reverseContourAt(editor, segment.contourId)),
     },
   );
@@ -542,8 +612,8 @@ export function Menu({
               onClose();
             }}
           >
-            <span className={styles.tick} aria-hidden="true">
-              {item.checked === true ? "✓" : ""}
+            <span className={styles.mark} aria-hidden="true">
+              <ItemMark item={item} />
             </span>
             {item.label}
           </button>
@@ -584,6 +654,7 @@ function guideItems(store: EditorStore, id: string): Item[] {
         found.scope === "glyph"
           ? "Give this guide to the whole font"
           : "Keep this guide in this glyph",
+      icon: RulerIcon,
       run: () =>
         store.applyTool(moveGuideToScope(editor, id, found.scope === "glyph" ? "font" : "glyph")),
     },
@@ -591,7 +662,22 @@ function guideItems(store: EditorStore, id: string): Item[] {
     {
       kind: "item",
       label: "Delete guide",
+      icon: TrashIcon,
       run: () => store.applyTool(removeGuideAt(editor, id)),
     },
   ];
+}
+
+/**
+ * What goes in the column before an item's words.
+ *
+ * The tick where the item is a state that is on, its own drawing otherwise, and
+ * nothing where it has neither — the column is kept in all three cases, so the
+ * labels line up down the menu.
+ */
+function ItemMark({ item }: { item: Item & { kind: "item" } }): React.JSX.Element | null {
+  if (item.checked === true) return <CheckIcon />;
+  if (item.icon === undefined) return null;
+  const Icon = item.icon;
+  return <Icon />;
 }

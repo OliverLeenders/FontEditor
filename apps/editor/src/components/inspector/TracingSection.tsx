@@ -2,6 +2,7 @@ import { fitImageToGlyph, moveImageTo, scaleImageTo } from "@fonteditor/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { ImageIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field, shown } from "./fields.js";
 
@@ -33,7 +34,7 @@ export function TracingSection(): React.JSX.Element | null {
   if (image === null) return null;
 
   return (
-    <Section name="tracing" title="Tracing">
+    <Section name="tracing" title="Tracing" icon={ImageIcon}>
       <Field label="Image">
         <div className={styles.imageRow}>
           <span className={styles.imageName} title={image.name}>

@@ -16,8 +16,16 @@
   color: var(--ink-2);
   border-bottom: 2px solid transparent;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.4rem;
+}
+
+/* A step under the label, and in the label's own colour, so the pair reads as
+   one thing rather than as a picture with a caption. */
+.tab svg {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
 }
 .tab:hover:not(:disabled) {
   color: var(--ink);

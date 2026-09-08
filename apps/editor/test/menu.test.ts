@@ -210,3 +210,33 @@ describe("context menu", () => {
     expect([...first()].sort()).toEqual([...before].sort());
   });
 });
+
+describe("what the menu shows beside its words", () => {
+  it("gives every action a drawing, or the tick column its own space", () => {
+    const store = new EditorStore();
+    const glyph = store.editor.document.glyphs[store.editor.currentGlyph]!;
+    const contour = glyph.contours[0]!;
+    const node = contour.nodes[0]!;
+
+    const items = itemsFor(store, {
+      x: 0,
+      y: 0,
+      target: {
+        kind: "node",
+        contourId: contour.id,
+        nodeId: node.id,
+        point: node.pt,
+      } as never,
+      point: node.pt,
+    }).filter((item) => item.kind === "item");
+
+    // Not every item has one — a state that is only ever ticked does not need a
+    // drawing as well — but the ones that do the work of the menu do.
+    const drawn = items.filter((item) => item.kind === "item" && item.icon !== undefined);
+    expect(drawn.length).toBeGreaterThan(items.length / 2);
+    expect(items.find((i) => i.kind === "item" && i.label === "Delete point")).toBeTruthy();
+    expect(
+      items.find((i) => i.kind === "item" && i.label === "Delete point" && i.icon !== undefined),
+    ).toBeTruthy();
+  });
+});

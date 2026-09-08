@@ -3,7 +3,18 @@ import { shownMeasurement } from "@fonteditor/tools";
 
 import { useStoreValue } from "../useStore.js";
 import styles from "./StatusBar.module.css";
+import type { AutosaveStatus } from "@fonteditor/storage";
+
+import type { StorageState } from "../store/index.js";
 import type { ViewId } from "./TabBar.js";
+import {
+  CircleCheckIcon,
+  CloudOffIcon,
+  HistoryIcon,
+  KeyboardIcon,
+  LoaderCircleIcon,
+  TriangleAlertIcon,
+} from "./icons.js";
 
 /**
  * A quiet line of facts: what is selected, what is saved, what went wrong.
@@ -71,13 +82,28 @@ export function StatusBar({ workspace }: { workspace: ViewId }): React.JSX.Eleme
           {pinned ? " · pinned" : null}
         </span>
       )}
+      {/* Saving is the one fact on this line somebody looks for rather than
+          reads, so it is a shape before it is a word. */}
       <span
-        className={storage === "unavailable" || saveStatus === "failed" ? styles.warn : undefined}
+        className={`${styles.state} ${
+          storage === "unavailable" || saveStatus === "failed" ? styles.warn : ""
+        }`}
       >
+        <SaveMark storage={storage} saveStatus={saveStatus} />
         {saved}
       </span>
-      {recovered ? <span className={styles.warn}>recovered unsaved work</span> : null}
-      <span className={styles.hints}>{HINTS[workspace]}</span>
+      {recovered ? (
+        <span className={`${styles.state} ${styles.warn}`}>
+          <HistoryIcon />
+          recovered unsaved work
+        </span>
+      ) : null}
+      <span className={styles.hints}>
+        {HINTS[workspace] === "" ? null : <KeyboardIcon />}
+        {/* The words in their own box, because a flex row cannot put an
+            ellipsis on a bare run of text. */}
+        <span className={styles.hintText}>{HINTS[workspace]}</span>
+      </span>
     </div>
   );
 }
@@ -96,3 +122,23 @@ const HINTS: Record<ViewId, string> = {
   features: "",
   proof: "",
 };
+
+/**
+ * The saving state, drawn.
+ *
+ * Four states and four shapes: nothing is being kept, something is on its way,
+ * something failed, everything is where it should be. The word beside it says
+ * which, and this says at a glance whether to care.
+ */
+function SaveMark({
+  storage,
+  saveStatus,
+}: {
+  storage: StorageState;
+  saveStatus: AutosaveStatus;
+}): React.JSX.Element {
+  if (storage === "unavailable") return <CloudOffIcon />;
+  if (storage === "connecting" || saveStatus === "saving") return <LoaderCircleIcon />;
+  if (saveStatus === "failed") return <TriangleAlertIcon />;
+  return <CircleCheckIcon />;
+}

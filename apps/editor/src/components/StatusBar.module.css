@@ -20,8 +20,32 @@
   color: var(--warn);
 }
 
+/*
+ * A fact with a mark in front of it.
+ *
+ * The icons here are the size of the type they sit with, and take its colour —
+ * which is what makes a warning read as one line rather than as a coloured
+ * picture beside grey words.
+ */
+.state,
+.hints {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.state svg,
+.hints svg {
+  flex: none;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
 .hints {
   margin-left: auto;
+  min-width: 0;
+}
+
+.hintText {
   overflow: hidden;
   text-overflow: ellipsis;
 }

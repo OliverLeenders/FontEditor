@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
+import { UploadIcon } from "./icons.js";
 
 /**
  * What the picker offers: the binary formats, a zipped UFO, and a family.
@@ -97,6 +98,7 @@ export function OpenFont(): React.JSX.Element {
         title={reading ? "Another tab is saving this project" : undefined}
         onClick={() => inputRef.current?.click()}
       >
+        <UploadIcon />
         {status.kind === "reading" ? "Reading…" : "Open font…"}
       </button>
       <Message status={status} />

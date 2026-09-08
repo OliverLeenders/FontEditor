@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Preflight.module.css";
 import open from "./OpenFont.module.css";
+import { CircleAlertIcon, InfoIcon, ShieldCheckIcon, TriangleAlertIcon } from "./icons.js";
 
 /**
  * Everything wrong with the font, and the way to each of them.
@@ -94,6 +95,7 @@ export function Preflight(): React.JSX.Element {
         title="Everything findable about this font before it is exported"
         onClick={() => setOpen(!open_)}
       >
+        <ShieldCheckIcon />
         Check font
       </button>
 
@@ -112,7 +114,15 @@ export function Preflight(): React.JSX.Element {
             <ul className={styles.list}>
               {findings.map((f, i) => (
                 <li key={`${f.check}-${String(f.glyph)}-${String(i)}`} className={styles.row}>
-                  <span className={`${styles.dot} ${styles[f.severity]}`} aria-hidden />
+                  {/* Shape as well as colour. A dot told a colourblind reader
+                      nothing the heading did not already say, and the three
+                      severities are three different drawings now. */}
+                  <span
+                    className={`${styles.mark} ${styles[f.severity]}`}
+                    title={SEVERITIES[f.severity]}
+                  >
+                    <SeverityIcon severity={f.severity} />
+                  </span>
                   <button
                     type="button"
                     className={styles.what}
@@ -146,3 +156,24 @@ function summary(counted: Record<Severity, number>): string {
 }
 
 const s = (n: number): string => (n === 1 ? "" : "s");
+
+/**
+ * The three severities, drawn.
+ *
+ * An error stops the font being what it says it is; a warning is something that
+ * compiles and is probably not what anybody meant; a note is worth knowing. The
+ * shapes are the ones every interface uses for those three, so nobody has to
+ * learn them here.
+ */
+function SeverityIcon({ severity }: { severity: Severity }): React.JSX.Element {
+  if (severity === "error") return <CircleAlertIcon />;
+  if (severity === "warning") return <TriangleAlertIcon />;
+  return <InfoIcon />;
+}
+
+/** What each mark means, for the pointer that stops on one. */
+const SEVERITIES: Record<Severity, string> = {
+  error: "An error: this will not come out as a font that says what it means",
+  warning: "A warning: this compiles, and is probably not what was meant",
+  note: "A note: worth knowing before this goes out",
+};

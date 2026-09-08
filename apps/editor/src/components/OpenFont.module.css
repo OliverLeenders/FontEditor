@@ -19,7 +19,18 @@
   display: none;
 }
 
+/*
+ * The bar button, which a dozen panels share.
+ *
+ * A row rather than a block, because most of these now carry a drawing in
+ * front of the word — the icon says what kind of thing this is at a glance and
+ * the word says which one, and neither does the other's job. Sized to stand
+ * with the label rather than over it.
+ */
 .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
   flex: none;
   padding: 0.28rem 0.6rem;
   border: 1px solid var(--rule-strong);
@@ -30,6 +41,15 @@
   font: inherit;
   font-size: 0.78rem;
 }
+.button svg {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--ink-2);
+}
+.button:hover:not(:disabled) svg {
+  color: inherit;
+}
 .button:hover:not(:disabled) {
   border-color: var(--accent);
 }
@@ -38,7 +58,11 @@
   cursor: default;
 }
 
+/* A message beside the buttons, which sometimes carries a warning mark. */
 .note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -46,8 +70,15 @@
   color: var(--ink-2);
 }
 
+.note svg {
+  flex: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  color: var(--warn);
+}
+
 .warn {
-  color: var(--warn, #b4791f);
+  color: var(--warn);
 }
 
 .error {
@@ -55,7 +86,7 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   font-size: 0.76rem;
-  color: var(--danger, #c2453d);
+  color: var(--danger);
 }
 
 /* Shared with NewFont: the two live side by side in the browser's bar and must
@@ -68,11 +99,11 @@
 }
 
 .danger {
-  border-color: var(--danger, #c2453d);
-  color: var(--danger, #c2453d);
+  border-color: var(--danger);
+  color: var(--danger);
 }
 .danger:hover:not(:disabled) {
-  border-color: var(--danger, #c2453d);
+  border-color: var(--danger);
 }
 
 /* Narrow: a glyph name is short, and the search box beside it wants the room. */

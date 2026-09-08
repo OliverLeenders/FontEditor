@@ -2,6 +2,7 @@ import { moveAnchorToPoint, removeAnchorAt, renameAnchorTo } from "@fonteditor/t
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { AnchorIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
 
@@ -43,6 +44,7 @@ export function AnchorsSection(): React.JSX.Element {
   return (
     <Section
       name="anchors"
+      icon={AnchorIcon}
       title="Anchors"
       note={anchors.length === 0 ? undefined : String(anchors.length)}
       relevant={anchors.length > 0}
@@ -88,7 +90,7 @@ export function AnchorsSection(): React.JSX.Element {
               aria-label={`Remove the anchor ${a.name}`}
               onClick={() => store.applyTool(removeAnchorAt(store.editor, a.id))}
             >
-              ×
+              <TrashIcon />
             </button>
           </div>
         ))}

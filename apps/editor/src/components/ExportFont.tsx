@@ -11,6 +11,7 @@ import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
+import { DownloadIcon } from "./icons.js";
 
 type Status =
   | { readonly kind: "idle" }
@@ -163,6 +164,7 @@ export function ExportFont(): React.JSX.Element {
         title="Build an OTF you can install — outlines and metrics only"
         onClick={otf}
       >
+        <DownloadIcon />
         Export OTF
       </button>
       <button
@@ -172,6 +174,7 @@ export function ExportFont(): React.JSX.Element {
         title="The same font with quadratic outlines — what hinting and most web pipelines want"
         onClick={truetype}
       >
+        <DownloadIcon />
         Export TTF
       </button>
       <button
@@ -181,6 +184,7 @@ export function ExportFont(): React.JSX.Element {
         title="Write a UFO source folder, zipped — nothing this editor models is lost"
         onClick={ufo}
       >
+        <DownloadIcon />
         Export UFO
       </button>
       {/* Only where there is a family to write. A designspace with one source
@@ -195,6 +199,7 @@ export function ExportFont(): React.JSX.Element {
             title="Write every master as its own UFO, with the designspace that ties them together"
             onClick={family}
           >
+            <DownloadIcon />
             Export family
           </button>
           <button
@@ -208,6 +213,7 @@ export function ExportFont(): React.JSX.Element {
             }
             onClick={variable}
           >
+            <DownloadIcon />
             Export variable
           </button>
         </>
