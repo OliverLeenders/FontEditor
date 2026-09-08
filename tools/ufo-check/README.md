@@ -23,9 +23,14 @@ reason there is a directory of Python in a TypeScript repository.
 2. `check_ufo.py` reads it with validation turned on everywhere it can be, cross-checks
    that kerning and groups refer to glyphs that exist, and compiles `features.fea` with
    `feaLib`.
-3. `rewrite_ufo.py` has fontTools write the whole font back out in its own hand and zip
+3. `check_family.py` does the same for a family: `designspaceLib` reads the
+   designspace this editor writes, every source has to resolve to a UFO beside
+   it, every location has to name an axis by the name the file declares, and
+   each UFO has to say on its own which style it is — a UFO is opened without
+   its designspace all the time.
+4. `rewrite_ufo.py` has fontTools write the whole font back out in its own hand and zip
    it — deflated, which our own exports never are.
-4. `proof-ufo.test.ts` reads that archive back and asserts the font is unchanged: the
+5. `proof-ufo.test.ts` reads that archive back and asserts the font is unchanged: the
    metrics, the glyph order, every advance and contour, the components, the groups, what
    each kern pair actually does, and the features.
 

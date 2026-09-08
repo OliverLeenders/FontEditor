@@ -430,3 +430,16 @@ export function looksLikeUfo(fileName: string): boolean {
   const lower = fileName.toLowerCase();
   return lower.endsWith(".ufo.zip") || lower.endsWith(".ufoz") || lower.endsWith(".ufo");
 }
+
+/**
+ * Whether a file is worth opening as an archive at all.
+ *
+ * Wider than {@link looksLikeUfo}, because a family is a zip of UFOs beside a
+ * designspace and its name says nothing about that. Being wrong is cheap: the
+ * archive is read, found not to hold a font, and the binary reader is asked
+ * instead — where being wrong the other way means telling somebody their family
+ * is an unsupported OpenType signature.
+ */
+export function looksLikeArchive(fileName: string): boolean {
+  return looksLikeUfo(fileName) || fileName.toLowerCase().endsWith(".zip");
+}

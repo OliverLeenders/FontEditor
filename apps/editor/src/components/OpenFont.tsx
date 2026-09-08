@@ -4,12 +4,16 @@ import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
 
 /**
- * What the picker offers: the binary formats, and a zipped UFO.
+ * What the picker offers: the binary formats, a zipped UFO, and a family.
  *
- * `.zip` has to be in the list for a UFO to be selectable at all, which does
- * mean the picker will show archives that are not fonts. The alternative is a
- * second button for one format, and a wrong file is answered immediately by the
- * reader rather than being a state anyone gets stuck in.
+ * `.zip` has to be in the list for either of the last two to be selectable at
+ * all, which does mean the picker will show archives that are not fonts. The
+ * alternative is a button per format, and a wrong file is answered immediately
+ * by the reader rather than being a state anyone gets stuck in.
+ *
+ * A family is a zip like any other and is told apart by what is inside it: a
+ * `.designspace` beside the UFOs. So there is nothing to add here, and nothing
+ * for somebody to pick wrongly.
  */
 const ACCEPT = ".ttf,.otf,.woff,.ufoz,.zip,font/ttf,font/otf,font/woff";
 

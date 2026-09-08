@@ -1,4 +1,4 @@
-import { exportFileName, exportFont, exportUfo } from "@fonteditor/font-io";
+import { exportFamily, exportFileName, exportFont, exportUfo } from "@fonteditor/font-io";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -22,6 +22,7 @@ type Status =
 export function ExportFont(): React.JSX.Element {
   const store = useEditorStore();
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
+  const masters = useStoreValue((s) => s.project.masters.length);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   /**
@@ -73,6 +74,21 @@ export function ExportFont(): React.JSX.Element {
       return { file, warnings };
     });
 
+  /**
+   * The whole family: a UFO per master and the designspace beside them.
+   *
+   * What fontmake is given, and what makes a design drawn here buildable by
+   * something else. Asynchronous because the masters that are not open live on
+   * disk and have to be read in.
+   */
+  const family = (): void =>
+    void attemptAsync(async () => {
+      const masters = await store.allMasters();
+      const { bytes, fileName, files } = exportFamily(store.getState().project.axes, masters);
+      download(bytes.slice().buffer, fileName, "application/zip");
+      return { file: `${fileName} · ${String(files)} files`, warnings: [] };
+    });
+
   const ufo = (): void =>
     void attemptAsync(async () => {
       const document = store.editor.document;
@@ -108,6 +124,20 @@ export function ExportFont(): React.JSX.Element {
       >
         Export UFO
       </button>
+      {/* Only where there is a family to write. A designspace with one source
+          is a legal file and a pointless one, and a button that made one would
+          be a button that does nothing anybody wanted. */}
+      {masters > 1 ? (
+        <button
+          type="button"
+          className={styles.button}
+          disabled={glyphCount === 0}
+          title="Write every master as its own UFO, with the designspace that ties them together"
+          onClick={family}
+        >
+          Export family
+        </button>
+      ) : null}
       {status.kind === "done" ? (
         <span className={styles.note}>
           {status.file}

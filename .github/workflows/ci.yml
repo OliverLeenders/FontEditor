@@ -97,6 +97,15 @@ jobs:
       - name: Read back what fontTools wrote
         run: FOREIGN_UFO="$RUNNER_TEMP/ufo/FromFontTools.ufo.zip" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
 
+      - name: Export the proof family
+        run: FAMILY_OUT="$RUNNER_TEMP/family" pnpm --filter @fonteditor/font-io exec vitest run family
+
+      # A designspace is a document about files, and the failure it makes
+      # possible — naming a UFO that is not beside it — is invisible to anything
+      # that only reads what we wrote.
+      - name: Read it with fontTools
+        run: python tools/ufo-check/check_family.py "$RUNNER_TEMP/family/Chalk.designspace"
+
       - name: Export the mark-attachment proof font
         run: OTF_OUT="$RUNNER_TEMP/otf" pnpm --filter @fonteditor/font-io exec vitest run proof-otf
 

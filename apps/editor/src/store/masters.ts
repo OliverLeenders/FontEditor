@@ -155,6 +155,54 @@ export async function startFresh(host: FontHost, document: FontDocument): Promis
 }
 
 /**
+ * Take on a whole family: the axes, and a master per source.
+ *
+ * The first master goes on screen and into the ordinary layout; the rest are
+ * parked, which is where masters that are not being drawn live. Ids are made
+ * here rather than read from the file — a designspace names its sources by
+ * filename, and a filename is a thing people change.
+ */
+export async function adoptFamily(
+  host: FontHost,
+  family: {
+    readonly axes: readonly Axis[];
+    readonly masters: readonly {
+      readonly name: string;
+      readonly location: Location;
+      readonly document: FontDocument;
+      readonly images: ReadonlyMap<string, Uint8Array>;
+    }[];
+  },
+): Promise<void> {
+  for (const m of host.state().project.masters) await host.disk.dropMaster(m.id);
+
+  const stamp = Date.now();
+  const masters = family.masters.map((m, i) => ({
+    id: `master-${String(stamp)}-${String(i)}`,
+    name: m.name,
+    location: m.location,
+  }));
+
+  const first = masters[0];
+  const opened = family.masters[0];
+  if (first === undefined || opened === undefined) return;
+
+  const next = {
+    axes: family.axes,
+    masters,
+    sources: { [first.id]: opened.document },
+    current: first.id,
+  };
+  host.patch({ project: next });
+
+  for (const [i, m] of masters.entries()) {
+    const source = family.masters[i];
+    if (source !== undefined) await host.disk.putMaster(m.id, source.document);
+  }
+  await rememberDesignspace(host, next);
+}
+
+/**
  * The project a stored designspace describes, around the document just loaded.
  *
  * The document is the master that was open when the tab last closed, so it goes

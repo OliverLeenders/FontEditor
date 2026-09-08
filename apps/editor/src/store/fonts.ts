@@ -1,7 +1,16 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import type { DiskFolder } from "@fonteditor/disk";
 import { session as newSession } from "@fonteditor/edit-core";
-import { importFont as parseFontFile, importUfo, looksLikeUfo } from "@fonteditor/font-io";
+import {
+  type FamilyImport,
+  importFont as parseFontFile,
+  importUfo,
+  looksLikeArchive,
+  looksLikeFamily,
+  looksLikeUfo,
+  readFamily,
+  unzip,
+} from "@fonteditor/font-io";
 import {
   type FontDocument,
   type GlyphName,
@@ -13,7 +22,7 @@ import {
 import { editorState } from "@fonteditor/tools";
 
 import type { Persistence } from "../persistence.js";
-import { startFresh } from "./masters.js";
+import { adoptFamily, startFresh } from "./masters.js";
 import type { StoreHost } from "./state.js";
 
 /**
@@ -78,6 +87,14 @@ export async function importFont(
   bytes: ArrayBuffer,
   fileName = "",
 ): Promise<ImportReport> {
+  // A family is a zip too, and looks like one until it is opened: the
+  // difference is a `.designspace` inside, so the archive is read once and
+  // asked rather than guessed at from the name.
+  if (looksLikeArchive(fileName)) {
+    const family = await readFamilyFrom(bytes);
+    if (family !== null) return await adoptFamilyFrom(host, family);
+  }
+
   const read = looksLikeUfo(fileName)
     ? await readUfo(bytes)
     : (() => {
@@ -99,6 +116,51 @@ export async function importFont(
     family: `${info.familyName} ${info.styleName}`.trim(),
     glyphs: glyphOrder.length,
     warnings: read.warnings,
+  };
+}
+
+/**
+ * A family, if this archive is one.
+ *
+ * `null` for an ordinary UFO, which is the common case and not a failure: the
+ * caller goes on to read it as one font.
+ */
+async function readFamilyFrom(bytes: ArrayBuffer): Promise<FamilyImport | null> {
+  const files = await unzip(bytes);
+  if (!Array.isArray(files) || !looksLikeFamily(files)) return null;
+
+  const read = readFamily(files, randomIds());
+  // A designspace that cannot be read is reported rather than quietly opened as
+  // whichever UFO happens to be first in the archive.
+  if ("reason" in read) throw new Error(read.reason);
+  return read;
+}
+
+/** Put a family on screen: the first master open, the rest parked. */
+async function adoptFamilyFrom(host: FontHost, family: FamilyImport): Promise<ImportReport> {
+  const first = family.masters[0];
+  if (first === undefined) throw new Error("the family has no masters");
+
+  await host.keepSnapshot();
+  showDocument(host, first.document, false);
+  host.setCatalogQuery(DEFAULT_QUERY);
+  host.setFolder(null);
+  await host.disk.replaceAll(first.document);
+
+  await adoptFamily(host, family);
+  // Every master's pictures, all into the one store: an image belongs to the
+  // font rather than to a master, and two masters tracing the same sheet name
+  // the same file.
+  for (const m of family.masters) await adoptImages(host, m.images);
+
+  const { info } = first.document;
+  return {
+    family: `${info.familyName} ${info.styleName}`.trim(),
+    glyphs: first.document.glyphOrder.length,
+    warnings: [
+      `${String(family.masters.length)} masters: ${family.masters.map((m) => m.name).join(", ")}`,
+      ...family.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
+    ],
   };
 }
 

@@ -26,7 +26,7 @@ import {
   result,
   setActiveTool,
 } from "@fonteditor/tools";
-import type { Axis } from "@fonteditor/font-model";
+import { type Axis, orderedMasters } from "@fonteditor/font-model";
 import type { ViewTransform } from "@fonteditor/view";
 import type { DiskFolder } from "@fonteditor/disk";
 
@@ -474,6 +474,24 @@ export class EditorStore {
     }
     await loadSources(this.host);
     this.patch({ preview: location });
+  }
+
+  /**
+   * Every master's document, for an export that has to carry them all.
+   *
+   * The parked ones are read in on the way, and the open one is what is on the
+   * screen rather than what was last parked.
+   */
+  async allMasters(): Promise<
+    { name: string; location: Record<string, number>; document: FontDocument }[]
+  > {
+    await loadSources(this.host);
+    const project = this.state.project;
+
+    return orderedMasters(project).flatMap((m) => {
+      const document = m.id === project.current ? this.editor.document : project.sources[m.id];
+      return document === undefined ? [] : [{ name: m.name, location: m.location, document }];
+    });
   }
 
   /** What cannot be interpolated between this master and another. */

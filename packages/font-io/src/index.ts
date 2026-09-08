@@ -40,7 +40,7 @@ export type { ImportResult, ImportWarning } from "./import.js";
 export { documentFrom, importFont } from "./import.js";
 
 export type { UfoImport, UfoImportError, UfoWarning } from "./ufo-import.js";
-export { importUfo, looksLikeUfo, readUfo } from "./ufo-import.js";
+export { importUfo, looksLikeArchive, looksLikeUfo, readUfo } from "./ufo-import.js";
 export type { ZipFile } from "./unzip.js";
 export { fileText, unzip } from "./unzip.js";
 
@@ -60,3 +60,9 @@ export {
   shaperFor,
   shaperForParsed,
 } from "./shaping.js";
+
+export type { Designspace, Source } from "./designspace.js";
+export { designspaceFileName, designspaceXml, parseDesignspace } from "./designspace.js";
+
+export type { FamilyExport, FamilyImport, FamilyMaster, FamilyProblem } from "./family.js";
+export { exportFamily, familyFiles, looksLikeFamily, readFamily } from "./family.js";
