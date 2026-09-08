@@ -253,7 +253,7 @@ export function App(): React.JSX.Element {
           <GlyphStrip />
         </>
       )}
-      <StatusBar workspace={view === "glyph" ? "glyph" : "font"} />
+      <StatusBar workspace={view} />
     </div>
   );
 }
