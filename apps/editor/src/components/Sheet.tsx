@@ -1,10 +1,11 @@
 import { placeImageByCrop, shownImageCrop } from "@fonteditor/tools";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { glyphsTracing } from "../store/images.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
-import open from "./OpenFont.module.css";
+import { BarMenu } from "./BarMenu.js";
 import styles from "./Sheet.module.css";
+import { CropIcon } from "./icons.js";
 
 /**
  * The picture whole, with a rectangle round each letter that has been found in
@@ -28,7 +29,6 @@ export function Sheet(): React.JSX.Element | null {
     (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.image ?? null,
   );
 
-  const [open_, setOpen] = useState(false);
   const [drag, setDrag] = useState<{ from: Point; to: Point } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -51,17 +51,6 @@ export function Sheet(): React.JSX.Element | null {
       return crop === null ? [] : [{ name, crop }];
     });
   }, [editor, image]);
-
-  useEffect(() => {
-    if (!open_) return;
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open_]);
 
   if (image === null) return null;
 
@@ -105,26 +94,25 @@ export function Sheet(): React.JSX.Element | null {
   };
 
   return (
-    <div className={styles.holder}>
-      <button
-        type="button"
-        className={open.button}
-        aria-expanded={open_}
-        title="See the whole picture, and draw a box round this letter in it"
-        onClick={() => setOpen(!open_)}
-      >
-        Sheet
-      </button>
-
-      {open_ ? (
-        <div className={styles.panel} role="group" aria-label="The picture whole">
+    <BarMenu
+      label="Sheet"
+      icon={CropIcon}
+      title="See the whole picture, and draw a box round this letter in it"
+      panelClassName={styles.panel}
+      panelLabel="The picture whole"
+      // A box is drawn in here by dragging, and a drag that ends outside the
+      // panel must not be read as leaving it.
+      closeOnOutside={false}
+    >
+      {(close) => (
+        <>
           <div className={styles.head}>
             <span>{image.name}</span>
             <span className={styles.hint}>
               Drag a box round {glyph}
               {decoded === null ? " · reading the picture…" : ""}
             </span>
-            <button type="button" className={styles.close} onClick={() => setOpen(false)}>
+            <button type="button" className={styles.close} onClick={close}>
               Done
             </button>
           </div>
@@ -184,9 +172,9 @@ export function Sheet(): React.JSX.Element | null {
               </>
             )}
           </div>
-        </div>
-      ) : null}
-    </div>
+        </>
+      )}
+    </BarMenu>
   );
 }
 

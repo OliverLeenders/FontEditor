@@ -41,16 +41,15 @@ import { useEffect, useRef } from "react";
 
 import type { EditorStore } from "../store/index.js";
 import styles from "./ContextMenu.module.css";
+import { type Item, MenuItems } from "./MenuItems.js";
 import {
   AnchorIcon,
   CentreGlyphIcon,
-  CheckIcon,
   CirclePlusIcon,
   ComponentIcon,
   DistributeCentreIcon,
   ExternalLinkIcon,
   GridIcon,
-  type IconComponent,
   IterationCcwIcon,
   LockIcon,
   MaximizeIcon,
@@ -75,25 +74,14 @@ export type MenuRequest = {
   readonly point: { x: number; y: number };
 };
 
-export type Item =
-  | {
-      readonly kind: "item";
-      readonly label: string;
-      /**
-       * What the item does, as a drawing.
-       *
-       * A canvas menu is read under the pointer, in a hurry, while looking at
-       * the thing it is about. The shapes are what make that a glance rather
-       * than a read — and the column they sit in is the one the tick uses, so
-       * a checked item shows the tick instead. Nothing here needs both.
-       */
-      readonly icon?: IconComponent;
-      readonly run: () => void;
-      readonly checked?: boolean;
-      /** Shown but not usable, for an action that is real here and not now. */
-      readonly disabled?: boolean;
-    }
-  | { readonly kind: "separator" };
+/**
+ * What a menu is made of, shared with the bar menus.
+ *
+ * Re-exported rather than moved out of sight: `itemsFor` below builds these,
+ * and a caller reading this file should not have to go looking for the shape
+ * of what it returns.
+ */
+export type { Item };
 
 /** New points from the menu need ids; the app owns the factory. */
 const ids = randomIds();
@@ -596,29 +584,7 @@ export function Menu({
       style={{ left: `${String(x)}px`, top: `${String(y)}px` }}
       role="menu"
     >
-      {items.map((item, index) =>
-        item.kind === "separator" ? (
-          <div key={`sep-${String(index)}`} className={styles.separator} role="separator" />
-        ) : (
-          <button
-            key={item.label}
-            type="button"
-            role="menuitemcheckbox"
-            aria-checked={item.checked ?? false}
-            disabled={item.disabled ?? false}
-            className={styles.item}
-            onClick={() => {
-              item.run();
-              onClose();
-            }}
-          >
-            <span className={styles.mark} aria-hidden="true">
-              <ItemMark item={item} />
-            </span>
-            {item.label}
-          </button>
-        ),
-      )}
+      <MenuItems items={items} onChose={onClose} />
     </div>
   );
 }
@@ -666,18 +632,4 @@ function guideItems(store: EditorStore, id: string): Item[] {
       run: () => store.applyTool(removeGuideAt(editor, id)),
     },
   ];
-}
-
-/**
- * What goes in the column before an item's words.
- *
- * The tick where the item is a state that is on, its own drawing otherwise, and
- * nothing where it has neither — the column is kept in all three cases, so the
- * labels line up down the menu.
- */
-function ItemMark({ item }: { item: Item & { kind: "item" } }): React.JSX.Element | null {
-  if (item.checked === true) return <CheckIcon />;
-  if (item.icon === undefined) return null;
-  const Icon = item.icon;
-  return <Icon />;
 }

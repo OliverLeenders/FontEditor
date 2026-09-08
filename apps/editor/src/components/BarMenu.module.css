@@ -1,0 +1,84 @@
+/*
+ * The button in the bar, and what opens under it.
+ *
+ * The panels each keep their own stylesheet, because each one is a different
+ * shape — a list of masters is not a metadata form. What is here is what they
+ * all share: the box the panel is positioned against, and the little mark that
+ * says pressing this opens something rather than doing something.
+ */
+.holder {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* The default panel, for anything that has not asked for its own width. */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 20;
+  min-width: 13rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+/*
+ * A menu, which is the same drawing as the canvas menu: rows of an icon and a
+ * label, in one column, on the surface colour.
+ */
+.menu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 12rem;
+  padding: 0.2rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+/*
+ * The disclosure mark: a triangle, drawn rather than typed, so it keeps its
+ * size when the label does not and needs no glyph from the reader's fonts.
+ */
+.caret {
+  width: 0;
+  height: 0;
+  margin-left: 0.1rem;
+  border-left: 0.22rem solid transparent;
+  border-right: 0.22rem solid transparent;
+  border-top: 0.26rem solid currentColor;
+  opacity: 0.55;
+}
+
+/*
+ * What a menu says about itself at the bottom: which folder the font is in,
+ * when it was last written. Not an action, so it is not a row.
+ */
+.footer {
+  margin: 0.35rem 0.15rem 0.1rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ink-3);
+}
+
+.footer strong {
+  display: block;
+  font-weight: 500;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

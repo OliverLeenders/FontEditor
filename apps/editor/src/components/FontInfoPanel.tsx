@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FontInfoPanel.module.css";
-import shared from "./OpenFont.module.css";
+import { BarMenu } from "./BarMenu.js";
 import { InfoIcon } from "./icons.js";
 import { Stepper } from "./Stepper.js";
 
@@ -183,63 +183,28 @@ export function FontInfoPanel(): React.JSX.Element {
   const store = useEditorStore();
   const info = useStoreValue((s) => s.session.editor.document.info);
   const reading = useStoreValue((s) => s.ownership === "reading");
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onDown = (event: MouseEvent): void => {
-      if (ref.current !== null && !ref.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== "Escape") return;
-      // Not while a field has it. This listener is on the window and in the
-      // capture phase, so it runs before the field's own handler and would
-      // close the panel out from under an edit somebody was abandoning — which
-      // is two things happening for one key.
-      const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) return;
-      setOpen(false);
-    };
-    window.addEventListener("pointerdown", onDown, true);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("pointerdown", onDown, true);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open]);
 
   return (
-    <div className={styles.holder}>
-      <button
-        type="button"
-        className={shared.button}
-        aria-expanded={open}
-        disabled={reading}
-        title={reading ? "Another tab is saving this project" : "Name, em and vertical metrics"}
-        onClick={() => setOpen((was) => !was)}
-      >
-        <InfoIcon />
-        Font info
-      </button>
-
-      {open ? (
-        <div ref={ref} className={styles.panel} role="group" aria-label="Font info">
-          {SECTIONS.map((section) => (
-            <section key={section.title} className={styles.section}>
-              <h3 className={styles.heading}>{section.title}</h3>
-              {section.fields.map((field) => (
-                <Field key={field.key} field={field} info={info} store={store} />
-              ))}
-            </section>
+    <BarMenu
+      label="Font info"
+      icon={InfoIcon}
+      disabled={reading}
+      title={reading ? "Another tab is saving this project" : "Name, em and vertical metrics"}
+      panelClassName={styles.panel}
+      panelLabel="Font info"
+    >
+      {SECTIONS.map((section) => (
+        <section key={section.title} className={styles.section}>
+          <h3 className={styles.heading}>{section.title}</h3>
+          {section.fields.map((field) => (
+            <Field key={field.key} field={field} info={info} store={store} />
           ))}
-          <p className={styles.note}>
-            {info.familyName} {info.styleName} &middot; {info.unitsPerEm} units per em
-          </p>
-        </div>
-      ) : null}
-    </div>
+        </section>
+      ))}
+      <p className={styles.note}>
+        {info.familyName} {info.styleName} &middot; {info.unitsPerEm} units per em
+      </p>
+    </BarMenu>
   );
 }
 

@@ -5,11 +5,11 @@ import {
   countBySeverity,
   preflight,
 } from "@fonteditor/preflight";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { BarMenu } from "./BarMenu.js";
 import styles from "./Preflight.module.css";
-import open from "./OpenFont.module.css";
 import { CircleAlertIcon, InfoIcon, ShieldCheckIcon, TriangleAlertIcon } from "./icons.js";
 
 /**
@@ -27,45 +27,42 @@ import { CircleAlertIcon, InfoIcon, ShieldCheckIcon, TriangleAlertIcon } from ".
  */
 export function Preflight(): React.JSX.Element {
   const store = useEditorStore();
+
+  return (
+    <BarMenu
+      label="Check font"
+      icon={ShieldCheckIcon}
+      title="Everything findable about this font before it is exported"
+      panelClassName={styles.panel}
+      panelLabel="Preflight"
+      // The list of pictures is read on demand, so it has to be asked for
+      // before the check that needs it runs.
+      onOpen={() => void store.refreshImages()}
+    >
+      <Report />
+    </BarMenu>
+  );
+}
+
+/**
+ * The findings, worked out while somebody is looking at them.
+ *
+ * Its own component because it is mounted only while the panel is open, and
+ * that is what keeps the walk lazy: a font of a few thousand glyphs is a walk
+ * over every point in it, and nothing wants the answer until it is asked for.
+ */
+function Report(): React.JSX.Element {
+  const store = useEditorStore();
   const document = useStoreValue((s) => s.session.editor.document);
   // The pictures the font really holds, so a glyph naming one that has gone is
   // found. Not in the document, so the check cannot ask for itself.
   const images = useStoreValue((s) => s.images);
-  const [open_, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
 
-  // Only while the panel is up. A font of a few thousand glyphs is a walk over
-  // every point in it, and nothing is looking at the answer until then.
   const findings = useMemo(
-    () =>
-      open_ ? preflight(document, { images: new Set(images.map((entry) => entry.name)) }) : [],
-    [open_, document, images],
+    () => preflight(document, { images: new Set(images.map((entry) => entry.name)) }),
+    [document, images],
   );
   const counted = useMemo(() => countBySeverity(findings), [findings]);
-
-  // The list of pictures is read on demand, so it has to be asked for before
-  // the check that needs it runs.
-  useEffect(() => {
-    if (!open_) return;
-    void store.refreshImages();
-  }, [open_, store]);
-
-  useEffect(() => {
-    if (!open_) return;
-
-    const onDown = (event: MouseEvent): void => {
-      if (ref.current !== null && !ref.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("pointerdown", onDown, true);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("pointerdown", onDown, true);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open_]);
 
   /**
    * Go to what the finding is about.
@@ -87,62 +84,47 @@ export function Preflight(): React.JSX.Element {
   };
 
   return (
-    <div className={styles.holder} ref={ref}>
-      <button
-        type="button"
-        className={open.button}
-        aria-expanded={open_}
-        title="Everything findable about this font before it is exported"
-        onClick={() => setOpen(!open_)}
-      >
-        <ShieldCheckIcon />
-        Check font
-      </button>
+    <>
+      <div className={styles.head}>
+        <span>{summary(counted)}</span>
+      </div>
 
-      {open_ ? (
-        <div className={styles.panel} role="group" aria-label="Preflight">
-          <div className={styles.head}>
-            <span>{summary(counted)}</span>
-          </div>
-
-          {findings.length === 0 ? (
-            <p className={styles.empty}>
-              Nothing found. Which is not the same as nothing wrong — this looks at what can be
-              found by reading the font, not at whether the drawing is any good.
-            </p>
-          ) : (
-            <ul className={styles.list}>
-              {findings.map((f, i) => (
-                <li key={`${f.check}-${String(f.glyph)}-${String(i)}`} className={styles.row}>
-                  {/* Shape as well as colour. A dot told a colourblind reader
+      {findings.length === 0 ? (
+        <p className={styles.empty}>
+          Nothing found. Which is not the same as nothing wrong — this looks at what can be found by
+          reading the font, not at whether the drawing is any good.
+        </p>
+      ) : (
+        <ul className={styles.list}>
+          {findings.map((f, i) => (
+            <li key={`${f.check}-${String(f.glyph)}-${String(i)}`} className={styles.row}>
+              {/* Shape as well as colour. A dot told a colourblind reader
                       nothing the heading did not already say, and the three
                       severities are three different drawings now. */}
-                  <span
-                    className={`${styles.mark} ${styles[f.severity]}`}
-                    title={SEVERITIES[f.severity]}
-                  >
-                    <SeverityIcon severity={f.severity} />
-                  </span>
-                  <button
-                    type="button"
-                    className={styles.what}
-                    disabled={f.glyph === null}
-                    title={checkNamed(f.check).why}
-                    onClick={() => goTo(f)}
-                  >
-                    <span className={styles.title}>{checkNamed(f.check).title}</span>
-                    <span className={styles.message}>
-                      {f.glyph === null ? "" : `${f.glyph} · `}
-                      {f.message}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ) : null}
-    </div>
+              <span
+                className={`${styles.mark} ${styles[f.severity]}`}
+                title={SEVERITIES[f.severity]}
+              >
+                <SeverityIcon severity={f.severity} />
+              </span>
+              <button
+                type="button"
+                className={styles.what}
+                disabled={f.glyph === null}
+                title={checkNamed(f.check).why}
+                onClick={() => goTo(f)}
+              >
+                <span className={styles.title}>{checkNamed(f.check).title}</span>
+                <span className={styles.message}>
+                  {f.glyph === null ? "" : `${f.glyph} · `}
+                  {f.message}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 

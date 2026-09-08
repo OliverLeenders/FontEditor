@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { BarMenu } from "./BarMenu.js";
 import styles from "./Snapshots.module.css";
-import open from "./OpenFont.module.css";
 import { CameraIcon, HistoryIcon, RotateCcwIcon } from "./icons.js";
 
 /**
@@ -22,34 +22,8 @@ export function Snapshots(): React.JSX.Element {
   const entries = useStoreValue((s) => s.snapshots);
   const reading = useStoreValue((s) => s.ownership === "reading");
 
-  const [open_, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // The list is read from disk when it is about to be looked at: nothing else
-  // shows it, and watching it would mean a message per copy for no reader.
-  useEffect(() => {
-    if (!open_) return;
-    void store.refreshSnapshots();
-  }, [open_, store]);
-
-  useEffect(() => {
-    if (!open_) return;
-
-    const onDown = (event: MouseEvent): void => {
-      if (ref.current !== null && !ref.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("pointerdown", onDown, true);
-    window.addEventListener("keydown", onKey, true);
-    return () => {
-      window.removeEventListener("pointerdown", onDown, true);
-      window.removeEventListener("keydown", onKey, true);
-    };
-  }, [open_]);
 
   const restore = async (at: number): Promise<void> => {
     setBusy(true);
@@ -71,68 +45,62 @@ export function Snapshots(): React.JSX.Element {
   };
 
   return (
-    <div className={styles.holder} ref={ref}>
-      <button
-        type="button"
-        className={open.button}
-        aria-expanded={open_}
-        title="Copies of the whole font, kept as you work"
-        onClick={() => setOpen(!open_)}
-      >
-        <HistoryIcon />
-        History
-      </button>
+    <BarMenu
+      label="History"
+      icon={HistoryIcon}
+      title="Copies of the whole font, kept as you work"
+      panelClassName={styles.panel}
+      panelLabel="Snapshots"
+      // Read from disk when it is about to be looked at: nothing else shows
+      // this list, and watching it would mean a message per copy for no reader.
+      onOpen={() => void store.refreshSnapshots()}
+    >
+      <div className={styles.head}>
+        <span>Copies of this font</span>
+        <button
+          type="button"
+          className={styles.keep}
+          disabled={busy || reading}
+          title={reading ? "Another tab is saving this project" : "Keep one now"}
+          onClick={() => void store.snapshot()}
+        >
+          <CameraIcon />
+          Keep one now
+        </button>
+      </div>
 
-      {open_ ? (
-        <div className={styles.panel} role="group" aria-label="Snapshots">
-          <div className={styles.head}>
-            <span>Copies of this font</span>
-            <button
-              type="button"
-              className={styles.keep}
-              disabled={busy || reading}
-              title={reading ? "Another tab is saving this project" : "Keep one now"}
-              onClick={() => void store.snapshot()}
-            >
-              <CameraIcon />
-              Keep one now
-            </button>
-          </div>
+      {entries.length === 0 ? (
+        <p className={styles.empty}>
+          None yet. One is kept every few minutes of work, and before anything that replaces the
+          font.
+        </p>
+      ) : (
+        <ul className={styles.list}>
+          {entries.map((entry) => (
+            <li key={entry.at} className={styles.row}>
+              <span className={styles.when}>{when(entry.at)}</span>
+              <span className={styles.size}>{entry.glyphs} glyphs</span>
+              <button
+                type="button"
+                className={styles.restore}
+                disabled={busy || reading}
+                title={
+                  reading
+                    ? "Another tab is saving this project"
+                    : "Put this copy back, keeping the one that is open"
+                }
+                onClick={() => void restore(entry.at)}
+              >
+                <RotateCcwIcon />
+                Restore
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
-          {entries.length === 0 ? (
-            <p className={styles.empty}>
-              None yet. One is kept every few minutes of work, and before anything that replaces the
-              font.
-            </p>
-          ) : (
-            <ul className={styles.list}>
-              {entries.map((entry) => (
-                <li key={entry.at} className={styles.row}>
-                  <span className={styles.when}>{when(entry.at)}</span>
-                  <span className={styles.size}>{entry.glyphs} glyphs</span>
-                  <button
-                    type="button"
-                    className={styles.restore}
-                    disabled={busy || reading}
-                    title={
-                      reading
-                        ? "Another tab is saving this project"
-                        : "Put this copy back, keeping the one that is open"
-                    }
-                    onClick={() => void restore(entry.at)}
-                  >
-                    <RotateCcwIcon />
-                    Restore
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {said === null ? null : <p className={styles.said}>{said}</p>}
-        </div>
-      ) : null}
-    </div>
+      {said === null ? null : <p className={styles.said}>{said}</p>}
+    </BarMenu>
   );
 }
 

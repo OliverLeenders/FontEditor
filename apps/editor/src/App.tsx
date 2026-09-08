@@ -28,7 +28,11 @@ const pasteIds = randomIds();
 
 export function App(): React.JSX.Element {
   const store = useEditorStore();
-  const [view, setView] = useState<ViewId>("glyph");
+  // The font is where a session starts: the whole typeface, and the glyph you
+  // want to work on somewhere in it. Opening on the canvas meant opening on
+  // whichever letter happened to be first, which is an answer to a question
+  // nobody asked yet.
+  const [view, setView] = useState<ViewId>("font");
   const [menu, setMenu] = useState<MenuRequest | null>(null);
   // Read by the window key handler, which is installed once and must not be
   // rebuilt every time the workspace changes.
