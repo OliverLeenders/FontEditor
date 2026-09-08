@@ -1,5 +1,5 @@
-import { useEditorStore, useStoreValue } from "../useStore.js";
-import styles from "./Inspector.module.css";
+import { useEditorStore, useStoreValue } from "../../useStore.js";
+import styles from "../Inspector.module.css";
 
 /**
  * One folding section of the inspector.
