@@ -71,7 +71,14 @@ export function MenuItems({
               <ItemMark item={item} />
             </span>
             {item.label}
-            {item.note === undefined ? null : <span className={styles.note}>{item.note}</span>}
+            {/* A space of its own, so the name a screen reader reads out is
+                "Save Ctrl-S" rather than "SaveCtrl-S". */}
+            {item.note === undefined ? null : (
+              <>
+                {" "}
+                <span className={styles.note}>{item.note}</span>
+              </>
+            )}
           </button>
         ),
       )}

@@ -53,6 +53,23 @@
 .item:hover .mark {
   color: inherit;
 }
+/*
+ * The word after a label: a shortcut, a count, what a format is for.
+ *
+ * Pushed to the right and quieter than the label, because it is an aside — the
+ * label says what the item does and this says something about it.
+ */
+.note {
+  margin-left: auto;
+  padding-left: 0.75rem;
+  color: var(--ink-3);
+  font-size: 0.92em;
+}
+.item:hover .note {
+  color: inherit;
+  opacity: 0.8;
+}
+
 .separator {
   height: 1px;
   background: var(--rule);

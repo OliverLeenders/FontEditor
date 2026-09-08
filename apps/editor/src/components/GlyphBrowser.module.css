@@ -78,14 +78,41 @@
 /* Wraps rather than clips. There are seven controls and a search field here
    now, and in a narrow window the last of them was being cut off at the edge —
    a button you cannot see is a button that does not exist. */
+/*
+ * The bar over the glyphs, in three groups.
+ *
+ * The groups are what stops it reading as a row of sixteen unrelated things:
+ * the font as a file, what the font holds, and the list below. A rule between
+ * them says so without a word, and the last group takes the space that is left
+ * because the search field is the one control here that wants to grow.
+ */
 .bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.5rem 0.75rem;
   padding: 0.45rem 0.6rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
+}
+
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.group + .group {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--rule);
+}
+
+/* The list controls take what is left, and the search field takes what is left
+   of that. */
+.listControls {
+  flex: 1;
+  min-width: 16rem;
 }
 
 .search {

@@ -10,6 +10,8 @@ import { type Location, defaultLocation } from "@fonteditor/font-model";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { BarMenu } from "./BarMenu.js";
+import type { Item } from "./MenuItems.js";
 import styles from "./OpenFont.module.css";
 import { DownloadIcon } from "./icons.js";
 
@@ -152,74 +154,75 @@ export function ExportFont(): React.JSX.Element {
       return { file: fileName, warnings: [] };
     });
 
+  /*
+   * Five files, one menu.
+   *
+   * They were five buttons in the bar, which spent a third of its width on the
+   * thing a person does at the end of a session. The words stay — a format is
+   * its name, and "OTF" is not a picture — and the one mark they share says
+   * what all five do.
+   */
+  const items: Item[] = [
+    {
+      kind: "item",
+      label: "OTF",
+      note: "install and use",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0,
+      run: otf,
+    },
+    {
+      kind: "item",
+      label: "TTF",
+      note: "quadratic outlines",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0,
+      run: truetype,
+    },
+    {
+      kind: "item",
+      label: "UFO",
+      note: "source, zipped",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0,
+      run: ufo,
+    },
+  ];
+
+  // Only where there is a family to write. A designspace with one source is a
+  // legal file and a pointless one, and an item that made one would be an item
+  // that does nothing anybody wanted.
+  if (masters > 1) {
+    items.push({ kind: "separator" });
+    items.push({
+      kind: "item",
+      label: "Family",
+      note: "a UFO per master",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0,
+      run: family,
+    });
+    items.push({
+      kind: "item",
+      label: "Variable font",
+      note: axes === 0 ? "needs an axis" : "every master in one",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0 || axes === 0,
+      run: variable,
+    });
+  }
+
   return (
-    <>
-      {/* Two exports, because they are for different things: an OTF is a font
-          to install and use, a UFO is the source to hand to another tool. The
-          OTF loses whatever this editor does not model; the UFO does not. */}
-      <button
-        type="button"
-        className={styles.button}
-        disabled={glyphCount === 0}
-        title="Build an OTF you can install — outlines and metrics only"
-        onClick={otf}
-      >
-        <DownloadIcon />
-        Export OTF
-      </button>
-      <button
-        type="button"
-        className={styles.button}
-        disabled={glyphCount === 0}
-        title="The same font with quadratic outlines — what hinting and most web pipelines want"
-        onClick={truetype}
-      >
-        <DownloadIcon />
-        Export TTF
-      </button>
-      <button
-        type="button"
-        className={styles.button}
-        disabled={glyphCount === 0}
-        title="Write a UFO source folder, zipped — nothing this editor models is lost"
-        onClick={ufo}
-      >
-        <DownloadIcon />
-        Export UFO
-      </button>
-      {/* Only where there is a family to write. A designspace with one source
-          is a legal file and a pointless one, and a button that made one would
-          be a button that does nothing anybody wanted. */}
-      {masters > 1 ? (
-        <>
-          <button
-            type="button"
-            className={styles.button}
-            disabled={glyphCount === 0}
-            title="Write every master as its own UFO, with the designspace that ties them together"
-            onClick={family}
-          >
-            <DownloadIcon />
-            Export family
-          </button>
-          <button
-            type="button"
-            className={styles.button}
-            disabled={glyphCount === 0 || axes === 0}
-            title={
-              axes === 0
-                ? "A variable font needs an axis to vary along"
-                : "One font that is every master and everything between them"
-            }
-            onClick={variable}
-          >
-            <DownloadIcon />
-            Export variable
-          </button>
-        </>
-      ) : null}
+    <div className={styles.zone}>
+      <BarMenu
+        label="Export"
+        icon={DownloadIcon}
+        title="Write a copy of this font out as a file"
+        panelLabel="Export"
+        items={items}
+      />
       {status.kind === "done" ? (
-        <span className={styles.note}>
+        <span className={styles.note} role="status">
           {status.file}
           {status.warnings.length > 0 ? (
             <span className={styles.warn} title={status.warnings.slice(0, 20).join("\n")}>
@@ -234,7 +237,7 @@ export function ExportFont(): React.JSX.Element {
           {status.message}
         </span>
       ) : null}
-    </>
+    </div>
   );
 }
 

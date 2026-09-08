@@ -8,20 +8,20 @@ import { freshStore, installDomStubs, render } from "./render.js";
 
 installBrowserGlobals();
 
-const { FontFile } = await import("../src/components/FontFile.js");
+const { FileMenu } = await import("../src/components/FileMenu.js");
 const { ufoFiles } = await import("@fonteditor/font-io");
 const { writeFolder } = await import("@fonteditor/disk");
 const { updateGlyph } = await import("@fonteditor/font-model");
 
 /**
- * The font's own folder on disk, as the bar shows it.
+ * The File menu, and the font's own folder behind it.
  *
- * The state being tested is the one a person actually reads off this row: is
+ * The state being tested is the one a person actually reads off this menu: is
  * there a folder, has anything changed since it was saved, and is Save the
  * thing to press. That last one is worth a test of its own because it is
  * derived rather than stored — the document as it was written, compared with
  * the document as it is — and a comparison that stops working shows up as a
- * Save button that never lights up.
+ * Save item that never lights up.
  */
 
 beforeAll(() => {
@@ -31,6 +31,15 @@ beforeAll(() => {
 afterEach(() => {
   cleanup();
 });
+
+/** Open the menu, which is where every one of these items lives now. */
+function openMenu(): void {
+  fireEvent.click(screen.getByRole("button", { name: /^File/ }));
+}
+
+/** The Save item, which carries its shortcut in its own label. */
+const saveItem = () =>
+  screen.getByRole<HTMLButtonElement>("menuitemcheckbox", { name: /^Save Ctrl/ });
 
 /** Put a folder behind the picker, or nothing to have the user close it. */
 function offer(folder: FakeFolder | null): void {
@@ -66,59 +75,67 @@ function edit(store: ReturnType<typeof freshStore>): void {
 
 describe("the font's folder in the bar", () => {
   it("offers to open one, and nothing else until there is one", () => {
-    render(<FontFile />);
+    render(<FileMenu />);
 
-    expect(screen.getByRole("button", { name: "Open folder…" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    openMenu();
+
+    expect(screen.getByRole("menuitemcheckbox", { name: "Open folder…" })).toBeTruthy();
+    // There is nowhere to save to yet, so the item says what pressing it does.
+    expect(screen.getByRole("menuitemcheckbox", { name: /^Save to a folder/ })).toBeTruthy();
   });
 
   it("names the folder once one is open", async () => {
     const store = freshStore();
     offer(await ufoOf(store));
-    render(<FontFile />, store);
+    render(<FileMenu />, store);
 
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
       await Promise.resolve();
     });
 
     await waitFor(() => {
-      expect(screen.getByTitle("The font is kept in Test.ufo")).toBeTruthy();
+      expect(store.getState().folder.name).toBe("Test.ufo");
     });
+    openMenu();
+    expect(screen.getByText("Test.ufo")).toBeTruthy();
   });
 
   it("has nothing to save until something changes", async () => {
     const store = freshStore();
     offer(await ufoOf(store));
-    render(<FontFile />, store);
+    render(<FileMenu />, store);
 
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
       await Promise.resolve();
     });
 
     await waitFor(() => {
-      expect(screen.getByRole<HTMLButtonElement>("button", { name: "Save" }).disabled).toBe(true);
+      expect(store.getState().folder.name).toBe("Test.ufo");
     });
+    openMenu();
+
+    expect(saveItem().disabled).toBe(true);
     expect(screen.getByText(/as opened/)).toBeTruthy();
   });
 
   it("lights up, and says so, once the font has moved", async () => {
     const store = freshStore();
     offer(await ufoOf(store));
-    render(<FontFile />, store);
+    render(<FileMenu />, store);
 
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
       await Promise.resolve();
     });
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
-    });
-
     edit(store);
+    openMenu();
 
-    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Save" }).disabled).toBe(false);
+    expect(saveItem().disabled).toBe(false);
     expect(screen.getByText(/unsaved changes/)).toBeTruthy();
   });
 
@@ -126,19 +143,18 @@ describe("the font's folder in the bar", () => {
     const store = freshStore();
     const folder = await ufoOf(store);
     offer(folder);
-    render(<FontFile />, store);
+    render(<FileMenu />, store);
 
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
       await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
     });
     edit(store);
 
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      fireEvent.click(saveItem());
       await Promise.resolve();
     });
 
@@ -151,10 +167,11 @@ describe("the font's folder in the bar", () => {
   it("says what went wrong rather than appearing to have worked", async () => {
     const store = freshStore();
     offer(new FakeFolder("Photos").put("holiday.jpg", "not a font"));
-    render(<FontFile />, store);
+    render(<FileMenu />, store);
 
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
       await Promise.resolve();
     });
 
@@ -165,24 +182,30 @@ describe("the font's folder in the bar", () => {
 
   it("leaves everything as it was when the picker is closed", async () => {
     const store = freshStore();
-    render(<FontFile />, store);
+    render(<FileMenu />, store);
     const before = store.editor.document;
 
+    openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
       await Promise.resolve();
     });
 
     expect(store.editor.document).toBe(before);
-    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    // Still nowhere to save to, so the item still asks for a folder.
+    openMenu();
+    expect(screen.getByRole("menuitemcheckbox", { name: /^Save to a folder/ })).toBeTruthy();
   });
 
-  it("shows nothing at all in a browser that cannot open folders", () => {
+  it("offers nothing about folders in a browser that has none", () => {
     delete (globalThis as { showDirectoryPicker?: unknown }).showDirectoryPicker;
-    const { container } = render(<FontFile />);
+    render(<FileMenu />);
+    openMenu();
 
-    // Firefox and Safari have the file pickers but not the directory one, and
-    // a row of buttons that cannot work is worse than no row.
-    expect(container.textContent).toBe("");
+    // Firefox and Safari have the file pickers but not the directory one. What
+    // they can do is still offered; what they cannot is not there to press.
+    expect(screen.getByRole("menuitemcheckbox", { name: "Open font…" })).toBeTruthy();
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Open folder…" })).toBeNull();
+    expect(screen.queryByRole("menuitemcheckbox", { name: /^Save/ })).toBeNull();
   });
 });

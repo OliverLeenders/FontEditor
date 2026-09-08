@@ -15,18 +15,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isDarkNow, watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
+import { CleanUpMenu } from "./CleanUpMenu.js";
 import { ExportFont } from "./ExportFont.js";
-import { FontFile } from "./FontFile.js";
+import { FileMenu } from "./FileMenu.js";
 import { Masters } from "./Masters.js";
-import { NewFont } from "./NewFont.js";
 import { Preflight } from "./Preflight.js";
 import { FontInfoPanel } from "./FontInfoPanel.js";
-import { RoundCoordinates } from "./RoundCoordinates.js";
 import { Sheet } from "./Sheet.js";
 import { Snapshots } from "./Snapshots.js";
 import { Tracing } from "./Tracing.js";
 import { NewGlyph } from "./NewGlyph.js";
-import { OpenFont } from "./OpenFont.js";
 import styles from "./GlyphBrowser.module.css";
 
 /** Where the Unicode blocks begin in the set list, for a divider. */
@@ -289,45 +287,61 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
 
       <div className={styles.main}>
         <div className={styles.bar}>
-          <OpenFont />
-          <NewFont />
-          <FontFile />
-          <ExportFont />
-          <NewGlyph />
-          <FontInfoPanel />
-          <Masters />
-          <Snapshots />
-          <Preflight />
-          <Tracing />
-          <Sheet />
-          <RoundCoordinates />
-          <input
-            type="search"
-            className={styles.search}
-            placeholder="Name, U+0041, or a character"
-            value={query.search}
-            aria-label="Search glyphs"
-            onChange={(event) => store.setCatalogQuery({ search: event.target.value })}
-          />
-          <label className={styles.orderLabel}>
-            Sort
-            <select
-              className={styles.order}
-              value={query.order}
-              onChange={(event) =>
-                store.setCatalogQuery({ order: event.target.value as typeof query.order })
-              }
-            >
-              <option value="font">Font order</option>
-              <option value="codePoint">Code point</option>
-              <option value="name">Name</option>
-            </select>
-          </label>
-          <span className={styles.count}>
-            {shown.length === entries.length
-              ? `${String(entries.length)} glyphs`
-              : `${String(shown.length)} of ${String(entries.length)}`}
-          </span>
+          {/* The font as a file, and copies of it going out. Two menus, because
+              this is a subject rather than a row of buttons — and because the
+              bar's width is worth more to the work than to the things somebody
+              does once at each end of a session. */}
+          <div className={styles.group}>
+            <FileMenu />
+            <ExportFont />
+            <CleanUpMenu />
+          </div>
+
+          {/* What the font holds, each behind the button that opens it. These
+              stay in the open: they are places you go and come back from, and
+              a menu in front of them would be a disclosure in front of a
+              disclosure. */}
+          <div className={styles.group}>
+            <FontInfoPanel />
+            <Masters />
+            <Tracing />
+            <Sheet />
+            <Preflight />
+            <Snapshots />
+          </div>
+
+          {/* And the list below: what is in it, what order it is in, and the
+              way to add to it. */}
+          <div className={`${styles.group} ${styles.listControls}`}>
+            <NewGlyph />
+            <input
+              type="search"
+              className={styles.search}
+              placeholder="Name, U+0041, or a character"
+              value={query.search}
+              aria-label="Search glyphs"
+              onChange={(event) => store.setCatalogQuery({ search: event.target.value })}
+            />
+            <label className={styles.orderLabel}>
+              Sort
+              <select
+                className={styles.order}
+                value={query.order}
+                onChange={(event) =>
+                  store.setCatalogQuery({ order: event.target.value as typeof query.order })
+                }
+              >
+                <option value="font">Font order</option>
+                <option value="codePoint">Code point</option>
+                <option value="name">Name</option>
+              </select>
+            </label>
+            <span className={styles.count}>
+              {shown.length === entries.length
+                ? `${String(entries.length)} glyphs`
+                : `${String(shown.length)} of ${String(entries.length)}`}
+            </span>
+          </div>
         </div>
 
         <div className={styles.gridArea}>
