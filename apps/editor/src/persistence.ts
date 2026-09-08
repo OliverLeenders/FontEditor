@@ -1,6 +1,7 @@
 import type { FontDocument } from "@fonteditor/font-model";
 import {
   type ImageEntry,
+  type StoredDesignspace,
   Autosave,
   type AutosaveStatus,
   type LoadedProject,
@@ -241,6 +242,44 @@ export class Persistence {
     at: number,
   ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
     return (await this.client?.readSnapshot(at)) ?? null;
+  }
+
+  // ---- the masters that are not being drawn -------------------------------
+
+  /**
+   * Park a master, whole.
+   *
+   * Refused without the lock, as every write is. Switching master in a tab that
+   * is only reading somebody else's project changes what is on the screen and
+   * nothing on the disk, which is the right answer for a reader.
+   */
+  async putMaster(master: string, document: FontDocument): Promise<void> {
+    if (this.client === null || !this.owner) return;
+    await this.client.putMaster(master, document);
+  }
+
+  async getMaster(
+    master: string,
+  ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
+    return (await this.client?.getMaster(master)) ?? null;
+  }
+
+  async dropMaster(master: string): Promise<void> {
+    if (this.client === null || !this.owner) return;
+    await this.client.dropMaster(master);
+  }
+
+  async putDesignspace(designspace: {
+    axes: unknown;
+    masters: unknown;
+    current: string;
+  }): Promise<void> {
+    if (this.client === null || !this.owner) return;
+    await this.client.putDesignspace(designspace);
+  }
+
+  async getDesignspace(): Promise<StoredDesignspace | null> {
+    return (await this.client?.getDesignspace()) ?? null;
   }
 
   // ---- the pictures a font is traced from --------------------------------

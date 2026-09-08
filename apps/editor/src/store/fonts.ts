@@ -13,6 +13,7 @@ import {
 import { editorState } from "@fonteditor/tools";
 
 import type { Persistence } from "../persistence.js";
+import { startFresh } from "./masters.js";
 import type { StoreHost } from "./state.js";
 
 /**
@@ -147,6 +148,10 @@ export async function adoptDocument(host: FontHost, document: FontDocument): Pro
   // most destructive thing this editor does — it replaces every glyph on disk —
   // and it is exactly the moment someone discovers they meant the other file.
   await host.keepSnapshot();
+
+  // One master again, and the old font's masters gone with it: they are
+  // drawings of a typeface that is no longer open.
+  await startFresh(host, document);
 
   showDocument(host, document, false);
   host.setCatalogQuery(DEFAULT_QUERY);

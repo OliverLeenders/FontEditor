@@ -1,0 +1,188 @@
+/*
+ * The drawings of the typeface, hanging under their button.
+ *
+ * Shaped like the history and check panels beside it. What is different is that
+ * a row is both a thing to read and a thing to go to, so the name is editable
+ * in place and the two verbs sit next to it.
+ */
+.holder {
+  position: relative;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 20;
+  width: 27rem;
+  padding: 0.55rem 0.6rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.add {
+  padding: 0.15rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: pointer;
+}
+.add:hover:not(:disabled) {
+  color: var(--ink);
+}
+.add:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  max-height: 18rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto 1.1rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.row:last-child {
+  border-bottom: 0;
+}
+
+.name {
+  min-width: 0;
+  padding: 0.15rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+}
+.name:hover:not(:disabled),
+.name:focus {
+  border-color: var(--rule-strong);
+  background: var(--ground);
+}
+/* The one being drawn. Its name is the fact the eye wants first. */
+.row[data-here="true"] .name {
+  color: var(--accent);
+}
+
+.at {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink-3);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.go {
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.go:hover:not(:disabled) {
+  color: var(--ink);
+}
+.go:disabled {
+  opacity: 0.4;
+  cursor: default;
+  border-color: var(--rule);
+}
+
+.drop {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.drop:hover:not(:disabled) {
+  color: var(--danger, #c2453d);
+}
+.drop:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.report {
+  margin-top: 0.5rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--rule);
+}
+
+.reportHead {
+  margin: 0 0 0.3rem;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.found {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+}
+
+.foundGlyph {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.says {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+  line-height: 1.35;
+}
+
+.said {
+  margin: 0.45rem 0 0;
+  color: var(--ink-2);
+  font-size: 0.76rem;
+}
+
+.error {
+  margin: 0.45rem 0 0;
+  color: var(--danger, #c2453d);
+  font-size: 0.76rem;
+}

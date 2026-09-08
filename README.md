@@ -17,19 +17,19 @@ both directions. A UFO folder on disk is opened and saved back to; everything au
 to the browser's own store besides, and copies of the whole font are kept as you work.
 Guides and a picture to trace from sit behind the drawing; before it goes out, eighteen checks say what is wrong with it.
 
-| Phase |                                     | Status                                                          |
-| ----- | ----------------------------------- | --------------------------------------------------------------- |
-| 0     | Foundations and the geometry kernel | done                                                            |
-| 1     | The editing surface                 | done                                                            |
-| 2     | Undo, redo, persistence             | done                                                            |
-| 3     | From paths to a glyph               | done, and anchors with it                                       |
-| 4     | From a glyph to a font              | done                                                            |
-| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways |
-| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                |
-| 7     | Spacing and kerning                 | done                                                            |
-| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks |
-| 9     | Variable fonts                      | not started                                                     |
-| 10    | Production polish                   | lint, format and 1912 tests, run on CI; preferences persist     |
+| Phase |                                     | Status                                                                        |
+| ----- | ----------------------------------- | ----------------------------------------------------------------------------- |
+| 0     | Foundations and the geometry kernel | done                                                                          |
+| 1     | The editing surface                 | done                                                                          |
+| 2     | Undo, redo, persistence             | done                                                                          |
+| 3     | From paths to a glyph               | done, and anchors with it                                                     |
+| 4     | From a glyph to a font              | done                                                                          |
+| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways               |
+| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                              |
+| 7     | Spacing and kerning                 | done                                                                          |
+| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks               |
+| 9     | Variable fonts                      | masters and compatibility in; interpolation and a variable font still to come |
+| 10    | Production polish                   | lint, format and 1956 tests, run on CI; preferences persist                   |
 
 ### What the table missed
 
@@ -45,7 +45,7 @@ for.
 | **Font metadata**                          | done        | Two dozen fields: version, copyright, trademark, designer, manufacturer, licence, description, italic angle, weight and width classes, a vendor id, and both naming schemes — the four-slot one an operating system groups by, and the typographic one for families of more than four styles.                                                                                                                                       |
 | **Curve quality**                          | done        | The curvature comb reads a join, the inspector gives the radius either side of a node and how far apart they are, and harmonising moves the node to where they agree.                                                                                                                                                                                                                                                               |
 | **Guides, and something to trace**         | done        | Guides are a point and an angle in two scopes, dragged on the canvas and snapped to where they are level or upright. Tracing follows UFO: the picture belongs to the font and the placement to the glyph, so one scan of an alphabet is one file and each letter is picked off it with a box drawn in the sheet view.                                                                                                               |
-| **Masters**                                | not started | Phase 9 is written as though variable fonts were an export format. The prerequisite is in the model: a glyph with more than one set of points, and a way to move between them.                                                                                                                                                                                                                                                      |
+| **Masters**                                | half done   | Axes, masters placed along them, and moving between them: a document is one master, whole, so nothing below the project learns that masters exist. A new one starts as a copy, which is what keeps it interpolatable. The compatibility check says which glyphs cannot be worked out in between and why. Interpolation and a designspace on disk are next.                                                                          |
 | **A file on disk**                         | done        | A UFO folder is opened, saved back to, and remembered for next time, through the File System Access API. Saving is manual: the working store autosaves, and a folder the user chose is somewhere the editor is a guest.                                                                                                                                                                                                             |
 | **`glyf` outlines**                        | not started | Everything written is CFF. A TrueType flavour is what hinting and most web pipelines want, and it is also the outline format that permits the overlaps this removes.                                                                                                                                                                                                                                                                |
 | **Preflight**                              | done        | Seventeen checks over the whole font — a contour left open, two points in the same place, a name a font cannot carry, two glyphs claiming one character, a component with nothing to place or that places itself, kerning about a glyph that has gone, a mark with nowhere to land — reported and never repaired, because every fix is a decision.                                                                                  |

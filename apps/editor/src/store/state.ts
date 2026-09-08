@@ -1,7 +1,7 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import { type EditSession, session as newSession } from "@fonteditor/edit-core";
 import { editorState } from "@fonteditor/tools";
-import type { FontDocument } from "@fonteditor/font-model";
+import { type FontDocument, type FontProject, project } from "@fonteditor/font-model";
 import type { AutosaveStatus, ImageEntry, SnapshotEntry } from "@fonteditor/storage";
 
 import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
@@ -37,6 +37,15 @@ export type StoreState = {
    * nothing to show.
    */
   readonly snapshots: readonly SnapshotEntry[];
+  /**
+   * The axes, the masters, and which one is being drawn.
+   *
+   * The documents of the masters that are not open are on disk rather than in
+   * here: this is the arrangement, and `session.editor.document` is the drawing.
+   * A font with one master is a project with one master, which is what every
+   * font starts as.
+   */
+  readonly project: FontProject;
   /** The font's own folder on the user's disk, and where saving it stands. */
   readonly folder: FolderState;
   /**
@@ -153,13 +162,15 @@ export const NO_FOLDER: FolderState = {
  * correcting itself.
  */
 export function initialState(preferences: Preferences): StoreState {
+  const starter = starterFont();
   return {
-    session: newSession(editorState({ document: starterFont(), view: { scale: 1, tx: 0, ty: 0 } })),
+    session: newSession(editorState({ document: starter, view: { scale: 1, tx: 0, ty: 0 } })),
     saveStatus: "idle",
     storage: "connecting",
     storageDetail: "",
     recovered: false,
     snapshots: [],
+    project: project(starter),
     folder: NO_FOLDER,
     images: [],
     showImage: preferences.showImage,

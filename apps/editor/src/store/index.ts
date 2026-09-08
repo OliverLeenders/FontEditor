@@ -26,6 +26,7 @@ import {
   result,
   setActiveTool,
 } from "@fonteditor/tools";
+import type { Axis } from "@fonteditor/font-model";
 import type { ViewTransform } from "@fonteditor/view";
 import type { DiskFolder } from "@fonteditor/disk";
 
@@ -60,6 +61,18 @@ import {
 } from "./folder.js";
 import { type FontHost, type ImportReport, importFont, newFont, showDocument } from "./fonts.js";
 import { type AddedImage, addImage, refreshImages, setImageOn } from "./images.js";
+import {
+  type MasterReport,
+  addMaster,
+  compareWith,
+  moveMaster,
+  parkCurrent,
+  projectFrom,
+  removeMaster,
+  renameMaster,
+  setAxes,
+  switchMaster,
+} from "./masters.js";
 import { defaults, remember, within } from "./settings.js";
 import { NO_FOLDER, type StoreState, initialState } from "./state.js";
 
@@ -83,6 +96,7 @@ export type { Ownership, StorageState } from "../persistence.js";
 export type { FolderState, StoreState } from "./state.js";
 export type { ImportReport } from "./fonts.js";
 export type { FolderReport, SaveReport } from "./folder.js";
+export type { MasterReport } from "./masters.js";
 export { unsaved } from "./folder.js";
 
 /**
@@ -416,6 +430,39 @@ export class EditorStore {
     return await importFont(this.host, bytes, fileName);
   }
 
+  // ---- masters ------------------------------------------------------------
+
+  /** Go to another master, parking the one being drawn on the way. */
+  async switchMaster(id: string): Promise<MasterReport | null> {
+    return await switchMaster(this.host, id);
+  }
+
+  /** Add one, drawn from the master in front of you. */
+  async addMaster(id: string, name: string, location: Record<string, number>): Promise<void> {
+    await addMaster(this.host, id, name, location);
+  }
+
+  async removeMaster(id: string): Promise<void> {
+    await removeMaster(this.host, id);
+  }
+
+  async renameMaster(id: string, name: string): Promise<void> {
+    await renameMaster(this.host, id, name);
+  }
+
+  async moveMaster(id: string, location: Record<string, number>): Promise<void> {
+    await moveMaster(this.host, id, location);
+  }
+
+  async setAxes(axes: readonly Axis[]): Promise<void> {
+    await setAxes(this.host, axes);
+  }
+
+  /** What cannot be interpolated between this master and another. */
+  async compareWith(id: string): Promise<Awaited<ReturnType<typeof compareWith>>> {
+    return await compareWith(this.host, id);
+  }
+
   // ---- the font's folder on disk -----------------------------------------
 
   /** Open a UFO folder the user picks, replacing what is open. */
@@ -661,6 +708,10 @@ export class EditorStore {
           },
         },
         recovered: loaded.recovered,
+        // The axes and the masters, if this project has any. What was loaded is
+        // the master that was open when the tab last closed; the rest stay
+        // parked until they are asked for.
+        project: projectFrom(await this.disk.getDesignspace(), loaded.document),
       });
       this.fitGlyph();
     }
@@ -688,10 +739,18 @@ export class EditorStore {
 
     showDocument(this.host, loaded.document, loaded.recovered);
     this.disk.markLoaded(loaded.document, loaded.recovered);
-    this.patch({ saveStatus: this.disk.status });
+    // The other tab may have added or removed masters as readily as glyphs.
+    this.patch({
+      saveStatus: this.disk.status,
+      project: projectFrom(await this.disk.getDesignspace(), loaded.document),
+    });
   }
 
   flush(): void {
     this.disk.flush();
+    // The parked copy of the open master, brought up to date. It is what every
+    // other master is compared against and what a switch reads back, and it is
+    // stale for exactly as long as this tab has been drawing.
+    void parkCurrent(this.host);
   }
 }

@@ -17,6 +17,7 @@ import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import { ExportFont } from "./ExportFont.js";
 import { FontFile } from "./FontFile.js";
+import { Masters } from "./Masters.js";
 import { NewFont } from "./NewFont.js";
 import { Preflight } from "./Preflight.js";
 import { FontInfoPanel } from "./FontInfoPanel.js";
@@ -294,6 +295,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           <ExportFont />
           <NewGlyph />
           <FontInfoPanel />
+          <Masters />
           <Snapshots />
           <Preflight />
           <Tracing />

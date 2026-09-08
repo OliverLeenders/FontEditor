@@ -79,6 +79,19 @@ export { OpfsFileStore, requestPersistence } from "./opfs.js";
 
 export { AT_ONCE, inParallel } from "./parallel.js";
 
+export type { StoredDesignspace } from "./masters.js";
+export {
+  DESIGNSPACE_PATH,
+  DESIGNSPACE_SCHEMA,
+  MASTERS_PREFIX,
+  listMasters,
+  readDesignspace,
+  readMaster,
+  removeMaster,
+  writeDesignspace,
+  writeMaster,
+} from "./masters.js";
+
 export type { ImageEntry } from "./images.js";
 export {
   IMAGES_PREFIX,

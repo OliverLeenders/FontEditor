@@ -2,6 +2,7 @@ import type { FontDocument, Glyph } from "@fonteditor/font-model";
 import { fontDocument, setFeatures, setGlyphOrder, setKerning } from "@fonteditor/font-model";
 
 import type { ImageEntry } from "./images.js";
+import type { StoredDesignspace } from "./masters.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import { type SnapshotEntry, type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";
 import {
@@ -166,6 +167,44 @@ export class StorageClient {
   ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
     const stored = (await this.send({ kind: "readSnapshot", at })) as StoredSnapshot | null;
     return stored === null ? null : documentOf(stored);
+  }
+
+  // ---- the masters that are not being drawn -------------------------------
+
+  /** Park a master: its whole font, in one file. */
+  async putMaster(master: string, document: FontDocument): Promise<void> {
+    await this.send({ kind: "putMaster", master, snapshot: snapshotOf(document, Date.now()) });
+  }
+
+  /** Read a parked master back, naming the glyphs that would not decode. */
+  async getMaster(
+    master: string,
+  ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
+    const raw = (await this.send({ kind: "getMaster", master })) as string | null;
+    if (raw === null) return null;
+
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return documentOf(parsed as StoredSnapshot);
+    } catch {
+      return null;
+    }
+  }
+
+  async dropMaster(master: string): Promise<void> {
+    await this.send({ kind: "dropMaster", master });
+  }
+
+  async putDesignspace(designspace: {
+    axes: unknown;
+    masters: unknown;
+    current: string;
+  }): Promise<void> {
+    await this.send({ kind: "putDesignspace", designspace });
+  }
+
+  async getDesignspace(): Promise<StoredDesignspace | null> {
+    return (await this.send({ kind: "getDesignspace" })) as StoredDesignspace | null;
   }
 
   // ---- the pictures a font is traced from --------------------------------

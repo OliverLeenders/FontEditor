@@ -80,6 +80,26 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "getImage"; readonly name: string }
   | { readonly id: number; readonly kind: "images" }
   | { readonly id: number; readonly kind: "removeImage"; readonly name: string }
+  /**
+   * The masters that are not being drawn: parked whole, one file each.
+   *
+   * The open one goes through the ordinary save path, a glyph at a time; these
+   * are written when you leave a master and read when you go back.
+   */
+  | {
+      readonly id: number;
+      readonly kind: "putMaster";
+      readonly master: string;
+      readonly snapshot: StoredSnapshot;
+    }
+  | { readonly id: number; readonly kind: "getMaster"; readonly master: string }
+  | { readonly id: number; readonly kind: "dropMaster"; readonly master: string }
+  | {
+      readonly id: number;
+      readonly kind: "putDesignspace";
+      readonly designspace: { axes: unknown; masters: unknown; current: string };
+    }
+  | { readonly id: number; readonly kind: "getDesignspace" }
   | { readonly id: number; readonly kind: "wipe" };
 
 export type LoadedPayload = {

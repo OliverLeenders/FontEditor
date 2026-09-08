@@ -236,3 +236,41 @@ export {
 
 export type { ImageRef } from "./image.js";
 export { imagePoint, imageRef, invertAffine, placeCrop, shownCrop } from "./image.js";
+
+export type { Axis, Location, Master, MasterId } from "./designspace.js";
+export {
+  WEIGHT,
+  axis,
+  defaultLocation,
+  describeLocation,
+  inAxisOrder,
+  master,
+  normalised,
+  sameLocation,
+  settledLocation,
+} from "./designspace.js";
+
+export type { FontProject, MasterProblem } from "./project.js";
+export {
+  FIRST_MASTER,
+  addMaster,
+  currentMaster,
+  currentSource,
+  hasMasters,
+  isProject,
+  masterById,
+  masterProblemSays,
+  moveMaster,
+  orderedMasters,
+  project,
+  removeMaster,
+  renameMaster,
+  setAxes,
+  sourceOf,
+  switchTo,
+  withCurrentSource,
+  withSource,
+} from "./project.js";
+
+export type { Incompatibility } from "./compatible.js";
+export { glyphCompatible, glyphIncompatibilities, incompatibilities } from "./compatible.js";
