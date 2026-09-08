@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FontInfoPanel.module.css";
 import shared from "./OpenFont.module.css";
+import { InfoIcon } from "./icons.js";
 import { Stepper } from "./Stepper.js";
 
 /**
@@ -219,6 +220,7 @@ export function FontInfoPanel(): React.JSX.Element {
         title={reading ? "Another tab is saving this project" : "Name, em and vertical metrics"}
         onClick={() => setOpen((was) => !was)}
       >
+        <InfoIcon />
         Font info
       </button>
 

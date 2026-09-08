@@ -78,10 +78,10 @@ describe("context menu", () => {
       "Add anchor here (top)",
       // Level and upright, in both scopes: which scope a guide is in is the
       // decision, so the menu asks rather than guessing.
-      "Guide across here",
-      "Guide up here",
-      "Guide across here, for the whole font",
-      "Guide up here, for the whole font",
+      "Add horizontal guide",
+      "Add vertical guide",
+      "Add horizontal guide, for the whole font",
+      "Add vertical guide, for the whole font",
       "Round selection",
       "Round this glyph",
     ]);

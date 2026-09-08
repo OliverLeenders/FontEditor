@@ -56,7 +56,7 @@ import {
   MaximizeIcon,
   MinimizeIcon,
   MinusIcon,
-  RulerIcon,
+  FrameIcon,
   SelectAllIcon,
   SplineIcon,
   TrashIcon,
@@ -169,26 +169,26 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       // and this letter's diagonal belongs to the letter.
       {
         kind: "item",
-        label: "Guide across here",
-        icon: RulerIcon,
+        label: "Add horizontal guide",
+        icon: FrameIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 0, "glyph", ids)),
       },
       {
         kind: "item",
-        label: "Guide up here",
-        icon: RulerIcon,
+        label: "Add vertical guide",
+        icon: FrameIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 90, "glyph", ids)),
       },
       {
         kind: "item",
-        label: "Guide across here, for the whole font",
-        icon: RulerIcon,
+        label: "Add horizontal guide, for the whole font",
+        icon: FrameIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 0, "font", ids)),
       },
       {
         kind: "item",
-        label: "Guide up here, for the whole font",
-        icon: RulerIcon,
+        label: "Add vertical guide, for the whole font",
+        icon: FrameIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 90, "font", ids)),
       },
       { kind: "separator" },
@@ -654,7 +654,7 @@ function guideItems(store: EditorStore, id: string): Item[] {
         found.scope === "glyph"
           ? "Give this guide to the whole font"
           : "Keep this guide in this glyph",
-      icon: RulerIcon,
+      icon: FrameIcon,
       run: () =>
         store.applyTool(moveGuideToScope(editor, id, found.scope === "glyph" ? "font" : "glyph")),
     },

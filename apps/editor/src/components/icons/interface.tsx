@@ -272,14 +272,13 @@ export const GridIcon: IconComponent = () => (
   </Glyph>
 );
 
-/** A guide: a line to draw against. */
-export const RulerIcon: IconComponent = () => (
+/** A guide: the lines a drawing is squared up against. */
+export const FrameIcon: IconComponent = () => (
   <Glyph>
-    <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
-    <path d="m14.5 12.5 2-2" />
-    <path d="m11.5 9.5 2-2" />
-    <path d="m8.5 6.5 2-2" />
-    <path d="m17.5 15.5 2-2" />
+    <line x1="22" x2="2" y1="6" y2="6" />
+    <line x1="22" x2="2" y1="18" y2="18" />
+    <line x1="6" x2="6" y1="2" y2="22" />
+    <line x1="18" x2="18" y1="2" y2="22" />
   </Glyph>
 );
 
@@ -334,10 +333,10 @@ export const GapHorizontalIcon: IconComponent = () => (
 );
 
 /** The features workspace, which is a file of code. */
-export const BracesIcon: IconComponent = () => (
+export const CodeIcon: IconComponent = () => (
   <Glyph>
-    <path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5c0 1.1.9 2 2 2h1" />
-    <path d="M16 21h1a2 2 0 0 0 2-2v-5c0-1.1.9-2 2-2a2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1" />
+    <path d="m16 18 6-6-6-6" />
+    <path d="m8 6-6 6 6 6" />
   </Glyph>
 );
 

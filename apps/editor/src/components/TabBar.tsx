@@ -1,6 +1,6 @@
 import styles from "./TabBar.module.css";
 import {
-  BracesIcon,
+  CodeIcon,
   FileTextIcon,
   GapHorizontalIcon,
   GridIcon,
@@ -27,7 +27,7 @@ const TABS: readonly Tab[] = [
   { id: "font", label: "Font", icon: GridIcon, ready: true },
   { id: "glyph", label: "Glyph", icon: PenToolIcon, ready: true },
   { id: "spacing", label: "Spacing", icon: GapHorizontalIcon, ready: true },
-  { id: "features", label: "Features", icon: BracesIcon, ready: true },
+  { id: "features", label: "Features", icon: CodeIcon, ready: true },
   { id: "proof", label: "Proof", icon: FileTextIcon, ready: true },
 ];
 
