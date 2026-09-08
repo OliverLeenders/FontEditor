@@ -15,10 +15,15 @@
 const HEADER = 12;
 const RECORD = 16;
 
-type Table = {
+export type Table = {
   readonly tag: string;
   readonly data: Uint8Array;
 };
+
+/** The tables a finished font holds, for anything that needs to read one back. */
+export function readTablesOf(font: Uint8Array): readonly Table[] {
+  return readTables(font).tables;
+}
 
 function readTables(font: Uint8Array): { sfntVersion: number; tables: Table[] } {
   const view = new DataView(font.buffer, font.byteOffset, font.byteLength);

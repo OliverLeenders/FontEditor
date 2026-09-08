@@ -1,4 +1,11 @@
-import { exportFamily, exportFileName, exportFont, exportUfo } from "@fonteditor/font-io";
+import {
+  exportFamily,
+  exportFileName,
+  exportFont,
+  exportUfo,
+  exportVariableFont,
+} from "@fonteditor/font-io";
+import { type Location, defaultLocation } from "@fonteditor/font-model";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -23,6 +30,7 @@ export function ExportFont(): React.JSX.Element {
   const store = useEditorStore();
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
   const masters = useStoreValue((s) => s.project.masters.length);
+  const axes = useStoreValue((s) => s.project.axes.length);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   /**
@@ -89,6 +97,30 @@ export function ExportFont(): React.JSX.Element {
       return { file: `${fileName} · ${String(files)} files`, warnings: [] };
     });
 
+  /**
+   * One font that is every master and everything between them.
+   *
+   * The masters have to be in the order the designspace puts them and the
+   * default first: everything in the file is a delta from the first master, and
+   * a font whose default is its Black is a font that is Black until something
+   * asks otherwise.
+   */
+  const variable = (): void =>
+    void attemptAsync(async () => {
+      const project = store.getState().project;
+      const all = await store.allMasters();
+      const home = defaultLocation(project.axes);
+      const ordered = [
+        ...all.filter((m) => atHome(m.location, home, project.axes)),
+        ...all.filter((m) => !atHome(m.location, home, project.axes)),
+      ];
+
+      const out = exportVariableFont(project.axes, ordered);
+      const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.otf");
+      download(out.bytes, file, "font/otf");
+      return { file, warnings: out.warnings };
+    });
+
   const ufo = (): void =>
     void attemptAsync(async () => {
       const document = store.editor.document;
@@ -128,15 +160,30 @@ export function ExportFont(): React.JSX.Element {
           is a legal file and a pointless one, and a button that made one would
           be a button that does nothing anybody wanted. */}
       {masters > 1 ? (
-        <button
-          type="button"
-          className={styles.button}
-          disabled={glyphCount === 0}
-          title="Write every master as its own UFO, with the designspace that ties them together"
-          onClick={family}
-        >
-          Export family
-        </button>
+        <>
+          <button
+            type="button"
+            className={styles.button}
+            disabled={glyphCount === 0}
+            title="Write every master as its own UFO, with the designspace that ties them together"
+            onClick={family}
+          >
+            Export family
+          </button>
+          <button
+            type="button"
+            className={styles.button}
+            disabled={glyphCount === 0 || axes === 0}
+            title={
+              axes === 0
+                ? "A variable font needs an axis to vary along"
+                : "One font that is every master and everything between them"
+            }
+            onClick={variable}
+          >
+            Export variable
+          </button>
+        </>
       ) : null}
       {status.kind === "done" ? (
         <span className={styles.note}>
@@ -156,4 +203,13 @@ export function ExportFont(): React.JSX.Element {
       ) : null}
     </>
   );
+}
+
+/** Whether a master sits where every axis has its default: the font's home. */
+function atHome(
+  at: Location,
+  home: Location,
+  axes: readonly { readonly tag: string; readonly default: number }[],
+): boolean {
+  return axes.every((a) => (at[a.tag] ?? a.default) === (home[a.tag] ?? a.default));
 }

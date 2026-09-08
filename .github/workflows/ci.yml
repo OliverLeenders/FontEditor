@@ -109,5 +109,15 @@ jobs:
       - name: Export the mark-attachment proof font
         run: OTF_OUT="$RUNNER_TEMP/otf" pnpm --filter @fonteditor/font-io exec vitest run proof-otf
 
+      - name: Export the variable proof font
+        run: VARIABLE_OUT="$RUNNER_TEMP/vf" pnpm --filter @fonteditor/font-io exec vitest run variable
+
+      # The one check this repository cannot make of itself: whether the deltas
+      # are right. The arithmetic that would verify them here is the arithmetic
+      # that wrote them, so fontTools pins the font at each master's location
+      # and the outlines are compared with what that master was drawn as.
+      - name: Instantiate it at every master
+        run: python tools/otf-check/check_vf.py "$RUNNER_TEMP/vf/Vary.otf" "$RUNNER_TEMP/vf/masters.json"
+
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"

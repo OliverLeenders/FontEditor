@@ -25,3 +25,18 @@ two places, an accent that attaches by one of them and offers a place of its own
 accent that stacks there, and a mark for the class the letter's other anchor names. That
 covers a base with a null anchor for a class it does not take, and the difference between
 mark-to-base and mark-to-mark.
+
+## The variable font
+
+`check_vf.py` is the same idea taken further. A variable font's deltas cannot be
+checked here at all: the arithmetic that would verify them is the arithmetic that
+wrote them, so a test in the suite would only ask whether we agree with
+ourselves.
+
+So fontTools is given the font and pinned to each master's own location, and the
+outlines and advances that come out are compared with what that master was drawn
+as. A variable font that is exactly its masters at its masters' locations has its
+blends in the right order, its regions right, and its offsets pointing where they
+say — and getting any one of those wrong gives a font that is perfect at the
+default and wrong everywhere else, which is the failure that would otherwise
+reach somebody's screen.
