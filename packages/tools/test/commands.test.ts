@@ -88,6 +88,7 @@ import {
   reverseContourAt,
   infoProblem,
   overlapAt,
+  selectedContourIds,
   roundCoordinates,
   setInfo,
   roundGlyphAt,
@@ -887,7 +888,7 @@ describe("removing overlap", () => {
       { minX: 0, minY: 0, maxX: 300, maxY: 300 },
       { minX: 200, minY: 200, maxX: 500, maxY: 500 },
     );
-    const { outcome, result } = overlapAt(s, "a", ids);
+    const { outcome, result } = overlapAt(s, "a", null, ids);
 
     expect(outcome).toBe(2);
     expect(result.state.document.glyphs["a"]!.contours).toHaveLength(1);
@@ -898,7 +899,7 @@ describe("removing overlap", () => {
       { minX: 0, minY: 0, maxX: 100, maxY: 100 },
       { minX: 300, minY: 300, maxX: 400, maxY: 400 },
     );
-    const { outcome, result } = overlapAt(s, "a", ids);
+    const { outcome, result } = overlapAt(s, "a", null, ids);
 
     expect(outcome).toBe("clean");
     // The very same state, so nothing lands in the undo stack.
@@ -913,14 +914,78 @@ describe("removing overlap", () => {
       { minX: 0, minY: 0, maxX: 400, maxY: 150 },
       { minX: 0, minY: 0, maxX: 150, maxY: 400 },
     );
-    const { outcome, result } = overlapAt(s, "a", ids);
+    const { outcome, result } = overlapAt(s, "a", null, ids);
 
     expect(outcome).not.toBe("refused");
     expect(result.state.document.glyphs["a"]!.contours).toHaveLength(1);
   });
 
   it("calls a glyph that is not there clean rather than refusing", () => {
-    expect(overlapAt(withContours(), "nope", ids).outcome).toBe("clean");
+    expect(overlapAt(withContours(), "nope", null, ids).outcome).toBe("clean");
+  });
+
+  it("unions only what the selection touches", () => {
+    // Three squares in a chain, and only the first two are wanted: this is a
+    // stem drawn as two strokes, beside a shape that is not part of it yet.
+    const s = withContours(
+      { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      { minX: 200, minY: 200, maxX: 500, maxY: 500 },
+      { minX: 400, minY: 400, maxX: 700, maxY: 700 },
+    );
+    const [a, b, c] = s.document.glyphs["a"]!.contours;
+    const chosen = {
+      ...s,
+      selection: [
+        { contourId: a!.id, nodeId: a!.nodes[0]!.id, part: "point" as const },
+        { contourId: b!.id, nodeId: b!.nodes[2]!.id, part: "point" as const },
+      ],
+    };
+
+    const { outcome, result } = overlapAt(chosen, "a", selectedContourIds(chosen), ids);
+
+    expect(outcome).toBe(2);
+    const after = result.state.document.glyphs["a"]!.contours;
+    expect(after).toHaveLength(2);
+    expect(after).toContain(c);
+  });
+
+  it("takes one selected point to mean the whole contour", () => {
+    const s = withContours(
+      { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      { minX: 200, minY: 200, maxX: 500, maxY: 500 },
+    );
+    const [a, b] = s.document.glyphs["a"]!.contours;
+    const chosen = {
+      ...s,
+      selection: [
+        { contourId: a!.id, nodeId: a!.nodes[0]!.id, part: "point" as const },
+        { contourId: b!.id, nodeId: b!.nodes[0]!.id, part: "point" as const },
+      ],
+    };
+
+    expect(overlapAt(chosen, "a", selectedContourIds(chosen), ids).outcome).toBe(2);
+  });
+
+  it("lets go of the selection, whose points the union has replaced", () => {
+    const s = withContours(
+      { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      { minX: 200, minY: 200, maxX: 500, maxY: 500 },
+    );
+    const [a] = s.document.glyphs["a"]!.contours;
+    const chosen = {
+      ...s,
+      selection: [{ contourId: a!.id, nodeId: a!.nodes[0]!.id, part: "point" as const }],
+    };
+
+    expect(overlapAt(chosen, "a", null, ids).result.state.selection).toEqual([]);
+  });
+
+  it("means the whole glyph when nothing is selected", () => {
+    const s = withContours(
+      { minX: 0, minY: 0, maxX: 300, maxY: 300 },
+      { minX: 200, minY: 200, maxX: 500, maxY: 500 },
+    );
+    expect(selectedContourIds(s)).toBeNull();
   });
 });
 

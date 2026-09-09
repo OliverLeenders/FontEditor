@@ -277,3 +277,65 @@ describe("a contour that crosses itself", () => {
     expect(removeOverlap(box, ids)?.glyph).toBe(box);
   });
 });
+
+describe("removing overlap from some of the contours", () => {
+  /**
+   * Three squares in a diagonal chain: the first crosses the second and the
+   * second crosses the third. Union the whole glyph and all three become one
+   * shape, which is exactly what someone building a letter out of strokes does
+   * not want yet.
+   */
+  const chain = () =>
+    glyph("a", {
+      advance: 800,
+      contours: [
+        rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        rectContour(ids, { minX: 200, minY: 200, maxX: 500, maxY: 500 }),
+        rectContour(ids, { minX: 400, minY: 400, maxX: 700, maxY: 700 }),
+      ],
+    });
+
+  it("unions the contours it was given and leaves the others as they were", () => {
+    const g = chain();
+    const [first, second, third] = g.contours;
+    const out = removeOverlap(g, ids, new Set([first!.id, second!.id]))!;
+
+    expect(out.crossings).toBe(2);
+    expect(out.glyph.contours).toHaveLength(2);
+    // The same object, not an equal one: the third square was not read, not
+    // rebuilt, and not renumbered.
+    expect(out.glyph.contours).toContain(third);
+  });
+
+  it("puts the union where the working set began", () => {
+    // Contour order is not geometry, but it is written into a `.glif` and read
+    // back, so a union should not shuffle the shapes nobody asked about.
+    const g = glyph("a", {
+      advance: 800,
+      contours: [
+        rectContour(ids, { minX: 600, minY: 0, maxX: 700, maxY: 100 }),
+        rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        rectContour(ids, { minX: 200, minY: 200, maxX: 500, maxY: 500 }),
+        rectContour(ids, { minX: 600, minY: 600, maxX: 700, maxY: 700 }),
+      ],
+    });
+    const [far, a, b, alsoFar] = g.contours;
+    const out = removeOverlap(g, ids, new Set([a!.id, b!.id]))!;
+
+    expect(out.glyph.contours).toHaveLength(3);
+    expect(out.glyph.contours[0]).toBe(far);
+    expect(out.glyph.contours[2]).toBe(alsoFar);
+  });
+
+  it("calls a working set that overlaps nothing clean, and leaves the glyph be", () => {
+    const g = chain();
+    const [first, , third] = g.contours;
+    // They cross the middle square, and not each other.
+    expect(removeOverlap(g, ids, new Set([first!.id, third!.id]))?.glyph).toBe(g);
+  });
+
+  it("names no contour at all as nothing to do", () => {
+    const g = chain();
+    expect(removeOverlap(g, ids, new Set())?.glyph).toBe(g);
+  });
+});

@@ -14,7 +14,7 @@ import {
 
 import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import type { Glyph } from "./glyph.js";
-import type { IdFactory } from "./ids.js";
+import type { ContourId, IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
 
 /**
@@ -78,19 +78,36 @@ const JOIN = 0.05;
 const SAME_PLACE = 0.002;
 
 /**
- * Remove overlap from a glyph.
+ * Remove overlap from a glyph, or from named contours of it.
  *
  * A glyph with nothing overlapping comes back unchanged, with a count of zero:
  * the same object, so a caller can tell "cleaned" from "already clean" by
  * identity as well as by the number.
+ *
+ * `only` narrows the working set. Everything outside it is left exactly as it
+ * was drawn and exactly where it was — which is the whole point of asking for a
+ * few contours rather than the glyph: a stem drawn as two strokes is merged
+ * while the counter beside it stays a separate shape, and a bowl being fitted
+ * to a stem is not swallowed by it a moment too early. The union of a subset is
+ * the same operation over a shorter list, so nothing below knows the difference.
  *
  * `null` means the outlines could not be resolved. It is the answer of last
  * resort — a boundary that will not close means the crossings were not found
  * cleanly, and handing back an outline with a gap in it would be worse than
  * handing back nothing.
  */
-export function removeOverlap(g: Glyph, ids: IdFactory): OverlapResult | null {
-  const closed = g.contours.filter((c) => c.closed && c.nodes.length >= 2);
+export function removeOverlap(
+  g: Glyph,
+  ids: IdFactory,
+  only: ReadonlySet<ContourId> | null = null,
+): OverlapResult | null {
+  // An open contour has no inside, and a contour of one node has no outline, so
+  // neither can take part; both are carried through untouched, the same as a
+  // contour the caller did not name.
+  const taken = (c: Contour): boolean =>
+    c.closed && c.nodes.length >= 2 && (only === null || only.has(c.id));
+
+  const closed = g.contours.filter(taken);
   if (closed.length === 0) return { glyph: g, crossings: 0 };
 
   const eps = tolerance(closed);
@@ -125,8 +142,15 @@ export function removeOverlap(g: Glyph, ids: IdFactory): OverlapResult | null {
   const loops = walk(kept, ids, eps);
   if (loops === null) return null;
 
-  const others = g.contours.filter((c) => !closed.includes(c));
-  return { glyph: { ...g, contours: [...others, ...loops] }, crossings };
+  // The union lands where the working set began, and everything else keeps the
+  // order it was drawn in. Order is not geometry — the fill does not depend on
+  // it — but it is written into a `.glif` and read back, so a save should not
+  // shuffle the contours a person did not ask about.
+  const at = g.contours.findIndex(taken);
+  const after = g.contours.slice(at + 1).filter((c) => !taken(c));
+  const contours = [...g.contours.slice(0, at), ...loops, ...after];
+
+  return { glyph: { ...g, contours }, crossings };
 }
 
 /**

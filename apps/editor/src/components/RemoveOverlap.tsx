@@ -1,4 +1,4 @@
-import { overlapAt } from "@fonteditor/tools";
+import { overlapAt, selectedContourIds } from "@fonteditor/tools";
 import { useEffect, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -9,7 +9,13 @@ import styles from "./Toolbar.module.css";
 const NOTE_MS = 4000;
 
 /**
- * "Overlap": union the contours of the glyph on screen.
+ * "Overlap": union the contours of the glyph on screen, or the selected ones.
+ *
+ * What it works on follows the selection, the way the transform panel and the
+ * nudge keys do: nothing selected means the glyph, and a selection means the
+ * contours it touches. That is what lets a stem drawn as two strokes be merged
+ * while the counter beside it is left alone — and it needs no second button,
+ * since "everything" is what an empty selection has always meant here.
  *
  * The result is said afterwards rather than predicted on the button, for the
  * same reason the font-wide rounding says its count afterwards — working out
@@ -24,6 +30,7 @@ const NOTE_MS = 4000;
 export function RemoveOverlap(): React.JSX.Element {
   const store = useEditorStore();
   const reading = useStoreValue((s) => s.ownership === "reading");
+  const chosen = useStoreValue((s) => s.session.editor.selection.length > 0);
   const [note, setNote] = useState<{ text: string; refused: boolean } | null>(null);
 
   useEffect(() => {
@@ -41,15 +48,24 @@ export function RemoveOverlap(): React.JSX.Element {
         title={
           reading
             ? "Another tab is saving this project"
-            : "Replace the overlapping contours with their outline"
+            : chosen
+              ? "Replace the selected contours with their outline"
+              : "Replace the overlapping contours with their outline"
         }
-        aria-label="Remove overlap"
+        aria-label={chosen ? "Remove overlap in selection" : "Remove overlap"}
         onClick={() => {
           const editor = store.editor;
-          const { outcome, result } = overlapAt(editor, editor.currentGlyph);
+          const only = selectedContourIds(editor);
+          const { outcome, result } = overlapAt(editor, editor.currentGlyph, only);
 
           if (outcome === "clean") {
-            setNote({ text: "Nothing was overlapping.", refused: false });
+            setNote({
+              text:
+                only === null
+                  ? "Nothing was overlapping."
+                  : "Nothing was overlapping in the selection.",
+              refused: false,
+            });
             return;
           }
           if (outcome === "refused") {

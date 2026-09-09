@@ -106,7 +106,7 @@ export {
 } from "./kerning.js";
 
 export type { OverlapOutcome } from "./overlap.js";
-export { overlapAt, removeOverlapAt } from "./overlap.js";
+export { overlapAt, removeOverlapAt, selectedContourIds } from "./overlap.js";
 
 export {
   deleteSelectedPoints,

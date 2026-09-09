@@ -110,6 +110,7 @@ export {
   infoProblem,
   removeOverlapAt,
   overlapAt,
+  selectedContourIds,
   type OverlapOutcome,
   renameCurrentGlyph,
   renameRefusal,
