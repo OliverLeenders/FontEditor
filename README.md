@@ -30,6 +30,10 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, e
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
 | 10    | Production polish                   | lint, format and 2065 tests, run on CI; preferences persist                         |
+| 11    | The drawing hand                    | planned: see below                                                                  |
+| 12    | Not losing what was opened          | planned: see below                                                                  |
+| 13    | The family, named                   | planned: see below                                                                  |
+| 14    | What ships to a browser             | planned: see below                                                                  |
 
 ### What the table missed
 
@@ -127,6 +131,76 @@ The gaps worth naming, in the order they would bite someone using this:
   checking our arithmetic against our own arithmetic. What is still unproven is the OTF
   against a rasteriser, and the UFO against the editors people actually use, which agree
   with fontTools about the format and not always about what a font should contain.
+
+### What is still missing
+
+The ten phases are done and the list above is ticked, so the roadmap stopped pointing
+anywhere. These are the holes found by reading the code back afterwards, grouped into
+the order they would be reached for. Small first, because they are the ones felt every
+day; the largest last, because it is the one nothing else waits on.
+
+#### Phase 11 — The drawing hand
+
+The editor can draw a whole font and still makes four small things harder than they
+need to be.
+
+- **Remove overlap from a selection, not only from the glyph.** `removeOverlap` takes a
+  glyph and unions every closed contour in it, which is the right default and the wrong
+  only option: a stem drawn as two strokes wants to be merged while the counter beside
+  it is left alone, and an `a` under construction is a bowl that should stay separate
+  from the shape being fitted to it. The union of a subset is the same operation over a
+  smaller working set, with everything unselected left exactly where it was — the
+  function already puts the open contours back untouched, so the shape of the change is
+  known. What is new is saying _which_ contours, and a button that reads the selection
+  and says so.
+- **A component can only be moved.** The model carries a full affine per component and
+  `.glif` reads and writes all four scale fields, but the inspector offers x and y
+  offset alone. So there is no flipped component: no `b` from `d`, no opening quote from
+  a closing one — the two places every family uses one. The format work is done; this is
+  fields and a pair of flip buttons.
+- **The ruler measures inside one letter.** Hold `M` and it reads a stem square to the
+  outline; drag `L` and it reads every width along a line. Neither answers the question
+  the glyph strip exists to ask, which is how big the gap between this letter and the
+  next one is.
+- **Nothing in the app says what the keys are.** There are around forty commands behind
+  icons, the right-click menu and held keys, and the only list of them is this file.
+
+#### Phase 12 — Not losing what was opened
+
+One item, and it is the only bug-shaped thing on this list. Saving to a folder writes a
+`layercontents.plist` that names one layer, so a source with a sketch or background
+layer keeps its files on disk and loses its listing of them. Everything else this editor
+cannot model is carried through unread and put back where it was found; layers are the
+exception, and they should be treated the same way.
+
+#### Phase 13 — The family, named
+
+A designspace is masters _and_ the instances drawn between them, and only the first half
+is here. The variable font's `fvar` fakes its named instances from the master list, so a
+two-axis family offers a menu of its corners rather than of its styles, and the
+`.designspace` written out has no `<instances>` element at all. Interpolation itself is
+already done — `interpolateFont` gives the document at any location, and the Masters
+panel already shows one. What is missing is somewhere to keep the list, the element in
+the file, real entries in `fvar`, and the thing that falls out for free once instances
+exist: exporting each of them as a static font.
+
+Metric keys belong to the same phase and are not in the model at all. Spacing a family
+by hand means re-spacing it after every change; a font source says instead that this
+glyph's advance is that one's, and the value is resolved when the font is compiled.
+
+#### Phase 14 — What ships to a browser
+
+Export writes OTF, TTF, UFO, a family and a variable OTF, and none of those is what goes
+on a web page. WOFF is the smaller half of this: a header and a table directory with
+each table deflated, and the deflate is already here for the UFO zip. WOFF2 needs Brotli
+and therefore a dependency, which is a decision rather than a task.
+
+The larger half is a variable font with `glyf` and `gvar` rather than CFF2. It is the
+flavour the web actually serves, and it is the biggest single job left: the quadratic
+conversion that TTF export already does has to come out _point-compatible_ across every
+master before a delta can be taken between them, which the current converter has no
+reason to guarantee, and `gvar` wants the four phantom points along with the outline.
+Nothing else on this list waits on it, which is why it is last.
 
 ## Getting started
 
