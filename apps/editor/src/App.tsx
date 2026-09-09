@@ -17,6 +17,7 @@ import { Inspector } from "./components/Inspector.js";
 import { FeaturesView } from "./components/FeaturesView.js";
 import { ProofView } from "./components/ProofView.js";
 import { SpacingView } from "./components/SpacingView.js";
+import { Shortcuts } from "./components/Shortcuts.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TabBar, type ViewId } from "./components/TabBar.js";
 import { Toolbar } from "./components/Toolbar.js";
@@ -34,6 +35,7 @@ export function App(): React.JSX.Element {
   // nobody asked yet.
   const [view, setView] = useState<ViewId>("font");
   const [menu, setMenu] = useState<MenuRequest | null>(null);
+  const [keysShown, setKeysShown] = useState(false);
   // Read by the window key handler, which is installed once and must not be
   // rebuilt every time the workspace changes.
   const viewRef = useRef(view);
@@ -62,6 +64,16 @@ export function App(): React.JSX.Element {
       // needs it, and gating it on the glyph view left spacing edits with no way
       // back — which is worse than an unhandled key, because the edit still
       // happened.
+      // The list of keys is itself a key, and it is the one shortcut that has
+      // to work from anywhere: somebody pressing it does not know where they
+      // are. "?" is where every application keeps it; F1 is where the operating
+      // system does.
+      if (!typing && (event.key === "?" || event.key === "F1")) {
+        event.preventDefault();
+        setKeysShown((shown) => !shown);
+        return;
+      }
+
       const modified = event.ctrlKey || event.metaKey;
       if (modified && event.key.toLowerCase() === "z") {
         event.preventDefault();
@@ -81,6 +93,14 @@ export function App(): React.JSX.Element {
       if (modified && !typing && event.key.toLowerCase() === "a") {
         event.preventDefault();
         store.applyTool(selectAllPoints(store.editor));
+        return;
+      }
+
+      // Through the font, a glyph at a time. The order is the font's own, which
+      // is the order the browser shows and the order a UFO stores.
+      if (!typing && !modified && (event.key === "PageUp" || event.key === "PageDown")) {
+        event.preventDefault();
+        store.stepGlyph(event.key === "PageDown" ? 1 : -1);
         return;
       }
 
@@ -260,7 +280,8 @@ export function App(): React.JSX.Element {
           <GlyphStrip />
         </>
       )}
-      <StatusBar workspace={view} />
+      <StatusBar workspace={view} onShortcuts={() => setKeysShown(true)} />
+      {keysShown ? <Shortcuts onClose={() => setKeysShown(false)} /> : null}
     </div>
   );
 }

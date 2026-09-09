@@ -29,12 +29,12 @@ afterEach(() => {
 
 describe("what the status bar says the keys do", () => {
   it("names the canvas keys while drawing", () => {
-    render(<StatusBar workspace="glyph" />);
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />);
     expect(screen.getByText(/hold M to measure/)).toBeTruthy();
   });
 
   it("names the browser keys in the font view", () => {
-    render(<StatusBar workspace="font" />);
+    render(<StatusBar workspace="font" onShortcuts={() => undefined} />);
     expect(screen.getByText(/double-click a glyph/)).toBeTruthy();
   });
 
@@ -42,7 +42,7 @@ describe("what the status bar says the keys do", () => {
     // Spacing has its own line of instructions under the strip; a second set
     // down here would be a repetition at best and a disagreement at worst.
     for (const workspace of ["spacing", "features", "proof"] as const) {
-      render(<StatusBar workspace={workspace} />);
+      render(<StatusBar workspace={workspace} onShortcuts={() => undefined} />);
       expect(screen.queryByText(/double-click a glyph/)).toBeNull();
       expect(screen.queryByText(/hold M to measure/)).toBeNull();
       cleanup();
@@ -52,11 +52,11 @@ describe("what the status bar says the keys do", () => {
 
 describe("what the status bar counts", () => {
   it("counts the selection only where there is a canvas to select on", () => {
-    render(<StatusBar workspace="glyph" />);
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />);
     expect(screen.getByText("selected")).toBeTruthy();
 
     cleanup();
-    render(<StatusBar workspace="font" />);
+    render(<StatusBar workspace="font" onShortcuts={() => undefined} />);
     expect(screen.queryByText("selected")).toBeNull();
   });
 });

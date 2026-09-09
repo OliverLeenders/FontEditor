@@ -38,7 +38,7 @@ export type MeasureOptions = {
    * The glyph being edited is *not* in this list — the tool adds it at its own
    * origin, because that is where the canvas draws it.
    */
-  readonly neighbours?: readonly PlacedGlyph[];
+  readonly neighbours?: readonly PlacedGlyph[] | undefined;
 };
 
 /** How near the pointer must come, in screen pixels, to measure from a segment. */

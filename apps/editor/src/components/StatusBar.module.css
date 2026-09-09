@@ -43,6 +43,17 @@
 .hints {
   margin-left: auto;
   min-width: 0;
+  padding: 0.1rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.hints:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink);
 }
 
 .hintText {

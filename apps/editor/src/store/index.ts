@@ -362,6 +362,23 @@ export class EditorStore {
     this.fitGlyph();
   }
 
+  /**
+   * The glyph before or after this one, in the font's own order.
+   *
+   * That order rather than alphabetical or by codepoint: it is what the browser
+   * shows, what a UFO stores, and what the designer arranged. Stops at either
+   * end rather than wrapping — arriving back at `A` from `z` reads as a bug the
+   * first three times it happens.
+   */
+  stepGlyph(by: number): void {
+    const order = this.editor.document.glyphOrder;
+    const at = order.indexOf(this.editor.currentGlyph);
+    if (at === -1) return;
+
+    const next = order[at + by];
+    if (next !== undefined) this.setCurrentGlyph(next);
+  }
+
   undo(): void {
     this.patch({ session: undo(this.state.session) });
     this.disk.commit(this.state.session.editor.document);

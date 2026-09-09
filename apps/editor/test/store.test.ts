@@ -213,6 +213,34 @@ describe("EditorStore", () => {
     });
   });
 
+  describe("stepping through the font", () => {
+    it("moves to the next glyph and back again, in the font's own order", () => {
+      const order = store.editor.document.glyphOrder;
+      const first = order[0]!;
+
+      store.setCurrentGlyph(first);
+      store.stepGlyph(1);
+      expect(store.editor.currentGlyph).toBe(order[1]);
+
+      store.stepGlyph(-1);
+      expect(store.editor.currentGlyph).toBe(first);
+    });
+
+    it("stops at either end rather than wrapping round", () => {
+      // Arriving back at the first glyph from the last reads as a bug the first
+      // three times it happens.
+      const order = store.editor.document.glyphOrder;
+
+      store.setCurrentGlyph(order[0]!);
+      store.stepGlyph(-1);
+      expect(store.editor.currentGlyph).toBe(order[0]);
+
+      store.setCurrentGlyph(order[order.length - 1]!);
+      store.stepGlyph(1);
+      expect(store.editor.currentGlyph).toBe(order[order.length - 1]);
+    });
+  });
+
   describe("fitGlyph", () => {
     it("does nothing before the canvas has a size", () => {
       const before = store.editor.view;

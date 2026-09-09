@@ -27,7 +27,14 @@ import {
  * one: every other workspace used to be told it was the glyph browser, and
  * offered to open a letter by double-clicking something that was not there.
  */
-export function StatusBar({ workspace }: { workspace: ViewId }): React.JSX.Element {
+export function StatusBar({
+  workspace,
+  onShortcuts,
+}: {
+  workspace: ViewId;
+  /** Opens the sheet of every key, which the status bar is where you look for. */
+  onShortcuts: () => void;
+}): React.JSX.Element {
   const selection = useStoreValue((s) => s.session.editor.selection.length);
   const tool = useStoreValue((s) => s.session.editor.activeTool);
   const saveStatus = useStoreValue((s) => s.saveStatus);
@@ -100,12 +107,20 @@ export function StatusBar({ workspace }: { workspace: ViewId }): React.JSX.Eleme
           recovered unsaved work
         </span>
       ) : null}
-      <span className={styles.hints}>
-        {HINTS[workspace] === "" ? null : <KeyboardIcon />}
+      {/* The line that already carried a keyboard and a few of the keys is
+          where somebody would look for the rest of them, so it is the way in
+          rather than a second control beside it. */}
+      <button
+        type="button"
+        className={styles.hints}
+        title="Every key this editor answers to  (?)"
+        onClick={onShortcuts}
+      >
+        <KeyboardIcon />
         {/* The words in their own box, because a flex row cannot put an
             ellipsis on a bare run of text. */}
         <span className={styles.hintText}>{HINTS[workspace]}</span>
-      </span>
+      </button>
     </div>
   );
 }

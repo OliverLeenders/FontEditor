@@ -29,8 +29,8 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, e
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2065 tests, run on CI; preferences persist                         |
-| 11    | The drawing hand                    | planned: see below                                                                  |
+| 10    | Production polish                   | lint, format and 2098 tests, run on CI; preferences persist                         |
+| 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | planned: see below                                                                  |
 | 13    | The family, named                   | planned: see below                                                                  |
 | 14    | What ships to a browser             | planned: see below                                                                  |
@@ -139,31 +139,27 @@ anywhere. These are the holes found by reading the code back afterwards, grouped
 the order they would be reached for. Small first, because they are the ones felt every
 day; the largest last, because it is the one nothing else waits on.
 
-#### Phase 11 — The drawing hand
+#### Phase 11 — The drawing hand — done
 
-The editor can draw a whole font and still makes four small things harder than they
-need to be.
+Four small things the editor made harder than they needed to be.
 
-- **Remove overlap from a selection, not only from the glyph.** `removeOverlap` takes a
-  glyph and unions every closed contour in it, which is the right default and the wrong
-  only option: a stem drawn as two strokes wants to be merged while the counter beside
-  it is left alone, and an `a` under construction is a bowl that should stay separate
-  from the shape being fitted to it. The union of a subset is the same operation over a
-  smaller working set, with everything unselected left exactly where it was — the
-  function already puts the open contours back untouched, so the shape of the change is
-  known. What is new is saying _which_ contours, and a button that reads the selection
-  and says so.
-- **A component can only be moved.** The model carries a full affine per component and
-  `.glif` reads and writes all four scale fields, but the inspector offers x and y
-  offset alone. So there is no flipped component: no `b` from `d`, no opening quote from
-  a closing one — the two places every family uses one. The format work is done; this is
-  fields and a pair of flip buttons.
-- **The ruler measures inside one letter.** Hold `M` and it reads a stem square to the
-  outline; drag `L` and it reads every width along a line. Neither answers the question
-  the glyph strip exists to ask, which is how big the gap between this letter and the
-  next one is.
-- **Nothing in the app says what the keys are.** There are around forty commands behind
-  icons, the right-click menu and held keys, and the only list of them is this file.
+- **Remove overlap from a selection.** The working set is a parameter now: nothing
+  selected still unions the whole glyph, and a selection unions the contours it touches
+  and leaves the rest exactly as drawn and exactly where they were. A stem drawn as two
+  strokes can be merged while the counter beside it stays a separate shape.
+- **A component can be turned over.** The row has a flip each way, mirroring the
+  component about the middle of what it _draws_ rather than about the base glyph's
+  origin, so a `b` built from a `d` stays where it was put. Scaling a component by a
+  typed number is deliberately still absent — a designer drawing by eye does not have
+  that number.
+- **The ruler reads the gap between two letters.** Ink to ink at the height being
+  pointed at, which is what the eye judges and what changes as you move up and down a
+  round letter — not the sidebearings, which say one number for the whole letter and say
+  it about the advance box. On an outline it still reads the stem; the two never both
+  answer.
+- **`?` shows every key.** One sheet, grouped by where the keys work, reachable from the
+  status bar as well. Writing it down found that `PageUp` and `PageDown` were documented
+  here and handled nowhere, so they exist now too.
 
 #### Phase 12 — Not losing what was opened
 
@@ -216,8 +212,8 @@ Then run the editor and open http://localhost:5174:
 pnpm dev
 ```
 
-Use PgUp and PgDn to move between glyphs. The toolbar is icons; every one names its
-shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
+Use PgUp and PgDn to move between glyphs, and press `?` for every key at once. The
+toolbar is icons; every one names its shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
 `L` ruler. Measuring one stem is **held** rather than switched to: `M` borrows the tool
 for as long as the key is down and gives the drawing tool back when it is let go, because
 measuring is something you do while drawing rather than instead of it. With the pen, click for a corner point and drag for a smooth one, Alt while
@@ -291,8 +287,11 @@ a straight side or an already harmonious join has nothing to reconcile.
 
 **Two rulers.** Hold `M` and point at a stem: the reading is taken square to the outline,
 which is what a stem width is — a straight line dragged across a round letter measures a
-chord instead, and answers a different question. Click to pin the reading, let the key go
-to carry on drawing. `L` is the other kind: drag a line across the whole letter and every
+chord instead, and answers a different question. Point at the space _between_ two letters
+instead and it reads the gap there: ink to ink at the height under the pointer, which is
+what the eye judges and which changes as you move up and down a round letter — the
+sidebearings say one number for the whole letter, and say it about the advance box. Click
+to pin the reading, let the key go to carry on drawing. `L` is the other kind: drag a line across the whole letter and every
 width along it is measured in a row — stem, counter, stem — with the stretches of ink
 told apart from the gaps between them. Shift holds the line to an eighth-turn, Escape
 takes it away, and it stays where it was put while you work under it.
