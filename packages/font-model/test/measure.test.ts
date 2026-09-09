@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { contour, reverseContour } from "../src/contour.js";
 import { addContour, glyph } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
-import { measureAngle, measureNormal, sectionAcross } from "../src/measure.js";
+import { measureAngle, measureGap, measureNormal, sectionAcross } from "../src/measure.js";
 import { node } from "../src/node.js";
 import { ellipseContour, rectContour } from "../src/shapes.js";
 
@@ -177,5 +177,94 @@ describe("a section across the glyph", () => {
     const out = sectionAcross(bars(), vec(-50, 900), vec(350, 900));
     expect(out.crossings).toEqual([]);
     expect(out.spans).toEqual([]);
+  });
+});
+
+/**
+ * The other ruler: how far apart two letters look.
+ *
+ * The stem reading is about one letter, and the strip of neighbours under the
+ * canvas exists to ask a question it cannot answer. What is measured is ink to
+ * ink at the height being pointed at, which is what the eye judges and what
+ * changes as you move up and down a round letter — not the sidebearings, which
+ * say one number for the whole letter and say it about the advance box.
+ */
+describe("measuring the gap between two letters", () => {
+  /** A box 200 wide and 500 tall at the origin, in a 300-unit advance. */
+  const box = (name: string) =>
+    glyph(name, {
+      advance: 300,
+      contours: [rectContour(ids, { minX: 50, minY: 0, maxX: 250, maxY: 500 })],
+    });
+
+  const pair = () => [
+    { glyph: box("a"), x: 0 },
+    { glyph: box("b"), x: 300 },
+  ];
+
+  it("reads from the right of one letter to the left of the next", () => {
+    // The first box ends at 250, the second begins at 300 + 50 = 350.
+    const m = measureGap(pair(), at(300, 250))!;
+
+    expect(m.distance).toBe(100);
+    expect(m.from).toEqual(at(250, 250));
+    expect(m.to).toEqual(at(350, 250));
+  });
+
+  it("says nothing at a height where one of them has no ink", () => {
+    expect(measureGap(pair(), at(300, 600))).toBeNull();
+  });
+
+  it("leaves the inside of a letter to the other ruler", () => {
+    expect(measureGap(pair(), at(150, 250))).toBeNull();
+  });
+
+  it("says nothing outside every gap", () => {
+    expect(measureGap(pair(), at(-100, 250))).toBeNull();
+    expect(measureGap(pair(), at(900, 250))).toBeNull();
+  });
+
+  it("measures the ink, so a round letter reads differently at different heights", () => {
+    // A circle beside a straight edge: the gap is widest where the circle is
+    // furthest from it, which is anywhere but the middle of its side.
+    const round = [
+      {
+        glyph: glyph("o", {
+          advance: 600,
+          contours: [ellipseContour(ids, { minX: 0, minY: 0, maxX: 600, maxY: 600 })],
+        }),
+        x: 0,
+      },
+      { glyph: box("l"), x: 700 },
+    ];
+
+    const middle = measureGap(round, at(650, 300))!;
+    const higher = measureGap(round, at(650, 450))!;
+
+    expect(middle.distance).toBeCloseTo(150, 6);
+    expect(higher.distance).toBeGreaterThan(middle.distance);
+  });
+
+  it("takes the outermost ink, so a counter is not a gap", () => {
+    // The ring's hole is inside it. Pointing there is inside the letter, and
+    // the gap to the next letter is measured from the ring's outer edge.
+    const withRing = [
+      { glyph: ring(), x: 0 },
+      { glyph: box("l"), x: 700 },
+    ];
+
+    expect(measureGap(withRing, at(300, 300))).toBeNull();
+    expect(measureGap(withRing, at(680, 300))!.from.x).toBeCloseTo(600, 6);
+  });
+
+  it("has nothing to read where kerning has pushed the ink together", () => {
+    // The second box starts left of where the first one ends, so there is no
+    // gap and nowhere to point that is not inside one of the two.
+    const tight = [
+      { glyph: box("a"), x: 0 },
+      { glyph: box("b"), x: 150 },
+    ];
+    expect(measureGap(tight, at(210, 250))).toBeNull();
+    expect(measureGap(tight, at(225, 250))).toBeNull();
   });
 });

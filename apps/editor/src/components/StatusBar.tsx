@@ -1,6 +1,7 @@
 import { measureAngle } from "@fonteditor/font-model";
 import { shownMeasurement } from "@fonteditor/tools";
 
+import { measurableNeighbours } from "../scene.js";
 import { useStoreValue } from "../useStore.js";
 import styles from "./StatusBar.module.css";
 import type { AutosaveStatus } from "@fonteditor/storage";
@@ -40,12 +41,13 @@ export function StatusBar({ workspace }: { workspace: ViewId }): React.JSX.Eleme
   // line on every store notification.
   const measured = useStoreValue((s) =>
     s.session.editor.activeTool === "measure"
-      ? (shownMeasurement(s.session.editor)?.distance ?? null)
+      ? (shownMeasurement(s.session.editor, { neighbours: measurableNeighbours(s) })?.distance ??
+        null)
       : null,
   );
   const measuredAngle = useStoreValue((s) => {
     if (s.session.editor.activeTool !== "measure") return null;
-    const m = shownMeasurement(s.session.editor);
+    const m = shownMeasurement(s.session.editor, { neighbours: measurableNeighbours(s) });
     return m === null ? null : measureAngle(m);
   });
   const pinned = useStoreValue((s) => s.session.editor.measure !== null);

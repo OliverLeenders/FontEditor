@@ -28,9 +28,15 @@ export type Measurement = {
   readonly distance: number;
   /** Direction from `from` to `to`, as a unit vector. */
   readonly normal: Vec2;
-  /** The segment measured from, so a caller can show which one it picked. */
-  readonly contourId: ContourId;
-  readonly segmentIndex: number;
+  /**
+   * The segment measured from, so a caller can show which one it picked.
+   *
+   * `null` for a measurement that came from no single segment — the gap between
+   * two letters is the distance between two different glyphs' outlines, and
+   * neither of them is where the reading belongs.
+   */
+  readonly contourId: ContourId | null;
+  readonly segmentIndex: number | null;
 };
 
 /**
@@ -98,6 +104,92 @@ export function measureNormal(
     contourId,
     segmentIndex,
   };
+}
+
+/** A glyph as it sits in a line: the drawing, and where its origin is. */
+export type PlacedGlyph = {
+  readonly glyph: Glyph;
+  readonly x: number;
+};
+
+/**
+ * Measure the gap between two letters, at the height being pointed at.
+ *
+ * The other ruler here measures inside one letter. This is the question the
+ * strip of neighbours under the canvas exists to ask and could not answer: how
+ * far apart do these two actually look. Not how far apart their advance boxes
+ * are — the sidebearings say that, and they say it once for the whole letter —
+ * but ink to ink at one height, which is what the eye judges and which changes
+ * as you move up and down a round letter.
+ *
+ * `null` where there is nothing to read: outside every gap, at a height where
+ * one of the two letters has no ink, or between letters that have none. The
+ * cursor sitting *inside* a letter is `null` too, because that is the other
+ * ruler's question and answering it here would give two readings for one place.
+ *
+ * Components are not resolved, for the same reason the canvas does not draw a
+ * neighbour's: what is measured is what is on screen.
+ */
+export function measureGap(placed: readonly PlacedGlyph[], at: Vec2): Measurement | null {
+  const edges: { readonly left: number; readonly right: number }[] = [];
+  for (const p of placed) {
+    const span = inkSpanAt(p.glyph, at.y);
+    if (span !== null) edges.push({ left: span.left + p.x, right: span.right + p.x });
+  }
+  edges.sort((l, r) => l.left - r.left);
+
+  for (const [i, edge] of edges.entries()) {
+    // Inside a letter rather than between two of them.
+    if (at.x >= edge.left && at.x <= edge.right) return null;
+
+    const next = edges[i + 1];
+    if (next === undefined) continue;
+    // Ink that reaches past the next letter's ink leaves no gap between them —
+    // kerning can do it — and there is then nowhere to point that is not inside
+    // one of the two.
+    if (next.left < edge.right) continue;
+    if (at.x < edge.right || at.x > next.left) continue;
+
+    const from = { x: edge.right, y: at.y };
+    const to = { x: next.left, y: at.y };
+    return {
+      from,
+      to,
+      distance: to.x - from.x,
+      normal: { x: 1, y: 0 },
+      contourId: null,
+      segmentIndex: null,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * How far the ink of one glyph reaches left and right at a given height.
+ *
+ * The outermost crossings of a horizontal line, so a letter with a counter — an
+ * `o`, an `e` — reads as one span from its left edge to its right, which is what
+ * the gap to the next letter is measured from. The hole in the middle is a
+ * question for the other ruler.
+ */
+function inkSpanAt(g: Glyph, y: number): { readonly left: number; readonly right: number } | null {
+  const box = glyphBounds(g);
+  if (box === null || y < box.minY || y > box.maxY) return null;
+
+  // Started and ended clear of the drawing, so a crossing is never at an end of
+  // the stroke, where "did it cross" and "did it touch" are the same arithmetic.
+  const reach = box.maxX - box.minX + 1;
+  const crossings = strokeCrossings(g, { x: box.minX - reach, y }, { x: box.maxX + reach, y });
+  if (crossings.length === 0) return null;
+
+  let left = Infinity;
+  let right = -Infinity;
+  for (const crossing of crossings) {
+    left = Math.min(left, crossing.point.x);
+    right = Math.max(right, crossing.point.x);
+  }
+  return { left, right };
 }
 
 /** The measurement's angle in degrees, measured from the horizontal. */

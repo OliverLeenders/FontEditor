@@ -191,5 +191,6 @@ export { shapePreview, shapeRect } from "./shape.js";
 export type { KnifeOptions } from "./knife.js";
 export { knifeStroke } from "./knife.js";
 
+export type { MeasureOptions } from "./measure.js";
 export { shownMeasurement } from "./measure.js";
 export { shownSection } from "./section.js";

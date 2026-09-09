@@ -21,7 +21,8 @@ import type { EditorState, ToolId } from "./state.js";
 export type ToolOptions = select.SelectOptions &
   pen.PenOptions &
   shape.ShapeOptions &
-  knife.KnifeOptions & { readonly ids?: IdFactory };
+  knife.KnifeOptions &
+  measure.MeasureOptions & { readonly ids?: IdFactory };
 
 export function pointerDown(
   state: EditorState,
@@ -41,7 +42,7 @@ export function pointerDown(
     case "section":
       return section.pointerDown(state, input);
     case "measure":
-      return measure.pointerDown(state, input);
+      return measure.pointerDown(state, input, options);
   }
 }
 

@@ -6,6 +6,7 @@ import {
   type Contour,
   type FontDocument,
   type Glyph,
+  type PlacedGlyph,
   filledContours,
   glyphBounds,
   glyphForCodePoint,
@@ -377,7 +378,22 @@ function measurementFor(state: StoreState): Scene["measurement"] {
   const editor = state.session.editor;
   if (editor.activeTool !== "measure") return null;
 
-  const m = shownMeasurement(editor);
+  const m = shownMeasurement(editor, { neighbours: measurableNeighbours(state) });
   if (m === null) return null;
   return { from: m.from, to: m.to, distance: m.distance, pinned: editor.measure !== null };
+}
+
+/**
+ * The letters the ruler may measure a gap to.
+ *
+ * Only what is on screen, which is the rule the margins, the anchors and the
+ * Tunni controls already follow: a reading taken against a letter that is not
+ * drawn is a number with nothing beside it to explain where it came from. So
+ * turning the neighbours off turns the gap reading off with them, and the
+ * stem-width reading — which is about this letter alone — carries on.
+ */
+export function measurableNeighbours(state: StoreState): readonly PlacedGlyph[] {
+  if (!state.showNeighbours) return [];
+  const editor = state.session.editor;
+  return neighboursFor(editor.document, editor.currentGlyph, state.stripText);
 }

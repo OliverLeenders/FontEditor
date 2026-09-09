@@ -213,8 +213,8 @@ export { cutGlyph } from "./knife.js";
 export type { StrokeCrossing } from "./crossings.js";
 export { byContour, samePoint, strokeCrossings } from "./crossings.js";
 
-export type { Measurement, Section, SectionSpan } from "./measure.js";
-export { measureAngle, measureNormal, sectionAcross } from "./measure.js";
+export type { Measurement, PlacedGlyph, Section, SectionSpan } from "./measure.js";
+export { measureAngle, measureGap, measureNormal, sectionAcross } from "./measure.js";
 
 export type { OverlapResult } from "./overlap.js";
 export { removeOverlap } from "./overlap.js";

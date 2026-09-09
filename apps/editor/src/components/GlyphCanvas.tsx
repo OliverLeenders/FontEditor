@@ -28,7 +28,14 @@ import {
 } from "@fonteditor/view";
 import { useEffect, useRef } from "react";
 
-import { handlesAutoHidden, neighbourAt, neighboursFor, sceneFor, withinGlyph } from "../scene.js";
+import {
+  handlesAutoHidden,
+  measurableNeighbours,
+  neighbourAt,
+  neighboursFor,
+  sceneFor,
+  withinGlyph,
+} from "../scene.js";
 import type { EditorStore } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore } from "../useStore.js";
@@ -59,6 +66,10 @@ function selectOptions(store: EditorStore): ToolOptions {
     // Only what is drawn may be grabbed, which is the rule the margins and the
     // Tunni controls already follow.
     anchors: state.showAnchors,
+    // Worked out only for the ruler, which is the one tool that reads them, and
+    // only while it is the tool in hand: this runs on every pointer move.
+    neighbours:
+      state.session.editor.activeTool === "measure" ? measurableNeighbours(state) : undefined,
   };
 }
 

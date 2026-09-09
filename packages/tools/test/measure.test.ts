@@ -82,6 +82,41 @@ describe("the measure tool", () => {
     expect(shownMeasurement(s)?.distance).toBeCloseTo(80, 6);
   });
 
+  it("reads the gap to the letter beside it when it is pointing at neither", () => {
+    // The stem runs 100 to 180 and the neighbour is placed 300 to the right, so
+    // its own stem stands at 400 to 480 and the gap between the two is 220.
+    const beside = [{ glyph: start().document.glyphs["l"]!, x: 300 }];
+    const s = hover(start(), 250, 350);
+
+    expect(shownMeasurement(s, { neighbours: beside })?.distance).toBeCloseTo(220, 6);
+  });
+
+  it("says nothing about the gap when the neighbours are not on screen", () => {
+    // Turning them off turns the reading off with them: a number measured
+    // against a letter that is not drawn has nothing beside it to explain it.
+    const s = hover(start(), 250, 350);
+    expect(shownMeasurement(s)).toBeNull();
+  });
+
+  it("still reads the stem when the pointer is on one, neighbours or not", () => {
+    const beside = [{ glyph: start().document.glyphs["l"]!, x: 300 }];
+    const s = hover(start(), 120, 350);
+
+    expect(shownMeasurement(s, { neighbours: beside })?.distance).toBeCloseTo(80, 6);
+  });
+
+  it("pins a gap reading the same way it pins a stem", () => {
+    const beside = [{ glyph: start().document.glyphs["l"]!, x: 300 }];
+    const s = pointerDown(hover(start(), 250, 350), pointerInput(vec(250, 350)), {
+      neighbours: beside,
+    }).state;
+
+    expect(s.measure?.distance).toBeCloseTo(220, 6);
+    // And it stays without being handed the neighbours again, because a pinned
+    // reading is a number that was taken rather than one being taken.
+    expect(shownMeasurement(s)?.distance).toBeCloseTo(220, 6);
+  });
+
   it("lets go of a pinned reading on a second click", () => {
     let s = pointerDown(hover(start(), 120, 350), pointerInput(vec(120, 350))).state;
     s = pointerDown(s, pointerInput(vec(120, 350))).state;
