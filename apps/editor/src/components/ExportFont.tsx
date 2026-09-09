@@ -4,6 +4,8 @@ import {
   exportFileName,
   exportFont,
   exportTrueType,
+  toWoff,
+  toWoff2,
   exportUfo,
   exportVariableFont,
 } from "@fonteditor/font-io";
@@ -167,6 +169,48 @@ export function ExportFont(): React.JSX.Element {
       return { file, warnings };
     });
 
+  /**
+   * The same font, wrapped for a web page.
+   *
+   * Neither of these is another drawing of the font: they are the TrueType
+   * flavour behind a header, each table squeezed, and a browser unwraps them
+   * back into exactly the file they were made from. TrueType rather than CFF
+   * because that is what the transform in WOFF2 is *for* — a CFF font goes
+   * through it unchanged and comes out barely smaller than a WOFF.
+   *
+   * Both, rather than the newer one alone, because a `@font-face` names them in
+   * a list and the second entry is what an old browser takes.
+   */
+  const woff = (): void =>
+    void attemptAsync(async () => {
+      const document = store.editor.document;
+      const made = exportTrueType(document);
+      const bytes = await toWoff(new Uint8Array(made.bytes));
+      const file = exportFileName(document).replace(/\.otf$/, ".woff");
+      download(bytes.slice().buffer, file, "font/woff");
+      return { file: `${file} · ${size(bytes.length)}`, warnings: made.warnings };
+    });
+
+  /**
+   * The same again, Brotli'd and with the outlines taken apart first.
+   *
+   * The wasm that does it is a megabyte, so it arrives when this is pressed and
+   * never at startup: an export is the last thing anybody does in a session,
+   * and a moment here is cheaper than a megabyte on every load.
+   */
+  const woff2 = (): void =>
+    void attemptAsync(async () => {
+      const document = store.editor.document;
+      const made = exportTrueType(document);
+      const out = await toWoff2(new Uint8Array(made.bytes));
+      const file = exportFileName(document).replace(/\.otf$/, ".woff2");
+      download(out.bytes.slice().buffer, file, "font/woff2");
+      return {
+        file: `${file} · ${size(out.bytes.length)} · ${String(Math.round(out.saved * 100))}% smaller`,
+        warnings: made.warnings,
+      };
+    });
+
   const ufo = (): void =>
     void attemptAsync(async () => {
       const document = store.editor.document;
@@ -203,6 +247,22 @@ export function ExportFont(): React.JSX.Element {
       icon: DownloadIcon,
       disabled: glyphCount === 0,
       run: truetype,
+    },
+    {
+      kind: "item",
+      label: "WOFF",
+      note: "for a web page",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0,
+      run: woff,
+    },
+    {
+      kind: "item",
+      label: "WOFF2",
+      note: "for a web page, smaller",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0,
+      run: woff2,
     },
     {
       kind: "item",
@@ -281,4 +341,13 @@ function atHome(
   axes: readonly { readonly tag: string; readonly default: number }[],
 ): boolean {
   return axes.every((a) => (at[a.tag] ?? a.default) === (home[a.tag] ?? a.default));
+}
+
+/** A file size, said the way a person says it. */
+function size(bytes: number): string {
+  return bytes < 1024
+    ? `${String(bytes)} B`
+    : bytes < 1024 * 1024
+      ? `${(bytes / 1024).toFixed(1)} kB`
+      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

@@ -12,7 +12,7 @@ derives from the reverse-engineering write-up in
 **A font drawn here can be kept on disk, exported and installed.** Five workspaces —
 Font, Glyph, Spacing, Features, Proof — around a canvas with select, pen, knife,
 rectangle, ellipse, measure and section tools, snapping, boolean union, anchors and
-components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF, TTF, a variable OTF and UFO in
+components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF, TTF, WOFF, WOFF2, a variable OTF and UFO in
 both directions. A family is several masters, a `.designspace` and one `.ufo` each; a UFO folder on disk is opened and saved back to; everything autosaves
 to the browser's own store besides, and copies of the whole font are kept as you work.
 Guides and a picture to trace from sit behind the drawing; before it goes out, nineteen checks say what is wrong with it.
@@ -29,11 +29,11 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, n
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2156 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2164 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
-| 14    | What ships to a browser             | planned: see below                                                                  |
+| 14    | What ships to a browser             | WOFF and WOFF2 done; the variable TrueType flavour is not                           |
 
 ### What the table missed
 
@@ -213,17 +213,26 @@ be the worst of the three, since the glyph still has spacing and nothing looks w
 
 #### Phase 14 — What ships to a browser
 
-Export writes OTF, TTF, UFO, a family and a variable OTF, and none of those is what goes
-on a web page. WOFF is the smaller half of this: a header and a table directory with
-each table deflated, and the deflate is already here for the UFO zip. WOFF2 needs Brotli
-and therefore a dependency, which is a decision rather than a task.
+**WOFF and WOFF2 are done.** Neither is another drawing of the font: they are the same
+tables behind a header saying how big each was before it was squeezed, and a browser
+unwraps one back into exactly the file it was made from. Both are written from the
+TrueType flavour, because the transform in WOFF2 is what makes it worth having and a CFF
+font goes through it unchanged.
 
-The larger half is a variable font with `glyf` and `gvar` rather than CFF2. It is the
+WOFF1 needed nothing installed — deflate is the browser's own `CompressionStream`, and
+the wrapping is a page of code. WOFF2 is somebody else's compiled C++: Brotli is in no
+browser's compression API, and the transform that takes `glyf` and `loca` apart into
+parallel streams is a specification in its own right, so this calls a wasm build of
+Google's `woff2` — the same code `woff2_compress` and fontTools use. Writing a second
+implementation of a format would mean having to prove ourselves right about it. The wasm
+is a megabyte and is fetched when somebody presses WOFF2, never at startup.
+
+What is left is **a variable font with `glyf` and `gvar`** rather than CFF2. It is the
 flavour the web actually serves, and it is the biggest single job left: the quadratic
 conversion that TTF export already does has to come out _point-compatible_ across every
 master before a delta can be taken between them, which the current converter has no
 reason to guarantee, and `gvar` wants the four phantom points along with the outline.
-Nothing else on this list waits on it, which is why it is last.
+Nothing else waits on it.
 
 ## Getting started
 
@@ -331,6 +340,11 @@ to pin the reading, let the key go to carry on drawing. `L` is the other kind: d
 width along it is measured in a row — stem, counter, stem — with the stretches of ink
 told apart from the gaps between them. Shift holds the line to an eighth-turn, Escape
 takes it away, and it stays where it was put while you work under it.
+
+**What comes out.** OTF and TTF to install, WOFF and WOFF2 for a web page, a UFO as
+source, and — once a font has more than one master — a family as a designspace with a
+UFO each, one variable font, and every named style as an ordinary static font. The web
+formats are written from the TrueType flavour, which is what WOFF2's transform is for.
 
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,
 reverse contour and delete. A handle offers the axis lock, its node's type, retract,

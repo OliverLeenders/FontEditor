@@ -30,6 +30,10 @@ export { tableChecksum, withTable } from "./sfnt.js";
 export type { ExportResult } from "./export.js";
 export { FontExportError, exportFileName, exportFont } from "./export.js";
 
+export { toWoff } from "./woff.js";
+export type { Woff2Result } from "./woff2.js";
+export { toWoff2 } from "./woff2.js";
+
 export type { UfoExport } from "./ufo.js";
 export { contourPoints, exportUfo, glif, ufoFiles } from "./ufo.js";
 

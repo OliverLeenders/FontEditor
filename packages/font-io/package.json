@@ -17,6 +17,7 @@
   "dependencies": {
     "@fonteditor/font-model": "workspace:*",
     "@fonteditor/geometry": "workspace:*",
-    "opentype.js": "^2.0.0"
+    "opentype.js": "^2.0.0",
+    "woff2-encoder": "^2.0.0"
   }
 }
