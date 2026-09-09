@@ -354,7 +354,8 @@
   color: var(--ink-2);
 }
 
-.componentRemove {
+.componentRemove,
+.rowAction {
   display: grid;
   place-items: center;
   flex: none;
@@ -370,12 +371,19 @@
 }
 /* Small, because the row it ends is four fields wide and the button is the
    least important thing in it — until it is the thing you want. */
-.componentRemove svg {
+.componentRemove svg,
+.rowAction svg {
   width: 0.8rem;
   height: 0.8rem;
 }
 .componentRemove:hover {
   color: var(--danger);
+  border-color: currentColor;
+}
+/* The same button, for an action that undoes rather than destroys: a flip is
+   a flip back, and colouring it like the bin would overstate it. */
+.rowAction:hover {
+  color: var(--accent);
   border-color: currentColor;
 }
 
@@ -477,6 +485,12 @@
 }
 .anchorRow[data-selected="true"] .input {
   border-color: var(--accent);
+}
+
+/* A component row is an anchor row with two more buttons on the end: the name,
+   where it sits, the two flips, and the bin. */
+.componentEntry {
+  grid-template-columns: 1fr 3.2rem 3.2rem 1.15rem 1.15rem 1.15rem;
 }
 
 /* The tracing row: which picture, where its corner is, how big, and the one

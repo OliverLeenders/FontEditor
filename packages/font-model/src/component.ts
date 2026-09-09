@@ -52,6 +52,36 @@ export function transformedComponent(c: Component, transform: Affine): Component
   return { ...c, transform };
 }
 
+/** Which way round a component is turned over. */
+export type FlipAxis = "horizontal" | "vertical";
+
+/**
+ * Turn a component over, about a line in the glyph that holds it.
+ *
+ * The two places every family needs this are a `b` built from a `d` and an
+ * opening quote built from a closing one. Both want the *drawn* shape mirrored
+ * where it already is, which is why the line to mirror about is asked for
+ * rather than assumed: negating the scale alone mirrors about the base glyph's
+ * origin and throws the shape across the letter, which is a second edit to
+ * undo before the first one is any use.
+ *
+ * A mirror is composed on the outside of the placement — reflect what the
+ * transform produced — so the whole first column of the matrix changes sign for
+ * a horizontal flip and the whole second for a vertical one. Doing it that way
+ * is what keeps a component that has already been turned or slanted mirrored
+ * rather than merely negated.
+ */
+export function flippedComponent(c: Component, axis: FlipAxis, about: number): Component {
+  const t = c.transform;
+  return {
+    ...c,
+    transform:
+      axis === "horizontal"
+        ? { ...t, xScale: -t.xScale, yxScale: -t.yxScale, xOffset: 2 * about - t.xOffset }
+        : { ...t, xyScale: -t.xyScale, yScale: -t.yScale, yOffset: 2 * about - t.yOffset },
+  };
+}
+
 export function movedComponent(c: Component, dx: number, dy: number): Component {
   return {
     ...c,

@@ -52,6 +52,7 @@ export {
   decomposeCurrentGlyph,
   decomposeGlyphAt,
   deleteSelectedComponent,
+  flipComponent,
   moveComponentTo,
   addKernGroup,
   breakOutKern,

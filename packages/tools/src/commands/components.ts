@@ -1,17 +1,23 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Rect, Vec2 } from "@fonteditor/geometry";
 import {
   type ComponentId,
   type ComponentSource,
+  type FlipAxis,
   type Glyph,
   type IdFactory,
   addGlyphComponent,
   attachmentOffset,
   component,
+  contourBounds,
+  counterIds,
   decomposedGlyph,
+  flippedComponent,
   glyphNamed,
   placedComponent,
   removeGlyphComponent,
+  resolveComponent,
   resolveGlyphComponents,
+  unionRect,
   updateGlyphComponent,
   updateGlyph,
   wouldRecurse,
@@ -89,6 +95,56 @@ export function moveComponentTo(state: EditorState, id: ComponentId, at: Vec2): 
 
   // Coalescing, as the coordinate fields are: typing "120" is three calls.
   return result({ ...state, document }, [begin("Move component"), commit]);
+}
+
+/**
+ * Turn a component over where it stands.
+ *
+ * The line it is mirrored about is the middle of what it draws, so the shape
+ * stays where it was put and only faces the other way. Mirroring about the base
+ * glyph's origin instead — which is what negating the scale on its own does —
+ * would throw a `d` clear of the letter it was placed in, and the flip would
+ * always be followed by dragging it back.
+ *
+ * A component that draws nothing has no middle to speak of. It is mirrored
+ * about the origin then, which is invisible either way, rather than refused:
+ * the base glyph may be drawn later, and the transform is the thing being
+ * edited.
+ */
+export function flipComponent(state: EditorState, id: ComponentId, axis: FlipAxis): ToolResult {
+  const owner = currentGlyph(state);
+  const placed = owner?.components.find((c) => c.id === id);
+  if (owner === null || placed === undefined) return result(state);
+
+  // Ids for contours nothing will ever select: this is a measurement, and the
+  // shapes are thrown away as soon as the box round them is known.
+  const drawn = resolveComponent(
+    componentSource(state),
+    placed.base,
+    placed.transform,
+    counterIds(`flip-${id}`),
+    [owner.name],
+  );
+
+  let box: Rect | null = null;
+  for (const c of drawn) {
+    const of = contourBounds(c);
+    if (of !== null) box = unionRect(box, of);
+  }
+
+  const about =
+    box === null
+      ? 0
+      : axis === "horizontal"
+        ? (box.minX + box.maxX) / 2
+        : (box.minY + box.maxY) / 2;
+
+  const document = editCurrentGlyph(state, (g) =>
+    updateGlyphComponent(g, id, (c) => flippedComponent(c, axis, about)),
+  );
+  if (document === null) return result(state);
+
+  return done(state, { ...state, document }, "Flip component");
 }
 
 /**

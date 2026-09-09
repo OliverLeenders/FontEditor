@@ -49,6 +49,7 @@ import {
   nodeCanHarmonise,
   selectedCurvature,
   attachComponent,
+  flipComponent,
   attachmentFor,
   balanceSegmentAt,
   decomposeCurrentGlyph,
@@ -1754,6 +1755,64 @@ describe("components", () => {
     expect(attachmentFor(nudged, id)).toEqual(vec(210, 210));
     const back = attachComponent(nudged, id).state;
     expect(placed(back)[0]!.transform).toMatchObject({ xOffset: 210, yOffset: 210 });
+  });
+
+  it("turns one over where it stands, rather than about the origin", () => {
+    // `a` is a 400 x 600 box at the origin, placed at (100, 0), so it draws
+    // from x = 100 to x = 500 and its middle is x = 300.
+    const start = addComponent(parts(), "a", counterIds("c")).state;
+    const id = placed(start)[0]!.id;
+    const s = moveComponentTo(start, id, vec(100, 0)).state;
+
+    const out = flipComponent(s, id, "horizontal").state;
+    const t = placed(out)[0]!.transform;
+
+    expect(t.xScale).toBe(-1);
+    expect(t.yScale).toBe(1);
+    // Mirrored about x = 300: the box still runs from 100 to 500, and the
+    // offset is where the base glyph's own x = 0 lands, which is its far edge.
+    expect(t.xOffset).toBe(500);
+  });
+
+  it("turns one over the other way without touching the first axis", () => {
+    const s = addComponent(parts(), "a", counterIds("c")).state;
+    const id = placed(s)[0]!.id;
+
+    const t = placed(flipComponent(s, id, "vertical").state)[0]!.transform;
+
+    expect(t.xScale).toBe(1);
+    expect(t.yScale).toBe(-1);
+    // The box runs from y = 0 to y = 600, so it mirrors about y = 300.
+    expect(t.yOffset).toBe(600);
+  });
+
+  it("flips back to exactly where it started", () => {
+    const s = addComponent(parts(), "a", counterIds("c")).state;
+    const id = placed(s)[0]!.id;
+    const there = flipComponent(s, id, "horizontal").state;
+
+    expect(placed(flipComponent(there, id, "horizontal").state)[0]!.transform).toEqual(
+      placed(s)[0]!.transform,
+    );
+  });
+
+  it("has no middle to flip about where the component draws nothing", () => {
+    // `aacute` is empty, so `space` — nothing at all — stands in for a base
+    // glyph that has not been drawn yet. The transform is still the thing being
+    // edited, so the flip lands rather than being refused.
+    const s = addComponent(parts(), "a", counterIds("c")).state;
+    const blank = {
+      ...s,
+      document: {
+        ...s.document,
+        glyphs: { ...s.document.glyphs, a: glyph("a", { advance: 500 }) },
+      },
+    };
+    const id = placed(blank)[0]!.id;
+
+    const t = placed(flipComponent(blank, id, "horizontal").state)[0]!.transform;
+    expect(t.xScale).toBe(-1);
+    expect(t.xOffset).toBe(0);
   });
 
   it("has nothing to align by where the pair is missing", () => {

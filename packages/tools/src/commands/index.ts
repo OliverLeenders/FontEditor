@@ -26,6 +26,7 @@ export {
   decomposeCurrentGlyph,
   decomposeGlyphAt,
   deleteSelectedComponent,
+  flipComponent,
   moveComponentTo,
   removeComponent,
 } from "./components.js";

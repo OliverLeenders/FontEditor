@@ -37,11 +37,12 @@ export {
   withHandleRaw,
 } from "./node.js";
 
-export type { Component, ComponentSource } from "./component.js";
+export type { Component, ComponentSource, FlipAxis } from "./component.js";
 export {
   MAX_COMPONENT_DEPTH,
   component,
   attachmentOffset,
+  flippedComponent,
   movedComponent,
   placedComponent,
   transformedComponent,

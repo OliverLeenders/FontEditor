@@ -8,8 +8,9 @@ import { freshStore, installDomStubs, render } from "./render.js";
 installBrowserGlobals();
 
 const { Inspector } = await import("../src/components/Inspector.js");
-const { addAnchor, addGuide, anchor, putGlyph, verticalGuide } =
+const { addAnchor, addGuide, anchor, counterIds, glyph, putGlyph, rectContour, verticalGuide } =
   await import("@fonteditor/font-model");
+const { addComponent } = await import("@fonteditor/tools");
 const { MIN_DOCK_WIDTH } = await import("../src/store/index.js");
 
 /**
@@ -233,5 +234,59 @@ describe("docking the inspector", () => {
     });
 
     expect(store.getState().inspector.width).toBe(MIN_DOCK_WIDTH);
+  });
+});
+
+/**
+ * The two transforms a component gets: turned over one way and the other.
+ *
+ * The model carries a whole affine per component and the row offers these two,
+ * because these two are what a family is built out of — a `b` from a `d`, an
+ * opening quote from a closing one. What is asked here is that the buttons are
+ * wired to the flip and that the flip leaves the shape where it was.
+ */
+describe("turning a component over", () => {
+  /** The current glyph with a box glyph placed inside it. */
+  function withComponent() {
+    const store = freshStore();
+    act(() => {
+      const editor = store.editor;
+      const box = putGlyph(
+        editor.document,
+        glyph("box", {
+          advance: 500,
+          contours: [rectContour(counterIds("box"), { minX: 0, minY: 0, maxX: 400, maxY: 600 })],
+        }),
+      );
+      store.setEditor({ ...editor, document: box });
+      store.applyTool(addComponent(store.editor, "box", counterIds("place")));
+    });
+    return store;
+  }
+
+  const only = (store: ReturnType<typeof freshStore>) =>
+    store.editor.document.glyphs[store.editor.currentGlyph]!.components[0]!;
+
+  it("mirrors it about its own middle, so it stays where it was put", () => {
+    const store = withComponent();
+    render(<Inspector />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip box horizontally" }));
+
+    // The box draws from x = 0 to x = 400, so it mirrors about x = 200 and the
+    // base glyph's own origin lands at its far edge.
+    expect(only(store).transform.xScale).toBe(-1);
+    expect(only(store).transform.xOffset).toBe(400);
+  });
+
+  it("turns it the other way without disturbing the first", () => {
+    const store = withComponent();
+    render(<Inspector />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip box vertically" }));
+
+    expect(only(store).transform.xScale).toBe(1);
+    expect(only(store).transform.yScale).toBe(-1);
+    expect(only(store).transform.yOffset).toBe(600);
   });
 });

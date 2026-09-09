@@ -3,6 +3,7 @@ import {
   addComponent,
   attachComponent,
   attachmentFor,
+  flipComponent,
   moveComponentTo,
   removeComponent,
 } from "@fonteditor/tools";
@@ -10,16 +11,21 @@ import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
-import { ComponentIcon, TrashIcon } from "../icons.js";
+import { ComponentIcon, FlipHorizontalIcon, FlipVerticalIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
 
 /**
  * The glyphs placed inside this one, and where each of them sits.
  *
- * Components are references, so the panel lists them and lets them be placed or
- * removed. Editing what one *looks* like means opening the glyph it refers to,
- * which is the entire point of using one.
+ * Components are references, so the panel lists them and lets them be placed,
+ * turned over or removed. Editing what one *looks* like means opening the glyph
+ * it refers to, which is the entire point of using one.
+ *
+ * The two flips are here rather than the whole affine the model carries. They
+ * are the transform families actually use — a `b` from a `d`, an opening quote
+ * from a closing one — and each is one press with nothing to type, whereas a
+ * scale field asks for a number that a designer drawing by eye does not have.
  */
 export function ComponentsSection(): React.JSX.Element {
   const store = useEditorStore();
@@ -59,7 +65,7 @@ export function ComponentsSection(): React.JSX.Element {
         {components.map((c) => (
           <div
             key={c.id}
-            className={styles.anchorRow}
+            className={`${styles.anchorRow} ${styles.componentEntry}`}
             data-selected={c.id === selectedComponent ? "true" : undefined}
           >
             {/* The name is a reference and not a label, so it is shown
@@ -90,6 +96,24 @@ export function ComponentsSection(): React.JSX.Element {
               value={shown(c.transform.yOffset)}
               onChange={(event) => commitComponent(c.id, "y", Number(event.target.value))}
             />
+            <button
+              type="button"
+              className={styles.rowAction}
+              title={`Turn ${c.base} over left to right, where it stands`}
+              aria-label={`Flip ${c.base} horizontally`}
+              onClick={() => store.applyTool(flipComponent(store.editor, c.id, "horizontal"))}
+            >
+              <FlipHorizontalIcon />
+            </button>
+            <button
+              type="button"
+              className={styles.rowAction}
+              title={`Turn ${c.base} over top to bottom, where it stands`}
+              aria-label={`Flip ${c.base} vertically`}
+              onClick={() => store.applyTool(flipComponent(store.editor, c.id, "vertical"))}
+            >
+              <FlipVerticalIcon />
+            </button>
             <button
               type="button"
               className={styles.componentRemove}
