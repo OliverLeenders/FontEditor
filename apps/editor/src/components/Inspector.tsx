@@ -37,6 +37,7 @@ export function Inspector(): React.JSX.Element | null {
   const dock = useStoreValue((s) => s.inspector.dock);
   const width = useStoreValue((s) => s.inspector.width);
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
+  const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
 
   // The field is only a draft until it is committed, so it holds its own text.
   // Reset when the open glyph changes, or it would show the last glyph's name.
@@ -204,6 +205,17 @@ export function Inspector(): React.JSX.Element | null {
           }}
         />
       )}
+
+      {/* Every glyph in the font, offered to the fields that name one: a
+          component's base, and where a glyph takes its spacing from. Here
+          rather than in either section, because both want it and a folded
+          section renders nothing — and because two elements claiming one id is
+          a bug waiting for whichever of them the browser picks. */}
+      <datalist id="fonteditor-glyph-names">
+        {glyphNames.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
 
       <div className={styles.body}>
         <GlyphSection />

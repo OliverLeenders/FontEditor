@@ -124,6 +124,7 @@ export {
   setSegmentTension,
   unroundedCount,
   nudgeSidebearing,
+  setMetricKey,
   harmoniseSelection,
   nodeCanBeTangent,
   nodeCanHarmonise,

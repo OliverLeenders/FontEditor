@@ -35,7 +35,6 @@ export function ComponentsSection(): React.JSX.Element {
       EMPTY_COMPONENTS,
   );
   const selectedComponent = useStoreValue((s) => s.session.editor.selectedComponent);
-  const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
   const [adding, setAdding] = useState("");
 
   /** Place one component at an exact offset. */
@@ -156,11 +155,6 @@ export function ComponentsSection(): React.JSX.Element {
               setAdding("");
             }}
           />
-          <datalist id="fonteditor-glyph-names">
-            {glyphNames.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
         </div>
       </div>
     </Section>

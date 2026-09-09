@@ -11,6 +11,7 @@ import {
   type HandleLock,
   type ImageRef,
   type Kept,
+  type MetricKeys,
   type PlainValue,
   type Node,
   type NodeType,
@@ -18,12 +19,14 @@ import {
   DEFAULT_FONT_INFO,
   NO_LOCK,
   NOTHING_KEPT,
+  NO_METRIC_KEYS,
   STYLE_MAP_STYLES,
   anchor,
   component,
   contour,
   glyph,
   guide,
+  hasMetricKeys,
   imageRef,
   node,
 } from "@fonteditor/font-model";
@@ -114,6 +117,17 @@ export type StoredGlyph = {
    * Written only when there are any, which is never for a glyph drawn here.
    */
   readonly kept?: readonly string[];
+  /**
+   * Where the glyph takes its spacing from, where it is another glyph's.
+   *
+   * Written only when it says something, which is never for a glyph spaced on
+   * its own — and that is nearly every glyph in nearly every font.
+   */
+  readonly metricKeys?: {
+    readonly left?: string;
+    readonly right?: string;
+    readonly width?: string;
+  };
 };
 
 /** A guide: a point, an angle, and what it is called. */
@@ -177,6 +191,7 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     ...(g.guides.length === 0 ? {} : { guides: g.guides.map(encodeGuide) }),
     ...(g.image === null ? {} : { image: encodeImage(g.image) }),
     ...(g.kept.length === 0 ? {} : { kept: [...g.kept] }),
+    ...(hasMetricKeys(g.metricKeys) ? { metricKeys: writtenKeys(g.metricKeys) } : {}),
   };
 }
 
@@ -516,6 +531,7 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
       guides: readGuides(source["guides"]),
       image: decodeImage(source["image"]),
       kept,
+      metricKeys: readMetricKeys(source["metricKeys"]),
     }),
   );
 }
@@ -660,4 +676,20 @@ export function decodeKerning(raw: unknown): Kerning {
     secondGroups: groups(raw["secondGroups"]),
     pairs,
   };
+}
+
+/** The three keys, with the empty ones left out of the file. */
+function writtenKeys(keys: MetricKeys): NonNullable<StoredGlyph["metricKeys"]> {
+  return {
+    ...(keys.left === "" ? {} : { left: keys.left }),
+    ...(keys.right === "" ? {} : { right: keys.right }),
+    ...(keys.width === "" ? {} : { width: keys.width }),
+  };
+}
+
+/** And back, believing nothing about what is on disk. */
+function readMetricKeys(raw: unknown): MetricKeys {
+  if (!isRecord(raw)) return NO_METRIC_KEYS;
+  const said = (key: string): string => (typeof raw[key] === "string" ? raw[key] : "");
+  return { left: said("left"), right: said("right"), width: said("width") };
 }

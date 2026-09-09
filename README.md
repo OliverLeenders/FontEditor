@@ -15,7 +15,7 @@ rectangle, ellipse, measure and section tools, snapping, boolean union, anchors 
 components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF, TTF, a variable OTF and UFO in
 both directions. A family is several masters, a `.designspace` and one `.ufo` each; a UFO folder on disk is opened and saved back to; everything autosaves
 to the browser's own store besides, and copies of the whole font are kept as you work.
-Guides and a picture to trace from sit behind the drawing; before it goes out, eighteen checks say what is wrong with it.
+Guides and a picture to trace from sit behind the drawing; before it goes out, nineteen checks say what is wrong with it.
 
 | Phase |                                     | Status                                                                              |
 | ----- | ----------------------------------- | ----------------------------------------------------------------------------------- |
@@ -29,10 +29,10 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, e
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2140 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2156 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
-| 13    | The family, named                   | planned: see below                                                                  |
+| 13    | The family, named                   | done                                                                                |
 | 14    | What ships to a browser             | planned: see below                                                                  |
 
 ### What the table missed
@@ -52,7 +52,7 @@ for.
 | **Masters**                                | done  | Axes, masters along them, moving between them, an instance at any location, the compatibility check, a `.designspace` with one `.ufo` per master, and one variable font out of the lot — CFF2 with the deltas beside the values, worked out by the model the format itself uses.                                                                                                                                                    |
 | **A file on disk**                         | done  | A UFO folder is opened, saved back to, and remembered for next time, through the File System Access API. Saving is manual: the working store autosaves, and a folder the user chose is somewhere the editor is a guest.                                                                                                                                                                                                             |
 | **`glyf` outlines**                        | done  | The TrueType flavour: cubics converted to quadratics on the way into the file, `glyf` and `loca` in place of `CFF `, and the four bytes that say which flavour it is. Checked against fontTools by drawing both flavours of the same font and comparing the outlines as shapes.                                                                                                                                                     |
-| **Preflight**                              | done  | Eighteen checks over the whole font — a contour left open, two points in the same place, a name a font cannot carry, two glyphs claiming one character, a component with nothing to place or that places itself, kerning about a glyph that has gone, a mark with nowhere to land — reported and never repaired, because every fix is a decision.                                                                                   |
+| **Preflight**                              | done  | Nineteen checks over the whole font — a contour left open, two points in the same place, a name a font cannot carry, two glyphs claiming one character, a component with nothing to place or that places itself, kerning about a glyph that has gone, a mark with nowhere to land — reported and never repaired, because every fix is a decision.                                                                                   |
 | **Testing the interface**                  | done  | The panels are rendered against a real store in jsdom, and asked what a person would ask: did pressing this change the font. It found two shipped bugs on the way in — an inspector that re-rendered for ever, and an Escape that committed the value it was meant to abandon.                                                                                                                                                      |
 
 ### What the table is hiding
@@ -177,20 +177,39 @@ rather than in it — a second set of glyphs is the size of the first — and wr
 where they were found. Kept in the session _and_ in the working store, because the store
 may be unavailable and because the save that would drop them is the one after a reload.
 
-#### Phase 13 — The family, named
+#### Phase 13 — The family, named — done
 
 A designspace is masters _and_ the instances drawn between them, and only the first half
-is here. The variable font's `fvar` fakes its named instances from the master list, so a
-two-axis family offers a menu of its corners rather than of its styles, and the
-`.designspace` written out has no `<instances>` element at all. Interpolation itself is
-already done — `interpolateFont` gives the document at any location, and the Masters
-panel already shows one. What is missing is somewhere to keep the list, the element in
-the file, real entries in `fvar`, and the thing that falls out for free once instances
-exist: exporting each of them as a static font.
+was here. An instance is a different thing from a master and the model says so: a master
+is a drawing somebody made and no two can share a place; an instance is a name and a
+place, what it looks like is worked out, and two of them in one place is ordinary — a
+family that sells its Condensed separately names one drawing twice, once under each
+family name. So instances refuse a repeated name where masters refuse a repeated
+location.
 
-Metric keys belong to the same phase and are not in the model at all. Spacing a family
-by hand means re-spacing it after every change; a font source says instead that this
-glyph's advance is that one's, and the value is resolved when the font is compiled.
+They are written into the `.designspace`, read back out of one, kept beside the axes in
+the working store, offered as the `fvar` names a style menu shows — which used to be the
+masters, so a two-axis family offered its four corners — and written out as ordinary
+static fonts, one per style, in a zip. Each carries its own names: six files that all
+call themselves Regular install as one font that keeps replacing itself. Where a family
+has named no styles the masters still stand in for the menu, because a menu of corners
+beats no menu.
+
+The list is a second section in the Masters panel, because it is the same designspace —
+and because the control just above it, which shows a place between the drawings, is
+exactly how somebody decides a place is worth naming.
+
+**Metric keys** landed with it. A glyph can say its left sidebearing is `n`'s, its right
+is `o`'s, or its whole advance is the zero's, and the number is worked out from whatever
+that glyph is now — which is what spacing a family by hand costs otherwise: doing it
+again after every change. Chains work, because families are built in chains: `ü` from `u`
+from `n`. Neither UFO nor OpenType has a field for this, so the two halves differ. The
+source keeps the rule, in the font's `lib` under this editor's own name, which is what a
+`lib` is for; the compiled font keeps only the answer, because a font file records an
+advance and an outline position and that is all a rasteriser ever sees. A rule that
+cannot be followed — a rename, a deletion, a loop — leaves the glyph exactly as drawn and
+is reported twice over: in the export warnings, and as a preflight check. Silence would
+be the worst of the three, since the glyph still has spacing and nothing looks wrong.
 
 #### Phase 14 — What ships to a browser
 
@@ -242,6 +261,15 @@ The glyphs either side are drawn from the strip text, dimmed, for judging spacin
 **double-click one to open it**. Everything about the glyph being edited comes first:
 anything pickable, and the whole box round its drawing, so a shape that overshoots well
 outside its own sidebearings is still that shape where it hangs over the next letter.
+
+**Spacing that follows another letter.** The inspector's glyph section has three fields
+saying where this glyph's spacing comes from: its left sidebearing, its right, or its
+whole advance, each the name of another glyph. Set one and the number beside it goes grey
+and shows what the rule works out to, following the chain — `ü` from `u` from `n` — and
+following it again the moment `n` moves. The rule is kept in the source and resolved
+where the font is compiled, so what comes out is an ordinary font. A rule that cannot be
+followed leaves the glyph as drawn and is reported, in the export warnings and in the
+preflight check.
 
 The inspector transforms whatever is selected by a number rather than by dragging: move,
 scale, rotate, slant, flip. It turns about any of the nine points of the selection's box,

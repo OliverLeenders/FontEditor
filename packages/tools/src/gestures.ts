@@ -13,6 +13,7 @@ import {
   movedComponent,
   moveAnchorTo,
   moveSegmentTunniLine,
+  NO_METRIC_KEYS,
   nodeById,
   segmentAt,
   segmentIndexForHandle,
@@ -84,6 +85,7 @@ export const EMPTY_GLYPH: Glyph = {
   guides: [],
   image: null,
   kept: [],
+  metricKeys: NO_METRIC_KEYS,
 };
 
 // ---------------------------------------------------------------------------

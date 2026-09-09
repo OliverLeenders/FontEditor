@@ -5,6 +5,7 @@ import {
   isMarkAnchor,
   orderedGlyphs,
   pairedName,
+  withResolvedMetrics,
 } from "@fonteditor/font-model";
 
 import { type Finding, finding } from "./finding.js";
@@ -23,6 +24,7 @@ export function fontFindings(document: FontDocument): Finding[] {
     ...unicodeFindings(document),
     ...kerningFindings(document),
     ...markFindings(document),
+    ...metricKeyFindings(document),
   ];
 }
 
@@ -141,6 +143,24 @@ function markFindings(document: FontDocument): Finding[] {
   }
 
   return out;
+}
+
+/**
+ * Spacing rules that cannot be followed.
+ *
+ * A metric key names another glyph, and names are the only thing one part of a
+ * font source refers to another by — so a rename, a deletion, or a loop breaks
+ * the rule silently. The glyph still has spacing, which is why this survives:
+ * nothing looks wrong, and the number stopped tracking what it was meant to
+ * track some edits ago.
+ *
+ * The model works out which of the three is broken and why; this reports what
+ * it says rather than deciding again.
+ */
+function metricKeyFindings(document: FontDocument): Finding[] {
+  return withResolvedMetrics(document).problems.map((p) =>
+    finding("broken-metric-key", p.glyph, `It ${p.says}.`),
+  );
 }
 
 /**

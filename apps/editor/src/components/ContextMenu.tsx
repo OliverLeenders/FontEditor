@@ -1,4 +1,4 @@
-import { contourById, randomIds, segmentAt } from "@fonteditor/font-model";
+import { NO_METRIC_KEYS, contourById, randomIds, segmentAt } from "@fonteditor/font-model";
 import {
   addGuideAt,
   guideById,
@@ -99,6 +99,7 @@ const EMPTY_GLYPH = {
   guides: [],
   image: null,
   kept: [],
+  metricKeys: NO_METRIC_KEYS,
 };
 
 /**

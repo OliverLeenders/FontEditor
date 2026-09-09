@@ -67,7 +67,42 @@ export type Glyph = {
    * Empty for a glyph drawn here, which has nothing to preserve.
    */
   readonly kept: readonly string[];
+  /**
+   * Where this glyph's spacing comes from, where it is another glyph's.
+   *
+   * Empty for nearly every glyph, which is spaced on its own. See
+   * `metric-keys.ts` for what the three mean and when they are followed.
+   */
+  readonly metricKeys: MetricKeys;
 };
+
+/**
+ * Where a glyph's spacing comes from, where it is another glyph's.
+ *
+ * Three of them, because there are three things to say: `left` and `right` take
+ * a sidebearing from another glyph, which is what spacing a lower case is made
+ * of — `o` from `c`, `ü` from `u` — and `width` takes the whole advance, which
+ * is what a tabular figure wants.
+ *
+ * Empty means "its own", which is what nearly every glyph says. The key is a
+ * glyph *name*, as a component's base and a kerning group's members are: names
+ * are the only thing one part of a font source has to refer to another by.
+ *
+ * The type is here because the field is; following the keys is in
+ * `metric-keys.ts`, which needs the whole document to do it.
+ */
+export type MetricKeys = {
+  readonly left: string;
+  readonly right: string;
+  readonly width: string;
+};
+
+export const NO_METRIC_KEYS: MetricKeys = { left: "", right: "", width: "" };
+
+/** Whether a glyph says anything about where its spacing comes from. */
+export function hasMetricKeys(keys: MetricKeys): boolean {
+  return keys.left !== "" || keys.right !== "" || keys.width !== "";
+}
 
 export type GlyphInit = {
   readonly unicodes?: readonly number[];
@@ -78,6 +113,7 @@ export type GlyphInit = {
   readonly guides?: readonly Guide[];
   readonly image?: ImageRef | null;
   readonly kept?: readonly string[];
+  readonly metricKeys?: MetricKeys;
 };
 
 export function glyph(name: string, init: GlyphInit = {}): Glyph {
@@ -91,6 +127,7 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     guides: init.guides ?? [],
     image: init.image ?? null,
     kept: init.kept ?? [],
+    metricKeys: init.metricKeys ?? NO_METRIC_KEYS,
   };
 }
 

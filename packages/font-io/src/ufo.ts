@@ -8,6 +8,7 @@ import {
   type PlainValue,
   glyphFileName,
   groupNameOf,
+  hasMetricKeys,
   isGroupKey,
   segments,
 } from "@fonteditor/font-model";
@@ -427,6 +428,9 @@ export function guideline(g: Guide): string {
 /** A coordinate as an attribute: whole where it is whole, and short where not. */
 const number = (n: number): string => String(Math.round(n * 1000) / 1000);
 
+/** Where a glyph's spacing comes from, in a lib key of this editor's own. */
+const METRIC_KEYS = "org.fonteditor.metricKeys";
+
 export function ufoFiles(
   document: FontDocument,
   images: ReadonlyMap<string, Uint8Array> = new Map(),
@@ -519,11 +523,29 @@ export function ufoFiles(
   if (contents.length > 0) {
     lib.push(["public.glyphOrder", array(contents.map(([name]) => str(name)))]);
   }
+  // Where the glyphs take their spacing from, which neither UFO nor OpenType
+  // has a field for. Under this editor's own name, because that is what a lib
+  // is: the place a tool keeps what the format cannot say. Another editor will
+  // not understand it and will carry it through, which is the arrangement
+  // working in the other direction.
+  const spacing: Array<readonly [string, string]> = [];
+  for (const name of document.glyphOrder) {
+    const g = document.glyphs[name];
+    if (g === undefined || !hasMetricKeys(g.metricKeys)) continue;
+
+    const said: Array<readonly [string, string]> = [];
+    if (g.metricKeys.left !== "") said.push(["left", str(g.metricKeys.left)]);
+    if (g.metricKeys.right !== "") said.push(["right", str(g.metricKeys.right)]);
+    if (g.metricKeys.width !== "") said.push(["width", str(g.metricKeys.width)]);
+    spacing.push([name, dict(said)]);
+  }
+  if (spacing.length > 0) lib.push([METRIC_KEYS, dict(spacing)]);
+
   // Everything else somebody put in the lib, back where they put it. A lib is
   // where every tool keeps what the format has no field for, so it is the one
   // file where writing only what we understand does the most damage.
   for (const [key, value] of Object.entries(document.kept.lib)) {
-    if (key === "public.glyphOrder") continue;
+    if (key === "public.glyphOrder" || key === METRIC_KEYS) continue;
     const written = plistValue(value);
     if (written !== null) lib.push([key, written]);
   }

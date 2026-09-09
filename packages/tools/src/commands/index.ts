@@ -144,7 +144,7 @@ export {
   selectedCoordinate,
 } from "./selection.js";
 
-export { centreCurrentGlyph, nudgeSidebearing } from "./spacing.js";
+export { centreCurrentGlyph, nudgeSidebearing, setMetricKey } from "./spacing.js";
 
 export type { TransformOrigin } from "./transform.js";
 export { BOX_CENTRE, transformOriginPoint, transformSelection } from "./transform.js";

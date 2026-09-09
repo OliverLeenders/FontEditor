@@ -7,6 +7,7 @@ import {
   type FontDocument,
   type Glyph,
   type PlacedGlyph,
+  NO_METRIC_KEYS,
   filledContours,
   glyphBounds,
   glyphForCodePoint,
@@ -52,6 +53,7 @@ const EMPTY: Glyph = {
   guides: [],
   image: null,
   kept: [],
+  metricKeys: NO_METRIC_KEYS,
 };
 
 /** Resolved component outlines are throwaway; their ids never leave the frame. */

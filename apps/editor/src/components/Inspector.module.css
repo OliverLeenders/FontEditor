@@ -323,6 +323,13 @@
   gap: 0.3rem;
 }
 
+/* The three metric keys: a glyph name each, and each usually empty. */
+.triple {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.3rem;
+}
+
 /* One row per component: what it is, where it sits, and a way to remove it. */
 .components {
   display: flex;

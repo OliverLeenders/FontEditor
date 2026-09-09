@@ -26,6 +26,7 @@ export const SEVERITIES: readonly Severity[] = ["error", "warning", "note"];
 
 export type CheckId =
   | "open-contour"
+  | "broken-metric-key"
   | "stray-point"
   | "empty-contour"
   | "duplicate-point"
@@ -180,6 +181,12 @@ export const CHECKS: readonly Check[] = [
     severity: "note",
     title: "Kerning group with no glyphs",
     why: "It kerns nothing. Harmless, and usually the last trace of glyphs that were removed.",
+  },
+  {
+    id: "broken-metric-key",
+    severity: "warning",
+    title: "Spacing taken from nowhere",
+    why: "The glyph says its spacing comes from another one, and that rule cannot be followed — so the font is compiled with whatever spacing the glyph happens to have.",
   },
   {
     id: "mark-without-base",

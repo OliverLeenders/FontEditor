@@ -13,6 +13,7 @@ import {
   removeOverlap,
   resolveGlyphComponents,
   segments,
+  withResolvedMetrics,
 } from "@fonteditor/font-model";
 
 import { kerningLookups, kerningSubtables } from "./gpos.js";
@@ -265,14 +266,20 @@ function platformsOf(font: { names: Record<string, unknown> }): Record<string, {
   return out;
 }
 
-export function exportFont(document: FontDocument, ids: IdFactory = counterIds("x")): ExportResult {
+export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x")): ExportResult {
   // Checked before the synthesised .notdef is added, or a document holding
   // nothing at all would quietly export as a font holding nothing at all.
-  if (document.glyphOrder.length === 0) {
+  if (source.glyphOrder.length === 0) {
     throw new FontExportError("This font has no glyphs to export.");
   }
 
-  const warnings: string[] = [];
+  // A font file has no way to say "this glyph is spaced like that one": it
+  // records an advance and an outline position, and that is all a rasteriser
+  // ever sees. So the keys are followed here and what comes out is ordinary.
+  const spaced = withResolvedMetrics(source);
+  const document = spaced.document;
+
+  const warnings: string[] = spaced.problems.map((p) => `${p.glyph} ${p.says}`);
   const { names, synthesised } = notdefFirst(document);
 
   const glyphs: OtGlyph[] = [];

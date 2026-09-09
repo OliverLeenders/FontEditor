@@ -102,6 +102,9 @@ export {
   insideGlyph,
 } from "./direction.js";
 
+export type { MetricKeyProblem, ResolvedMetrics } from "./metric-keys.js";
+export { resolvedMetrics, withResolvedMetrics } from "./metric-keys.js";
+
 export type { MetricLine, Sidebearings } from "./metrics.js";
 export {
   centreGlyph,
@@ -171,7 +174,7 @@ export {
   updateGlyph,
 } from "./document.js";
 
-export type { Glyph, GlyphInit } from "./glyph.js";
+export type { Glyph, GlyphInit, MetricKeys } from "./glyph.js";
 export {
   addContour,
   addAnchor,
@@ -201,6 +204,8 @@ export {
   replaceContour,
   setAdvance,
   updateContour,
+  NO_METRIC_KEYS,
+  hasMetricKeys,
 } from "./glyph.js";
 
 export { UNIT_GRID, roundFont, roundGlyph, unroundedGlyphs } from "./round.js";

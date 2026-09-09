@@ -10,6 +10,7 @@ import {
   DEFAULT_FONT_INFO,
   EMPTY_KERNING,
   fontDocument,
+  hasMetricKeys,
   groupKey,
   guide,
   setFeatures,
@@ -158,7 +159,14 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
   // The glyph order is the model's; everything else somebody put in the lib is
   // theirs, and is carried through untouched so that saving puts it back.
   const keptLib =
-    libSource === null ? {} : unmodelled(parsePlistDict(libSource), ["public.glyphOrder"]);
+    libSource === null
+      ? {}
+      : unmodelled(parsePlistDict(libSource), ["public.glyphOrder", METRIC_KEYS]);
+
+  // Where a glyph's spacing comes from, which neither UFO nor OpenType has a
+  // field for. Written under this editor's own name, and read back onto the
+  // glyphs — a rule about the font rather than a note in somebody's lib.
+  const spacedGlyphs = withMetricKeys(ordered, libSource);
 
   const kerning = readKerning(at("groups.plist"), at("kerning.plist"), warn);
   // Taken as it is, not parsed. What could not be compiled is still somebody's
@@ -181,7 +189,10 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
     images,
     layers: extraLayers(files, root, listing),
     document: setKept(
-      setGuides(setFeatures(setKerning(fontDocument(ordered, info), kerning), features), guides),
+      setGuides(
+        setFeatures(setKerning(fontDocument(spacedGlyphs, info), kerning), features),
+        guides,
+      ),
       { fontInfo: keptInfo, lib: keptLib },
     ),
     warnings,
@@ -437,4 +448,35 @@ export function looksLikeUfo(fileName: string): boolean {
  */
 export function looksLikeArchive(fileName: string): boolean {
   return looksLikeUfo(fileName) || fileName.toLowerCase().endsWith(".zip");
+}
+
+/** Where a glyph's spacing comes from, in a lib key of this editor's own. */
+const METRIC_KEYS = "org.fonteditor.metricKeys";
+
+/**
+ * The glyphs, with whatever the lib said about where their spacing comes from.
+ *
+ * A dictionary of glyph name to a dictionary of the three keys. Nothing here
+ * checks that the glyphs named exist: a source is allowed to be mid-edit, and
+ * a key pointing nowhere is reported when the font is compiled rather than
+ * dropped on the way in — dropping it would lose the designer's rule to fix a
+ * problem they can see and we cannot.
+ */
+function withMetricKeys(glyphs: readonly Glyph[], lib: string | null): Glyph[] {
+  if (lib === null) return [...glyphs];
+
+  const found = parsePlistDict(lib)[METRIC_KEYS];
+  if (!isDict(found)) return [...glyphs];
+
+  return glyphs.map((g) => {
+    const keys = found[g.name];
+    if (!isDict(keys)) return g;
+
+    const metricKeys = {
+      left: plistString(keys, "left") ?? "",
+      right: plistString(keys, "right") ?? "",
+      width: plistString(keys, "width") ?? "",
+    };
+    return hasMetricKeys(metricKeys) ? { ...g, metricKeys } : g;
+  });
 }
