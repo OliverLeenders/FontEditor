@@ -196,3 +196,86 @@ describe("previewing a weight nobody drew", () => {
     expect(screen.queryByLabelText("Weight of the instance")).toBeNull();
   });
 });
+
+/**
+ * The styles named between the masters.
+ *
+ * A second section in the same panel, because it is the same designspace — and
+ * because the control that shows a place between the drawings is exactly how
+ * somebody decides a place is worth naming.
+ */
+describe("naming the styles between the masters", () => {
+  it("says what a family with none is missing out on", () => {
+    const store = withThree();
+    openPanel(store);
+
+    expect(screen.getByText(/None yet/)).toBeTruthy();
+  });
+
+  it("names one, at the default place, when nothing is being shown", async () => {
+    const store = withThree();
+    openPanel(store);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Name…/ }));
+      await Promise.resolve();
+    });
+
+    const [only] = store.getState().project.instances;
+    expect(only?.name).toBe("New style");
+    expect(only?.location).toEqual({ wght: 400 });
+  });
+
+  it("names the place being shown, once one is", async () => {
+    const store = withThree();
+    openPanel(store);
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Show an instance between the masters"));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Weight of the instance"), {
+        target: { value: "600" },
+      });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Name this…/ }));
+      await Promise.resolve();
+    });
+
+    expect(store.getState().project.instances[0]?.location).toEqual({ wght: 600 });
+  });
+
+  it("renames one, moves it, and takes it away", async () => {
+    const store = withThree();
+    openPanel(store);
+
+    await act(async () => {
+      await store.addInstance("i1", "Semibold", { wght: 600 });
+    });
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Name of the instance Semibold"), {
+        target: { value: "Demibold" },
+      });
+      await Promise.resolve();
+    });
+    expect(store.getState().project.instances[0]?.name).toBe("Demibold");
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText("Weight of the instance Demibold"), {
+        target: { value: "550" },
+      });
+      await Promise.resolve();
+    });
+    expect(store.getState().project.instances[0]?.location).toEqual({ wght: 550 });
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Remove the instance Demibold"));
+      await Promise.resolve();
+    });
+    expect(store.getState().project.instances).toEqual([]);
+  });
+});

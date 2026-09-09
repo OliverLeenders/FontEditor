@@ -1,5 +1,6 @@
 import {
   exportFamily,
+  exportInstances,
   exportFileName,
   exportFont,
   exportTrueType,
@@ -35,6 +36,7 @@ export function ExportFont(): React.JSX.Element {
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
   const masters = useStoreValue((s) => s.project.masters.length);
   const axes = useStoreValue((s) => s.project.axes.length);
+  const instanceCount = useStoreValue((s) => s.project.instances.length);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   /**
@@ -95,10 +97,33 @@ export function ExportFont(): React.JSX.Element {
    */
   const family = (): void =>
     void attemptAsync(async () => {
+      const project = store.getState().project;
       const masters = await store.allMasters();
-      const { bytes, fileName, files } = exportFamily(store.getState().project.axes, masters);
+      const { bytes, fileName, files } = exportFamily(project.axes, masters, project.instances);
       download(bytes.slice().buffer, fileName, "application/zip");
       return { file: `${fileName} · ${String(files)} files`, warnings: [] };
+    });
+
+  /**
+   * Every named style, as an ordinary font of its own.
+   *
+   * The other answer to the same question the variable font answers. One file
+   * that is every style is right nearly everywhere; a folder of static fonts is
+   * what a printer wants, what an operating system older than 2017 can install,
+   * and what most places that take an upload still ask for.
+   *
+   * Only the instances, never the masters. A master is a drawing and an
+   * instance is a style somebody decided the family has — and in a two-axis
+   * family the masters are its four corners, which is not a set of fonts
+   * anybody would ship.
+   */
+  const instances = (): void =>
+    void attemptAsync(async () => {
+      const project = store.getState().project;
+      const masters = await store.allMasters();
+      const out = exportInstances(project.axes, masters, project.instances);
+      download(out.bytes.slice().buffer, out.fileName, "application/zip");
+      return { file: `${out.fileName} · ${String(out.files)} fonts`, warnings: out.warnings };
     });
 
   /**
@@ -119,7 +144,7 @@ export function ExportFont(): React.JSX.Element {
         ...all.filter((m) => !atHome(m.location, home, project.axes)),
       ];
 
-      const out = exportVariableFont(project.axes, ordered);
+      const out = exportVariableFont(project.axes, ordered, project.instances);
       const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.otf");
       download(out.bytes, file, "font/otf");
       return { file, warnings: out.warnings };
@@ -209,6 +234,14 @@ export function ExportFont(): React.JSX.Element {
       icon: DownloadIcon,
       disabled: glyphCount === 0 || axes === 0,
       run: variable,
+    });
+    items.push({
+      kind: "item",
+      label: "Instances",
+      note: instanceCount === 0 ? "name some first" : `${String(instanceCount)} static fonts`,
+      icon: DownloadIcon,
+      disabled: glyphCount === 0 || instanceCount === 0,
+      run: instances,
     });
   }
 

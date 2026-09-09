@@ -231,6 +231,7 @@ describe("an instance between the masters", () => {
         masters: [master("m1", "Regular", { wght: 400 }), master("m2", "Black", { wght: 900 })],
         sources: { m1: light, m2: black },
         current: "m1",
+        instances: [],
       },
     });
     store.setCurrentGlyph("o");

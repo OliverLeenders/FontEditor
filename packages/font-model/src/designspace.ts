@@ -49,6 +49,42 @@ export type Master = {
   readonly location: Location;
 };
 
+export type InstanceId = string;
+
+/**
+ * A style the family is meant to have, at a place between the masters.
+ *
+ * A designspace is masters *and* the instances drawn between them, and the two
+ * are different in kind. A master is a drawing somebody made and every glyph in
+ * it is theirs. An instance is a name and a location — Light at 300, Semibold
+ * at 600 — and what it looks like is worked out. There is nothing to draw in
+ * one, which is why it has no source.
+ *
+ * They are what the menu in a word processor lists, and until they exist a
+ * variable font can only offer its own corners: the four extremes a two-axis
+ * family is drawn at, which is not what anybody calls a style.
+ *
+ * `familyName` is empty for the ordinary case, where the instance belongs to
+ * the family it was designed in. A family that splits — a Condensed sold under
+ * its own name — says so here.
+ */
+export type Instance = {
+  readonly id: InstanceId;
+  /** The style name: Light, Bold Italic, Condensed Medium. */
+  readonly name: string;
+  readonly location: Location;
+  readonly familyName: string;
+};
+
+export function instance(
+  id: InstanceId,
+  name: string,
+  location: Location = {},
+  familyName = "",
+): Instance {
+  return { id, name, location, familyName };
+}
+
 export function axis(tag: string, name: string, min: number, value: number, max: number): Axis {
   const low = Math.min(min, max);
   const high = Math.max(min, max);
@@ -114,8 +150,15 @@ export function sameLocation(axes: readonly Axis[], one: Location, two: Location
  * its own — it is a set of points in a space — so any list of masters shown to
  * somebody has to invent one, and "along the axes" is the only one that is
  * about the design rather than about when they were made.
+ *
+ * Written for anything placed on the axes rather than for masters alone: the
+ * instances want the same order for the same reason, and the sort has nothing
+ * to say about which of the two it is looking at.
  */
-export function inAxisOrder(axes: readonly Axis[], masters: readonly Master[]): Master[] {
+export function inAxisOrder<T extends { readonly name: string; readonly location: Location }>(
+  axes: readonly Axis[],
+  masters: readonly T[],
+): T[] {
   return [...masters].sort((one, two) => {
     for (const a of axes) {
       const difference = (one.location[a.tag] ?? a.default) - (two.location[a.tag] ?? a.default);

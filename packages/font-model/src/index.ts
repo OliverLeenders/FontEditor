@@ -238,35 +238,45 @@ export {
 export type { ImageRef } from "./image.js";
 export { imagePoint, imageRef, invertAffine, placeCrop, shownCrop } from "./image.js";
 
-export type { Axis, Location, Master, MasterId } from "./designspace.js";
+export type { Axis, Instance, InstanceId, Location, Master, MasterId } from "./designspace.js";
 export {
   WEIGHT,
   axis,
   defaultLocation,
   describeLocation,
   inAxisOrder,
+  instance,
   master,
   normalised,
   sameLocation,
   settledLocation,
 } from "./designspace.js";
 
-export type { FontProject, MasterProblem } from "./project.js";
+export type { FontProject, InstanceProblem, MasterProblem } from "./project.js";
 export {
   FIRST_MASTER,
+  addInstance,
   addMaster,
   currentMaster,
   currentSource,
   hasMasters,
+  instanceById,
+  instanceProblemSays,
   isProject,
   masterById,
   masterProblemSays,
+  moveInstance,
   moveMaster,
+  orderedInstances,
   orderedMasters,
   project,
+  removeInstance,
   removeMaster,
+  renameInstance,
   renameMaster,
   setAxes,
+  setInstanceFamily,
+  setInstances,
   sourceOf,
   switchTo,
   withCurrentSource,

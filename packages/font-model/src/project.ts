@@ -1,10 +1,13 @@
 import {
   type Axis,
+  type Instance,
+  type InstanceId,
   type Location,
   type Master,
   type MasterId,
   defaultLocation,
   inAxisOrder,
+  instance as makeInstance,
   master as makeMaster,
   sameLocation,
   settledLocation,
@@ -36,6 +39,19 @@ export type FontProject = {
   readonly sources: Readonly<Record<MasterId, FontDocument>>;
   /** The one being edited. Always one of `masters`. */
   readonly current: MasterId;
+  /**
+   * The styles the family is meant to have, between the masters.
+   *
+   * Empty for most fonts, and that is not the same as having none worth naming:
+   * a family drawn at Light and Black with nothing said about the middle ships
+   * a variable font whose style menu offers Light and Black, which is a menu of
+   * its corners rather than of its styles.
+   *
+   * Not sources. There is nothing to draw in an instance — it is a name and a
+   * place, and what it looks like is worked out — so it has no document and
+   * cannot be switched to.
+   */
+  readonly instances: readonly Instance[];
 };
 
 /** The name a font's first master is given, before anybody says otherwise. */
@@ -58,6 +74,7 @@ export function project(
     masters: [makeMaster(id, options.name ?? FIRST_MASTER)],
     sources: { [id]: document },
     current: id,
+    instances: [],
   };
 }
 
@@ -209,6 +226,111 @@ export function moveMaster(
   return { ...p, masters: p.masters.map((m) => (m.id === id ? { ...m, location: at } : m)) };
 }
 
+/**
+ * The instances, in the order they sit on the axes.
+ *
+ * The same order the masters are given in, and for the same reason: a list of
+ * styles running Light, Regular, Bold reads as the family it describes, and one
+ * in the order somebody happened to type them does not.
+ */
+export function orderedInstances(p: FontProject): Instance[] {
+  return inAxisOrder(p.axes, p.instances);
+}
+
+export function instanceById(p: FontProject, id: InstanceId): Instance | null {
+  return p.instances.find((i) => i.id === id) ?? null;
+}
+
+/** Why an instance could not be added or changed, or `null` when it can. */
+export type InstanceProblem = "no-name" | "name-taken" | "missing";
+
+/**
+ * Name a style, at a place on the axes.
+ *
+ * Duplicate locations are allowed where duplicate names are not, which is the
+ * other way round from masters — and both follow from what the thing is. Two
+ * masters in one place would be two drawings of the same font with nothing to
+ * choose between them. Two instances in one place is ordinary: a family that
+ * sells its Condensed separately names the same drawing twice, once in each
+ * family. What must be unique is the name, because that is what a menu shows
+ * and what a file is called.
+ */
+export function addInstance(
+  p: FontProject,
+  id: InstanceId,
+  name: string,
+  location: Location,
+  familyName = "",
+): FontProject | InstanceProblem {
+  const trimmed = name.trim();
+  if (trimmed === "") return "no-name";
+  if (p.instances.some((i) => i.name === trimmed)) return "name-taken";
+
+  const at = settledLocation(p.axes, location);
+  return { ...p, instances: [...p.instances, makeInstance(id, trimmed, at, familyName.trim())] };
+}
+
+export function removeInstance(p: FontProject, id: InstanceId): FontProject | InstanceProblem {
+  if (instanceById(p, id) === null) return "missing";
+  return { ...p, instances: p.instances.filter((i) => i.id !== id) };
+}
+
+export function renameInstance(
+  p: FontProject,
+  id: InstanceId,
+  name: string,
+): FontProject | InstanceProblem {
+  const trimmed = name.trim();
+  if (trimmed === "") return "no-name";
+  if (p.instances.some((i) => i.name === trimmed && i.id !== id)) return "name-taken";
+  if (instanceById(p, id) === null) return "missing";
+
+  return { ...p, instances: p.instances.map((i) => (i.id === id ? { ...i, name: trimmed } : i)) };
+}
+
+/** Move an instance to another place on the axes. */
+export function moveInstance(
+  p: FontProject,
+  id: InstanceId,
+  location: Location,
+): FontProject | InstanceProblem {
+  if (instanceById(p, id) === null) return "missing";
+
+  const at = settledLocation(p.axes, location);
+  return { ...p, instances: p.instances.map((i) => (i.id === id ? { ...i, location: at } : i)) };
+}
+
+/** Say which family an instance belongs to, or `""` for this one. */
+export function setInstanceFamily(
+  p: FontProject,
+  id: InstanceId,
+  familyName: string,
+): FontProject | InstanceProblem {
+  if (instanceById(p, id) === null) return "missing";
+  const trimmed = familyName.trim();
+
+  return {
+    ...p,
+    instances: p.instances.map((i) => (i.id === id ? { ...i, familyName: trimmed } : i)),
+  };
+}
+
+export function setInstances(p: FontProject, instances: readonly Instance[]): FontProject {
+  return { ...p, instances };
+}
+
+/** What went wrong, said to somebody who was trying to do it. */
+export function instanceProblemSays(problem: InstanceProblem): string {
+  switch (problem) {
+    case "no-name":
+      return "An instance needs a name.";
+    case "name-taken":
+      return "There is already an instance with that name.";
+    case "missing":
+      return "That instance is not in this font.";
+  }
+}
+
 /** What went wrong, said to somebody who was trying to do it. */
 export function masterProblemSays(problem: MasterProblem): string {
   switch (problem) {
@@ -226,7 +348,7 @@ export function masterProblemSays(problem: MasterProblem): string {
 }
 
 /** Whether a value the model handed back is a project or a refusal. */
-export const isProject = (out: FontProject | MasterProblem): out is FontProject =>
+export const isProject = (out: FontProject | MasterProblem | InstanceProblem): out is FontProject =>
   typeof out !== "string";
 
 export { defaultLocation };

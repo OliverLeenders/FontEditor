@@ -72,6 +72,49 @@ function tagsOf(bytes: ArrayBuffer): string[] {
   return out;
 }
 
+/** Where a table starts, or -1. */
+function tableAt(bytes: ArrayBuffer, tag: string): number {
+  const font = new Uint8Array(bytes);
+  const view = new DataView(bytes);
+  const count = view.getUint16(4);
+
+  for (let i = 0; i < count; i++) {
+    const at = 12 + i * 16;
+    const found = String.fromCharCode(font[at]!, font[at + 1]!, font[at + 2]!, font[at + 3]!);
+    if (found === tag) return view.getUint32(at + 8);
+  }
+  return -1;
+}
+
+/**
+ * The named instances an `fvar` offers, as their coordinates.
+ *
+ * The names themselves are ids into the `name` table and reading them back
+ * would be a second decoder; how many there are and where they sit is what
+ * says whether the styles or the masters were written.
+ */
+function fvarInstances(bytes: ArrayBuffer): number[][] {
+  const start = tableAt(bytes, "fvar");
+  if (start < 0) return [];
+
+  const view = new DataView(bytes);
+  const axesAt = start + view.getUint16(start + 4);
+  const axisCount = view.getUint16(start + 8);
+  const axisSize = view.getUint16(start + 10);
+  const instanceCount = view.getUint16(start + 12);
+  const instanceSize = view.getUint16(start + 14);
+
+  const out: number[][] = [];
+  for (let i = 0; i < instanceCount; i++) {
+    // Each instance is a name id, flags, and one 16.16 fixed per axis.
+    const at = axesAt + axisCount * axisSize + i * instanceSize + 4;
+    const coords: number[] = [];
+    for (let a = 0; a < axisCount; a++) coords.push(view.getInt32(at + a * 4) / 65536);
+    out.push(coords);
+  }
+  return out;
+}
+
 describe("a variable font", () => {
   it("has the tables that make it one", () => {
     const tags = tagsOf(exportVariableFont([WEIGHT], family()).bytes);
@@ -164,3 +207,29 @@ function drawnPoints(g: ReturnType<typeof glyph>): [number, number][] {
 
   return out;
 }
+
+/**
+ * The style menu a variable font offers.
+ *
+ * Its named instances, which are the family's *instances* — Light, Semibold —
+ * and not its masters. The two are different in kind: a master is a drawing
+ * somebody made, and a two-axis family's masters are its four corners, which is
+ * not a menu anybody wants to pick a style from.
+ */
+describe("the styles a variable font offers", () => {
+  it("offers the styles it was given", () => {
+    const out = exportVariableFont([WEIGHT], family(), [
+      { name: "Light", location: { wght: 300 } },
+      { name: "Regular", location: { wght: 400 } },
+      { name: "Semibold", location: { wght: 600 } },
+    ]);
+
+    expect(fvarInstances(out.bytes)).toEqual([[300], [400], [600]]);
+  });
+
+  it("falls back to the masters where a family has named no styles", () => {
+    // A menu of the corners still beats no menu, and it is what this wrote
+    // before instances existed.
+    expect(fvarInstances(exportVariableFont([WEIGHT], family()).bytes)).toEqual([[400], [900]]);
+  });
+});

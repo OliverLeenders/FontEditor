@@ -28,6 +28,19 @@ import { type ZipEntry, zip } from "./zip.js";
  * over a directory. Unzipping gives the arrangement above.
  */
 
+/**
+ * One instance on the way out: a name, a family, and a place.
+ *
+ * No document, because there is nothing to draw in one — a build works the
+ * shapes out from the masters either side. `familyName` is empty for the
+ * ordinary case, where the style belongs to the family it was designed in.
+ */
+export type FamilyInstance = {
+  readonly name: string;
+  readonly location: Location;
+  readonly familyName: string;
+};
+
 /** One master on the way out: what it is called, where it sits, what it holds. */
 export type FamilyMaster = {
   readonly name: string;
@@ -50,7 +63,11 @@ export type FamilyExport = {
  * what goes wrong here is a designspace naming a UFO that is not beside it, and
  * that is invisible through an archive.
  */
-export function familyFiles(axes: readonly Axis[], masters: readonly FamilyMaster[]): ZipEntry[] {
+export function familyFiles(
+  axes: readonly Axis[],
+  masters: readonly FamilyMaster[],
+  instances: readonly FamilyInstance[] = [],
+): ZipEntry[] {
   const family = familyName(masters);
   const sources: Source[] = masters.map((m) => ({
     filename: ufoFolderName(family, m.name),
@@ -60,7 +77,22 @@ export function familyFiles(axes: readonly Axis[], masters: readonly FamilyMaste
     location: m.location,
   }));
 
-  const designspace: Designspace = { axes, sources };
+  const designspace: Designspace = {
+    axes,
+    sources,
+    // The styles between the masters, with the file name a build would give
+    // each: the convention every pipeline follows, and the one this editor uses
+    // when it writes the instances out itself.
+    instances: instances.map((it) => {
+      const under = it.familyName === "" ? family : it.familyName;
+      return {
+        familyName: under,
+        styleName: it.name,
+        location: it.location,
+        filename: `instance_ufo/${ufoFolderName(under, it.name)}`,
+      };
+    }),
+  };
   const entries: ZipEntry[] = [
     { path: designspaceFileName(family), text: designspaceXml(designspace) },
   ];
@@ -82,14 +114,17 @@ export function familyFiles(axes: readonly Axis[], masters: readonly FamilyMaste
 export function exportFamily(
   axes: readonly Axis[],
   masters: readonly FamilyMaster[],
+  instances: readonly FamilyInstance[] = [],
 ): FamilyExport {
-  const files = familyFiles(axes, masters);
+  const files = familyFiles(axes, masters, instances);
   return { bytes: zip(files), fileName: `${familyName(masters)}.zip`, files: files.length };
 }
 
 /** What came back from reading a family. */
 export type FamilyImport = {
   readonly axes: readonly Axis[];
+  /** The styles the file asked for between its sources. */
+  readonly instances: readonly FamilyInstance[];
   readonly masters: readonly {
     readonly name: string;
     readonly location: Location;
@@ -170,7 +205,24 @@ export function readFamily(
     return { reason: "the designspace names no source this archive contains" };
   }
 
-  return { axes: designspace.axes, masters, warnings };
+  return {
+    axes: designspace.axes,
+    masters,
+    // The family name is dropped where it is the family's own: a style that
+    // says it belongs to the family it is in is saying nothing, and keeping it
+    // would make every instance look like a split-off subfamily.
+    instances: designspace.instances.map((it) => ({
+      name: it.styleName,
+      location: it.location,
+      familyName: it.familyName === familyOf(designspace.sources) ? "" : it.familyName,
+    })),
+    warnings,
+  };
+}
+
+/** The family the sources agree they belong to, or the first one's answer. */
+function familyOf(sources: readonly Source[]): string {
+  return sources[0]?.familyName ?? "";
 }
 
 /**

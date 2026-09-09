@@ -13,15 +13,22 @@ import { glyph } from "../src/glyph.js";
 import {
   type FontProject,
   type MasterProblem,
+  addInstance,
   addMaster,
   currentSource,
   hasMasters,
   isProject,
   orderedMasters,
   project,
+  instanceById,
+  moveInstance,
+  orderedInstances,
+  removeInstance,
   removeMaster,
+  renameInstance,
   renameMaster,
   moveMaster,
+  setInstanceFamily,
   setAxes,
   switchTo,
   withCurrentSource,
@@ -207,5 +214,104 @@ describe("locations", () => {
     // map through the whole range would say neither.
     expect(normalised([WEIGHT], { wght: 250 })["wght"]).toBeCloseTo(-0.5, 10);
     expect(normalised([WEIGHT], { wght: 650 })["wght"]).toBeCloseTo(0.5, 10);
+  });
+});
+
+/**
+ * The styles named between the masters.
+ *
+ * A different thing from a master and deliberately looser: a master is a
+ * drawing and no two of them can be in the same place, an instance is a name
+ * and a place and two of them there is ordinary.
+ */
+describe("instances", () => {
+  const two = (): FontProject => {
+    const one = setAxes(project(fontDocument([glyph("a")]), { id: "m1" }), [WEIGHT]);
+    const out = addMaster(one, "m2", "Black", { wght: 900 });
+    if (!isProject(out)) throw new Error(out);
+    return out;
+  };
+
+  const named = (p: FontProject, name: string, at: Record<string, number>): FontProject => {
+    const out = addInstance(p, `i-${name}`, name, at);
+    if (!isProject(out)) throw new Error(out);
+    return out;
+  };
+
+  it("starts with none, which is what most fonts have", () => {
+    expect(project(fontDocument()).instances).toEqual([]);
+  });
+
+  it("names a style at a place on the axes", () => {
+    const p = named(two(), "Semibold", { wght: 600 });
+
+    expect(p.instances).toHaveLength(1);
+    expect(instanceById(p, "i-Semibold")?.location).toEqual({ wght: 600 });
+    // Empty means the family it was designed in, which is nearly always right.
+    expect(instanceById(p, "i-Semibold")?.familyName).toBe("");
+  });
+
+  it("settles a location the way a master's is settled", () => {
+    // An axis the font does not have is somebody's leftover; one it does have
+    // and the location omits means the default there.
+    const p = named(two(), "Odd", { wdth: 50 });
+    expect(instanceById(p, "i-Odd")?.location).toEqual({ wght: 400 });
+  });
+
+  it("refuses a second style with the same name", () => {
+    const p = named(two(), "Semibold", { wght: 600 });
+    expect(addInstance(p, "other", "Semibold", { wght: 500 })).toBe("name-taken");
+    expect(addInstance(p, "other", "  ", { wght: 500 })).toBe("no-name");
+  });
+
+  it("allows two styles in the same place, which a split family has", () => {
+    // Chalk Condensed Bold and Chalk Bold can be one drawing under two names,
+    // and refusing that would refuse the reason familyName exists.
+    let p = named(two(), "Bold", { wght: 700 });
+    p = named(p, "Condensed Bold", { wght: 700 });
+    expect(p.instances).toHaveLength(2);
+  });
+
+  it("renames, moves and re-families one", () => {
+    let p = named(two(), "Semibold", { wght: 600 });
+
+    const renamed = renameInstance(p, "i-Semibold", "Demibold");
+    if (!isProject(renamed)) throw new Error(renamed);
+    p = renamed;
+    expect(instanceById(p, "i-Semibold")?.name).toBe("Demibold");
+
+    const moved = moveInstance(p, "i-Semibold", { wght: 550 });
+    if (!isProject(moved)) throw new Error(moved);
+    p = moved;
+    expect(instanceById(p, "i-Semibold")?.location).toEqual({ wght: 550 });
+
+    const split = setInstanceFamily(p, "i-Semibold", "Chalk Text");
+    if (!isProject(split)) throw new Error(split);
+    expect(instanceById(split, "i-Semibold")?.familyName).toBe("Chalk Text");
+  });
+
+  it("says so about a style that is not there", () => {
+    const p = two();
+    expect(renameInstance(p, "nope", "X")).toBe("missing");
+    expect(moveInstance(p, "nope", {})).toBe("missing");
+    expect(removeInstance(p, "nope")).toBe("missing");
+    expect(setInstanceFamily(p, "nope", "X")).toBe("missing");
+  });
+
+  it("takes one away, however many are left", () => {
+    // Unlike a master: a font with no styles named is the ordinary case, so
+    // there is no last one to protect.
+    const p = named(two(), "Semibold", { wght: 600 });
+    const out = removeInstance(p, "i-Semibold");
+    if (!isProject(out)) throw new Error(out);
+    expect(out.instances).toEqual([]);
+  });
+
+  it("lists them along the axes, lightest first", () => {
+    let p = named(two(), "Bold", { wght: 700 });
+    p = named(p, "Light", { wght: 300 });
+    p = named(p, "Semibold", { wght: 600 });
+
+    expect(orderedInstances(p).map((i) => i.name)).toEqual(["Light", "Semibold", "Bold"]);
   });
 });

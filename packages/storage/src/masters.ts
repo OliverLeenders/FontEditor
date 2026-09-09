@@ -1,4 +1,4 @@
-import type { Axis, FontDocument, Master, MasterId } from "@fonteditor/font-model";
+import type { Axis, FontDocument, Instance, Master, MasterId } from "@fonteditor/font-model";
 
 import type { FileStore } from "./file-store.js";
 import { type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";
@@ -33,6 +33,13 @@ export type StoredDesignspace = {
   readonly masters: readonly Master[];
   /** Which one was being drawn, so opening the project puts you back there. */
   readonly current: MasterId;
+  /**
+   * The styles named between the masters.
+   *
+   * Absent in every project written before instances existed, which is why the
+   * reader takes a missing list as an empty one rather than as a damaged file.
+   */
+  readonly instances: readonly Instance[];
 };
 
 export const DESIGNSPACE_SCHEMA = 1;
@@ -65,9 +72,10 @@ export async function readDesignspace(store: FileStore): Promise<StoredDesignspa
     const axes = Array.isArray(parsed["axes"]) ? (parsed["axes"] as Axis[]) : [];
     const masters = Array.isArray(parsed["masters"]) ? (parsed["masters"] as Master[]) : [];
     const current = typeof parsed["current"] === "string" ? parsed["current"] : "";
+    const instances = Array.isArray(parsed["instances"]) ? (parsed["instances"] as Instance[]) : [];
     if (masters.length === 0) return null;
 
-    return { schema: DESIGNSPACE_SCHEMA, axes, masters, current };
+    return { schema: DESIGNSPACE_SCHEMA, axes, masters, current, instances };
   } catch {
     // A file that will not parse is a project whose designspace has been lost,
     // and the font itself is still there: better one master than no font.

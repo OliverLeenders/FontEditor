@@ -69,11 +69,20 @@ export {
   shaperForParsed,
 } from "./shaping.js";
 
-export type { Designspace, Source } from "./designspace.js";
+export type { Designspace, DesignspaceInstance, Source } from "./designspace.js";
 export { designspaceFileName, designspaceXml, parseDesignspace } from "./designspace.js";
 
-export type { FamilyExport, FamilyImport, FamilyMaster, FamilyProblem } from "./family.js";
+export type {
+  FamilyExport,
+  FamilyImport,
+  FamilyInstance,
+  FamilyMaster,
+  FamilyProblem,
+} from "./family.js";
 export { exportFamily, familyFiles, looksLikeFamily, readFamily } from "./family.js";
+
+export type { InstanceFont, InstanceMaster, InstancesExport, NamedPlace } from "./instances.js";
+export { exportInstances, instanceFonts } from "./instances.js";
 
 export { Bytes } from "./bytes.js";
 export type { Cff2Font, Cff2Result } from "./cff2.js";

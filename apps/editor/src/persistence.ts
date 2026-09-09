@@ -274,6 +274,7 @@ export class Persistence {
     axes: unknown;
     masters: unknown;
     current: string;
+    instances: unknown;
   }): Promise<void> {
     if (this.client === null || !this.owner) return;
     await this.client.putDesignspace(designspace);

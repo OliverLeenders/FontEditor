@@ -30,9 +30,31 @@ export type Source = {
   readonly location: Location;
 };
 
+/**
+ * One instance, as the designspace asks for it.
+ *
+ * A style the family is meant to have at a place between the sources. There is
+ * nothing to draw in one — the shapes are worked out — so it is a name, a
+ * family, a location, and the file it would be built as.
+ */
+export type DesignspaceInstance = {
+  readonly familyName: string;
+  readonly styleName: string;
+  readonly location: Location;
+  /** Where a build would put it, which is the convention every pipeline uses. */
+  readonly filename: string;
+};
+
 export type Designspace = {
   readonly axes: readonly Axis[];
   readonly sources: readonly Source[];
+  /**
+   * The styles asked for between the sources.
+   *
+   * Empty is ordinary and is not the same as "none worth naming": a family with
+   * no instances builds a variable font whose style menu offers its corners.
+   */
+  readonly instances: readonly DesignspaceInstance[];
 };
 
 /** What the file is called, given a family name. */
@@ -79,7 +101,30 @@ export function designspaceXml(designspace: Designspace): string {
     lines.push("\t\t\t</location>", "\t\t</source>");
   }
 
-  lines.push("\t</sources>", "</designspace>", "");
+  lines.push("\t</sources>");
+
+  // The instances, where there are any. An empty `<instances/>` is legal and
+  // says the same thing as no element at all, so the shorter of the two is
+  // written: a file should not carry a section to announce that it is empty.
+  if (designspace.instances.length > 0) {
+    lines.push("\t<instances>");
+    for (const it of designspace.instances) {
+      lines.push(
+        `\t\t<instance familyname="${escapeXml(it.familyName)}"` +
+          ` stylename="${escapeXml(it.styleName)}"` +
+          ` filename="${escapeXml(it.filename)}">`,
+        "\t\t\t<location>",
+      );
+      for (const a of designspace.axes) {
+        const value = it.location[a.tag] ?? a.default;
+        lines.push(`\t\t\t\t<dimension name="${escapeXml(a.name)}" xvalue="${number(value)}"/>`);
+      }
+      lines.push("\t\t\t</location>", "\t\t</instance>");
+    }
+    lines.push("\t</instances>");
+  }
+
+  lines.push("</designspace>", "");
   return lines.join("\n");
 }
 
@@ -115,7 +160,22 @@ export function parseDesignspace(source: string): Designspace | null {
     });
   }
 
-  return { axes, sources };
+  const instances: DesignspaceInstance[] = [];
+  for (const element of childrenNamed(childNamed(root, "instances") ?? empty(), "instance")) {
+    const styleName = element.attributes["stylename"] ?? "";
+    // A style with no name is a row nobody can pick from a menu, and naming it
+    // for them would be inventing part of somebody's family.
+    if (styleName === "") continue;
+
+    instances.push({
+      familyName: element.attributes["familyname"] ?? "",
+      styleName,
+      filename: element.attributes["filename"] ?? "",
+      location: readLocation(childNamed(element, "location"), byName),
+    });
+  }
+
+  return { axes, sources, instances };
 }
 
 function readAxes(element: XmlElement | null): Axis[] {

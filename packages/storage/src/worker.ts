@@ -251,6 +251,7 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
         axes: request.designspace.axes as never,
         masters: request.designspace.masters as never,
         current: request.designspace.current,
+        instances: request.designspace.instances as never,
       });
       return null;
     }

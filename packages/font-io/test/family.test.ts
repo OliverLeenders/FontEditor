@@ -83,6 +83,7 @@ describe("the designspace file", () => {
   it("names its axes by tag and its locations by name", () => {
     const text = designspaceXml({
       axes: [WEIGHT],
+      instances: [],
       sources: [
         {
           filename: "Chalk-Bold.ufo",
@@ -103,6 +104,7 @@ describe("the designspace file", () => {
   it("says which source the family's information comes from", () => {
     const text = designspaceXml({
       axes: [WEIGHT],
+      instances: [],
       sources: [
         {
           filename: "a.ufo",
@@ -123,6 +125,14 @@ describe("the designspace file", () => {
   it("reads back what it wrote", () => {
     const before = {
       axes: [WEIGHT, axis("wdth", "Width", 75, 100, 125)],
+      instances: [
+        {
+          familyName: "Chalk",
+          styleName: "Semibold",
+          filename: "instance_ufo/Chalk-Semibold.ufo",
+          location: { wght: 600, wdth: 100 },
+        },
+      ],
       sources: [
         {
           filename: "Chalk-Regular.ufo",
@@ -144,6 +154,7 @@ describe("the designspace file", () => {
     const after = parseDesignspace(designspaceXml(before));
     expect(after?.axes).toEqual(before.axes);
     expect(after?.sources).toEqual(before.sources);
+    expect(after?.instances).toEqual(before.instances);
   });
 
   it("is not fooled by something that is not one", () => {

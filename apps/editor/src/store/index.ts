@@ -67,14 +67,19 @@ import { type FontHost, type ImportReport, importFont, newFont, showDocument } f
 import { type AddedImage, addImage, refreshImages, setImageOn } from "./images.js";
 import {
   type MasterReport,
+  addInstance,
   addMaster,
   compareWith,
+  moveInstance,
   moveMaster,
   loadSources,
   parkCurrent,
   projectFrom,
+  removeInstance,
   removeMaster,
+  renameInstance,
   renameMaster,
+  setInstanceFamily,
   setAxes,
   switchMaster,
 } from "./masters.js";
@@ -484,6 +489,28 @@ export class EditorStore {
 
   async setAxes(axes: readonly Axis[]): Promise<void> {
     await setAxes(this.host, axes);
+  }
+
+  // ---- the styles named between the masters -------------------------------
+
+  async addInstance(id: string, name: string, location: Record<string, number>): Promise<void> {
+    await addInstance(this.host, id, name, location);
+  }
+
+  async removeInstance(id: string): Promise<void> {
+    await removeInstance(this.host, id);
+  }
+
+  async renameInstance(id: string, name: string): Promise<void> {
+    await renameInstance(this.host, id, name);
+  }
+
+  async moveInstance(id: string, location: Record<string, number>): Promise<void> {
+    await moveInstance(this.host, id, location);
+  }
+
+  async setInstanceFamily(id: string, familyName: string): Promise<void> {
+    await setInstanceFamily(this.host, id, familyName);
   }
 
   /**

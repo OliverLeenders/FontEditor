@@ -2,7 +2,9 @@ import {
   type Incompatibility,
   type MasterId,
   WEIGHT,
+  defaultLocation,
   describeLocation,
+  orderedInstances,
   orderedMasters,
 } from "@fonteditor/font-model";
 import { useState } from "react";
@@ -187,6 +189,8 @@ export function Masters(): React.JSX.Element {
 
       {project.masters.length > 1 && project.axes.length > 0 ? <Preview /> : null}
 
+      {project.axes.length > 0 ? <Instances onFailed={setFailed} onSaid={setSaid} /> : null}
+
       {checked === null ? null : <Report name={checked.name} found={checked.found} store={store} />}
 
       {failed !== null ? (
@@ -196,6 +200,161 @@ export function Masters(): React.JSX.Element {
       ) : null}
       {failed === null && said !== null ? <p className={styles.said}>{said}</p> : null}
     </BarMenu>
+  );
+}
+
+/**
+ * The styles the family is meant to have, between the masters.
+ *
+ * A different thing from a master, and the difference is what the section is
+ * for. A master is a drawing somebody made; an instance is a name and a place,
+ * and what it looks like is worked out. Until they exist a variable font can
+ * only offer its own corners in a style menu — a two-axis family's four
+ * extremes, which is not what anybody calls a set of styles — and there is no
+ * static font to write out either, because nothing has said which places are
+ * worth writing.
+ *
+ * They live here rather than in a panel of their own because they are the same
+ * designspace, and because the control just above — showing a place between the
+ * drawings — is exactly how somebody decides a place is worth naming.
+ */
+function Instances({
+  onFailed,
+  onSaid,
+}: {
+  onFailed: (message: string | null) => void;
+  onSaid: (message: string | null) => void;
+}): React.JSX.Element {
+  const store = useEditorStore();
+  const project = useStoreValue((s) => s.project);
+  const family = useStoreValue((s) => s.session.editor.document.info.familyName);
+  const reading = useStoreValue((s) => s.ownership === "reading");
+  const at = useStoreValue((s) => s.preview);
+
+  const instances = orderedInstances(project);
+
+  const attempt = (run: () => Promise<string | null>): void => {
+    onFailed(null);
+    void (async () => {
+      try {
+        const message = await run();
+        if (message !== null) onSaid(message);
+      } catch (error) {
+        onFailed(error instanceof Error ? error.message : String(error));
+      }
+    })();
+  };
+
+  /**
+   * Name the place being shown, or the default one when nothing is.
+   *
+   * Following the preview is the whole point of putting this here: you move the
+   * sliders until the weight looks like a Semibold, and then you say so.
+   */
+  const add = (): void =>
+    attempt(async () => {
+      const where = at ?? defaultLocation(project.axes);
+      const name = unique(
+        "New style",
+        instances.map((i) => i.name),
+      );
+      await store.addInstance(`instance-${String(Date.now())}`, name, where);
+      return `Named ${name} at ${describeLocation(project.axes, where)}`;
+    });
+
+  return (
+    <div className={styles.instances}>
+      <div className={styles.head}>
+        <span>Styles between them</span>
+        <button
+          type="button"
+          className={styles.add}
+          disabled={reading}
+          title={
+            reading
+              ? "Another tab is saving this project"
+              : at === null
+                ? "Name a style at the default place on the axes"
+                : "Name the place being shown"
+          }
+          onClick={add}
+        >
+          <CopyPlusIcon />
+          {at === null ? "Name…" : "Name this…"}
+        </button>
+      </div>
+
+      {instances.length === 0 ? (
+        <p className={styles.none}>
+          None yet. A variable font written now offers its masters as its styles, and there is
+          nothing to write out as ordinary fonts.
+        </p>
+      ) : null}
+
+      <ul className={styles.list}>
+        {instances.map((it) => (
+          <li key={it.id} className={styles.instance}>
+            <div className={styles.instanceHead}>
+              <input
+                className={styles.name}
+                value={it.name}
+                aria-label={`Name of the instance ${it.name}`}
+                spellCheck={false}
+                disabled={reading}
+                onChange={(event) => void store.renameInstance(it.id, event.target.value)}
+              />
+              <input
+                className={styles.instanceFamily}
+                value={it.familyName}
+                placeholder={family}
+                title="The family this style belongs to, where it is not this one"
+                aria-label={`Family of the instance ${it.name}`}
+                spellCheck={false}
+                disabled={reading}
+                onChange={(event) => void store.setInstanceFamily(it.id, event.target.value)}
+              />
+              <button
+                type="button"
+                className={styles.drop}
+                disabled={reading}
+                title={`Remove ${it.name}`}
+                aria-label={`Remove the instance ${it.name}`}
+                onClick={() =>
+                  attempt(async () => {
+                    await store.removeInstance(it.id);
+                    return `Removed ${it.name}`;
+                  })
+                }
+              >
+                <TrashIcon />
+              </button>
+            </div>
+
+            <div className={styles.instanceAt}>
+              {project.axes.map((a) => (
+                <label key={a.tag} className={styles.instanceAxis}>
+                  {a.name}
+                  <input
+                    className={styles.instanceValue}
+                    type="number"
+                    min={a.min}
+                    max={a.max}
+                    value={it.location[a.tag] ?? a.default}
+                    aria-label={`${a.name} of the instance ${it.name}`}
+                    disabled={reading}
+                    onChange={(event) => {
+                      const value = Number(event.target.value);
+                      if (!Number.isFinite(value)) return;
+                      void store.moveInstance(it.id, { ...it.location, [a.tag]: value });
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

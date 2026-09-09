@@ -48,10 +48,17 @@ export type VariableResult = ExportResult & {
  * asked of it, and every delta is measured from it. A designspace usually has
  * its default in the middle of the axes, and the caller is expected to have put
  * that master first.
+ *
+ * `named` is what the style menu offers. Those are the family's *instances* —
+ * Light, Regular, Semibold — which are a different thing from its masters: a
+ * master is a drawing somebody made, and a two-axis family's masters are its
+ * four corners, which is not a menu anybody wants. Where a family has named
+ * none, the masters stand in, because a menu of corners still beats no menu.
  */
 export function exportVariableFont(
   axes: readonly Axis[],
   masters: readonly VariableMaster[],
+  named: readonly NamedInstance[] = [],
 ): VariableResult {
   const first = masters[0];
   if (first === undefined) throw new Error("a variable font needs at least one master");
@@ -83,7 +90,8 @@ export function exportVariableFont(
 
   // The names the axes and instances are known by, added to the table
   // opentype.js wrote, and the numbers handed back.
-  const instances: NamedInstance[] = masters.map((m) => ({ name: m.name, location: m.location }));
+  const instances: NamedInstance[] =
+    named.length > 0 ? [...named] : masters.map((m) => ({ name: m.name, location: m.location }));
   const names = [...axes.map((a) => a.name), ...instances.map((i) => i.name)];
   const written = withNames(nameTableOf(bytes), names);
 

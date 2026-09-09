@@ -106,7 +106,12 @@ export type StorageRequest =
   | {
       readonly id: number;
       readonly kind: "putDesignspace";
-      readonly designspace: { axes: unknown; masters: unknown; current: string };
+      readonly designspace: {
+        axes: unknown;
+        masters: unknown;
+        current: string;
+        instances: unknown;
+      };
     }
   | { readonly id: number; readonly kind: "getDesignspace" }
   | { readonly id: number; readonly kind: "wipe" };

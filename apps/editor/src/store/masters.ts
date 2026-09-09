@@ -1,16 +1,24 @@
 import {
   type Axis,
   type FontDocument,
+  type Instance,
+  type InstanceId,
   type Location,
   type Master,
   type MasterId,
+  addInstance as addToInstances,
   addMaster as addToProject,
+  instanceProblemSays,
   incompatibilities,
   isProject,
   masterProblemSays,
+  moveInstance as moveInInstances,
   moveMaster as moveInProject,
+  removeInstance as removeFromInstances,
   removeMaster as removeFromProject,
+  renameInstance as renameInInstances,
   renameMaster as renameInProject,
+  setInstanceFamily as setFamilyInInstances,
   project as makeProject,
   setAxes as setProjectAxes,
   switchTo as switchProjectTo,
@@ -172,6 +180,7 @@ export async function adoptFamily(
       readonly document: FontDocument;
       readonly images: ReadonlyMap<string, Uint8Array>;
     }[];
+    readonly instances: readonly { name: string; location: Location; familyName: string }[];
   },
 ): Promise<void> {
   for (const m of host.state().project.masters) await host.disk.dropMaster(m.id);
@@ -192,6 +201,13 @@ export async function adoptFamily(
     masters,
     sources: { [first.id]: opened.document },
     current: first.id,
+    // The styles the designspace named between its masters, kept with a fresh
+    // id each: what came out of the file is a name and a place, and the id is
+    // this session's way of pointing at a row.
+    instances: family.instances.map((it, i) => ({
+      ...it,
+      id: `instance-${String(stamp)}-${String(i)}`,
+    })),
   };
   host.patch({ project: next });
 
@@ -211,7 +227,12 @@ export async function adoptFamily(
  * actually on disk is the truth about what the font has.
  */
 export function projectFrom(
-  stored: { axes: readonly Axis[]; masters: readonly Master[]; current: MasterId } | null,
+  stored: {
+    axes: readonly Axis[];
+    masters: readonly Master[];
+    current: MasterId;
+    instances?: readonly Instance[];
+  } | null,
   document: FontDocument,
 ): ReturnType<typeof makeProject> {
   if (stored === null || stored.masters.length === 0) return makeProject(document);
@@ -223,6 +244,8 @@ export function projectFrom(
     masters: stored.masters,
     sources: { [current]: document },
     current,
+    // Absent in every project written before instances existed.
+    instances: stored.instances ?? [],
   };
 }
 
@@ -274,7 +297,69 @@ export async function rememberDesignspace(
     axes: project.axes,
     masters: project.masters,
     current: project.current,
+    instances: project.instances,
   });
+}
+
+/**
+ * The styles named between the masters.
+ *
+ * Simpler than the master commands throughout, and for one reason: an instance
+ * has no source. There is no file to write, none to drop, and nothing on screen
+ * that could be standing in a place that has just gone — so each of these is
+ * the project's own answer, remembered.
+ */
+export async function addInstance(
+  host: FontHost,
+  id: InstanceId,
+  name: string,
+  location: Location,
+): Promise<void> {
+  const out = addToInstances(host.state().project, id, name, location);
+  if (!isProject(out)) throw new Error(instanceProblemSays(out));
+
+  host.patch({ project: out });
+  await rememberDesignspace(host, out);
+}
+
+export async function removeInstance(host: FontHost, id: InstanceId): Promise<void> {
+  const out = removeFromInstances(host.state().project, id);
+  if (!isProject(out)) throw new Error(instanceProblemSays(out));
+
+  host.patch({ project: out });
+  await rememberDesignspace(host, out);
+}
+
+export async function renameInstance(host: FontHost, id: InstanceId, name: string): Promise<void> {
+  const out = renameInInstances(host.state().project, id, name);
+  if (!isProject(out)) throw new Error(instanceProblemSays(out));
+
+  host.patch({ project: out });
+  await rememberDesignspace(host, out);
+}
+
+export async function moveInstance(
+  host: FontHost,
+  id: InstanceId,
+  location: Location,
+): Promise<void> {
+  const out = moveInInstances(host.state().project, id, location);
+  if (!isProject(out)) throw new Error(instanceProblemSays(out));
+
+  host.patch({ project: out });
+  await rememberDesignspace(host, out);
+}
+
+export async function setInstanceFamily(
+  host: FontHost,
+  id: InstanceId,
+  familyName: string,
+): Promise<void> {
+  const out = setFamilyInInstances(host.state().project, id, familyName);
+  if (!isProject(out)) throw new Error(instanceProblemSays(out));
+
+  host.patch({ project: out });
+  await rememberDesignspace(host, out);
 }
 
 /**

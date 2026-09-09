@@ -250,3 +250,82 @@
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+/* The styles named between the masters.
+   A second section rather than a second panel: masters and instances are the
+   same designspace, and the control that shows a place between the drawings is
+   also the way to name one. */
+.instances {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* Two lines per instance, because a location is as wide as the font has axes
+   and a row that grew with the design would push the name off the panel. */
+.instance {
+  padding: 0.3rem 0.1rem;
+  border-bottom: 1px solid var(--rule);
+}
+.instance:last-child {
+  border-bottom: 0;
+}
+
+.instanceHead {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.1rem;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.instanceAt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.instanceAxis {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.instanceValue {
+  width: 3.6rem;
+  padding: 0.1rem 0.25rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The family an instance belongs to, which is nearly always this one — so it
+   shows the family name greyed rather than sitting there empty. */
+.instanceFamily {
+  min-width: 0;
+  padding: 0.15rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.76rem;
+}
+.instanceFamily:hover,
+.instanceFamily:focus {
+  border-color: var(--rule-strong);
+  background: var(--surface);
+}
+
+.none {
+  margin: 0.2rem 0 0;
+  font-size: 0.74rem;
+  color: var(--ink-3);
+}
