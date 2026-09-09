@@ -2,6 +2,7 @@ import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
 import type { DiskFolder } from "@fonteditor/disk";
 import { session as newSession } from "@fonteditor/edit-core";
 import {
+  type ExtraLayer,
   type FamilyImport,
   importFont as parseFontFile,
   importUfo,
@@ -102,6 +103,7 @@ export async function importFont(
         return {
           document: parsed.document,
           images: new Map<string, Uint8Array>(),
+          layers: [] as readonly ExtraLayer[],
           warnings: parsed.warnings.map((w) =>
             w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
           ),
@@ -110,6 +112,7 @@ export async function importFont(
 
   await adoptDocument(host, read.document);
   await adoptImages(host, read.images);
+  await adoptLayers(host, read.layers);
 
   const { info, glyphOrder } = read.document;
   return {
@@ -168,6 +171,7 @@ async function readUfo(bytes: ArrayBuffer): Promise<{
   document: FontDocument;
   warnings: string[];
   images: ReadonlyMap<string, Uint8Array>;
+  layers: readonly ExtraLayer[];
 }> {
   const out = await importUfo(bytes, randomIds());
   // A UFO that cannot be read is reported rather than half-adopted: there is
@@ -177,6 +181,7 @@ async function readUfo(bytes: ArrayBuffer): Promise<{
   return {
     document: out.document,
     images: out.images,
+    layers: out.layers,
     warnings: out.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
   };
 }
@@ -196,6 +201,23 @@ export async function adoptImages(
     await host.disk.putImage(name, bytes);
   }
   host.patch({ images: await host.disk.images() });
+}
+
+/**
+ * Put the layers a source arrived with into the store.
+ *
+ * Replacing whatever was there rather than adding to it: these belong to the
+ * font that was just opened, and the one before it has gone. Called with an
+ * empty list for a font that has none — a binary, a new font — which is what
+ * clears the previous font's layers out.
+ */
+export async function adoptLayers(host: FontHost, layers: readonly ExtraLayer[]): Promise<void> {
+  // In the session and in the store both. The session is what a save reads, so
+  // it works in a browser that will not keep a file; the store is what makes
+  // them survive the reload that would otherwise be followed by a save without
+  // them.
+  host.patch({ layers });
+  await host.disk.putLayers(layers);
 }
 
 /**
@@ -221,6 +243,13 @@ export async function adoptDocument(host: FontHost, document: FontDocument): Pro
   // here means Save can never quietly write this font over that one; opening a
   // folder sets the link again straight afterwards.
   host.setFolder(null);
+  // And the layers of whatever source was open, which belonged to it. Cleared
+  // here rather than at each caller so that opening anything — a binary, a new
+  // font, a UFO with one layer — cannot leave the last font's sketch behind to
+  // be written into the next one. A caller with layers of its own sets them
+  // straight afterwards.
+  host.patch({ layers: [] });
+  await host.disk.putLayers([]);
   await host.disk.replaceAll(document);
 }
 

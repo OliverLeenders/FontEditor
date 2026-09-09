@@ -31,6 +31,7 @@ import {
   plistStrings,
   stringEntries,
 } from "./plist.js";
+import { type ExtraLayer, defaultLayer, extraLayers } from "./ufo-layers.js";
 import { type ZipFile, fileText, unzip } from "./unzip.js";
 
 /**
@@ -58,6 +59,15 @@ export type UfoImport = {
    * on every edit. The caller puts them wherever it keeps such things.
    */
   readonly images: ReadonlyMap<string, Uint8Array>;
+  /**
+   * The layers this font has besides the one being edited, exactly as found.
+   *
+   * Beside the document for the reason the pictures are: a second set of glyphs
+   * is the size of the first, and the document is a value that history copies
+   * on every edit. The caller keeps them and hands them back when the font is
+   * written out again.
+   */
+  readonly layers: readonly ExtraLayer[];
 };
 
 export type UfoWarning = {
@@ -104,7 +114,8 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
   const at = (path: string): string | null => fileText(files, `${root}${path}`);
 
   const { info, guides, kept: keptInfo } = readFontInfo(at("fontinfo.plist"), ids, warn);
-  const layer = defaultLayer(at("layercontents.plist"));
+  const listing = at("layercontents.plist");
+  const layer = defaultLayer(listing);
   const contents = parsePlistDict(at(`${layer}/contents.plist`) ?? "");
   const entries = stringEntries(contents);
 
@@ -168,6 +179,7 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
 
   return {
     images,
+    layers: extraLayers(files, root, listing),
     document: setKept(
       setGuides(setFeatures(setKerning(fontDocument(ordered, info), kerning), features), guides),
       { fontInfo: keptInfo, lib: keptLib },
@@ -219,23 +231,6 @@ function findRoot(files: readonly ZipFile[]): string | null {
   );
   if (marker === undefined) return null;
   return marker.path.slice(0, marker.path.length - "metainfo.plist".length);
-}
-
-/**
- * Which directory the default layer lives in.
- *
- * Almost always `glyphs`, and required to be for the default layer in practice,
- * but the file says so explicitly and a source with several layers is ordinary.
- * Reading it costs nothing and opening the wrong layer would be baffling.
- */
-function defaultLayer(source: string | null): string {
-  if (source === null) return "glyphs";
-
-  // An array of [name, directory] pairs rather than a dict, so the plist reader
-  // would give a nested list to walk for one string. The pairing is what is
-  // being matched, and matching it directly says so.
-  const match = source.match(/<string>public\.default<\/string>\s*<string>([^<]+)<\/string>/);
-  return match?.[1] ?? "glyphs";
 }
 
 function readFontInfo(

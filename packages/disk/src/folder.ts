@@ -1,4 +1,10 @@
-import { type ZipEntry, type ZipFile, entryBytes } from "@fonteditor/font-io";
+import {
+  DEFAULT_LAYER_DIRECTORY,
+  type ZipEntry,
+  type ZipFile,
+  defaultLayer,
+  entryBytes,
+} from "@fonteditor/font-io";
 
 import type { DiskFile, DiskFolder } from "./handles.js";
 
@@ -82,7 +88,7 @@ export async function writeFolder(
   // Read before writing: both of these are files we are about to overwrite.
   const before = glifsListed(await textAt(folder, "glyphs/contents.plist"));
   const layer = defaultLayer(await textAt(folder, "layercontents.plist"));
-  if (layer !== null && layer !== "glyphs") {
+  if (layer !== DEFAULT_LAYER_DIRECTORY) {
     notes.push(
       `the font's default layer was ${layer}; the glyphs are in glyphs/ now, and ${layer}/ ` +
         `is still on disk but no longer listed in layercontents.plist`,
@@ -165,11 +171,4 @@ function glifsListed(source: string | null): Set<string> {
     if (name !== undefined && !name.includes("/")) out.add(name);
   }
   return out;
-}
-
-/** Which directory a `layercontents.plist` calls the default layer. */
-function defaultLayer(source: string | null): string | null {
-  if (source === null) return null;
-  const match = source.match(/<string>public\.default<\/string>\s*<string>([^<]+)<\/string>/);
-  return match?.[1] ?? null;
 }

@@ -145,6 +145,87 @@ describe("the font's folder on disk", () => {
   });
 });
 
+/**
+ * A source with more than one layer, opened and saved back.
+ *
+ * A designer's UFO holds more than the drawing — a sketch traced over, a
+ * previous version — and this editor edits exactly one of those. It used to
+ * write a `layercontents.plist` naming only that one, so the other directories
+ * stayed on disk with nothing pointing at them, which is what every tool that
+ * opens the font afterwards reads as their having been deleted.
+ */
+describe("a folder with a second layer in it", () => {
+  let store: Store;
+  beforeEach(() => {
+    store = freshStore();
+    offer(null);
+  });
+
+  /** The starter font, plus a sketch layer nothing in the editor can reach. */
+  async function withSketch(): Promise<FakeFolder> {
+    const folder = await ufoOf(store);
+    folder.put(
+      "layercontents.plist",
+      [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<plist version="1.0">',
+        "<array>",
+        "	<array><string>public.default</string><string>glyphs</string></array>",
+        "	<array><string>sketch</string><string>glyphs.sketch</string></array>",
+        "</array>",
+        "</plist>",
+      ].join("\n"),
+    );
+    folder.put(
+      "glyphs.sketch/contents.plist",
+      '<plist version="1.0"><dict><key>a</key><string>a.glif</string></dict></plist>',
+    );
+    folder.put("glyphs.sketch/a.glif", '<glyph name="a" format="2"><advance width="999"/></glyph>');
+    return folder;
+  }
+
+  it("keeps the layer listed and keeps its files, after a save", async () => {
+    const folder = await withSketch();
+    offer(folder);
+    await store.openFolder();
+
+    edit(store);
+    await store.saveFolder();
+
+    const files = folder.all();
+    expect(files.get("layercontents.plist")).toContain("glyphs.sketch");
+    expect(files.get("glyphs.sketch/a.glif")).toContain('width="999"');
+    expect(files.has("glyphs.sketch/contents.plist")).toBe(true);
+  });
+
+  it("carries it into a folder saved somewhere else", async () => {
+    // Save as writes into an empty folder, so nothing is there to survive on
+    // its own: the layer only arrives if the editor kept it.
+    offer(await withSketch());
+    await store.openFolder();
+
+    const elsewhere = new FakeFolder("Elsewhere.ufo");
+    offer(elsewhere);
+    await store.saveFolderAs();
+
+    expect(elsewhere.all().get("glyphs.sketch/a.glif")).toContain('width="999"');
+  });
+
+  it("does not carry it into the next font opened", async () => {
+    offer(await withSketch());
+    await store.openFolder();
+    await store.newFont();
+
+    const plain = new FakeFolder("Plain.ufo");
+    offer(plain);
+    await store.saveFolderAs();
+
+    const files = plain.all();
+    expect(files.has("glyphs.sketch/a.glif")).toBe(false);
+    expect(files.get("layercontents.plist")).not.toContain("glyphs.sketch");
+  });
+});
+
 function unsavedNow(state: ReturnType<Store["getState"]>): boolean {
   return state.folder.saved !== null && state.folder.saved !== state.session.editor.document;
 }

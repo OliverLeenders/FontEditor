@@ -6,6 +6,7 @@ import {
   type AutosaveStatus,
   type LoadedProject,
   type SnapshotEntry,
+  type StoredLayer,
   ProjectLock,
   StorageClient,
   browserLocks,
@@ -317,6 +318,23 @@ export class Persistence {
   async removeImage(name: string): Promise<void> {
     if (this.client === null || !this.owner) return;
     await this.client.removeImage(name);
+  }
+
+  /**
+   * The layers of the source this editor does not edit, kept whole.
+   *
+   * They belong to the font as much as the pictures do and are as large, so
+   * they live here rather than on the document — and they have to survive a
+   * reload, because the save that would drop them is the one that comes after
+   * it.
+   */
+  async putLayers(layers: readonly StoredLayer[]): Promise<void> {
+    if (this.client === null || !this.owner) return;
+    await this.client.putLayers(layers);
+  }
+
+  async layers(): Promise<readonly StoredLayer[]> {
+    return (await this.client?.layers()) ?? [];
   }
 
   /** Give up on storage, saying why. The editor keeps working without it. */

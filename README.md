@@ -29,9 +29,9 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, e
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2098 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2120 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
-| 12    | Not losing what was opened          | planned: see below                                                                  |
+| 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | planned: see below                                                                  |
 | 14    | What ships to a browser             | planned: see below                                                                  |
 
@@ -66,9 +66,12 @@ The gaps worth naming, in the order they would bite someone using this:
   as it was found and written back where it was, unread. The model does not interpret any
   of it, which is the point: it is somebody's data passing through. Deleting is careful
   for the same reason — only `.glif` files the previous save listed are removed, and files
-  this editor never wrote are left alone. What is still lost is a layer that is not the
-  default: its files stay on disk, but `layercontents.plist` stops listing them, and that
-  is the one thing to know before saving over a source with more than one layer.
+  this editor never wrote are left alone. Layers other than the default one are carried
+  the same way — read whole, never looked at, written back where they were, and listed
+  again in `layercontents.plist` — so a source with a sketch layer beside the drawing
+  survives being opened, edited and saved. The one thing left to know is that a source
+  whose default layer is not in `glyphs/` has its glyphs moved there, and the old
+  directory is reported rather than deleted.
 
 - **Positioning in `.fea` is the single adjustment only.** `pos @caps <10 0 20 0>;`
   compiles and merges into the same GPOS the kerning is written to. A pair adjustment is
@@ -161,13 +164,18 @@ Four small things the editor made harder than they needed to be.
   status bar as well. Writing it down found that `PageUp` and `PageDown` were documented
   here and handled nowhere, so they exist now too.
 
-#### Phase 12 — Not losing what was opened
+#### Phase 12 — Not losing what was opened — done
 
-One item, and it is the only bug-shaped thing on this list. Saving to a folder writes a
-`layercontents.plist` that names one layer, so a source with a sketch or background
-layer keeps its files on disk and loses its listing of them. Everything else this editor
-cannot model is carried through unread and put back where it was found; layers are the
-exception, and they should be treated the same way.
+The one bug-shaped item on this list. Saving to a folder wrote a `layercontents.plist`
+naming a single layer, so a source with a sketch or a background layer kept its files on
+disk and lost the listing that pointed at them — which is what every tool that opens the
+font afterwards reads as their having been deleted, and what a `.ufoz` export made true.
+
+They are carried through unread now, the way the unmodelled `fontinfo` keys and the whole
+of a `lib` already were: read with everything in the directory, kept beside the document
+rather than in it — a second set of glyphs is the size of the first — and written back
+where they were found. Kept in the session _and_ in the working store, because the store
+may be unavailable and because the save that would drop them is the one after a reload.
 
 #### Phase 13 — The family, named
 

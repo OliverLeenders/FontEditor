@@ -93,6 +93,8 @@ export {
 } from "./masters.js";
 
 export type { ImageEntry } from "./images.js";
+export type { StoredLayer } from "./layers.js";
+export { LAYERS_PATH, LAYERS_SCHEMA, readLayers, writeLayers } from "./layers.js";
 export {
   IMAGES_PREFIX,
   allImages,

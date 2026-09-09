@@ -12,6 +12,7 @@ import {
   segments,
 } from "@fonteditor/font-model";
 
+import { DEFAULT_LAYER_DIRECTORY, type ExtraLayer, layerContentsPlist } from "./ufo-layers.js";
 import { type ZipEntry, zip } from "./zip.js";
 
 /**
@@ -429,6 +430,7 @@ const number = (n: number): string => String(Math.round(n * 1000) / 1000);
 export function ufoFiles(
   document: FontDocument,
   images: ReadonlyMap<string, Uint8Array> = new Map(),
+  layers: readonly ExtraLayer[] = [],
 ): ZipEntry[] {
   const entries: ZipEntry[] = [
     {
@@ -440,19 +442,12 @@ export function ufoFiles(
         ]),
       ),
     },
-    {
-      path: "layercontents.plist",
-      text: plist(
-        [
-          "<array>",
-          "\t<array>",
-          `\t\t${str("public.default")}`,
-          `\t\t${str("glyphs")}`,
-          "\t</array>",
-          "</array>",
-        ].join("\n"),
-      ),
-    },
+    // The default layer, and then every layer the font was read with. A source
+    // may carry a sketch to trace over or a previous version of the drawing,
+    // and a listing that named only the default one left those directories on
+    // disk with nothing pointing at them — which is what every other tool that
+    // opens the font afterwards reads as having deleted them.
+    { path: "layercontents.plist", text: plist(layerContentsPlist(layers)) },
   ];
 
   entries.push({ path: "fontinfo.plist", text: plist(dict(fontInfoPairs(document))) });
@@ -542,6 +537,17 @@ export function ufoFiles(
     entries.push({ path: `images/${name}`, bytes });
   }
 
+  // The other layers, back exactly as they were read — the glyphs, the
+  // `contents.plist` naming them, and whatever else was in the directory. The
+  // model has never looked inside any of it, which is the point: it is
+  // somebody's data passing through.
+  for (const layer of layers) {
+    if (layer.directory === DEFAULT_LAYER_DIRECTORY || layer.directory.includes("..")) continue;
+    for (const file of layer.files) {
+      entries.push({ path: `${layer.directory}/${file.path}`, text: file.text });
+    }
+  }
+
   return entries;
 }
 
@@ -554,6 +560,7 @@ export type UfoExport = {
 export function exportUfo(
   document: FontDocument,
   images: ReadonlyMap<string, Uint8Array> = new Map(),
+  layers: readonly ExtraLayer[] = [],
 ): UfoExport {
   const clean = (s: string): string => s.replace(/[^A-Za-z0-9]/g, "");
   const family = clean(document.info.familyName) || "Untitled";
@@ -562,7 +569,7 @@ export function exportUfo(
 
   // Everything sits inside a folder named for the font, so unzipping produces a
   // `.ufo` directory rather than scattering plists into wherever you unzipped.
-  const files = ufoFiles(document, images).map((entry) => ({
+  const files = ufoFiles(document, images, layers).map((entry) => ({
     ...entry,
     path: `${root}/${entry.path}`,
   }));

@@ -19,6 +19,7 @@ import type { FileStore } from "./file-store.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import { listSnapshots, pruneSnapshots, readSnapshot, writeSnapshot } from "./snapshots.js";
 import { listImages, readImage, removeImage, writeImage } from "./images.js";
+import { readLayers, writeLayers } from "./layers.js";
 import { readDesignspace, writeDesignspace } from "./masters.js";
 import {
   FONT_INFO_PATH,
@@ -223,6 +224,14 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
       await removeImage(required(), request.name);
       return null;
     }
+
+    case "putLayers": {
+      await writeLayers(required(), request.layers);
+      return null;
+    }
+
+    case "layers":
+      return await readLayers(required());
 
     case "putMaster": {
       await required().write(`masters/${request.master}.json`, JSON.stringify(request.snapshot));

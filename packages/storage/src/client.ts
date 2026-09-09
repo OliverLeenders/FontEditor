@@ -2,6 +2,7 @@ import type { FontDocument, Glyph } from "@fonteditor/font-model";
 import { fontDocument, setFeatures, setGlyphOrder, setKerning } from "@fonteditor/font-model";
 
 import type { ImageEntry } from "./images.js";
+import type { StoredLayer } from "./layers.js";
 import type { StoredDesignspace } from "./masters.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import { type SnapshotEntry, type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";
@@ -233,6 +234,21 @@ export class StorageClient {
 
   async removeImage(name: string): Promise<void> {
     await this.send({ kind: "removeImage", name });
+  }
+
+  /**
+   * The layers of the source this editor does not edit.
+   *
+   * Both halves take and give the lot: they are written when a font is opened
+   * and read when one is written out, and nothing in between ever wants a piece
+   * of them.
+   */
+  async putLayers(layers: readonly StoredLayer[]): Promise<void> {
+    await this.send({ kind: "putLayers", layers });
+  }
+
+  async layers(): Promise<readonly StoredLayer[]> {
+    return (await this.send({ kind: "layers" })) as readonly StoredLayer[];
   }
 
   async saveKerning(document: FontDocument): Promise<void> {

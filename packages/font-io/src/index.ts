@@ -41,6 +41,14 @@ export { documentFrom, importFont } from "./import.js";
 
 export type { UfoImport, UfoImportError, UfoWarning } from "./ufo-import.js";
 export { importUfo, looksLikeArchive, looksLikeUfo, readUfo } from "./ufo-import.js";
+export type { ExtraLayer, LayerFile } from "./ufo-layers.js";
+export {
+  DEFAULT_LAYER_DIRECTORY,
+  defaultLayer,
+  extraLayers,
+  layerContentsPlist,
+  parseLayerContents,
+} from "./ufo-layers.js";
 export type { ZipFile } from "./unzip.js";
 export { fileText, unzip } from "./unzip.js";
 

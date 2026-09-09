@@ -1,4 +1,5 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
+import type { ExtraLayer } from "@fonteditor/font-io";
 import { type EditSession, session as newSession } from "@fonteditor/edit-core";
 import { editorState } from "@fonteditor/tools";
 import {
@@ -68,6 +69,22 @@ export type StoreState = {
    * the list, which is the only time anybody wants it.
    */
   readonly images: readonly ImageEntry[];
+  /**
+   * The layers of the source that are not the one being drawn.
+   *
+   * Held whole rather than as a listing, because nothing here ever wants part
+   * of one: they arrive when a font is opened and leave when a UFO is written,
+   * and in between the editor has no way to look at them and no business doing
+   * so. Beside the document rather than in it, for the reason the pictures are
+   * — a second set of glyphs is the size of the first, and the document is a
+   * value history copies on every edit.
+   *
+   * Here as well as in the working store, and that is deliberate: the store may
+   * be unavailable — a private window, a browser that refuses OPFS — and a save
+   * that dropped somebody's sketch layer because their browser would not keep a
+   * file is the bug this whole arrangement exists to stop.
+   */
+  readonly layers: readonly ExtraLayer[];
   /** Draw the picture behind the glyph at all, and how strongly. */
   readonly showImage: boolean;
   readonly imageOpacity: number;
@@ -186,6 +203,7 @@ export function initialState(preferences: Preferences): StoreState {
     preview: null,
     folder: NO_FOLDER,
     images: [],
+    layers: [],
     showImage: preferences.showImage,
     imageOpacity: preferences.imageOpacity,
     ownership: "owner",

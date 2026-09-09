@@ -1,4 +1,5 @@
 import type { CatalogQuery } from "@fonteditor/catalog";
+import type { ExtraLayer } from "@fonteditor/font-io";
 import {
   canRedoSession,
   canUndoSession,
@@ -579,6 +580,17 @@ export class EditorStore {
     return await this.disk.allImages();
   }
 
+  /**
+   * The layers of the source this editor does not edit.
+   *
+   * For an export that has to carry them: a UFO written without them is one
+   * whose `layercontents.plist` lists only the layer we edit, which every other
+   * tool reads as the designer's sketch having been deleted.
+   */
+  layers(): readonly ExtraLayer[] {
+    return this.state.layers;
+  }
+
   /** Read the list of pictures back from the store. */
   async refreshImages(): Promise<void> {
     await refreshImages(this.host);
@@ -807,6 +819,11 @@ export class EditorStore {
       });
       this.fitGlyph();
     }
+
+    // The layers of the source, if this project was opened from one. They are
+    // not in the document, so nothing above brings them back — and the save
+    // that would write the font without them is exactly the one after a reload.
+    this.patch({ layers: await this.disk.layers() });
 
     // Only a document read back from the glyph files is genuinely on disk. One
     // recovered from the journal is ahead of them, and the starter font shown

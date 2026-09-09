@@ -1,3 +1,4 @@
+import type { StoredLayer } from "./layers.js";
 import type { StoredKerning, StoredFontInfo, StoredGlyph } from "./schema.js";
 import type { StoredSnapshot } from "./snapshots.js";
 
@@ -80,6 +81,14 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "getImage"; readonly name: string }
   | { readonly id: number; readonly kind: "images" }
   | { readonly id: number; readonly kind: "removeImage"; readonly name: string }
+  /**
+   * The layers of the source this editor does not edit, kept whole.
+   *
+   * Written once when a font is opened and read once when one is saved, so
+   * there is no message for a part of them: they arrive and leave together.
+   */
+  | { readonly id: number; readonly kind: "putLayers"; readonly layers: readonly StoredLayer[] }
+  | { readonly id: number; readonly kind: "layers" }
   /**
    * The masters that are not being drawn: parked whole, one file each.
    *
