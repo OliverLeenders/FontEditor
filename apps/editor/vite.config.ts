@@ -10,6 +10,14 @@ export default defineConfig({
     // leave the window pointing at whatever was on 5174 — which, if another
     // copy of the editor is already running, is the wrong one.
     strictPort: true,
+    watch: {
+      // Never look inside the desktop shell. `src-tauri/target` is cargo's
+      // scratch space — thousands of files, written while the Rust compiler is
+      // running, some of them locked as it writes them — and a watcher that
+      // tries to follow one goes down with EBUSY and takes the dev server with
+      // it. Nothing in there is source the browser could reload anyway.
+      ignored: ["**/src-tauri/**"],
+    },
   },
   // The desktop shell prints its own progress, and Vite clearing the screen
   // takes the Rust compiler's output with it.
