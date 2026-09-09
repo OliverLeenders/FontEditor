@@ -1,3 +1,6 @@
 pnpm-lock.yaml
 node_modules
 dist
+
+# Written by tauri-build on every compile, from the capabilities beside it.
+apps/editor/src-tauri/gen

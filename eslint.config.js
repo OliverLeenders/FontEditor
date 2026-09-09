@@ -17,7 +17,16 @@ import tseslint from "typescript-eslint";
  */
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/*.d.ts"],
+    // `src-tauri/target` is cargo's, and it holds JavaScript that tauri-build
+    // generated and then compiled into the binary — somebody else's output,
+    // and some of it not JavaScript at all.
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/*.d.ts",
+      "**/src-tauri/target/**",
+      "**/src-tauri/gen/**",
+    ],
   },
 
   js.configs.recommended,

@@ -19,3 +19,8 @@ Thumbs.db
 npm-debug.log*
 pnpm-debug.log*
 .pnpm-store/
+
+# The desktop shell is a Rust crate, and cargo's build directory is gigabytes
+# of compiled dependencies rebuilt from Cargo.lock on any machine that needs it.
+apps/editor/src-tauri/target/
+apps/editor/src-tauri/gen/

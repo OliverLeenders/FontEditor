@@ -248,6 +248,39 @@ Then run the editor and open http://localhost:5174:
 pnpm dev
 ```
 
+### As a desktop application
+
+The same editor, in a window of its own rather than a browser tab:
+
+```bash
+pnpm --filter @fonteditor/editor app
+```
+
+and to make an installer:
+
+```bash
+pnpm --filter @fonteditor/editor app:build
+```
+
+This is [Tauri](https://tauri.app), which is a Rust program that opens a window and points
+the operating system's own webview at the editor. Building it needs a Rust toolchain
+(`rustup`), and on Windows the MSVC build tools and the WebView2 runtime — the last of
+which ships with Windows 11.
+
+Tauri rather than Electron for one reason that matters here and one that does not. The one
+that does not is size: ~10 MB against ~150 MB, because the browser is the one already on
+the machine rather than a second copy of Chromium. The one that does is that using the
+system webview means using _a_ browser rather than a pinned one, and this editor is
+unusually dependent on browser APIs — the File System Access API for a folder on disk, the
+private filesystem for autosave, Web Locks so two windows cannot write the same project,
+and a worker. On Windows the system webview is WebView2, which is Chromium, so those are
+the same implementations the browser build is tested against.
+
+Nothing in `src-tauri` knows anything about fonts. It opens a window and gets out of the
+way: no commands, no plugins beyond a logger, and no Tauri API called from the editor —
+which is what keeps the browser and the desktop builds the same program rather than two
+that have started to drift.
+
 Use PgUp and PgDn to move between glyphs, and press `?` for every key at once. The
 toolbar is icons; every one names its shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
 `L` ruler. Measuring one stem is **held** rather than switched to: `M` borrows the tool
@@ -378,6 +411,7 @@ pnpm typecheck
 ```
 apps/
   editor/       The editor: shell, panels, and the canvas.
+    src-tauri/  A window for it on the desktop. Rust, and nothing about fonts.
 
 packages/
   geometry/     Vec2, cubic Béziers, and the Tunni-line kernel. Pure; no DOM.
