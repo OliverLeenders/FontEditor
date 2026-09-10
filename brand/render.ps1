@@ -3,7 +3,6 @@ Add-Type -AssemblyName System.Drawing
 $root = $PSScriptRoot
 $repo = Split-Path -Parent $root
 New-Item -ItemType Directory -Force -Path "$root\png" | Out-Null
-$SS = 8
 
 function Poly($pts) {
   $a = New-Object 'System.Drawing.PointF[]' ($pts.Count)
@@ -15,51 +14,74 @@ function Scale($pts, $k) {
   $out = @(); foreach ($p in $pts) { $out += ,@(($k * $p[0]), ($k * $p[1])) }; return $out
 }
 
-$FULL = @{
-  left  = @(@(14,30),@(50,48),@(50,92),@(14,74))
-  right = @(@(86,30),@(50,48),@(50,92),@(86,74))
-  nick  = @(@(14,58),@(50,76),@(50,84),@(14,66))
-  top   = @(@(50,12),@(86,30),@(50,48),@(14,30))
-  bar   = @(@(29.48,30.18),@(50.36,19.74),@(55.40,22.26),@(34.52,32.70))
-  stem  = @(@(37.40,26.22),@(42.44,23.70),@(62.60,33.78),@(57.56,36.30))
+# The block, filling the square it is drawn in. An icon sits beside others in a
+# taskbar and is read against them: art that stops at seven tenths of its canvas
+# looks like a smaller program, whatever its own proportions are.
+$BLOCK = @{
+  left  = @(@(6.8,23.6),@(50,45.2),@(50,98),@(6.8,76.4))
+  right = @(@(93.2,23.6),@(50,45.2),@(50,98),@(93.2,76.4))
+  nick  = @(@(6.8,57.2),@(50,78.8),@(50,88.4),@(6.8,66.8))
+  top   = @(@(50,2),@(93.2,23.6),@(50,45.2),@(6.8,23.6))
 }
-$SMALL = @{
-  left  = @(@(14,30),@(50,48),@(50,92),@(14,74))
-  right = @(@(86,30),@(50,48),@(50,92),@(86,74))
-  nick  = $null
-  top   = @(@(50,12),@(86,30),@(50,48),@(14,30))
-  bar   = @(@(28.40,30.72),@(51.44,19.20),@(57.56,22.26),@(34.52,33.78))
-  stem  = @(@(36.86,26.49),@(42.98,23.43),@(63.14,33.51),@(57.02,36.57))
+
+# The letter, in two weights, already sheared onto the face.
+#
+# The shear is not kind to a crossbar: it compresses the bar while leaving the
+# stem near full width, so the arm that runs away from the viewer thins out
+# first. At and below 48 pixels that arm is under a pixel and the T reads as a
+# bent stick, so the bold cut is used there and the medium one is kept for the
+# sizes with room for it.
+$MEDIUM = @{
+  bar  = @(@(25.376,23.816),@(50.432,11.288),@(56.48,14.312),@(31.424,26.84))
+  stem = @(@(34.88,19.064),@(40.928,16.04),@(65.12,28.136),@(59.072,31.16))
+}
+$BOLD = @{
+  bar  = @(@(24.08,24.464),@(51.728,10.64),@(59.072,14.312),@(31.424,28.136))
+  stem = @(@(34.232,19.388),@(41.576,15.716),@(65.768,27.812),@(58.424,31.484))
 }
 
 $C = @{ left = "#EDF3F9"; right = "#7E97B2"; nick = "#2C6DAF"; top = "#131922"; t = "#FFFFFF" }
 
+<#
+  Drawn at the size asked for, not drawn large and shrunk.
+
+  Supersampling and then resampling down is the obvious way and it is the wrong
+  one here: every edge in this mark is a straight line between two flat fills,
+  and a bicubic downsample spreads each of them over two or three pixels. The
+  result is an icon that looks soft beside neighbours that are not. GDI+ draws
+  an antialiased polygon edge directly, which puts the softness only where the
+  edge actually falls.
+#>
 function Render($size) {
-  $geo = if ($size -le 24) { $SMALL } else { $FULL }
-  $big = New-Object System.Drawing.Bitmap ($size*$SS), ($size*$SS)
-  $g = [System.Drawing.Graphics]::FromImage($big)
-  $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-  $g.Clear([System.Drawing.Color]::Transparent)
-  $k = ($size*$SS) / 100.0
-  $g.FillPolygon((B $C.left),  (Poly (Scale $geo.left  $k)))
-  $g.FillPolygon((B $C.right), (Poly (Scale $geo.right $k)))
-  if ($null -ne $geo.nick) { $g.FillPolygon((B $C.nick), (Poly (Scale $geo.nick $k))) }
-  $g.FillPolygon((B $C.top),   (Poly (Scale $geo.top   $k)))
-  $wb = B $C.t
-  $g.FillPolygon($wb, (Poly (Scale $geo.bar  $k)))
-  $g.FillPolygon($wb, (Poly (Scale $geo.stem $k)))
-  $g.Dispose()
+  # Two decisions, and they do not turn over at the same size. The nick is a
+  # six-unit slot: below 32 pixels it is less than two and reads as dirt, so it
+  # goes. The letter turns bold earlier than that, at 48.
+  $nick = $size -ge 32
+  $letter = if ($size -le 48) { $BOLD } else { $MEDIUM }
   $out = New-Object System.Drawing.Bitmap $size, $size
-  $g2 = [System.Drawing.Graphics]::FromImage($out)
-  $g2.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-  $g2.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-  $g2.Clear([System.Drawing.Color]::Transparent)
-  $g2.DrawImage($big, (New-Object System.Drawing.Rectangle 0, 0, $size, $size))
-  $g2.Dispose(); $big.Dispose()
+  $g = [System.Drawing.Graphics]::FromImage($out)
+  $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+  $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+  $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+  $g.Clear([System.Drawing.Color]::Transparent)
+
+  $k = $size / 100.0
+  $g.FillPolygon((B $C.left),  (Poly (Scale $BLOCK.left  $k)))
+  $g.FillPolygon((B $C.right), (Poly (Scale $BLOCK.right $k)))
+  if ($nick) { $g.FillPolygon((B $C.nick), (Poly (Scale $BLOCK.nick $k))) }
+  $g.FillPolygon((B $C.top),   (Poly (Scale $BLOCK.top   $k)))
+  $wb = B $C.t
+  $g.FillPolygon($wb, (Poly (Scale $letter.bar  $k)))
+  $g.FillPolygon($wb, (Poly (Scale $letter.stem $k)))
+  $g.Dispose()
   return $out
 }
 
-$sizes = @(16, 20, 24, 30, 32, 44, 48, 50, 64, 71, 89, 107, 128, 142, 150, 256, 284, 310, 512, 1024)
+# Every size Windows asks for, drawn rather than interpolated. The shell wants
+# 16, 20, 24, 32, 40, 48, 64, 96, 128 and 256 depending on where the icon is
+# shown and how the display is scaled; a size that is missing is one the shell
+# resamples for itself, which is where a blurry taskbar icon comes from.
+$sizes = @(16, 20, 24, 30, 32, 36, 40, 44, 48, 50, 56, 60, 64, 71, 72, 89, 96, 107, 128, 142, 150, 256, 284, 310, 512, 1024)
 foreach ($s in $sizes) {
   $bmp = Render $s
   $bmp.Save("$root\png\$s.png", [System.Drawing.Imaging.ImageFormat]::Png)
@@ -89,6 +111,7 @@ $named = [ordered]@{
   "284.png"  = "Square284x284Logo.png"
   "310.png"  = "Square310x310Logo.png"
 }
+
 # Copy, and then say so if it did not take. Windows keeps icon files memory
 # mapped for the thumbnail cache, and a mapped file refuses to be overwritten in
 # place — so the target is removed first, and the result is checked rather than
@@ -111,4 +134,3 @@ Install (Join-Path $root "icon.ico") (Join-Path $public "favicon.ico")
 Install (Join-Path $root "favicon.svg") (Join-Path $public "favicon.svg")
 
 Write-Output "icons rendered and installed"
-

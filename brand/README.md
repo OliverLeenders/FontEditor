@@ -23,9 +23,25 @@ brand\render.ps1
 
 Rasterising is `System.Drawing`, which ships with Windows, and the `.ico`
 container is thirty lines of `struct` — no image library is installed for this.
-Sizes at or below 24 are drawn from the simplified geometry rather than
-downsampled from the large one, because at those sizes the nick is a smudge and
-the medium stem closes up.
+
+Every size is **drawn at that size**, never drawn large and shrunk. Every edge
+in this mark is a straight line between two flat fills, and resampling spreads
+each of them over two or three pixels — which is what a blurry icon is. Two
+details also change with size, and they do not change at the same size:
+
+| Size      | Nick | Letter |
+| --------- | ---- | ------ |
+| 16–24     | no   | bold   |
+| 32–48     | yes  | bold   |
+| 56 and up | yes  | medium |
+
+The nick is a six-unit slot: under 32 pixels it is less than two and reads as
+dirt. The letter turns bold earlier, because the shear compresses the crossbar
+while leaving the stem near full width, so the arm running away from the viewer
+is the first thing to thin out.
+
+The `.ico` carries 16, 20, 24, 32, 40, 48, 56, 64, 96, 128 and 256. A size the
+shell wants and does not find is one it resamples for itself.
 
 The script writes `png/` and `icon.ico` here — both ignored, both intermediates —
 and then copies what ships into `apps/editor/src-tauri/icons` and
