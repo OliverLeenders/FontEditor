@@ -1,7 +1,6 @@
 import { type Cubic, type Vec2, subcurve } from "@fonteditor/geometry";
 
 import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
-import { insideGlyph } from "./direction.js";
 import { type StrokeCrossing, byContour, samePoint, strokeCrossings } from "./crossings.js";
 import type { Glyph } from "./glyph.js";
 import type { IdFactory } from "./ids.js";
@@ -25,23 +24,21 @@ import { type Node, node } from "./node.js";
  * outer-to-counter and counter-to-outer, which is exactly the two chords each
  * half needs. Nothing here knows what a counter is.
  *
- * The odd number of crossings is the other half, and it used to do nothing at
- * all. A stroke that comes in and does not come out has no pair of shapes to
- * make, but it does have a meaning, and which meaning depends on where the
- * stroke stopped:
+ * Pairing along the stroke rather than within a contour is also what lets a cut
+ * *join* two contours. Go into an `o` from outside and stop in the counter: the
+ * outer contour is met once and the counter once, and the pair spans the ink
+ * between them. Walking that gives a single closed contour — round the outside,
+ * along the stroke inwards, round the counter, back along the stroke — which is
+ * a ring with a slit in it, and is simply connected the way a `c` is where the
+ * `o` was not. One shape where there were two, and the hole is gone: the slit
+ * has no width yet, and pulling it open is drawing rather than cutting.
  *
- *  - **It stopped in the ink.** The knife was used to mark a place rather than
- *    to divide anything: a point goes in at the crossing and the contour stays
- *    exactly as it was. Cutting halfway into a stem adds a point there.
- *  - **It went through.** Out the far side, or into a counter — either way the
- *    outline has been broken, so the loop is opened at the crossing and becomes
- *    a path that begins and ends there. Cut into an `o` from outside to the
- *    middle and both the outer contour and the counter are opened, because the
- *    stroke passed through both.
- *
- * Where the stroke ends is one question asked once, of the glyph's fill, and
- * every contour it crossed oddly is answered the same way. That is what keeps
- * it predictable: one stroke does one kind of thing.
+ * An odd number of crossings in total is the one case with no pairing at all.
+ * The stroke came in and did not come out, so there is no chord to close and
+ * nothing to divide — but there is a place worth naming, so a point goes in at
+ * each crossing and every contour keeps its shape. That is the knife used to
+ * mark rather than to cut, and it is how a point gets put exactly where a
+ * stroke crosses an edge.
  */
 
 export type KnifeCut = {
@@ -50,8 +47,6 @@ export type KnifeCut = {
   readonly crossings: number;
   /** Contours left alone because the cut could not be made sense of. */
   readonly skipped: number;
-  /** Closed contours the stroke went through and left open. */
-  readonly opened: number;
   /** Places the stroke marked without dividing anything. */
   readonly marked: number;
   /** Open contours the stroke divided. */
@@ -80,51 +75,21 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
   const perContour = byContour(found);
   const crossings = found.length;
 
-  // Where the stroke stopped, asked once, of the end it stopped at. A stroke
-  // that ended in the ink was marking a place; one that ended anywhere else —
-  // out the far side, or in a counter — went through something.
-  //
-  // The end rather than either end, so the answer is the one thing the hand
-  // controls: where you let go. It does mean the same line drawn the other way
-  // round can mean the other thing, which is the price of a rule that can be
-  // said in one sentence.
-  const stoppedInside = insideGlyph(g, b);
-
-  // Three kinds of contour, by how many times the stroke met each.
+  // An open contour has no inside, so there is no chord to close across it and
+  // no parity to satisfy: a path that is cut is simply shorter paths. It is set
+  // aside here so the pairing below is about closed outlines alone.
   const cutting = new Map<number, StrokeCrossing[]>();
-  const odd = new Map<number, StrokeCrossing[]>();
   const dividing = new Map<number, StrokeCrossing[]>();
 
   for (const [index, list] of perContour) {
     const source = g.contours[index];
     if (source === undefined) continue;
-
-    // An open contour has no inside, so there is no parity to it: the stroke
-    // divides it wherever it crosses, however many times that is.
-    if (!source.closed) dividing.set(index, list);
-    else if (list.length % 2 === 1) odd.set(index, list);
-    else cutting.set(index, list);
+    if (source.closed) cutting.set(index, list);
+    else dividing.set(index, list);
   }
 
-  let opened = 0;
-  let marked = 0;
   let divided = 0;
   const replaced = new Map<number, Contour[]>();
-
-  for (const [index, list] of odd) {
-    const source = g.contours[index]!;
-    const { contour: withNode, meetings } = splitAtCrossings(source, list, ids, index);
-    const at = meetings[0];
-    if (at === undefined) continue;
-
-    if (stoppedInside) {
-      replaced.set(index, [withNode]);
-      marked += 1;
-    } else {
-      replaced.set(index, [openedAt(withNode, at.index, ids)]);
-      opened += 1;
-    }
-  }
 
   for (const [index, list] of dividing) {
     const source = g.contours[index]!;
@@ -134,14 +99,39 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
     divided += 1;
   }
 
+  // Parity is asked of the stroke, not of each contour. Every pair of crossings
+  // along it spans a stretch inside the ink, and that stretch is an edge of the
+  // result — whether its two ends are on one contour or on two.
+  const closedCrossings = [...cutting.values()].reduce((n, list) => n + list.length, 0);
+
+  if (closedCrossings % 2 === 1) {
+    // Nothing to pair, so nothing is divided. The crossings are still places
+    // worth naming, and a point goes in at each.
+    let marked = 0;
+    for (const [index, list] of cutting) {
+      const source = g.contours[index]!;
+      const { contour: withNodes, meetings } = splitAtCrossings(source, list, ids, index);
+      if (meetings.length === 0) continue;
+      replaced.set(index, [withNodes]);
+      marked += meetings.length;
+    }
+    return {
+      glyph: replaced.size === 0 ? g : { ...g, contours: rebuilt(g.contours, replaced, []) },
+      crossings,
+      skipped: 0,
+      marked,
+      divided,
+    };
+  }
+
+  const marked = 0;
   const skipped = 0;
   if (cutting.size === 0) {
-    if (replaced.size === 0) return { glyph: g, crossings, skipped, opened, marked, divided };
+    if (replaced.size === 0) return { glyph: g, crossings, skipped, marked, divided };
     return {
       glyph: { ...g, contours: rebuilt(g.contours, replaced, []) },
       crossings,
       skipped,
-      opened,
       marked,
       divided,
     };
@@ -172,14 +162,7 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
 
   const loops = walk(split, partner, meetings, key, ids);
   if (loops === null) {
-    return {
-      glyph: g,
-      crossings,
-      skipped: skipped + cutting.size,
-      opened: 0,
-      marked: 0,
-      divided: 0,
-    };
+    return { glyph: g, crossings, skipped: skipped + cutting.size, marked: 0, divided: 0 };
   }
 
   for (const index of cutting.keys()) replaced.set(index, []);
@@ -187,7 +170,6 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
     glyph: { ...g, contours: rebuilt(g.contours, replaced, loops) },
     crossings,
     skipped,
-    opened,
     marked,
     divided,
   };
@@ -213,26 +195,6 @@ function rebuilt(
   }
   out.push(...loops);
   return out;
-}
-
-/**
- * A closed contour, opened at one of its nodes.
- *
- * The path begins and ends at that point, so the outline still runs the whole
- * way round and the drawing is unchanged — what has gone is the join. The node
- * appears twice for that reason: an open contour has one fewer segment than
- * nodes, so without the second copy the stretch back to the start would vanish
- * and the shape would lose a piece.
- */
-function openedAt(c: Contour, index: number, ids: IdFactory): Contour {
-  const rotated = [...c.nodes.slice(index), ...c.nodes.slice(0, index)];
-  const first = rotated[0];
-  if (first === undefined) return c;
-
-  const start = node(ids.node(), first.pt, { type: first.type, in: null, out: first.out });
-  const end = node(ids.node(), first.pt, { type: first.type, in: first.in, out: null });
-
-  return contour(c.id, [start, ...rotated.slice(1), end], false);
 }
 
 /**
@@ -341,7 +303,11 @@ function arc(c: Contour, from: number, to: number, ids: IdFactory): Node[] {
   const out: Node[] = [];
   const count = c.nodes.length;
 
-  for (let step = 0; step < count; step++) {
+  // `<= count`, and the stop tested only after the first step, so that an arc
+  // from a crossing back to itself is the whole ring rather than nothing. That
+  // is the case where a contour was met once — going into an `o` and stopping
+  // in the counter — and the arc has to come all the way round to the slit.
+  for (let step = 0; step <= count; step++) {
     const index = (from + step) % count;
     const source = c.nodes[index]!;
     const first = step === 0;
@@ -354,7 +320,7 @@ function arc(c: Contour, from: number, to: number, ids: IdFactory): Node[] {
         out: source.out,
       }),
     );
-    if (index === to) break;
+    if (step > 0 && index === to) break;
   }
 
   // The crossing this arc ends at keeps no outgoing handle: the chord leaving it

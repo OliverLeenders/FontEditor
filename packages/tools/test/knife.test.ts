@@ -137,10 +137,11 @@ describe("what the step is called", () => {
     expect(out.effects[0]).toMatchObject({ label: "Insert point" });
   });
 
-  it("calls a stroke that went through an opened contour", () => {
-    // Out of the square and beyond it: one crossing, ending in open air.
+  it("calls a stroke out of a shape an inserted point too", () => {
+    // One crossing either way round: there is no pair to make a chord from, so
+    // nothing is divided and the crossing is marked.
     const out = stroke(start(), { x: 200, y: 200 }, { x: 200, y: 900 });
-    expect(out.effects[0]).toMatchObject({ label: "Open contour" });
+    expect(out.effects[0]).toMatchObject({ label: "Insert point" });
   });
 
   it("still calls a cut a cut", () => {

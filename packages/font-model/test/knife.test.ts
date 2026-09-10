@@ -80,7 +80,6 @@ describe("cutting a single shape", () => {
 
     expect(cut.crossings).toBe(1);
     expect(cut.marked).toBe(1);
-    expect(cut.opened).toBe(0);
     expect(cut.glyph.contours).toHaveLength(1);
     expect(cut.glyph.contours[0]?.closed).toBe(true);
   });
@@ -175,39 +174,34 @@ describe("what a cut refuses", () => {
 });
 
 /**
- * A stroke that goes through rather than stopping.
+ * A stroke that goes in and stops between two contours.
  *
- * The other half of the odd crossing. The outline has been broken, so the loop
- * is opened at the crossing and becomes a path that begins and ends there — the
- * drawing is unchanged, and what has gone is the join.
+ * The pairing is along the stroke rather than within a contour, so a pair whose
+ * two ends are on *different* contours joins them: into an `o` from outside,
+ * stopping in the counter, and what comes back is one closed contour — round
+ * the outside, along the stroke inwards, round the counter, back along the
+ * stroke. A ring with a slit in it, simply connected the way a `c` is.
  */
-describe("opening a loop", () => {
-  it("opens the contour where the stroke went through", () => {
-    // From outside the square, through it, and out the other side is two
-    // crossings and an ordinary cut. From outside to a point beyond it on the
-    // same side is one crossing, and the stroke ended in open air.
-    const cut = cutGlyph(square(), at(100, -50), at(100, 500), ids)!;
-    expect(cut.crossings).toBe(2);
+describe("cutting a ring open", () => {
+  const intoTheCounter = () => cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
 
-    // Straight through: an ordinary cut, two shapes, both closed.
-    expect(cut.opened).toBe(0);
-    expect(cut.glyph.contours).toHaveLength(2);
+  it("meets the outer contour once and the counter once", () => {
+    expect(intoTheCounter().crossings).toBe(2);
   });
 
-  it("opens both the outer contour and the counter of a ring", () => {
-    // Into an `o` from outside to the middle: the outer contour once, the
-    // counter once, and the stroke stops in the hole — which is not ink.
-    const cut = cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
+  it("leaves one closed contour where there were two", () => {
+    const cut = intoTheCounter();
 
-    expect(cut.opened).toBe(2);
+    expect(cut.glyph.contours).toHaveLength(1);
+    expect(cut.glyph.contours[0]?.closed).toBe(true);
     expect(cut.marked).toBe(0);
-    expect(cut.glyph.contours).toHaveLength(2);
-    for (const c of cut.glyph.contours) expect(c.closed).toBe(false);
   });
 
-  it("leaves the drawing where it was when it opens a loop", () => {
+  it("keeps the drawing exactly where it was", () => {
+    // The slit has no width yet, so the ring still looks like a ring. Pulling
+    // it open is drawing rather than cutting.
     const before = glyphBounds(ring())!;
-    const after = glyphBounds(cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!.glyph)!;
+    const after = glyphBounds(intoTheCounter().glyph)!;
 
     expect(after.minX).toBeCloseTo(before.minX, 6);
     expect(after.maxX).toBeCloseTo(before.maxX, 6);
@@ -215,25 +209,35 @@ describe("opening a loop", () => {
     expect(after.maxY).toBeCloseTo(before.maxY, 6);
   });
 
-  it("begins and ends the opened path at the same place", () => {
-    const cut = cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
+  it("walks the whole of both rings, not a corner of either", () => {
+    // The arc from a crossing back to itself is the whole contour. Getting that
+    // wrong gives a contour of four nodes that looks nothing like an `o`.
+    const cut = intoTheCounter();
+    const before = ring().contours.reduce((n, c) => n + c.nodes.length, 0);
 
-    for (const c of cut.glyph.contours) {
-      const first = c.nodes[0]!;
-      const last = c.nodes[c.nodes.length - 1]!;
-      expect(first.pt.x).toBeCloseTo(last.pt.x, 6);
-      expect(first.pt.y).toBeCloseTo(last.pt.y, 6);
+    expect(cut.glyph.contours[0]!.nodes.length).toBeGreaterThanOrEqual(before);
+  });
+
+  it("has two points at each end of the slit", () => {
+    // Two edges run along the stroke — in and out — so each crossing appears
+    // twice, once for each side of the slit.
+    const nodes = intoTheCounter().glyph.contours[0]!.nodes;
+
+    // The outer ellipse is crossed at x = 0, the counter at x = 150.
+    for (const x of [0, 150]) {
+      const here = nodes.filter(
+        (n) => Math.abs(n.pt.x - x) < 1e-6 && Math.abs(n.pt.y - 300) < 1e-6,
+      );
+      expect(here.length).toBe(2);
     }
   });
 
-  it("has nothing before its first point or after its last", () => {
-    // An open path starts where it starts: a handle arriving at the first node
-    // would be describing a segment that is not there.
-    const cut = cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
+  it("cuts the ring in two when the stroke goes all the way through", () => {
+    // Four crossings pair as outer-to-counter and counter-to-outer, which is
+    // the ordinary cut and is unchanged.
+    const cut = cutGlyph(ring(), at(-50, 300), at(650, 300), ids)!;
 
-    for (const c of cut.glyph.contours) {
-      expect(c.nodes[0]?.in).toBeNull();
-      expect(c.nodes[c.nodes.length - 1]?.out).toBeNull();
-    }
+    expect(cut.crossings).toBe(4);
+    expect(cut.glyph.contours).toHaveLength(2);
   });
 });

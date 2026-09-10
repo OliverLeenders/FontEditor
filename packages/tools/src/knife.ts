@@ -65,13 +65,14 @@ export function pointerUp(
 /**
  * What the stroke did, for the undo menu.
  *
- * Three things wear the knife now — dividing a shape, opening a loop, putting a
- * point in — and a history of four steps all called "Cut" is a history nobody
- * can read backwards. Named for what happened rather than for the tool.
+ * The knife divides a shape, joins two into one, or simply puts a point in, and
+ * a history of steps all called "Cut" is one nobody can read backwards. Naming
+ * the marking case apart is the one that matters: it changed nothing about the
+ * shape, so an undo that came back to it would otherwise look like a no-op.
  */
 function labelFor(cut: KnifeCut): string {
-  if (cut.marked > 0 && cut.opened === 0 && cut.divided === 0) return "Insert point";
-  if (cut.opened > 0 && cut.divided === 0) return "Open contour";
+  if (cut.marked > 0 && cut.divided === 0)
+    return cut.marked === 1 ? "Insert point" : "Insert points";
   return "Cut";
 }
 

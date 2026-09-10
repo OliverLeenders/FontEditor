@@ -29,7 +29,7 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, n
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2192 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2193 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
@@ -369,16 +369,22 @@ both segments keep the directions they were drawn with, and the node lands exact
 as well as curvature-continuous. It is offered only where it would do something: a corner,
 a straight side or an already harmonious join has nothing to reconcile.
 
-**The knife does three things, and which one depends on where you stop.** Drawn all the
-way across a shape it divides it, which is what a knife is for. Stopped part way — one
-crossing rather than two — it has no pair of shapes to make, and then where the stroke
-ended is the question: **in the ink**, and it puts a point at the crossing and leaves the
-outline closed, which is the quick way to add a point exactly where you want one; **out
-the other side, or into a counter**, and it opens the loop there, so the contour becomes a
-path beginning and ending at the cut with the drawing unchanged. Cut into an `o` from
-outside to the middle and both the outer contour and the counter open, because the stroke
-went through both. An open path has no inside and no parity to satisfy, so a stroke across
-one simply divides it into shorter paths.
+**The knife counts crossings along the stroke, not around each contour.** Every pair of
+crossings spans a stretch of the stroke that lies inside the ink, and each of those
+stretches becomes an edge of the result — which is what makes the interesting case fall
+out rather than needing a rule of its own. Drawn all the way across a shape, the pair
+divides it in two. Drawn into an `o` from outside and stopped in the counter, the pair has
+one end on the outer contour and one on the counter, so it _joins_ them: what comes back is
+a single closed contour running round the outside, along the stroke inwards, round the
+counter and back along the stroke — a ring with a slit in it, simply connected the way a
+`c` is where the `o` was not. The slit has no width yet; pulling it open is drawing rather
+than cutting.
+
+An odd number of crossings is the case with no pairing at all: the stroke came in and did
+not come out, so nothing is divided and a point goes in at each crossing instead. That is
+the quick way to put a point exactly where a stroke meets an edge. An open path has no
+inside and no parity to satisfy, so a stroke across one simply divides it into shorter
+paths.
 
 **Two rulers.** Hold `M` and point at a stem: the reading is taken square to the outline,
 which is what a stem width is — a straight line dragged across a round letter measures a
