@@ -3,7 +3,7 @@ import os
 import struct
 
 root = os.path.dirname(os.path.abspath(__file__))
-sizes = [16, 20, 24, 32, 40, 48, 56, 64, 96, 128, 256]
+sizes = [16, 20, 24, 28, 30, 32, 36, 40, 44, 48, 56, 60, 64, 72, 80, 96, 128, 256]
 
 blobs = []
 for s in sizes:

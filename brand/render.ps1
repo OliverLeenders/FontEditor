@@ -20,9 +20,21 @@ function Scale($pts, $k) {
 $BLOCK = @{
   left  = @(@(6.8,23.6),@(50,45.2),@(50,98),@(6.8,76.4))
   right = @(@(93.2,23.6),@(50,45.2),@(50,98),@(93.2,76.4))
-  nick  = @(@(6.8,57.2),@(50,78.8),@(50,88.4),@(6.8,66.8))
   top   = @(@(50,2),@(93.2,23.6),@(50,45.2),@(6.8,23.6))
 }
+
+# The nick, in two depths.
+#
+# It is always drawn. Dropping it at small sizes was a mistake with a very
+# specific cost: a taskbar at 100% scaling shows a 24 pixel icon, which is
+# exactly where it had been dropped, so the one detail that says "metal type"
+# was missing from the place the icon is looked at most.
+#
+# What it needs at that size is not to be there, but to be deeper. Ten units is
+# two pixels at 24, and two pixels of pale blue against white survives neither
+# antialiasing nor whatever rescaling the shell does on its way to the taskbar.
+$NICK = @(@(6.8,57.2),@(50,78.8),@(50,88.4),@(6.8,66.8))
+$NICK_DEEP = @(@(6.8,53.6),@(50,75.2),@(50,89.6),@(6.8,68))
 
 # The letter, in two weights, already sheared onto the face.
 #
@@ -40,6 +52,18 @@ $BOLD = @{
   stem = @(@(34.232,19.388),@(41.576,15.716),@(65.768,27.812),@(58.424,31.484))
 }
 
+# The letter at the sizes where it is barely a letter at all.
+#
+# At 24 pixels the face is ten pixels deep, and a T set with the margins that
+# look right at 128 has three pixels to say what it is with. It does not read as
+# a T, it reads as a smudge. So at these sizes it is not set on the face, it
+# very nearly is the face: margins cut to a tenth, and a stem wide enough that
+# the crossbar and the stem are the same two strokes after rounding.
+$HUGE = @{
+  bar  = @(@(15.44,24.464),@(51.728,6.32),@(60.8,10.856),@(24.512,29))
+  stem = @(@(28.832,17.768),@(38.336,13.016),@(71.168,29.432),@(61.664,34.184))
+}
+
 $C = @{ left = "#EDF3F9"; right = "#7E97B2"; nick = "#2C6DAF"; top = "#131922"; t = "#FFFFFF" }
 
 <#
@@ -53,11 +77,11 @@ $C = @{ left = "#EDF3F9"; right = "#7E97B2"; nick = "#2C6DAF"; top = "#131922"; 
   edge actually falls.
 #>
 function Render($size) {
-  # Two decisions, and they do not turn over at the same size. The nick is a
-  # six-unit slot: below 32 pixels it is less than two and reads as dirt, so it
-  # goes. The letter turns bold earlier than that, at 48.
-  $nick = $size -ge 32
-  $letter = if ($size -le 48) { $BOLD } else { $MEDIUM }
+  # Everything gets heavier below 48, because below 48 is where a detail either
+  # survives or is not there at all: the deeper nick, and the bold cut of the
+  # letter whose crossbar the shear thins first.
+  $nick = if ($size -le 48) { $NICK_DEEP } else { $NICK }
+  $letter = if ($size -le 32) { $HUGE } elseif ($size -le 48) { $BOLD } else { $MEDIUM }
   $out = New-Object System.Drawing.Bitmap $size, $size
   $g = [System.Drawing.Graphics]::FromImage($out)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
@@ -68,7 +92,7 @@ function Render($size) {
   $k = $size / 100.0
   $g.FillPolygon((B $C.left),  (Poly (Scale $BLOCK.left  $k)))
   $g.FillPolygon((B $C.right), (Poly (Scale $BLOCK.right $k)))
-  if ($nick) { $g.FillPolygon((B $C.nick), (Poly (Scale $BLOCK.nick $k))) }
+  $g.FillPolygon((B $C.nick), (Poly (Scale $nick $k)))
   $g.FillPolygon((B $C.top),   (Poly (Scale $BLOCK.top   $k)))
   $wb = B $C.t
   $g.FillPolygon($wb, (Poly (Scale $letter.bar  $k)))
@@ -81,7 +105,7 @@ function Render($size) {
 # 16, 20, 24, 32, 40, 48, 64, 96, 128 and 256 depending on where the icon is
 # shown and how the display is scaled; a size that is missing is one the shell
 # resamples for itself, which is where a blurry taskbar icon comes from.
-$sizes = @(16, 20, 24, 30, 32, 36, 40, 44, 48, 50, 56, 60, 64, 71, 72, 89, 96, 107, 128, 142, 150, 256, 284, 310, 512, 1024)
+$sizes = @(16, 20, 24, 28, 30, 32, 36, 40, 44, 48, 50, 56, 60, 64, 71, 72, 80, 89, 96, 107, 128, 142, 150, 256, 284, 310, 512, 1024)
 foreach ($s in $sizes) {
   $bmp = Render $s
   $bmp.Save("$root\png\$s.png", [System.Drawing.Imaging.ImageFormat]::Png)
