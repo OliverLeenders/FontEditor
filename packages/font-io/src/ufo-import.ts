@@ -20,7 +20,7 @@ import {
   setKept,
   setKerning,
   STYLE_MAP_STYLES,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { parseGlif } from "./glif.js";
 import {
@@ -161,7 +161,7 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
   const keptLib =
     libSource === null
       ? {}
-      : unmodelled(parsePlistDict(libSource), ["public.glyphOrder", METRIC_KEYS]);
+      : unmodelled(parsePlistDict(libSource), ["public.glyphOrder", METRIC_KEYS, OLD_METRIC_KEYS]);
 
   // Where a glyph's spacing comes from, which neither UFO nor OpenType has a
   // field for. Written under this editor's own name, and read back onto the
@@ -451,7 +451,17 @@ export function looksLikeArchive(fileName: string): boolean {
 }
 
 /** Where a glyph's spacing comes from, in a lib key of this editor's own. */
-const METRIC_KEYS = "org.fonteditor.metricKeys";
+const METRIC_KEYS = "org.typewright.metricKeys";
+
+/**
+ * The same key, under the name the editor had before it was named.
+ *
+ * Read, never written. A lib key is not a setting — it is in the source on
+ * disk, in files this editor wrote and someone may still be working on, so
+ * dropping it would silently lose the spacing rules from every font saved
+ * before the rename.
+ */
+const OLD_METRIC_KEYS = "org.fonteditor.metricKeys";
 
 /**
  * The glyphs, with whatever the lib said about where their spacing comes from.
@@ -465,7 +475,8 @@ const METRIC_KEYS = "org.fonteditor.metricKeys";
 function withMetricKeys(glyphs: readonly Glyph[], lib: string | null): Glyph[] {
   if (lib === null) return [...glyphs];
 
-  const found = parsePlistDict(lib)[METRIC_KEYS];
+  const dict = parsePlistDict(lib);
+  const found = dict[METRIC_KEYS] ?? dict[OLD_METRIC_KEYS];
   if (!isDict(found)) return [...glyphs];
 
   return glyphs.map((g) => {

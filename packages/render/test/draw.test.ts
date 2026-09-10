@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 import {
   type Contour,
   addAnchor,
@@ -10,8 +10,8 @@ import {
   node,
   segmentTunniPoint,
   setHandle,
-} from "@fonteditor/font-model";
-import { type ViewTransform, combFor, toScreen } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { type ViewTransform, combFor, toScreen } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
 import { drawScene } from "../src/draw.js";

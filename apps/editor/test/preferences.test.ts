@@ -26,12 +26,12 @@ describe("reading preferences", () => {
   });
 
   it("survives a storage entry that is not JSON", () => {
-    localStorage.setItem("fonteditor.preferences", "{ not json");
+    localStorage.setItem("typewright.preferences", "{ not json");
     expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
   });
 
   it("survives one that is JSON but not an object", () => {
-    localStorage.setItem("fonteditor.preferences", "42");
+    localStorage.setItem("typewright.preferences", "42");
     expect(loadPreferences()).toEqual(DEFAULT_PREFERENCES);
   });
 
@@ -39,7 +39,7 @@ describe("reading preferences", () => {
     // What an older version wrote, or a hand-edited entry. One bad field must
     // not take the others down with it.
     localStorage.setItem(
-      "fonteditor.preferences",
+      "typewright.preferences",
       JSON.stringify({ theme: "light", outlineWidth: "thick", snapPoints: false }),
     );
     const read = loadPreferences();
@@ -49,7 +49,7 @@ describe("reading preferences", () => {
   });
 
   it("refuses a theme it does not have", () => {
-    localStorage.setItem("fonteditor.preferences", JSON.stringify({ theme: "sepia" }));
+    localStorage.setItem("typewright.preferences", JSON.stringify({ theme: "sepia" }));
     expect(loadPreferences().theme).toBe("system");
   });
 
@@ -57,12 +57,28 @@ describe("reading preferences", () => {
     // A weight from a version whose slider went further would otherwise pin the
     // handle at one end while drawing something else.
     localStorage.setItem(
-      "fonteditor.preferences",
+      "typewright.preferences",
       JSON.stringify({ outlineWidth: 99, proofSize: 1 }),
     );
     const read = loadPreferences();
     expect(read.outlineWidth).toBe(MAX_OUTLINE_WIDTH);
     expect(read.proofSize).toBe(MIN_PROOF_SIZE);
+  });
+
+  it("adopts what was saved before the editor was named", () => {
+    localStorage.setItem(
+      "fonteditor.preferences",
+      JSON.stringify({ theme: "dark", outlineWidth: 3.5 }),
+    );
+    const read = loadPreferences();
+    expect(read.theme).toBe("dark");
+    expect(read.outlineWidth).toBe(3.5);
+  });
+
+  it("prefers what is under the new name when both are there", () => {
+    localStorage.setItem("fonteditor.preferences", JSON.stringify({ theme: "dark" }));
+    localStorage.setItem("typewright.preferences", JSON.stringify({ theme: "light" }));
+    expect(loadPreferences().theme).toBe("light");
   });
 
   it("adopts an inspector position left by the version before this one", () => {

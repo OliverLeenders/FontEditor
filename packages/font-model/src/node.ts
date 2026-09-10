@@ -1,4 +1,4 @@
-import { type Vec2, add, addScaled, distance, length, sub } from "@fonteditor/geometry";
+import { type Vec2, add, addScaled, distance, length, sub } from "@typewright/geometry";
 
 import type { NodeId } from "./ids.js";
 

@@ -1,4 +1,4 @@
-import type { Axis, FontDocument, IdFactory, Location } from "@fonteditor/font-model";
+import type { Axis, FontDocument, IdFactory, Location } from "@typewright/font-model";
 
 import {
   type Designspace,

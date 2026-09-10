@@ -5,7 +5,7 @@ import {
   crc32,
   defaultLayer,
   entryBytes,
-} from "@fonteditor/font-io";
+} from "@typewright/font-io";
 
 import type { DiskFile, DiskFolder } from "./handles.js";
 

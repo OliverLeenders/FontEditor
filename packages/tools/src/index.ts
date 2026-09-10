@@ -1,5 +1,5 @@
 /**
- * @fonteditor/tools
+ * @typewright/tools
  *
  * Pointer and keyboard tools, as pure reducers over an explicit editor state.
  *

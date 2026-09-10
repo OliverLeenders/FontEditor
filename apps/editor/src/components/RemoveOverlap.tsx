@@ -1,4 +1,4 @@
-import { overlapAt, selectedContourIds } from "@fonteditor/tools";
+import { overlapAt, selectedContourIds } from "@typewright/tools";
 import { useEffect, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

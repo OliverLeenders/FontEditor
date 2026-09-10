@@ -1,6 +1,6 @@
-import { codePointsOfSet, glyphSet } from "@fonteditor/catalog";
-import { glyphNameForCodePoint } from "@fonteditor/font-model";
-import { type NewGlyph as GlyphSpec, createGlyphs } from "@fonteditor/tools";
+import { codePointsOfSet, glyphSet } from "@typewright/catalog";
+import { glyphNameForCodePoint } from "@typewright/font-model";
+import { type NewGlyph as GlyphSpec, createGlyphs } from "@typewright/tools";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

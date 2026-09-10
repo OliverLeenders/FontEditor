@@ -51,10 +51,10 @@ under MSYS2's Python they land in `.venv/bin` anyway.
 
 ```bash
 OUT=$(mktemp -d)
-UFO_OUT="$OUT" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
+UFO_OUT="$OUT" pnpm --filter @typewright/font-io exec vitest run proof-ufo
 .venv/bin/python tools/ufo-check/check_ufo.py "$OUT/TunniProof-SemiboldItalic.ufo"
 .venv/bin/python tools/ufo-check/rewrite_ufo.py "$OUT/TunniProof-SemiboldItalic.ufo" "$OUT/FromFontTools.ufo" "$OUT/FromFontTools.ufo.zip"
-FOREIGN_UFO="$OUT/FromFontTools.ufo.zip" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
+FOREIGN_UFO="$OUT/FromFontTools.ufo.zip" pnpm --filter @typewright/font-io exec vitest run proof-ufo
 ```
 
 Without those two environment variables the same test file still runs in the ordinary

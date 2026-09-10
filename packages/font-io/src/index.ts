@@ -1,5 +1,5 @@
 /**
- * @fonteditor/font-io
+ * @typewright/font-io
  *
  * Font binaries in, model out. The one package that knows a font parser exists,
  * and the boundary that keeps `opentype.js` from becoming load-bearing anywhere

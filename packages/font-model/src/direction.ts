@@ -1,4 +1,4 @@
-import { type Vec2, flatten } from "@fonteditor/geometry";
+import { type Vec2, flatten } from "@typewright/geometry";
 
 import { type Contour, reverseContour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import type { Glyph } from "./glyph.js";

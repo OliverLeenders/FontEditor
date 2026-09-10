@@ -1,4 +1,4 @@
-import { renameCurrentGlyph, renameRefusal } from "@fonteditor/tools";
+import { renameCurrentGlyph, renameRefusal } from "@typewright/tools";
 import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -211,7 +211,7 @@ export function Inspector(): React.JSX.Element | null {
           rather than in either section, because both want it and a folded
           section renders nothing — and because two elements claiming one id is
           a bug waiting for whichever of them the browser picks. */}
-      <datalist id="fonteditor-glyph-names">
+      <datalist id="typewright-glyph-names">
         {glyphNames.map((name) => (
           <option key={name} value={name} />
         ))}

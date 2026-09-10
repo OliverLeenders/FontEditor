@@ -1,5 +1,5 @@
-import type { Vec2 } from "@fonteditor/geometry";
-import { type Section, sectionAcross } from "@fonteditor/font-model";
+import type { Vec2 } from "@typewright/geometry";
+import { type Section, sectionAcross } from "@typewright/font-model";
 
 import { type ToolResult, result } from "./effects.js";
 import type { PointerInput } from "./input.js";

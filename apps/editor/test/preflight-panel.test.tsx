@@ -8,8 +8,8 @@ import { freshStore, installDomStubs, render } from "./render.js";
 installBrowserGlobals();
 
 const { Preflight } = await import("../src/components/Preflight.js");
-const { contour, node, addContour, putGlyph } = await import("@fonteditor/font-model");
-const { vec } = await import("@fonteditor/geometry");
+const { contour, node, addContour, putGlyph } = await import("@typewright/font-model");
+const { vec } = await import("@typewright/geometry");
 
 /**
  * The report, on screen.

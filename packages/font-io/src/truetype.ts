@@ -1,4 +1,4 @@
-import type { FontDocument } from "@fonteditor/font-model";
+import type { FontDocument } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
 import { type ExportResult, exportFont, flattenedGlyphs } from "./export.js";

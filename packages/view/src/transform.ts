@@ -1,4 +1,4 @@
-import type { Rect, Vec2 } from "@fonteditor/geometry";
+import type { Rect, Vec2 } from "@typewright/geometry";
 
 /**
  * The one place where design space meets screen space.

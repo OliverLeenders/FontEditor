@@ -1,4 +1,4 @@
-import type { Axis, Support } from "@fonteditor/font-model";
+import type { Axis, Support } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
 import type { Drawn } from "./glyf.js";

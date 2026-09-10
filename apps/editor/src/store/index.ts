@@ -1,5 +1,5 @@
-import type { CatalogQuery } from "@fonteditor/catalog";
-import type { ExtraLayer } from "@fonteditor/font-io";
+import type { CatalogQuery } from "@typewright/catalog";
+import type { ExtraLayer } from "@typewright/font-io";
 import {
   canRedoSession,
   canUndoSession,
@@ -8,7 +8,7 @@ import {
   undo,
   undoLabelOf,
   apply as applyToSession,
-} from "@fonteditor/edit-core";
+} from "@typewright/edit-core";
 import {
   type FontDocument,
   type Glyph,
@@ -16,7 +16,7 @@ import {
   putGlyph,
   setFeatures,
   setGlyphImage,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import {
   type EditorState,
   type ToolId,
@@ -26,10 +26,10 @@ import {
   currentGlyph,
   result,
   setActiveTool,
-} from "@fonteditor/tools";
-import { type Axis, orderedMasters } from "@fonteditor/font-model";
-import type { ViewTransform } from "@fonteditor/view";
-import type { DiskFolder } from "@fonteditor/disk";
+} from "@typewright/tools";
+import { type Axis, orderedMasters } from "@typewright/font-model";
+import type { ViewTransform } from "@typewright/view";
+import type { DiskFolder } from "@typewright/disk";
 
 import { frameGlyph } from "../framing.js";
 import { type Decoded, ImageCache } from "../images.js";

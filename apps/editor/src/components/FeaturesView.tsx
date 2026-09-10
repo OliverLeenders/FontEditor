@@ -1,4 +1,4 @@
-import { compileFeatures } from "@fonteditor/font-io";
+import { compileFeatures } from "@typewright/font-io";
 import { useMemo } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

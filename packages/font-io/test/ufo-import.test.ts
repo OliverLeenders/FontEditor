@@ -18,7 +18,7 @@ import {
   setKern,
   setKernGroup,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { exportUfo } from "../src/ufo.js";

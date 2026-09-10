@@ -1,4 +1,4 @@
-import { distance, vec } from "@fonteditor/geometry";
+import { distance, vec } from "@typewright/geometry";
 import {
   type FontDocument,
   type Glyph,
@@ -8,8 +8,8 @@ import {
   orderedGlyphs,
   segmentAt,
   segmentCount,
-} from "@fonteditor/font-model";
-import type { ViewTransform } from "@fonteditor/view";
+} from "@typewright/font-model";
+import type { ViewTransform } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
 import {

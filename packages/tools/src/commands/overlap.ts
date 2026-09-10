@@ -5,7 +5,7 @@ import {
   putGlyph,
   removeOverlap,
   randomIds,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { type ToolResult, result } from "../effects.js";
 import { type EditorState } from "../state.js";
 import { done } from "./shared.js";

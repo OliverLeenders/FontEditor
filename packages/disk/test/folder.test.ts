@@ -1,5 +1,5 @@
-import { readUfo, ufoFiles } from "@fonteditor/font-io";
-import { DEFAULT_FONT_INFO, fontDocument, glyph, randomIds } from "@fonteditor/font-model";
+import { readUfo, ufoFiles } from "@typewright/font-io";
+import { DEFAULT_FONT_INFO, fontDocument, glyph, randomIds } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { MAX_DEPTH, readFolder, writeFolder } from "../src/folder.js";

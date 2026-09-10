@@ -1,7 +1,7 @@
 [package]
-name = "fonteditor"
+name = "typewright"
 version = "0.1.0"
-description = "A browser-based font editor that uses Tunni lines"
+description = "A font editor for the browser and the desktop"
 authors = ["Oliver Leenders"]
 license = ""
 repository = ""
@@ -11,7 +11,7 @@ rust-version = "1.77.2"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "fonteditor_lib"
+name = "typewright_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

@@ -1,4 +1,4 @@
-import type { FontDocument, Glyph, GlyphName } from "@fonteditor/font-model";
+import type { FontDocument, Glyph, GlyphName } from "@typewright/font-model";
 
 import { type UnicodeBlock, blockOf } from "./blocks.js";
 

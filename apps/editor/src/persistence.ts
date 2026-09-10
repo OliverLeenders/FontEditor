@@ -1,4 +1,4 @@
-import type { FontDocument } from "@fonteditor/font-model";
+import type { FontDocument } from "@typewright/font-model";
 import {
   type ImageEntry,
   type StoredDesignspace,
@@ -13,7 +13,7 @@ import {
   dirtyGlyphs,
   removedGlyphs,
   requestPersistence,
-} from "@fonteditor/storage";
+} from "@typewright/storage";
 
 export type StorageState = "connecting" | "ready" | "unavailable";
 

@@ -41,37 +41,37 @@ importers:
 
   apps/editor:
     dependencies:
-      '@fonteditor/catalog':
+      '@typewright/catalog':
         specifier: workspace:*
         version: link:../../packages/catalog
-      '@fonteditor/disk':
+      '@typewright/disk':
         specifier: workspace:*
         version: link:../../packages/disk
-      '@fonteditor/edit-core':
+      '@typewright/edit-core':
         specifier: workspace:*
         version: link:../../packages/edit-core
-      '@fonteditor/font-io':
+      '@typewright/font-io':
         specifier: workspace:*
         version: link:../../packages/font-io
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../../packages/font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../../packages/geometry
-      '@fonteditor/preflight':
+      '@typewright/preflight':
         specifier: workspace:*
         version: link:../../packages/preflight
-      '@fonteditor/render':
+      '@typewright/render':
         specifier: workspace:*
         version: link:../../packages/render
-      '@fonteditor/storage':
+      '@typewright/storage':
         specifier: workspace:*
         version: link:../../packages/storage
-      '@fonteditor/tools':
+      '@typewright/tools':
         specifier: workspace:*
         version: link:../../packages/tools
-      '@fonteditor/view':
+      '@typewright/view':
         specifier: workspace:*
         version: link:../../packages/view
       react:
@@ -111,40 +111,40 @@ importers:
 
   packages/catalog:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
 
   packages/disk:
     dependencies:
-      '@fonteditor/font-io':
+      '@typewright/font-io':
         specifier: workspace:*
         version: link:../font-io
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
 
   packages/edit-core:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
-      '@fonteditor/tools':
+      '@typewright/tools':
         specifier: workspace:*
         version: link:../tools
-      '@fonteditor/view':
+      '@typewright/view':
         specifier: workspace:*
         version: link:../view
 
   packages/font-io:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
       opentype.js:
@@ -156,7 +156,7 @@ importers:
 
   packages/font-model:
     dependencies:
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
 
@@ -164,52 +164,52 @@ importers:
 
   packages/preflight:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
 
   packages/render:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
-      '@fonteditor/view':
+      '@typewright/view':
         specifier: workspace:*
         version: link:../view
 
   packages/storage:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
 
   packages/tools:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
-      '@fonteditor/view':
+      '@typewright/view':
         specifier: workspace:*
         version: link:../view
 
   packages/view:
     dependencies:
-      '@fonteditor/font-model':
+      '@typewright/font-model':
         specifier: workspace:*
         version: link:../font-model
-      '@fonteditor/geometry':
+      '@typewright/geometry':
         specifier: workspace:*
         version: link:../geometry
 

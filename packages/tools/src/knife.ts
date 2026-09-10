@@ -1,5 +1,5 @@
-import type { Vec2 } from "@fonteditor/geometry";
-import { type IdFactory, type KnifeCut, cutGlyph, randomIds } from "@fonteditor/font-model";
+import type { Vec2 } from "@typewright/geometry";
+import { type IdFactory, type KnifeCut, cutGlyph, randomIds } from "@typewright/font-model";
 
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import type { GestureOptions } from "./gestures.js";

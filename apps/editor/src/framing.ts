@@ -1,6 +1,6 @@
-import type { FontInfo, Glyph } from "@fonteditor/font-model";
-import { glyphBounds } from "@fonteditor/font-model";
-import { type ViewTransform, fitRect } from "@fonteditor/view";
+import type { FontInfo, Glyph } from "@typewright/font-model";
+import { glyphBounds } from "@typewright/font-model";
+import { type ViewTransform, fitRect } from "@typewright/view";
 
 /** Space left around the em box, in screen pixels. */
 const MARGIN = 60;

@@ -1,4 +1,4 @@
-import { IDENTITY_AFFINE, applyAffine, vec } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE, applyAffine, vec } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import { imagePoint, imageRef, invertAffine, placeCrop, shownCrop } from "../src/image.js";

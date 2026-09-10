@@ -1,4 +1,4 @@
-import type { Rect, Vec2 } from "@fonteditor/geometry";
+import type { Rect, Vec2 } from "@typewright/geometry";
 import {
   type ComponentId,
   type ComponentSource,
@@ -21,7 +21,7 @@ import {
   updateGlyphComponent,
   updateGlyph,
   wouldRecurse,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";

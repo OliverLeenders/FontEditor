@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 import {
   DEFAULT_FONT_INFO,
   setKept,
@@ -14,7 +14,7 @@ import {
   setFeatures,
   setKern,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { MemoryFileStore } from "../src/file-store.js";

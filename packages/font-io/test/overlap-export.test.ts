@@ -1,5 +1,5 @@
-import { vec } from "@fonteditor/geometry";
-import { component, contour, counterIds, fontDocument, glyph, node } from "@fonteditor/font-model";
+import { vec } from "@typewright/geometry";
+import { component, contour, counterIds, fontDocument, glyph, node } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";

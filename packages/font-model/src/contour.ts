@@ -22,7 +22,7 @@ import {
   tunniLambdas,
   tunniPoint,
   tunniStatus,
-} from "@fonteditor/geometry";
+} from "@typewright/geometry";
 
 import type { ContourId, IdFactory, NodeId } from "./ids.js";
 import {

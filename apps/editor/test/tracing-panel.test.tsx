@@ -8,7 +8,7 @@ import { freshStore, installDomStubs, render } from "./render.js";
 installBrowserGlobals();
 
 const { Tracing } = await import("../src/components/Tracing.js");
-const { imageRef, putGlyph, setGlyphImage } = await import("@fonteditor/font-model");
+const { imageRef, putGlyph, setGlyphImage } = await import("@typewright/font-model");
 
 /**
  * The list of pictures a font is traced from.

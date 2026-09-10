@@ -14,7 +14,7 @@ import {
   resolveGlyphComponents,
   segments,
   withResolvedMetrics,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { kerningLookups, kerningSubtables } from "./gpos.js";
 import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";

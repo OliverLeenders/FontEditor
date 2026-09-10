@@ -28,7 +28,7 @@ export type LockManagerLike = {
   ): Promise<unknown>;
 };
 
-export const PROJECT_LOCK = "fonteditor/project";
+export const PROJECT_LOCK = "typewright/project";
 
 export function browserLocks(): LockManagerLike | null {
   const locks = (navigator as { locks?: LockManagerLike }).locks;

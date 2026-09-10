@@ -1,4 +1,4 @@
-import { NO_METRIC_KEYS, contourById, randomIds, segmentAt } from "@fonteditor/font-model";
+import { NO_METRIC_KEYS, contourById, randomIds, segmentAt } from "@typewright/font-model";
 import {
   addGuideAt,
   guideById,
@@ -35,8 +35,8 @@ import {
   setNodeHvLock,
   setPointType,
   unroundedSelected,
-} from "@fonteditor/tools";
-import type { HitTarget } from "@fonteditor/view";
+} from "@typewright/tools";
+import type { HitTarget } from "@typewright/view";
 import { useEffect, useRef } from "react";
 
 import type { EditorStore } from "../store/index.js";

@@ -6,8 +6,8 @@ import {
   setLeftSidebearing,
   setRightSidebearing,
   sidebearings,
-} from "@fonteditor/font-model";
-import { begin, commit, editCurrentGlyph, result, setMetricKey } from "@fonteditor/tools";
+} from "@typewright/font-model";
+import { begin, commit, editCurrentGlyph, result, setMetricKey } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
@@ -189,7 +189,7 @@ export function GlyphSection(): React.JSX.Element {
         <div className={styles.triple}>
           <input
             className={styles.input}
-            list="fonteditor-glyph-names"
+            list="typewright-glyph-names"
             placeholder="left"
             aria-label="Left sidebearing taken from"
             title="Take the left sidebearing from this glyph"
@@ -199,7 +199,7 @@ export function GlyphSection(): React.JSX.Element {
           />
           <input
             className={styles.input}
-            list="fonteditor-glyph-names"
+            list="typewright-glyph-names"
             placeholder="right"
             aria-label="Right sidebearing taken from"
             title="Take the right sidebearing from this glyph"
@@ -209,7 +209,7 @@ export function GlyphSection(): React.JSX.Element {
           />
           <input
             className={styles.input}
-            list="fonteditor-glyph-names"
+            list="typewright-glyph-names"
             placeholder="width"
             aria-label="Advance taken from"
             title="Take the whole advance from this glyph"

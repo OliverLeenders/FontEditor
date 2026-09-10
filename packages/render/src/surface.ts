@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 
 import type { Canvas2D } from "./context.js";
 

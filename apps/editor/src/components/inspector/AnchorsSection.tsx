@@ -1,4 +1,4 @@
-import { moveAnchorToPoint, removeAnchorAt, renameAnchorTo } from "@fonteditor/tools";
+import { moveAnchorToPoint, removeAnchorAt, renameAnchorTo } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";

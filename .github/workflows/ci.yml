@@ -82,7 +82,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build the editor for production
-        run: pnpm --filter @fonteditor/editor build
+        run: pnpm --filter @typewright/editor build
 
       # What a browser would be served, and what the desktop shell embeds. An
       # empty one means the build reported success and produced nothing.
@@ -139,7 +139,7 @@ jobs:
       - run: pip install -r tools/ufo-check/requirements.txt
 
       - name: Export the proof font
-        run: UFO_OUT="$RUNNER_TEMP/ufo" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
+        run: UFO_OUT="$RUNNER_TEMP/ufo" pnpm --filter @typewright/font-io exec vitest run proof-ufo
 
       - name: Read it with fontTools
         run: python tools/ufo-check/check_ufo.py "$RUNNER_TEMP/ufo/TunniProof-SemiboldItalic.ufo"
@@ -153,10 +153,10 @@ jobs:
 
       # The only test here whose input was written by something other than us.
       - name: Read back what fontTools wrote
-        run: FOREIGN_UFO="$RUNNER_TEMP/ufo/FromFontTools.ufo.zip" pnpm --filter @fonteditor/font-io exec vitest run proof-ufo
+        run: FOREIGN_UFO="$RUNNER_TEMP/ufo/FromFontTools.ufo.zip" pnpm --filter @typewright/font-io exec vitest run proof-ufo
 
       - name: Export the proof family
-        run: FAMILY_OUT="$RUNNER_TEMP/family" pnpm --filter @fonteditor/font-io exec vitest run family
+        run: FAMILY_OUT="$RUNNER_TEMP/family" pnpm --filter @typewright/font-io exec vitest run family
 
       # A designspace is a document about files, and the failure it makes
       # possible — naming a UFO that is not beside it — is invisible to anything
@@ -165,10 +165,10 @@ jobs:
         run: python tools/ufo-check/check_family.py "$RUNNER_TEMP/family/Chalk.designspace"
 
       - name: Export the mark-attachment proof font
-        run: OTF_OUT="$RUNNER_TEMP/otf" pnpm --filter @fonteditor/font-io exec vitest run proof-otf
+        run: OTF_OUT="$RUNNER_TEMP/otf" pnpm --filter @typewright/font-io exec vitest run proof-otf
 
       - name: Export both flavours of the proof font
-        run: TRUETYPE_OUT="$RUNNER_TEMP/ttf" pnpm --filter @fonteditor/font-io exec vitest run truetype
+        run: TRUETYPE_OUT="$RUNNER_TEMP/ttf" pnpm --filter @typewright/font-io exec vitest run truetype
 
       # A cubic cannot be written as quadratics exactly, so the only question is
       # how close — and the arithmetic that would measure it here is the
@@ -178,7 +178,7 @@ jobs:
         run: python tools/otf-check/check_ttf.py "$RUNNER_TEMP/ttf/Quad.ttf" "$RUNNER_TEMP/ttf/Quad.otf"
 
       - name: Export the variable proof font
-        run: VARIABLE_OUT="$RUNNER_TEMP/vf" pnpm --filter @fonteditor/font-io exec vitest run variable
+        run: VARIABLE_OUT="$RUNNER_TEMP/vf" pnpm --filter @typewright/font-io exec vitest run variable
 
       # The one check this repository cannot make of itself: whether the deltas
       # are right. The arithmetic that would verify them here is the arithmetic

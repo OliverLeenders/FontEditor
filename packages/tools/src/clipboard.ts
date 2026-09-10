@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 import {
   type Contour,
   type IdFactory,
@@ -8,7 +8,7 @@ import {
   contour,
   node,
   removeContour,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { type ToolResult, begin, commit, result } from "./effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "./state.js";
@@ -27,7 +27,16 @@ import { type EditorState, currentGlyph, editCurrentGlyph } from "./state.js";
  * They are minted fresh on arrival instead.
  */
 
-const MARKER = "fonteditor/contours";
+const MARKER = "typewright/contours";
+
+/**
+ * What the marker said before the editor was named.
+ *
+ * Accepted on paste, never written. The clipboard can outlive a reload, so
+ * someone who copied before updating and pasted after would otherwise find the
+ * paste silently doing nothing.
+ */
+const OLD_MARKER = "fonteditor/contours";
 const VERSION = 1;
 
 type StoredNode = {
@@ -39,7 +48,7 @@ type StoredNode = {
 };
 
 type Payload = {
-  readonly kind: typeof MARKER;
+  readonly kind: typeof MARKER | typeof OLD_MARKER;
   readonly version: number;
   readonly contours: ReadonlyArray<{
     readonly closed: boolean;
@@ -159,7 +168,7 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
     return null;
   }
 
-  if (!isRecord(raw) || raw["kind"] !== MARKER) return null;
+  if (!isRecord(raw) || (raw["kind"] !== MARKER && raw["kind"] !== OLD_MARKER)) return null;
   if (typeof raw["version"] !== "number" || raw["version"] > VERSION) return null;
   if (!Array.isArray(raw["contours"])) return null;
 

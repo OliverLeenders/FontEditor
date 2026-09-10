@@ -1,15 +1,15 @@
-import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
-import type { WrittenFile } from "@fonteditor/disk";
-import type { ExtraLayer } from "@fonteditor/font-io";
-import { type EditSession, session as newSession } from "@fonteditor/edit-core";
-import { editorState } from "@fonteditor/tools";
+import { type CatalogQuery, DEFAULT_QUERY } from "@typewright/catalog";
+import type { WrittenFile } from "@typewright/disk";
+import type { ExtraLayer } from "@typewright/font-io";
+import { type EditSession, session as newSession } from "@typewright/edit-core";
+import { editorState } from "@typewright/tools";
 import {
   type FontDocument,
   type FontProject,
   type Location,
   project,
-} from "@fonteditor/font-model";
-import type { AutosaveStatus, ImageEntry, SnapshotEntry } from "@fonteditor/storage";
+} from "@typewright/font-model";
+import type { AutosaveStatus, ImageEntry, SnapshotEntry } from "@typewright/storage";
 
 import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
 import type { Ownership, StorageState } from "../persistence.js";

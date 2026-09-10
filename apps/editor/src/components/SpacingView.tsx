@@ -1,13 +1,13 @@
-import { breakOutKern, kerningFor, nudgeKern, nudgeSidebearing } from "@fonteditor/tools";
-import { CanvasSurface, type RunScene, drawRun } from "@fonteditor/render";
-import { sidebearings } from "@fonteditor/font-model";
+import { breakOutKern, kerningFor, nudgeKern, nudgeSidebearing } from "@typewright/tools";
+import { CanvasSurface, type RunScene, drawRun } from "@typewright/render";
+import { sidebearings } from "@typewright/font-model";
 import {
   type ViewTransform,
   glyphAtX,
   layoutRun,
   occurrencesOf,
   wheelIntent,
-} from "@fonteditor/view";
+} from "@typewright/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { KernGroups } from "./KernGroups.js";

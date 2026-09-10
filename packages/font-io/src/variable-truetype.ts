@@ -1,5 +1,5 @@
-import type { Axis } from "@fonteditor/font-model";
-import { orderedGlyphs } from "@fonteditor/font-model";
+import type { Axis } from "@typewright/font-model";
+import { orderedGlyphs } from "@typewright/font-model";
 
 import { type NamedInstance, fvarTable, statTable } from "./fvar.js";
 import { type Drawn, compatiblePoints, glyfTable } from "./glyf.js";

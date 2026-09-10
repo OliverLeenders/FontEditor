@@ -1,5 +1,5 @@
-import { type Vec2, project } from "@fonteditor/geometry";
-import { type ContourId, contourById, segmentAt, segmentCubic } from "@fonteditor/font-model";
+import { type Vec2, project } from "@typewright/geometry";
+import { type ContourId, contourById, segmentAt, segmentCubic } from "@typewright/font-model";
 import {
   type SegmentRef,
   type Selection,
@@ -7,7 +7,7 @@ import {
   addItems,
   itemPoint,
   sameSelection,
-} from "@fonteditor/view";
+} from "@typewright/view";
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { translateSelection } from "../gestures.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";

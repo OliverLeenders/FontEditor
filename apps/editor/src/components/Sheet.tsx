@@ -1,4 +1,4 @@
-import { placeImageByCrop, shownImageCrop } from "@fonteditor/tools";
+import { placeImageByCrop, shownImageCrop } from "@typewright/tools";
 import { useMemo, useRef, useState } from "react";
 
 import { glyphsTracing } from "../store/images.js";

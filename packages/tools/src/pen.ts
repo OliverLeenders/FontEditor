@@ -1,4 +1,4 @@
-import { type Cubic, type Vec2, distance, sub } from "@fonteditor/geometry";
+import { type Cubic, type Vec2, distance, sub } from "@typewright/geometry";
 import {
   type Contour,
   type IdFactory,
@@ -14,8 +14,8 @@ import {
   setClosed,
   updateContour,
   updateGlyph,
-} from "@fonteditor/font-model";
-import { screenTolerance } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { screenTolerance } from "@typewright/view";
 
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import type { KeyInput, PointerInput } from "./input.js";

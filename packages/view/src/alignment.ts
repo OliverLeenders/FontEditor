@@ -1,5 +1,5 @@
-import type { Vec2 } from "@fonteditor/geometry";
-import type { Contour, Glyph, Node } from "@fonteditor/font-model";
+import type { Vec2 } from "@typewright/geometry";
+import type { Contour, Glyph, Node } from "@typewright/font-model";
 
 import type { Selection, SelectionItem } from "./selection.js";
 import type { SnapLine } from "./snap.js";

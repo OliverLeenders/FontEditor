@@ -1,4 +1,4 @@
-import { distance, evaluate, vec } from "@fonteditor/geometry";
+import { distance, evaluate, vec } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import {

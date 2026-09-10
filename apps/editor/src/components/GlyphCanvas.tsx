@@ -1,4 +1,4 @@
-import { CanvasSurface, drawScene } from "@fonteditor/render";
+import { CanvasSurface, drawScene } from "@typewright/render";
 import {
   type ToolOptions,
   BOX_HANDLE_PIXELS,
@@ -11,7 +11,7 @@ import {
   pointerMove,
   pointerUp,
   selectionBox,
-} from "@fonteditor/tools";
+} from "@typewright/tools";
 import {
   type BoxHandle,
   BOX_STEM_PIXELS,
@@ -25,7 +25,7 @@ import {
   toDesign,
   wheelIntent,
   zoomAt,
-} from "@fonteditor/view";
+} from "@typewright/view";
 import { useEffect, useRef } from "react";
 
 import {

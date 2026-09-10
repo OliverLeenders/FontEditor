@@ -1,4 +1,4 @@
-import { DEFAULT_FONT_INFO, counterIds, glyphForCodePoint } from "@fonteditor/font-model";
+import { DEFAULT_FONT_INFO, counterIds, glyphForCodePoint } from "@typewright/font-model";
 import { opentype } from "../src/opentype.js";
 import { describe, expect, it } from "vitest";
 

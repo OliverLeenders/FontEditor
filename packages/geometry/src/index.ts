@@ -1,5 +1,5 @@
 /**
- * @fonteditor/geometry
+ * @typewright/geometry
  *
  * Pure 2D geometry and the Tunni-line kernel.
  *

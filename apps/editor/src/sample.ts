@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 import {
   type Contour,
   type FontDocument,
@@ -9,7 +9,7 @@ import {
   fontDocument,
   glyph,
   node,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 /** The usual constant for approximating a quarter circle with a cubic. */
 const K = 0.5523;

@@ -1,6 +1,6 @@
-import type { Affine, Cubic, Rect, Vec2 } from "@fonteditor/geometry";
-import type { AnchorId, Contour, Glyph, Guide, GuideId } from "@fonteditor/font-model";
-import type { BoxFrame, Comb, Selection, SegmentRef, ViewTransform } from "@fonteditor/view";
+import type { Affine, Cubic, Rect, Vec2 } from "@typewright/geometry";
+import type { AnchorId, Contour, Glyph, Guide, GuideId } from "@typewright/font-model";
+import type { BoxFrame, Comb, Selection, SegmentRef, ViewTransform } from "@typewright/view";
 
 import type { RenderPalette } from "./palette.js";
 

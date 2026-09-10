@@ -1,5 +1,5 @@
-import { NO_POSITIONING, NO_SHAPING, positionerFor, shaperFor } from "@fonteditor/font-io";
-import type { Positioner, Shaper } from "@fonteditor/view";
+import { NO_POSITIONING, NO_SHAPING, positionerFor, shaperFor } from "@typewright/font-io";
+import type { Positioner, Shaper } from "@typewright/view";
 
 /**
  * The shaper the spacing line and the proof set with.

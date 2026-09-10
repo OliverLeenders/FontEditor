@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 
 /**
  * Where a line a drag can catch on came from.

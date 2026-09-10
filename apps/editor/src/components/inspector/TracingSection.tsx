@@ -1,4 +1,4 @@
-import { fitImageToGlyph, moveImageTo, scaleImageTo } from "@fonteditor/tools";
+import { fitImageToGlyph, moveImageTo, scaleImageTo } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";

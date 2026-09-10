@@ -1,4 +1,4 @@
-import { type Vec2, handleIntersection } from "@fonteditor/geometry";
+import { type Vec2, handleIntersection } from "@typewright/geometry";
 import {
   type Guide,
   guideDirection,
@@ -11,7 +11,7 @@ import {
   segmentTunniPoint,
   segmentTunniStatus,
   segments,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import {
   type HandleVisibility,
   type SegmentRef,
@@ -26,7 +26,7 @@ import {
   selectedKeys,
   selectionKey,
   toScreen,
-} from "@fonteditor/view";
+} from "@typewright/view";
 
 import type { Canvas2D } from "./context.js";
 import type { RenderPalette } from "./palette.js";

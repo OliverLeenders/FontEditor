@@ -10,7 +10,7 @@ import {
   selfIntersection,
   subcurve,
   tangent,
-} from "@fonteditor/geometry";
+} from "@typewright/geometry";
 
 import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import type { Glyph } from "./glyph.js";

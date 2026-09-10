@@ -14,8 +14,8 @@ import {
   guide,
   imageRef,
   node,
-} from "@fonteditor/font-model";
-import { IDENTITY_AFFINE, type Vec2 } from "@fonteditor/geometry";
+} from "@typewright/font-model";
+import { IDENTITY_AFFINE, type Vec2 } from "@typewright/geometry";
 
 import {
   type XmlElement,

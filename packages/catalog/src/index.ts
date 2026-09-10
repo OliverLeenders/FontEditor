@@ -1,5 +1,5 @@
 /**
- * @fonteditor/catalog
+ * @typewright/catalog
  *
  * Querying a font's glyphs — which sets a glyph belongs to, what a search
  * matches, what order to show things in. Everything the glyph browser needs to

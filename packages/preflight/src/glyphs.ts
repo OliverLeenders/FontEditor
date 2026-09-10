@@ -1,5 +1,5 @@
-import type { ComponentSource, Contour, FontDocument, Glyph, Node } from "@fonteditor/font-model";
-import { isMarkAnchor, wouldRecurse } from "@fonteditor/font-model";
+import type { ComponentSource, Contour, FontDocument, Glyph, Node } from "@typewright/font-model";
+import { isMarkAnchor, wouldRecurse } from "@typewright/font-model";
 
 import { type Finding, finding } from "./finding.js";
 

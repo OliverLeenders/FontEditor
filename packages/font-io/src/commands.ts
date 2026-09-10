@@ -1,4 +1,4 @@
-import { type Vec2, length, quadraticToCubic, sub } from "@fonteditor/geometry";
+import { type Vec2, length, quadraticToCubic, sub } from "@typewright/geometry";
 import {
   type Contour,
   type IdFactory,
@@ -6,7 +6,7 @@ import {
   type NodeType,
   contour,
   node,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 /**
  * A path as a font file describes it: a flat command list, y up, design units.

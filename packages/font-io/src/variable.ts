@@ -1,12 +1,12 @@
-import type { Axis, FontDocument, Location } from "@fonteditor/font-model";
-import type { ComponentSource, Glyph } from "@fonteditor/font-model";
+import type { Axis, FontDocument, Location } from "@typewright/font-model";
+import type { ComponentSource, Glyph } from "@typewright/font-model";
 import {
   correctDirections,
   counterIds,
   glyph,
   orderedGlyphs,
   resolveGlyphComponents,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { cff2Table } from "./cff2.js";
 import { type ExportResult, exportFont } from "./export.js";

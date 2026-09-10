@@ -1,4 +1,4 @@
-import { bounds } from "@fonteditor/geometry";
+import { bounds } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import { segmentAt, segmentCount, segmentCubic } from "../src/contour.js";

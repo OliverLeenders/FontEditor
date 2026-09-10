@@ -1,5 +1,5 @@
-import type { Axis, FontDocument, Location } from "@fonteditor/font-model";
-import { interpolateFont } from "@fonteditor/font-model";
+import type { Axis, FontDocument, Location } from "@typewright/font-model";
+import { interpolateFont } from "@typewright/font-model";
 
 import { exportFont } from "./export.js";
 import { type ZipEntry, zip } from "./zip.js";

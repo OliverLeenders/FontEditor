@@ -1,7 +1,7 @@
-import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@fonteditor/catalog";
-import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@fonteditor/render";
-import { deleteGlyph, renameCurrentGlyph, roundGlyphAt } from "@fonteditor/tools";
-import { NOTDEF } from "@fonteditor/font-model";
+import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@typewright/catalog";
+import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@typewright/render";
+import { deleteGlyph, renameCurrentGlyph, roundGlyphAt } from "@typewright/tools";
+import { NOTDEF } from "@typewright/font-model";
 import {
   type GridLayout,
   cellBox,
@@ -9,7 +9,7 @@ import {
   gridLayout,
   scrollToCell,
   visibleCells,
-} from "@fonteditor/view";
+} from "@typewright/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { isDarkNow, watchScheme } from "../scheme.js";

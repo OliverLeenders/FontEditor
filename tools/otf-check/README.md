@@ -16,7 +16,7 @@ check then asks for the anchors back by name and compares them with what was dra
 
 ```bash
 pip install -r ../ufo-check/requirements.txt
-OTF_OUT=/tmp/otf pnpm --filter @fonteditor/font-io exec vitest run proof-otf
+OTF_OUT=/tmp/otf pnpm --filter @typewright/font-io exec vitest run proof-otf
 python check_otf.py /tmp/otf/TunniMarks-SemiboldItalic.otf
 ```
 

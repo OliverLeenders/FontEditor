@@ -4,7 +4,7 @@ import {
   IDENTITY_AFFINE,
   applyAffine,
   composeAffine,
-} from "@fonteditor/geometry";
+} from "@typewright/geometry";
 
 import { pairedName } from "./anchor.js";
 import { type Contour, contour } from "./contour.js";

@@ -29,8 +29,8 @@ import {
   hasMetricKeys,
   imageRef,
   node,
-} from "@fonteditor/font-model";
-import type { Vec2 } from "@fonteditor/geometry";
+} from "@typewright/font-model";
+import type { Vec2 } from "@typewright/geometry";
 
 /**
  * The on-disk format, written out explicitly rather than by dumping the model.

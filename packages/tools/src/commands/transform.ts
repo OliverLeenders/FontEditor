@@ -6,8 +6,8 @@ import {
   isTranslation,
   keepsAxes,
   rotation,
-} from "@fonteditor/geometry";
-import { selectionBounds } from "@fonteditor/view";
+} from "@typewright/geometry";
+import { selectionBounds } from "@typewright/view";
 import { type ToolResult, result } from "../effects.js";
 import { transformedDocument } from "../transform.js";
 import { type EditorState, boxAngle, currentGlyph, turnedFrame } from "../state.js";

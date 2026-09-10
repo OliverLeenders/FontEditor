@@ -1,4 +1,4 @@
-import { fontDocument, glyph } from "@fonteditor/font-model";
+import { fontDocument, glyph } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { layoutParagraph, paragraphWidth } from "../src/run.js";

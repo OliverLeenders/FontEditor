@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 import {
   type Contour,
   contour,
@@ -6,7 +6,7 @@ import {
   fontDocument,
   glyph,
   node,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -78,7 +78,7 @@ describe("clipboardText", () => {
 
   it("carries the geometry, and never the ids", () => {
     const text = clipboardText(selectPoints(start(), "c1"))!;
-    expect(text).toContain("fonteditor/contours");
+    expect(text).toContain("typewright/contours");
     // Ids identify a node in a document, not a shape; carrying them would let a
     // paste collide with the contour it came from.
     expect(text).not.toContain("c1-a");
@@ -124,21 +124,29 @@ describe("parseClipboard", () => {
       "not json at all",
       "{}",
       '{"kind":"something/else","version":1,"contours":[]}',
-      '{"kind":"fonteditor/contours"}',
-      '{"kind":"fonteditor/contours","version":1}',
+      '{"kind":"typewright/contours"}',
+      '{"kind":"typewright/contours","version":1}',
     ]) {
       expect(parseClipboard(junk, counterIds())).toBeNull();
     }
   });
 
+  it("still takes a payload copied before the editor was named", () => {
+    const text = clipboardText(selectPoints(start(), "c1"))!.replace(
+      "typewright/contours",
+      "fonteditor/contours",
+    );
+    expect(parseClipboard(text, counterIds())).not.toBeNull();
+  });
+
   it("refuses a payload from a later version it cannot understand", () => {
-    const text = '{"kind":"fonteditor/contours","version":99,"contours":[]}';
+    const text = '{"kind":"typewright/contours","version":99,"contours":[]}';
     expect(parseClipboard(text, counterIds())).toBeNull();
   });
 
   it("refuses a node whose point is missing or not finite", () => {
     const bad = (pt: string) =>
-      `{"kind":"fonteditor/contours","version":1,"contours":[{"closed":true,"nodes":[{"pt":${pt}},{"pt":{"x":1,"y":1}}]}]}`;
+      `{"kind":"typewright/contours","version":1,"contours":[{"closed":true,"nodes":[{"pt":${pt}},{"pt":{"x":1,"y":1}}]}]}`;
     expect(parseClipboard(bad("null"), counterIds())).toBeNull();
     expect(parseClipboard(bad('{"x":"a","y":0}'), counterIds())).toBeNull();
     expect(parseClipboard(bad('{"x":null,"y":0}'), counterIds())).toBeNull();
@@ -146,7 +154,7 @@ describe("parseClipboard", () => {
 
   it("drops a contour too small to draw anything", () => {
     const text =
-      '{"kind":"fonteditor/contours","version":1,"contours":[{"closed":true,"nodes":[{"pt":{"x":0,"y":0}}]}]}';
+      '{"kind":"typewright/contours","version":1,"contours":[{"closed":true,"nodes":[{"pt":{"x":0,"y":0}}]}]}';
     expect(parseClipboard(text, counterIds())).toBeNull();
   });
 });

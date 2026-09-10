@@ -1,5 +1,5 @@
-import type { Glyph } from "@fonteditor/font-model";
-import { type ViewTransform, toScreen } from "@fonteditor/view";
+import type { Glyph } from "@typewright/font-model";
+import { type ViewTransform, toScreen } from "@typewright/view";
 
 import type { Canvas2D } from "./context.js";
 import type { RenderPalette } from "./palette.js";

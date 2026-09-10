@@ -9,9 +9,9 @@ import {
   rememberFolder,
   textAt,
   writeFolder,
-} from "@fonteditor/disk";
-import { crc32, readUfo, ufoFiles } from "@fonteditor/font-io";
-import { type FontDocument, randomIds } from "@fonteditor/font-model";
+} from "@typewright/disk";
+import { crc32, readUfo, ufoFiles } from "@typewright/font-io";
+import { type FontDocument, randomIds } from "@typewright/font-model";
 
 import { type FontHost, adoptDocument, adoptImages, adoptLayers } from "./fonts.js";
 import { NO_FOLDER } from "./state.js";

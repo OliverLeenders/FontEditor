@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="64" height="64">
+  <title>Typewright</title>
+  <path d="M14 30 L50 48 L50 92 L14 74 Z" fill="#edf3f9"/>
+  <path d="M86 30 L50 48 L50 92 L86 74 Z" fill="#7e97b2"/>
+  <path d="M50 12 L86 30 L50 48 L14 30 Z" fill="#131922"/>
+  <g transform="matrix(0.36 -0.18 0.36 0.18 14 30)" fill="#ffffff">
+    <rect x="18" y="22" width="64" height="17"/>
+    <rect x="41.5" y="22" width="17" height="56"/>
+  </g>
+</svg>

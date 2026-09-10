@@ -1,5 +1,5 @@
-import type { Affine, Vec2 } from "@fonteditor/geometry";
-import { type ImageRef, placeCrop, setGlyphImage, shownCrop } from "@fonteditor/font-model";
+import type { Affine, Vec2 } from "@typewright/geometry";
+import { type ImageRef, placeCrop, setGlyphImage, shownCrop } from "@typewright/font-model";
 
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";

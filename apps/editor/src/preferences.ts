@@ -108,7 +108,17 @@ export type Preferences = {
   readonly inspector: InspectorPlacement;
 };
 
-const KEY = "fonteditor.preferences";
+const KEY = "typewright.preferences";
+
+/**
+ * The keys these settings lived under before the editor was named.
+ *
+ * Read but never written. Someone who used the editor under its old name has
+ * their theme and their inspector where they left them, and the first save
+ * moves everything to the new key; nothing is migrated eagerly, because a
+ * settings file is not worth a startup write.
+ */
+const OLD_KEY = "fonteditor.preferences";
 
 /** The key the inspector's position used before it moved in here. */
 const OLD_INSPECTOR_KEY = "fonteditor.inspector";
@@ -170,7 +180,7 @@ export function clampInspector(x: number, y: number): { x: number; y: number } {
  * rather than taking the rest of the settings down with it.
  */
 export function loadPreferences(): Preferences {
-  const stored = read(KEY);
+  const stored = read(KEY) ?? read(OLD_KEY);
   const raw: Record<string, unknown> = stored ?? {};
 
   const inspector = (raw["inspector"] ?? read(OLD_INSPECTOR_KEY) ?? {}) as Record<string, unknown>;

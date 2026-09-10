@@ -1,5 +1,5 @@
 {
-  "name": "@fonteditor/catalog",
+  "name": "@typewright/catalog",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,6 +15,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fonteditor/font-model": "workspace:*"
+    "@typewright/font-model": "workspace:*"
   }
 }

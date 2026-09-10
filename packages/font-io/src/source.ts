@@ -2,7 +2,7 @@ import type { OtCommand, OtFont, OtNames } from "opentype.js";
 
 import { opentype } from "./opentype.js";
 
-import type { Affine } from "@fonteditor/geometry";
+import type { Affine } from "@typewright/geometry";
 
 import type { PathCommand } from "./commands.js";
 import { type SourceKerning, kerningFromGpos, kerningFromKernTable } from "./readkern.js";

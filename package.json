@@ -1,17 +1,17 @@
 {
-  "name": "fonteditor",
+  "name": "typewright",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.24.0",
-  "description": "A browser font editor with Tunni-line curve control.",
+  "description": "A font editor for the browser and the desktop.",
   "engines": {
     "node": ">=22.13"
   },
   "scripts": {
-    "dev": "pnpm --filter @fonteditor/editor dev",
-    "test": "pnpm --filter \"./packages/*\" --filter @fonteditor/editor test",
-    "test:watch": "pnpm --filter @fonteditor/geometry test:watch",
+    "dev": "pnpm --filter @typewright/editor dev",
+    "test": "pnpm --filter \"./packages/*\" --filter @typewright/editor test",
+    "test:watch": "pnpm --filter @typewright/geometry test:watch",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

@@ -6,7 +6,7 @@ import {
   glyph,
   node,
   setFeatures,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { compileFeatures } from "../src/features.js";

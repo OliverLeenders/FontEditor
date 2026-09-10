@@ -1,4 +1,4 @@
-import { orderedGlyphs } from "@fonteditor/font-model";
+import { orderedGlyphs } from "@typewright/font-model";
 import {
   type KernSide,
   addKernGroup,
@@ -8,7 +8,7 @@ import {
   putGlyphInKernGroup,
   renameKernGroupTo,
   takeGlyphFromKernGroup,
-} from "@fonteditor/tools";
+} from "@typewright/tools";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

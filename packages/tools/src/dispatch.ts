@@ -1,4 +1,4 @@
-import type { IdFactory } from "@fonteditor/font-model";
+import type { IdFactory } from "@typewright/font-model";
 
 import { type ToolResult, abort, result } from "./effects.js";
 import type { KeyInput, PointerInput } from "./input.js";

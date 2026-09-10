@@ -4,12 +4,13 @@ import {
   fontDocument,
   glyph,
   rectContour,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";
-import { exportUfo } from "../src/ufo.js";
+import { exportUfo, ufoFiles } from "../src/ufo.js";
 import { importUfo } from "../src/ufo-import.js";
+import { entryText, zip } from "../src/zip.js";
 
 /**
  * Spacing taken from another glyph, through a file and back.
@@ -58,6 +59,36 @@ describe("a UFO carrying the rules", () => {
     if ("reason" in back) throw new Error(back.reason);
 
     expect(back.document.glyphs["m"]?.advance).toBe(520);
+  });
+
+  it("reads the rules a font saved before the editor was named", async () => {
+    // The key is in somebody's source folder on disk, written by this editor
+    // under the name it used to have. Not reading it would quietly drop every
+    // spacing rule in every font saved before the rename.
+    const renamed = ufoFiles(font()).map((entry) =>
+      entry.path.endsWith("lib.plist")
+        ? {
+            path: entry.path,
+            text: entryText(entry).replace(
+              "org.typewright.metricKeys",
+              "org.fonteditor.metricKeys",
+            ),
+          }
+        : entry,
+    );
+
+    const back = await importUfo(zip(renamed).slice().buffer, ids);
+    if ("reason" in back) throw new Error(back.reason);
+
+    expect(back.document.glyphs["m"]?.metricKeys).toEqual({ left: "n", right: "n", width: "" });
+  });
+
+  it("writes the rules back under the new name, and does not keep the old one", async () => {
+    const lib = ufoFiles(font()).find((entry) => entry.path.endsWith("lib.plist"));
+    const text = lib === undefined ? "" : entryText(lib);
+
+    expect(text).toContain("org.typewright.metricKeys");
+    expect(text).not.toContain("org.fonteditor.metricKeys");
   });
 
   it("writes no lib entry for a font where nothing says anything", async () => {

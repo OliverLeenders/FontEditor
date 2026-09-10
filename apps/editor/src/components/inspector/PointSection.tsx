@@ -1,4 +1,4 @@
-import { type NodeType, setNodeType, updateContour } from "@fonteditor/font-model";
+import { type NodeType, setNodeType, updateContour } from "@typewright/font-model";
 import {
   type EditorState,
   begin,
@@ -9,7 +9,7 @@ import {
   selectedCanBeTangent,
   selectedCoordinate,
   selectedNode,
-} from "@fonteditor/tools";
+} from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";

@@ -1,4 +1,4 @@
-import { type Affine, IDENTITY_AFFINE, type Vec2, applyAffine } from "@fonteditor/geometry";
+import { type Affine, IDENTITY_AFFINE, type Vec2, applyAffine } from "@typewright/geometry";
 
 /**
  * A picture to draw against: a scan, a photograph of lettering, a letter from
@@ -16,8 +16,8 @@ import { type Affine, IDENTITY_AFFINE, type Vec2, applyAffine } from "@fontedito
  *
  * The bytes are not in this model. They are megabytes, they never change, and
  * putting them in a document that history keeps a copy of on every edit would
- * make undo cost a scan. They live beside the font — see `@fonteditor/storage`
- * for the working store and `@fonteditor/disk` for a folder on a disk — and the
+ * make undo cost a scan. They live beside the font — see `@typewright/storage`
+ * for the working store and `@typewright/disk` for a folder on a disk — and the
  * name here is how the two find each other.
  */
 export type ImageRef = {

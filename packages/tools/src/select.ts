@@ -1,4 +1,4 @@
-import { type Vec2, rotation } from "@fonteditor/geometry";
+import { type Vec2, rotation } from "@typewright/geometry";
 import {
   type ComponentId,
   type ComponentSource,
@@ -8,7 +8,7 @@ import {
   resolveComponent,
   setNodeType,
   updateContour,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import {
   type BoxFrame,
   type HandleVisibility,
@@ -21,7 +21,7 @@ import {
   pickBoxHandle,
   screenTolerance,
   selectionBounds,
-} from "@fonteditor/view";
+} from "@typewright/view";
 
 import {
   deleteSelectedAnchor,

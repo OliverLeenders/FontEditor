@@ -1,4 +1,4 @@
-import type { FontDocument, GlyphName } from "@fonteditor/font-model";
+import type { FontDocument, GlyphName } from "@typewright/font-model";
 import {
   groupNameOf,
   isGroupKey,
@@ -6,7 +6,7 @@ import {
   orderedGlyphs,
   pairedName,
   withResolvedMetrics,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { type Finding, finding } from "./finding.js";
 

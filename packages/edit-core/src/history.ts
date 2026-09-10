@@ -1,5 +1,5 @@
-import type { FontDocument } from "@fonteditor/font-model";
-import type { Selection } from "@fonteditor/view";
+import type { FontDocument } from "@typewright/font-model";
+import type { Selection } from "@typewright/view";
 
 /**
  * One undoable step: the document either side of it, and the selection either

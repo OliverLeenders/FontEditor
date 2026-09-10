@@ -5,7 +5,7 @@ import {
   removeGuideAt,
   renameGuideTo,
   turnGuideTo,
-} from "@fonteditor/tools";
+} from "@typewright/tools";
 import { useMemo } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";

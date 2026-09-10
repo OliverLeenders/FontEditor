@@ -1,5 +1,5 @@
-import type { FontDocument, Glyph, GlyphName } from "@fonteditor/font-model";
-import { glyphsForString, kernIndex, kernValue } from "@fonteditor/font-model";
+import type { FontDocument, Glyph, GlyphName } from "@typewright/font-model";
+import { glyphsForString, kernIndex, kernValue } from "@typewright/font-model";
 
 /**
  * One glyph placed in a line of text.

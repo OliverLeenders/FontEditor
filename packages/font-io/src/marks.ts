@@ -1,4 +1,4 @@
-import { type Anchor, type Glyph, type GlyphName, isMarkAnchor } from "@fonteditor/font-model";
+import { type Anchor, type Glyph, type GlyphName, isMarkAnchor } from "@typewright/font-model";
 
 import { Writer, classDef, coverage } from "./gpos.js";
 import type { Lookup } from "./layout.js";

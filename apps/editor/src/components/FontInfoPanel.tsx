@@ -1,5 +1,5 @@
-import { type FontInfo, STYLE_MAP_STYLES } from "@fonteditor/font-model";
-import { infoProblem, setInfo } from "@fonteditor/tools";
+import { type FontInfo, STYLE_MAP_STYLES } from "@typewright/font-model";
+import { infoProblem, setInfo } from "@typewright/tools";
 import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 import {
   type ContourId,
   type GlyphName,
@@ -8,8 +8,8 @@ import {
   updateContour,
   roundGlyph,
   unroundedGlyphs,
-} from "@fonteditor/font-model";
-import { itemPoint } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { itemPoint } from "@typewright/view";
 import { type ToolResult, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";
 import { done } from "./shared.js";

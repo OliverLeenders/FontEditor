@@ -1,4 +1,4 @@
-import type { Axis, Location } from "@fonteditor/font-model";
+import type { Axis, Location } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
 

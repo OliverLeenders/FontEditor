@@ -1,4 +1,4 @@
-import { type HandleScales, pannedLambdas, panOf } from "@fonteditor/geometry";
+import { type HandleScales, pannedLambdas, panOf } from "@typewright/geometry";
 import {
   begin,
   commit,
@@ -9,8 +9,8 @@ import {
   result,
   selectedCurvature,
   setSegmentTension,
-} from "@fonteditor/tools";
-import type { SegmentRef } from "@fonteditor/view";
+} from "@typewright/tools";
+import type { SegmentRef } from "@typewright/view";
 import { useEffect, useRef } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";

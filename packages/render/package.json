@@ -1,5 +1,5 @@
 {
-  "name": "@fonteditor/render",
+  "name": "@typewright/render",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,8 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fonteditor/font-model": "workspace:*",
-    "@fonteditor/geometry": "workspace:*",
-    "@fonteditor/view": "workspace:*"
+    "@typewright/font-model": "workspace:*",
+    "@typewright/geometry": "workspace:*",
+    "@typewright/view": "workspace:*"
   }
 }

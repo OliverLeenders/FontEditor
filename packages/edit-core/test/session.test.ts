@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 import {
   type Contour,
   type FontDocument,
@@ -12,7 +12,7 @@ import {
   nodeById,
   orderedGlyphs,
   segmentTunniPoint,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import {
   type EditorState,
   doubleClick,
@@ -23,8 +23,8 @@ import {
   pointerInput,
   pointerMove,
   pointerUp,
-} from "@fonteditor/tools";
-import type { ViewTransform } from "@fonteditor/view";
+} from "@typewright/tools";
+import type { ViewTransform } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
 import { history, push } from "../src/history.js";

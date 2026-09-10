@@ -5,7 +5,7 @@ import {
   glyph,
   glyphNamed,
   imageRef,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { ufoFiles } from "../src/ufo.js";

@@ -1,5 +1,5 @@
 /**
- * @fonteditor/edit-core
+ * @typewright/edit-core
  *
  * Transactions, undo and redo.
  *

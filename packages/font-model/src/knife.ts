@@ -1,4 +1,4 @@
-import { type Cubic, type Vec2, subcurve } from "@fonteditor/geometry";
+import { type Cubic, type Vec2, subcurve } from "@typewright/geometry";
 
 import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { type StrokeCrossing, byContour, samePoint, strokeCrossings } from "./crossings.js";

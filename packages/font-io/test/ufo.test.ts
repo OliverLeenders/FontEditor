@@ -1,4 +1,4 @@
-import { IDENTITY_AFFINE, translation } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE, translation } from "@typewright/geometry";
 import {
   DEFAULT_FONT_INFO,
   type FontDocument,
@@ -8,7 +8,7 @@ import {
   fontDocument,
   glyph,
   node,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { entryText } from "../src/zip.js";

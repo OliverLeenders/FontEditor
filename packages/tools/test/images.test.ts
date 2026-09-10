@@ -1,4 +1,4 @@
-import { DEFAULT_FONT_INFO, fontDocument, glyph, imageRef } from "@fonteditor/font-model";
+import { DEFAULT_FONT_INFO, fontDocument, glyph, imageRef } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import {

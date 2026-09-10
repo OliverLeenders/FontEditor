@@ -8,7 +8,7 @@ import {
   distanceToSegment,
   flatten,
   project,
-} from "@fonteditor/geometry";
+} from "@typewright/geometry";
 import {
   type AnchorId,
   type ComponentId,
@@ -21,7 +21,7 @@ import {
   segmentTunniStatus,
   segments,
   segmentTunniPoint,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { type SegmentRef, sameSegment } from "./proximity.js";
 import { type Selection, selectedNodeKeys } from "./selection.js";

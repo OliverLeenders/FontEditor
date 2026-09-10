@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 import {
   type Contour,
   addContour,
@@ -7,7 +7,7 @@ import {
   fontDocument,
   glyph,
   node,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import {

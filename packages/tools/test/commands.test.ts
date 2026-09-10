@@ -7,7 +7,7 @@ import {
   skewing,
   translation,
   vec,
-} from "@fonteditor/geometry";
+} from "@typewright/geometry";
 import {
   DEFAULT_FONT_INFO,
   type Contour,
@@ -34,8 +34,8 @@ import {
   segmentCount,
   sidebearings,
   component,
-} from "@fonteditor/font-model";
-import { type ViewTransform, boxHandlePoint } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { type ViewTransform, boxHandlePoint } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
 import {

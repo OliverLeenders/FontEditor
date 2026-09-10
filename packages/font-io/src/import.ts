@@ -14,7 +14,7 @@ import {
   setKern,
   setKernGroup,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { contoursFromCommands } from "./commands.js";
 import { type SourceKernSide, type SourceKerning } from "./readkern.js";

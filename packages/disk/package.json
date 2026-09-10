@@ -1,5 +1,5 @@
 {
-  "name": "@fonteditor/disk",
+  "name": "@typewright/disk",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fonteditor/font-io": "workspace:*",
-    "@fonteditor/font-model": "workspace:*"
+    "@typewright/font-io": "workspace:*",
+    "@typewright/font-model": "workspace:*"
   }
 }

@@ -4,9 +4,9 @@ import {
   glyph,
   glyphBounds,
   orderedGlyphs,
-} from "@fonteditor/font-model";
-import { vec } from "@fonteditor/geometry";
-import type { ViewTransform } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { vec } from "@typewright/geometry";
+import type { ViewTransform } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
 import { pointerInput } from "../src/input.js";

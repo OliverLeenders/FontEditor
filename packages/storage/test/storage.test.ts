@@ -1,4 +1,4 @@
-import { IDENTITY_AFFINE, vec } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE, vec } from "@typewright/geometry";
 import {
   setGuides,
   horizontalGuide,
@@ -33,7 +33,7 @@ import {
   setKern,
   setKernGroup,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it, vi } from "vitest";
 
 import { Autosave } from "../src/autosave.js";

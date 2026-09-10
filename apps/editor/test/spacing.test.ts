@@ -6,7 +6,7 @@ installBrowserGlobals();
 
 const { runView } = await import("../src/components/SpacingView.js");
 const { EditorStore } = await import("../src/store/index.js");
-const { glyphAtX, layoutRun } = await import("@fonteditor/view");
+const { glyphAtX, layoutRun } = await import("@typewright/view");
 
 const VIEWPORT = { width: 1000, height: 600 };
 

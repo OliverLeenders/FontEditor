@@ -6,7 +6,7 @@ import {
   composeAffine,
   rotation,
   scaling,
-} from "@fonteditor/geometry";
+} from "@typewright/geometry";
 
 /**
  * The box drawn round a selection, and what its handles do.

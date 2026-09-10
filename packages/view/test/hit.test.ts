@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 import {
   type Contour,
   addAnchor,
@@ -10,7 +10,7 @@ import {
   node,
   segmentTunniPoint,
   setHandle,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { buildHitIndex, distanceToTarget, nodesInRect, pick, pickAll, pickOf } from "../src/hit.js";

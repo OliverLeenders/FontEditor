@@ -1,10 +1,10 @@
-import { randomIds } from "@fonteditor/font-model";
+import { randomIds } from "@typewright/font-model";
 import {
   clipboardText,
   deleteSelectedContours,
   pasteContours,
   selectAllPoints,
-} from "@fonteditor/tools";
+} from "@typewright/tools";
 import { useEffect, useRef, useState } from "react";
 
 import { applyTheme } from "./scheme.js";

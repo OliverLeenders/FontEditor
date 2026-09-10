@@ -1,4 +1,4 @@
-import { type Rect, type Vec2, curvature, derivative, evaluate } from "@fonteditor/geometry";
+import { type Rect, type Vec2, curvature, derivative, evaluate } from "@typewright/geometry";
 import {
   type Contour,
   contourBounds,
@@ -6,7 +6,7 @@ import {
   segmentCount,
   segmentCubic,
   unionRect,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import type { ViewTransform } from "./transform.js";
 

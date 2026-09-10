@@ -1,5 +1,5 @@
 /**
- * @fonteditor/font-model
+ * @typewright/font-model
  *
  * The document model. Plain, serializable, structurally-shareable data — no
  * class instances, no DOM references, no live view objects. It must survive

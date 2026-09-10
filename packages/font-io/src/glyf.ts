@@ -1,6 +1,6 @@
-import { type Vec2, toQuadratics, toQuadraticsTogether } from "@fonteditor/geometry";
-import type { Contour, Glyph } from "@fonteditor/font-model";
-import { segmentCubic, segments } from "@fonteditor/font-model";
+import { type Vec2, toQuadratics, toQuadraticsTogether } from "@typewright/geometry";
+import type { Contour, Glyph } from "@typewright/font-model";
+import { segmentCubic, segments } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
 

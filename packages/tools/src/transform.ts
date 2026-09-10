@@ -1,4 +1,4 @@
-import { type Affine, applyAffine } from "@fonteditor/geometry";
+import { type Affine, applyAffine } from "@typewright/geometry";
 import {
   type ContourId,
   type FontDocument,
@@ -8,8 +8,8 @@ import {
   enforceTangents,
   updateContour,
   updateGlyph,
-} from "@fonteditor/font-model";
-import type { Selection } from "@fonteditor/view";
+} from "@typewright/font-model";
+import type { Selection } from "@typewright/view";
 
 /**
  * Moving a set of points by a matrix.

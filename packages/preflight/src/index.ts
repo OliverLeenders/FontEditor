@@ -1,12 +1,12 @@
-import type { FontDocument, Glyph } from "@fonteditor/font-model";
-import { orderedGlyphs } from "@fonteditor/font-model";
+import type { FontDocument, Glyph } from "@typewright/font-model";
+import { orderedGlyphs } from "@typewright/font-model";
 
 import { type CheckId, type Finding, type Severity, SEVERITIES } from "./finding.js";
 import { fontFindings, imageFindings } from "./font.js";
 import { glyphFindings } from "./glyphs.js";
 
 /**
- * @fonteditor/preflight
+ * @typewright/preflight
  *
  * Everything findable about a font before it is exported, and nothing that
  * fixes it.

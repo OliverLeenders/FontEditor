@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 import {
   interpolateGlyph,
   masterWeights,
@@ -14,8 +14,8 @@ import {
   metricLines,
   randomIds,
   resolveGlyphComponents,
-} from "@fonteditor/font-model";
-import type { NeighbourGlyph, SceneImage, SnapGuide } from "@fonteditor/render";
+} from "@typewright/font-model";
+import type { NeighbourGlyph, SceneImage, SnapGuide } from "@typewright/render";
 import {
   DARK_PALETTE,
   DEFAULT_METRICS,
@@ -23,7 +23,7 @@ import {
   type RenderPalette,
   type Scene,
   scene as buildScene,
-} from "@fonteditor/render";
+} from "@typewright/render";
 import {
   guidesInForce,
   type EditorState,
@@ -36,8 +36,8 @@ import {
   shownSection,
   snapHold,
   tunniSegments,
-} from "@fonteditor/tools";
-import { type Comb, combFor } from "@fonteditor/view";
+} from "@typewright/tools";
+import { type Comb, combFor } from "@typewright/view";
 
 import type { Decoded } from "./images.js";
 import { isDarkNow } from "./scheme.js";

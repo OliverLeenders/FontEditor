@@ -13,7 +13,7 @@ import {
   setFeatures,
   setGlyphOrder,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";

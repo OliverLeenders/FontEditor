@@ -1,6 +1,6 @@
-import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
-import type { DiskFolder } from "@fonteditor/disk";
-import { session as newSession } from "@fonteditor/edit-core";
+import { type CatalogQuery, DEFAULT_QUERY } from "@typewright/catalog";
+import type { DiskFolder } from "@typewright/disk";
+import { session as newSession } from "@typewright/edit-core";
 import {
   type ExtraLayer,
   type FamilyImport,
@@ -11,7 +11,7 @@ import {
   looksLikeUfo,
   readFamily,
   unzip,
-} from "@fonteditor/font-io";
+} from "@typewright/font-io";
 import {
   type FontDocument,
   type GlyphName,
@@ -19,8 +19,8 @@ import {
   fontDocument,
   glyph,
   randomIds,
-} from "@fonteditor/font-model";
-import { editorState } from "@fonteditor/tools";
+} from "@typewright/font-model";
+import { editorState } from "@typewright/tools";
 
 import type { Persistence } from "../persistence.js";
 import { adoptFamily, startFresh } from "./masters.js";

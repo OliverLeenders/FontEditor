@@ -1,4 +1,4 @@
-import { roundCoordinates, unroundedCount } from "@fonteditor/tools";
+import { roundCoordinates, unroundedCount } from "@typewright/tools";
 import { useEffect, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

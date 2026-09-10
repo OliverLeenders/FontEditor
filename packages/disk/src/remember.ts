@@ -15,7 +15,18 @@ import type { DiskFolder } from "./handles.js";
  * was", never "the editor will not start".
  */
 
-const DATABASE = "fonteditor-disk";
+const DATABASE = "typewright-disk";
+
+/**
+ * The database this used before the editor was named.
+ *
+ * Consulted once, when the new one is empty, and what is found there is copied
+ * across rather than read from again. This is the one piece of remembered state
+ * worth carrying over: it holds a live directory handle, and losing it means
+ * being asked to find the font folder again — which is precisely what
+ * remembering it was for.
+ */
+const OLD_DATABASE = "fonteditor-disk";
 const STORE = "handles";
 const KEY = "ufo-folder";
 
@@ -54,18 +65,51 @@ export async function rememberFolder(
 }
 
 export async function recallFolder(): Promise<RememberedFolder | null> {
-  const found = await inStore("readonly", (store) => store.get(KEY));
+  const here = await inStore("readonly", (store) => store.get(KEY));
+  const found = here ?? (await fromOldDatabase());
   if (found === null || typeof found !== "object") return null;
 
   // Written by an older version of this editor, or by something else entirely.
   const candidate = found as Partial<RememberedFolder>;
   if (candidate.folder === undefined || typeof candidate.name !== "string") return null;
-  return {
+  const remembered: RememberedFolder = {
     folder: candidate.folder,
     name: candidate.name,
     at: candidate.at ?? 0,
     wrote: Array.isArray(candidate.wrote) ? candidate.wrote.filter(isWritten) : [],
   };
+
+  // Found under the old name: move it, so this is asked once and never again.
+  // If the write fails the folder is still returned — being remembered this
+  // session matters more than being remembered next session.
+  if (here === null) await inStore("readwrite", (store) => store.put(remembered, KEY));
+
+  return remembered;
+}
+
+/**
+ * What the editor remembered under its old name, if it ever ran under it.
+ *
+ * Asks the browser which databases exist before opening one, because opening a
+ * database creates it: without the question, every fresh installation would
+ * leave behind an empty database named after a program that never ran here. A
+ * browser that will not answer the question is asked the database directly,
+ * which is the forgiving way round.
+ */
+async function fromOldDatabase(): Promise<unknown> {
+  const factory = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  if (factory === undefined) return null;
+
+  if (typeof factory.databases === "function") {
+    try {
+      const existing = await factory.databases();
+      if (!existing.some((it) => it.name === OLD_DATABASE)) return null;
+    } catch {
+      // Fall through and ask the database itself.
+    }
+  }
+
+  return await inStore("readonly", (store) => store.get(KEY), OLD_DATABASE);
 }
 
 /** Believe nothing about what is in the database: it may be older than this. */
@@ -94,6 +138,7 @@ export async function forgetFolder(): Promise<void> {
 async function inStore(
   mode: IDBTransactionMode,
   run: (store: IDBObjectStore) => IDBRequest,
+  database: string = DATABASE,
 ): Promise<unknown> {
   const factory = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
   if (factory === undefined) return null;
@@ -101,7 +146,7 @@ async function inStore(
   return await new Promise<unknown>((resolve) => {
     let open: IDBOpenDBRequest;
     try {
-      open = factory.open(DATABASE, 1);
+      open = factory.open(database, 1);
     } catch {
       resolve(null);
       return;
@@ -112,20 +157,20 @@ async function inStore(
     };
     open.onerror = () => resolve(null);
     open.onsuccess = () => {
-      const database = open.result;
+      const opened = open.result;
       try {
-        const request = run(database.transaction(STORE, mode).objectStore(STORE));
+        const request = run(opened.transaction(STORE, mode).objectStore(STORE));
         request.onerror = () => {
-          database.close();
+          opened.close();
           resolve(null);
         };
         request.onsuccess = () => {
           const value: unknown = request.result;
-          database.close();
+          opened.close();
           resolve(value ?? null);
         };
       } catch {
-        database.close();
+        opened.close();
         resolve(null);
       }
     };

@@ -1,4 +1,4 @@
-import type { ToolId } from "@fonteditor/tools";
+import type { ToolId } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import {

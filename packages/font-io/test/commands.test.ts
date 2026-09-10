@@ -1,5 +1,5 @@
-import { evaluate, evaluateQuadratic } from "@fonteditor/geometry";
-import { counterIds, segmentAt, segmentCount } from "@fonteditor/font-model";
+import { evaluate, evaluateQuadratic } from "@typewright/geometry";
+import { counterIds, segmentAt, segmentCount } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { type PathCommand, contoursFromCommands } from "../src/commands.js";

@@ -22,7 +22,7 @@ import {
   project as makeProject,
   setAxes as setProjectAxes,
   switchTo as switchProjectTo,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import type { FontHost } from "./fonts.js";
 import { showDocument } from "./fonts.js";

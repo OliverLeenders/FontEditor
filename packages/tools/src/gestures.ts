@@ -1,4 +1,4 @@
-import { type Vec2, about, add, keepsAxes, rotation, sub } from "@fonteditor/geometry";
+import { type Vec2, about, add, keepsAxes, rotation, sub } from "@typewright/geometry";
 import {
   type GuideId,
   isHorizontal,
@@ -25,7 +25,7 @@ import {
   updateContour,
   updateGlyph,
   updateGlyphComponent,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import {
   type BoxFrame,
   type BoxHandle,
@@ -56,7 +56,7 @@ import {
   boxScale,
   boxScaleTransform,
   boxTurn,
-} from "@fonteditor/view";
+} from "@typewright/view";
 
 import { type ToolResult, begin, result } from "./effects.js";
 import type { PointerInput } from "./input.js";

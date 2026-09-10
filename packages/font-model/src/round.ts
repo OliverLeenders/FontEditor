@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 
 import type { Anchor } from "./anchor.js";
 import type { Component } from "./component.js";

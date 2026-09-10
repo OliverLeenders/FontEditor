@@ -1,5 +1,5 @@
-import { contour, counterIds, glyph, node } from "@fonteditor/font-model";
-import { vec } from "@fonteditor/geometry";
+import { contour, counterIds, glyph, node } from "@typewright/font-model";
+import { vec } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import { LIGHT_PALETTE } from "../src/palette.js";

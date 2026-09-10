@@ -5,8 +5,8 @@ import {
   fontDocument,
   glyph,
   node,
-} from "@fonteditor/font-model";
-import { vec } from "@fonteditor/geometry";
+} from "@typewright/font-model";
+import { vec } from "@typewright/geometry";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

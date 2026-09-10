@@ -1,4 +1,4 @@
-import type { Rect, Vec2 } from "@fonteditor/geometry";
+import type { Rect, Vec2 } from "@typewright/geometry";
 import {
   type Contour,
   type IdFactory,
@@ -6,8 +6,8 @@ import {
   ellipseContour,
   randomIds,
   rectContour,
-} from "@fonteditor/font-model";
-import { snapPoint } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { snapPoint } from "@typewright/view";
 
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import { type GestureOptions, snappingFor } from "./gestures.js";

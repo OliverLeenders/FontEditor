@@ -1,4 +1,4 @@
-import { project, vec } from "@fonteditor/geometry";
+import { project, vec } from "@typewright/geometry";
 import {
   type Contour,
   addContour,
@@ -9,7 +9,7 @@ import {
   segmentAt,
   segmentCubic,
   segmentTunniPoint,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { hoveredSegment, sameSegment, segmentProximity } from "../src/proximity.js";

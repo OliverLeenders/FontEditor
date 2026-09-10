@@ -19,8 +19,8 @@ import {
   setHvLock,
   setNodeType,
   updateContour,
-} from "@fonteditor/font-model";
-import { type SegmentRef } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { type SegmentRef } from "@typewright/view";
 import { type ToolResult, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";
 import { done } from "./shared.js";

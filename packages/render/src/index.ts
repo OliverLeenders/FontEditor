@@ -1,5 +1,5 @@
 /**
- * @fonteditor/render
+ * @typewright/render
  *
  * Canvas drawing for the glyph editing surface.
  *

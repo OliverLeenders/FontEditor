@@ -4,7 +4,7 @@ import { installBrowserGlobals } from "./browser-globals.js";
 
 installBrowserGlobals();
 
-const { preflight } = await import("@fonteditor/preflight");
+const { preflight } = await import("@typewright/preflight");
 const { starterFont } = await import("../src/sample.js");
 
 /**

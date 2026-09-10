@@ -14,7 +14,7 @@ import {
   setKern,
   setKernGroup,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";

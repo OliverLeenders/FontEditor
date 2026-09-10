@@ -15,8 +15,8 @@ import {
   setKern,
   setKernGroup,
   setKerning,
-} from "@fonteditor/font-model";
-import { vec } from "@fonteditor/geometry";
+} from "@typewright/font-model";
+import { vec } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import { CHECKS, type CheckId, countBySeverity, preflight } from "../src/index.js";

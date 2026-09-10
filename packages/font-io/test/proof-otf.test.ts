@@ -11,7 +11,7 @@ import {
   fontDocument,
   glyph,
   node,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";

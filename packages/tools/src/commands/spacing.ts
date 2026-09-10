@@ -6,7 +6,7 @@ import {
   setRightSidebearing,
   sidebearings,
   updateGlyph,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { type EditorState, editCurrentGlyph } from "../state.js";
 import { done } from "./shared.js";

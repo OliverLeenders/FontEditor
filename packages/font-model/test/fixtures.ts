@@ -1,4 +1,4 @@
-import { vec } from "@fonteditor/geometry";
+import { vec } from "@typewright/geometry";
 
 import { type Contour, contour } from "../src/contour.js";
 import { counterIds } from "../src/ids.js";

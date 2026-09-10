@@ -1,11 +1,11 @@
-import { type Affine, type Rect, type Vec2, applyAffine } from "@fonteditor/geometry";
+import { type Affine, type Rect, type Vec2, applyAffine } from "@typewright/geometry";
 import {
   type ContourId,
   type Glyph,
   type NodeId,
   contourById,
   nodeById,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import type { HitTarget } from "./hit.js";
 

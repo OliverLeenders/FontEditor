@@ -1,7 +1,9 @@
-# FontEditor
+# Typewright
 
-A browser-based font editor that uses **Tunni lines** as an additional way to control
-cubic Bézier splines.
+A font editor that runs in a browser and ships as a desktop application. It draws,
+spaces, interpolates and exports a whole family — masters, instances, static fonts and
+variable fonts — and it offers **Tunni lines** as an additional way to control cubic
+Bézier splines.
 
 Tunni lines were devised by Eduardo Tunni and FontLab Ltd. The maths in this repository
 derives from the reverse-engineering write-up in
@@ -29,7 +31,7 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, n
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2204 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2216 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
@@ -266,13 +268,13 @@ pnpm dev
 The same editor, in a window of its own rather than a browser tab:
 
 ```bash
-pnpm --filter @fonteditor/editor app
+pnpm --filter @typewright/editor app
 ```
 
 and to make an installer:
 
 ```bash
-pnpm --filter @fonteditor/editor app:build
+pnpm --filter @typewright/editor app:build
 ```
 
 This is [Tauri](https://tauri.app), which is a Rust program that opens a window and points

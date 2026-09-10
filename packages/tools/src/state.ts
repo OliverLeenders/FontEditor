@@ -1,4 +1,4 @@
-import type { Rect, Vec2 } from "@fonteditor/geometry";
+import type { Rect, Vec2 } from "@typewright/geometry";
 import {
   type AnchorId,
   type GuideId,
@@ -11,7 +11,7 @@ import {
   type NodeId,
   glyphNamed,
   updateGlyph,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure" | "section";
 import {
@@ -24,7 +24,7 @@ import {
   NO_HOLD,
   sameSegment,
   sameSelection,
-} from "@fonteditor/view";
+} from "@typewright/view";
 
 /**
  * What is happening between pointer down and pointer up.

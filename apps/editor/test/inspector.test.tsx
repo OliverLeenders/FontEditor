@@ -9,8 +9,8 @@ installBrowserGlobals();
 
 const { Inspector } = await import("../src/components/Inspector.js");
 const { addAnchor, addGuide, anchor, counterIds, glyph, putGlyph, rectContour, verticalGuide } =
-  await import("@fonteditor/font-model");
-const { addComponent } = await import("@fonteditor/tools");
+  await import("@typewright/font-model");
+const { addComponent } = await import("@typewright/tools");
 const { MIN_DOCK_WIDTH } = await import("../src/store/index.js");
 
 /**

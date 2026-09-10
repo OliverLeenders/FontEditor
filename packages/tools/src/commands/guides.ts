@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 import {
   type Guide,
   type GuideId,
@@ -13,9 +13,9 @@ import {
   setGuides,
   turnedGuide,
   updateGuide,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
-import { screenTolerance } from "@fonteditor/view";
+import { screenTolerance } from "@typewright/view";
 
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";

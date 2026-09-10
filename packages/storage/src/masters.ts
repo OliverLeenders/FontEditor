@@ -1,4 +1,4 @@
-import type { Axis, FontDocument, Instance, Master, MasterId } from "@fonteditor/font-model";
+import type { Axis, FontDocument, Instance, Master, MasterId } from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
 import { type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";

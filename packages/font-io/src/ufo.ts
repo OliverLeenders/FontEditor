@@ -11,7 +11,7 @@ import {
   hasMetricKeys,
   isGroupKey,
   segments,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { DEFAULT_LAYER_DIRECTORY, type ExtraLayer, layerContentsPlist } from "./ufo-layers.js";
 import { type ZipEntry, zip } from "./zip.js";
@@ -29,7 +29,7 @@ import { type ZipEntry, zip } from "./zip.js";
  * gives an ordinary `.ufo` folder.
  */
 
-const CREATOR = "com.fonteditor.tunni";
+const CREATOR = "com.typewright.editor";
 
 function escapeXml(value: string): string {
   return value
@@ -429,7 +429,7 @@ export function guideline(g: Guide): string {
 const number = (n: number): string => String(Math.round(n * 1000) / 1000);
 
 /** Where a glyph's spacing comes from, in a lib key of this editor's own. */
-const METRIC_KEYS = "org.fonteditor.metricKeys";
+const METRIC_KEYS = "org.typewright.metricKeys";
 
 export function ufoFiles(
   document: FontDocument,
@@ -546,6 +546,9 @@ export function ufoFiles(
   // file where writing only what we understand does the most damage.
   for (const [key, value] of Object.entries(document.kept.lib)) {
     if (key === "public.glyphOrder" || key === METRIC_KEYS) continue;
+    // The key this used to be written under. Dropped rather than carried, so
+    // that saving a font once moves it over instead of leaving both.
+    if (key === "org.fonteditor.metricKeys") continue;
     const written = plistValue(value);
     if (written !== null) lib.push([key, written]);
   }

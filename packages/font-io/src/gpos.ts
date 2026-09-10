@@ -6,7 +6,7 @@ import {
   groupNameOf,
   isGroupKey,
   kernPairs,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 /**
  * Building the GPOS table that makes a font actually kern.

@@ -1,4 +1,4 @@
-import type { Vec2 } from "@fonteditor/geometry";
+import type { Vec2 } from "@typewright/geometry";
 import {
   type AnchorId,
   type Glyph,
@@ -9,7 +9,7 @@ import {
   moveAnchorTo,
   removeAnchor,
   renameAnchor,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";

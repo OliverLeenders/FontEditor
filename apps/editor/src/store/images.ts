@@ -1,6 +1,6 @@
-import { setGlyphImage } from "@fonteditor/font-model";
-import { usableImageName } from "@fonteditor/storage";
-import { type EditorState, editCurrentGlyph } from "@fonteditor/tools";
+import { setGlyphImage } from "@typewright/font-model";
+import { usableImageName } from "@typewright/storage";
+import { type EditorState, editCurrentGlyph } from "@typewright/tools";
 
 import type { FontHost } from "./fonts.js";
 

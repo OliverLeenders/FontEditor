@@ -1,4 +1,4 @@
-import { type HandleScales, type TunniStatus } from "@fonteditor/geometry";
+import { type HandleScales, type TunniStatus } from "@typewright/geometry";
 import {
   type ContourId,
   type IdFactory,
@@ -12,8 +12,8 @@ import {
   segmentTunniStatus,
   setSegmentLambdas,
   updateContour,
-} from "@fonteditor/font-model";
-import { type SegmentRef } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { type SegmentRef } from "@typewright/view";
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";
 import { done } from "./shared.js";

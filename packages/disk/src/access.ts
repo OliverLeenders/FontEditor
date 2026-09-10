@@ -52,7 +52,7 @@ export async function pickFolder(
   try {
     // The id makes the browser reopen where this editor was last, rather than
     // wherever the last download went.
-    return await pick({ mode, id: "fonteditor-ufo" });
+    return await pick({ mode, id: "typewright-ufo" });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return null;
     throw error;

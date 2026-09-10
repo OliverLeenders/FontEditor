@@ -8,8 +8,8 @@ installBrowserGlobals();
 const { EditorStore } = await import("../src/store/index.js");
 const { itemsFor } = await import("../src/components/ContextMenu.js");
 const { contourById, segmentAt, segmentCount, sidebearings } =
-  await import("@fonteditor/font-model");
-const { segmentCubic } = await import("@fonteditor/font-model");
+  await import("@typewright/font-model");
+const { segmentCubic } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
 

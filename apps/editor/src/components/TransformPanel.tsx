@@ -1,5 +1,5 @@
-import { rotation, scaling, skewing, translation } from "@fonteditor/geometry";
-import { type TransformOrigin, transformSelection } from "@fonteditor/tools";
+import { rotation, scaling, skewing, translation } from "@typewright/geometry";
+import { type TransformOrigin, transformSelection } from "@typewright/tools";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

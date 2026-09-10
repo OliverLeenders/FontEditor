@@ -5,8 +5,8 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
-const { exportFamily } = await import("@fonteditor/font-io");
-const { WEIGHT, DEFAULT_FONT_INFO, fontDocument, glyph } = await import("@fonteditor/font-model");
+const { exportFamily } = await import("@typewright/font-io");
+const { WEIGHT, DEFAULT_FONT_INFO, fontDocument, glyph } = await import("@typewright/font-model");
 
 /**
  * Opening a family.
@@ -71,7 +71,7 @@ describe("opening a family", () => {
 
   it("still opens an ordinary UFO as one font", async () => {
     const store = freshStore();
-    const { exportUfo } = await import("@fonteditor/font-io");
+    const { exportUfo } = await import("@typewright/font-io");
     const { bytes } = exportUfo(font("Plain", 480));
 
     const report = await store.importFont(bytes.slice().buffer, "Plain.ufo.zip");
@@ -86,7 +86,7 @@ describe("opening a family", () => {
     await store.importFont(archive(), "Chalk.zip");
     expect(store.getState().project.masters).toHaveLength(2);
 
-    const { exportUfo } = await import("@fonteditor/font-io");
+    const { exportUfo } = await import("@typewright/font-io");
     const { bytes } = exportUfo(font("Plain", 480));
     await store.importFont(bytes.slice().buffer, "Plain.ufo.zip");
 

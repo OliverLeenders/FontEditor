@@ -3,8 +3,8 @@ import {
   type PlacedGlyph,
   measureGap,
   measureNormal,
-} from "@fonteditor/font-model";
-import { hoveredSegment } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { hoveredSegment } from "@typewright/view";
 
 import { type ToolResult, result } from "./effects.js";
 import { EMPTY_GLYPH } from "./gestures.js";

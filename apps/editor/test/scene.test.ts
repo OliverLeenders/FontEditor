@@ -7,8 +7,8 @@ installBrowserGlobals();
 const { EditorStore } = await import("../src/store/index.js");
 const { handlesAutoHidden, neighbourAt, neighboursFor, sceneFor, withinGlyph } =
   await import("../src/scene.js");
-const { setActiveTool } = await import("@fonteditor/tools");
-const { WEIGHT, glyphBounds, master, updateGlyph } = await import("@fonteditor/font-model");
+const { setActiveTool } = await import("@typewright/tools");
+const { WEIGHT, glyphBounds, master, updateGlyph } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
 

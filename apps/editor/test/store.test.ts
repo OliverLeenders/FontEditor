@@ -5,8 +5,8 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
-const { setPointType, deleteSelectedPoints, begin, commit } = await import("@fonteditor/tools");
-const { glyphBounds, sidebearings, updateGlyph } = await import("@fonteditor/font-model");
+const { setPointType, deleteSelectedPoints, begin, commit } = await import("@typewright/tools");
+const { glyphBounds, sidebearings, updateGlyph } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
 

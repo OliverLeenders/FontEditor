@@ -7,7 +7,7 @@ import {
   removeGlyph,
   renameGlyph as renameInDocument,
   renameProblem,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import type { EditorState } from "../state.js";
 import { done } from "./shared.js";

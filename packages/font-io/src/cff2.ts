@@ -1,6 +1,6 @@
-import type { Vec2 } from "@fonteditor/geometry";
-import type { Axis, Glyph, Location } from "@fonteditor/font-model";
-import { segmentCubic, segments } from "@fonteditor/font-model";
+import type { Vec2 } from "@typewright/geometry";
+import type { Axis, Glyph, Location } from "@typewright/font-model";
+import { segmentCubic, segments } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
 import { itemVariationStore, regionsOf } from "./varstore.js";

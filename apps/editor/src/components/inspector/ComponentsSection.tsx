@@ -1,4 +1,4 @@
-import { randomIds } from "@fonteditor/font-model";
+import { randomIds } from "@typewright/font-model";
 import {
   addComponent,
   attachComponent,
@@ -6,7 +6,7 @@ import {
   flipComponent,
   moveComponentTo,
   removeComponent,
-} from "@fonteditor/tools";
+} from "@typewright/tools";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
@@ -144,7 +144,7 @@ export function ComponentsSection(): React.JSX.Element {
         <div className={styles.componentRow}>
           <input
             className={styles.input}
-            list="fonteditor-glyph-names"
+            list="typewright-glyph-names"
             placeholder="glyph name"
             aria-label="Add a component"
             value={adding}

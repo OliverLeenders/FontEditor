@@ -1,5 +1,5 @@
-import type { Axis, Location } from "@fonteditor/font-model";
-import { axis as makeAxis } from "@fonteditor/font-model";
+import type { Axis, Location } from "@typewright/font-model";
+import { axis as makeAxis } from "@typewright/font-model";
 
 import { type XmlElement, childNamed, childrenNamed, parseXml } from "./xml.js";
 

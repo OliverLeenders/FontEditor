@@ -9,9 +9,9 @@ import type { MenuRequest } from "../src/components/ContextMenu.js";
 installBrowserGlobals();
 
 const { GlyphCanvas } = await import("../src/components/GlyphCanvas.js");
-const { toScreen } = await import("@fonteditor/view");
-const { tunniLambdas, tunniPoint } = await import("@fonteditor/geometry");
-const { segmentCubic, segments } = await import("@fonteditor/font-model");
+const { toScreen } = await import("@typewright/view");
+const { tunniLambdas, tunniPoint } = await import("@typewright/geometry");
+const { segmentCubic, segments } = await import("@typewright/font-model");
 
 /** The store, named for the tests: the components are imported dynamically. */
 type Store = ReturnType<typeof freshStore>;

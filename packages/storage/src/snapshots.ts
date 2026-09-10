@@ -1,4 +1,4 @@
-import type { FontDocument } from "@fonteditor/font-model";
+import type { FontDocument } from "@typewright/font-model";
 import {
   fontDocument,
   orderedGlyphs,
@@ -7,7 +7,7 @@ import {
   setGuides,
   setKept,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
 import {

@@ -9,8 +9,8 @@ import {
   exportUfo,
   exportVariableFont,
   exportVariableTrueType,
-} from "@fonteditor/font-io";
-import { type Location, defaultLocation } from "@fonteditor/font-model";
+} from "@typewright/font-io";
+import { type Location, defaultLocation } from "@typewright/font-model";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

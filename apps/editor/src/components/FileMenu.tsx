@@ -1,4 +1,4 @@
-import { canOpenFolders } from "@fonteditor/disk";
+import { canOpenFolders } from "@typewright/disk";
 import { useEffect, useRef, useState } from "react";
 
 import { unsaved } from "../store/index.js";

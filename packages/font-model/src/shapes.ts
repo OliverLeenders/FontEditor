@@ -1,4 +1,4 @@
-import type { Rect, Vec2 } from "@fonteditor/geometry";
+import type { Rect, Vec2 } from "@typewright/geometry";
 
 import { type Contour, contour } from "./contour.js";
 import type { IdFactory } from "./ids.js";

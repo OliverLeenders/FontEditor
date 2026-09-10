@@ -1,4 +1,4 @@
-import { IDENTITY_AFFINE, translation } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE, translation } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import {

@@ -1,4 +1,4 @@
-import { counterIds, fontDocument, glyph } from "@fonteditor/font-model";
+import { counterIds, fontDocument, glyph } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { exportUfo } from "../src/ufo.js";

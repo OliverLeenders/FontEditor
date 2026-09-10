@@ -1,5 +1,5 @@
-import type { FontDocument, Glyph } from "@fonteditor/font-model";
-import { fontDocument, setFeatures, setGlyphOrder, setKerning } from "@fonteditor/font-model";
+import type { FontDocument, Glyph } from "@typewright/font-model";
+import { fontDocument, setFeatures, setGlyphOrder, setKerning } from "@typewright/font-model";
 
 import type { ImageEntry } from "./images.js";
 import type { StoredLayer } from "./layers.js";

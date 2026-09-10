@@ -1,6 +1,6 @@
-import { rotation, scaling, translation, vec } from "@fonteditor/geometry";
-import { contour, counterIds, fontDocument, glyph, node } from "@fonteditor/font-model";
-import type { Selection } from "@fonteditor/view";
+import { rotation, scaling, translation, vec } from "@typewright/geometry";
+import { contour, counterIds, fontDocument, glyph, node } from "@typewright/font-model";
+import type { Selection } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
 import { transformedDocument } from "../src/transform.js";

@@ -1,4 +1,4 @@
-import type { Rect } from "@fonteditor/geometry";
+import type { Rect } from "@typewright/geometry";
 
 import { type Anchor, movedAnchor, renamedAnchor } from "./anchor.js";
 import type { Guide } from "./guide.js";

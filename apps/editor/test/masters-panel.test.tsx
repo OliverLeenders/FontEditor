@@ -8,7 +8,7 @@ import { freshStore, installDomStubs, render } from "./render.js";
 installBrowserGlobals();
 
 const { Masters } = await import("../src/components/Masters.js");
-const { WEIGHT, master, project, setAxes } = await import("@fonteditor/font-model");
+const { WEIGHT, master, project, setAxes } = await import("@typewright/font-model");
 
 /**
  * The drawings of a typeface, in the bar.

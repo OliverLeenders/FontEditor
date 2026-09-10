@@ -5,7 +5,7 @@ import {
   distanceToRect,
   distanceToSegment,
   project,
-} from "@fonteditor/geometry";
+} from "@typewright/geometry";
 import {
   type ContourId,
   type Glyph,
@@ -15,7 +15,7 @@ import {
   segmentCubic,
   segmentTunniPoint,
   segmentTunniStatus,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import { type ViewTransform, screenTolerance } from "./transform.js";
 

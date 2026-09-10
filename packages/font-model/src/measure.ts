@@ -1,4 +1,4 @@
-import { type Vec2, project, tangent } from "@fonteditor/geometry";
+import { type Vec2, project, tangent } from "@typewright/geometry";
 
 import { segmentAt, segmentCubic } from "./contour.js";
 import { strokeCrossings } from "./crossings.js";

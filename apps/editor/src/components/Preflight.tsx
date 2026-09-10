@@ -4,7 +4,7 @@ import {
   checkNamed,
   countBySeverity,
   preflight,
-} from "@fonteditor/preflight";
+} from "@typewright/preflight";
 import { useMemo } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

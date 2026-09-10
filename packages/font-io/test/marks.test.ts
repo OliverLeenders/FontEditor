@@ -1,4 +1,4 @@
-import { addAnchor, anchor, glyph, rectContour, counterIds } from "@fonteditor/font-model";
+import { addAnchor, anchor, glyph, rectContour, counterIds } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { layoutTable } from "../src/layout.js";

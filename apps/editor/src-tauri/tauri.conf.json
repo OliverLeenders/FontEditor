@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "FontEditor",
+  "productName": "Typewright",
   "version": "0.1.0",
-  "identifier": "dev.fonteditor.app",
+  "identifier": "dev.typewright.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5174",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "FontEditor",
+        "title": "Typewright",
         "width": 1400,
         "height": 900,
         "minWidth": 900,

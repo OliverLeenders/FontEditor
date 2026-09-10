@@ -1,5 +1,5 @@
-import { CanvasSurface, type ProofScene, drawProof } from "@fonteditor/render";
-import { layoutParagraph, wheelIntent } from "@fonteditor/view";
+import { CanvasSurface, type ProofScene, drawProof } from "@typewright/render";
+import { layoutParagraph, wheelIntent } from "@typewright/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";

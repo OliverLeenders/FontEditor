@@ -1,4 +1,4 @@
-import { contour, counterIds, glyph, node } from "@fonteditor/font-model";
+import { contour, counterIds, glyph, node } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { alignmentLines } from "../src/alignment.js";

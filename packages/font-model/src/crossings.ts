@@ -1,4 +1,4 @@
-import { type Vec2, intersectSegmentCubic } from "@fonteditor/geometry";
+import { type Vec2, intersectSegmentCubic } from "@typewright/geometry";
 
 import { segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import type { Glyph } from "./glyph.js";

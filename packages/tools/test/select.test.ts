@@ -1,4 +1,4 @@
-import { IDENTITY_AFFINE, distance, vec } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE, distance, vec } from "@typewright/geometry";
 import {
   type Contour,
   type FontDocument,
@@ -17,8 +17,8 @@ import {
   orderedGlyphs,
   segmentTunniPoint,
   sidebearings,
-} from "@fonteditor/font-model";
-import { type Selection, type ViewTransform, boxHandlePoint, boxPivot } from "@fonteditor/view";
+} from "@typewright/font-model";
+import { type Selection, type ViewTransform, boxHandlePoint, boxPivot } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
 import { selectContour } from "../src/commands/index.js";

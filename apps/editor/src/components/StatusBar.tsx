@@ -1,10 +1,10 @@
-import { measureAngle } from "@fonteditor/font-model";
-import { shownMeasurement } from "@fonteditor/tools";
+import { measureAngle } from "@typewright/font-model";
+import { shownMeasurement } from "@typewright/tools";
 
 import { measurableNeighbours } from "../scene.js";
 import { useStoreValue } from "../useStore.js";
 import styles from "./StatusBar.module.css";
-import type { AutosaveStatus } from "@fonteditor/storage";
+import type { AutosaveStatus } from "@typewright/storage";
 
 import type { StorageState } from "../store/index.js";
 import type { ViewId } from "./TabBar.js";

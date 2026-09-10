@@ -1,5 +1,5 @@
-import type { GlyphName } from "@fonteditor/font-model";
-import type { ContourId, NodeId } from "@fonteditor/font-model";
+import type { GlyphName } from "@typewright/font-model";
+import type { ContourId, NodeId } from "@typewright/font-model";
 
 /**
  * What a check found, and what a check is.

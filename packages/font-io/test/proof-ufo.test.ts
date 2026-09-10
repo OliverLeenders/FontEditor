@@ -22,7 +22,7 @@ import {
   setKernGroup,
   setKept,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";

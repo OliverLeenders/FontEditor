@@ -27,13 +27,13 @@ export default defineConfig({
     // reaches the browser without a build step. Pre-bundling would snapshot them
     // once at startup and silently ignore later edits.
     exclude: [
-      "@fonteditor/geometry",
-      "@fonteditor/font-model",
-      "@fonteditor/view",
-      "@fonteditor/render",
-      "@fonteditor/tools",
-      "@fonteditor/edit-core",
-      "@fonteditor/storage",
+      "@typewright/geometry",
+      "@typewright/font-model",
+      "@typewright/view",
+      "@typewright/render",
+      "@typewright/tools",
+      "@typewright/edit-core",
+      "@typewright/storage",
     ],
   },
 });

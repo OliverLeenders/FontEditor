@@ -9,9 +9,9 @@ import { freshStore, installDomStubs, render } from "./render.js";
 installBrowserGlobals();
 
 const { FileMenu } = await import("../src/components/FileMenu.js");
-const { ufoFiles } = await import("@fonteditor/font-io");
-const { writeFolder } = await import("@fonteditor/disk");
-const { updateGlyph } = await import("@fonteditor/font-model");
+const { ufoFiles } = await import("@typewright/font-io");
+const { writeFolder } = await import("@typewright/disk");
+const { updateGlyph } = await import("@typewright/font-model");
 
 /**
  * The File menu, and the font's own folder behind it.

@@ -1,6 +1,6 @@
-import type { Glyph } from "@fonteditor/font-model";
-import { glyphsForString } from "@fonteditor/font-model";
-import { drawGlyphThumbnail } from "@fonteditor/render";
+import type { Glyph } from "@typewright/font-model";
+import { glyphsForString } from "@typewright/font-model";
+import { drawGlyphThumbnail } from "@typewright/render";
 import { useEffect, useRef } from "react";
 
 import { palette } from "../scene.js";

@@ -1,5 +1,5 @@
 {
-  "name": "@fonteditor/geometry",
+  "name": "@typewright/geometry",
   "version": "0.0.0",
   "private": true,
   "type": "module",

@@ -1,5 +1,5 @@
-import type { Axis, Location, Support } from "@fonteditor/font-model";
-import { supportsFor } from "@fonteditor/font-model";
+import type { Axis, Location, Support } from "@typewright/font-model";
+import { supportsFor } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
 
@@ -13,7 +13,7 @@ import { Bytes } from "./bytes.js";
  * shared by everything that varies.
  *
  * The regions are exactly the ones the interpolation model already works out —
- * see `@fonteditor/font-model`'s `supportsFor` — which is the point of having
+ * see `@typewright/font-model`'s `supportsFor` — which is the point of having
  * written that the way a variable font does. What the editor previews and what
  * the font draws come out of the same arithmetic, so a preview that looks right
  * is a font that is right.

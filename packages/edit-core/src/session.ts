@@ -1,6 +1,6 @@
-import type { FontDocument } from "@fonteditor/font-model";
-import type { EditorState, ToolResult } from "@fonteditor/tools";
-import type { Selection } from "@fonteditor/view";
+import type { FontDocument } from "@typewright/font-model";
+import type { EditorState, ToolResult } from "@typewright/tools";
+import type { Selection } from "@typewright/view";
 
 import {
   type History,

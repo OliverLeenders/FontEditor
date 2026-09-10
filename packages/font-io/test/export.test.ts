@@ -1,4 +1,4 @@
-import { translation } from "@fonteditor/geometry";
+import { translation } from "@typewright/geometry";
 import {
   DEFAULT_FONT_INFO,
   type FontDocument,
@@ -14,7 +14,7 @@ import {
   node,
   segmentAt,
   segmentCount,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { FontExportError, exportFileName, exportFont } from "../src/export.js";

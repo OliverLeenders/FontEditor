@@ -1,4 +1,4 @@
-import { contour, counterIds, node } from "@fonteditor/font-model";
+import { contour, counterIds, node } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { ALL_HANDLES, type HandleVisibility, handleIsVisible } from "../src/hit.js";

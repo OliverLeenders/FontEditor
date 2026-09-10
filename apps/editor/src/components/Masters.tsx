@@ -6,7 +6,7 @@ import {
   describeLocation,
   orderedInstances,
   orderedMasters,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";

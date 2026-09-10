@@ -1,5 +1,5 @@
 /**
- * @fonteditor/view
+ * @typewright/view
  *
  * The boundary between design space and screen space, and everything the
  * pointer can address.

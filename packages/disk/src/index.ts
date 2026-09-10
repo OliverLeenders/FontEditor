@@ -1,9 +1,9 @@
 /**
- * @fonteditor/disk
+ * @typewright/disk
  *
  * The user's own files.
  *
- * `@fonteditor/storage` keeps the font in a place the browser owns: it survives
+ * `@typewright/storage` keeps the font in a place the browser owns: it survives
  * a reload, and it cannot be opened in a file manager, emailed, or put in a git
  * repository. This package is the other half — a UFO folder the user picked,
  * read and written where they can see it, with the format code shared rather

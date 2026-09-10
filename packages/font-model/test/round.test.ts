@@ -1,4 +1,4 @@
-import { IDENTITY_AFFINE } from "@fonteditor/geometry";
+import { IDENTITY_AFFINE } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import { addContour, glyph } from "../src/glyph.js";

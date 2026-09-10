@@ -1,4 +1,4 @@
-import type { FontDocument, Glyph } from "@fonteditor/font-model";
+import type { FontDocument, Glyph } from "@typewright/font-model";
 import {
   DEFAULT_FONT_INFO,
   fontDocument,
@@ -8,7 +8,7 @@ import {
   setGuides,
   setKept,
   setKerning,
-} from "@fonteditor/font-model";
+} from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
 import { inParallel } from "./parallel.js";

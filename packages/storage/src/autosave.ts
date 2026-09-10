@@ -1,4 +1,4 @@
-import type { FontDocument } from "@fonteditor/font-model";
+import type { FontDocument } from "@typewright/font-model";
 
 /**
  * Decides *when* to write, having been told *what* changed.

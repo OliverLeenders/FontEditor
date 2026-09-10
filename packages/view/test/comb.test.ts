@@ -1,5 +1,5 @@
-import { curvature, cubic, vec } from "@fonteditor/geometry";
-import { contour, counterIds, node, reverseContour } from "@fonteditor/font-model";
+import { curvature, cubic, vec } from "@typewright/geometry";
+import { contour, counterIds, node, reverseContour } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { combFor } from "../src/comb.js";
