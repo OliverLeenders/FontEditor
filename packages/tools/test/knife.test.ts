@@ -124,3 +124,27 @@ describe("the knife tool", () => {
     ]);
   });
 });
+
+/**
+ * What the stroke did, in the undo menu.
+ *
+ * Three things wear the knife now, and a history of four steps all called "Cut"
+ * is one nobody can read backwards.
+ */
+describe("what the step is called", () => {
+  it("calls a stroke that stopped in the ink an inserted point", () => {
+    const out = stroke(start(), { x: -50, y: 200 }, { x: 200, y: 200 });
+    expect(out.effects[0]).toMatchObject({ label: "Insert point" });
+  });
+
+  it("calls a stroke that went through an opened contour", () => {
+    // Out of the square and beyond it: one crossing, ending in open air.
+    const out = stroke(start(), { x: 200, y: 200 }, { x: 200, y: 900 });
+    expect(out.effects[0]).toMatchObject({ label: "Open contour" });
+  });
+
+  it("still calls a cut a cut", () => {
+    const out = stroke(start(), { x: -50, y: 200 }, { x: 500, y: 200 });
+    expect(out.effects[0]).toMatchObject({ label: "Cut" });
+  });
+});

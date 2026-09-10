@@ -1,5 +1,5 @@
 import type { Vec2 } from "@fonteditor/geometry";
-import { type IdFactory, cutGlyph, randomIds } from "@fonteditor/font-model";
+import { type IdFactory, type KnifeCut, cutGlyph, randomIds } from "@fonteditor/font-model";
 
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import type { GestureOptions } from "./gestures.js";
@@ -59,7 +59,20 @@ export function pointerUp(
   const document = editCurrentGlyph(settled, () => cut.glyph);
   if (document === null) return result(settled, [abort]);
 
-  return result({ ...settled, document }, [begin("Cut", false), commit]);
+  return result({ ...settled, document }, [begin(labelFor(cut), false), commit]);
+}
+
+/**
+ * What the stroke did, for the undo menu.
+ *
+ * Three things wear the knife now — dividing a shape, opening a loop, putting a
+ * point in — and a history of four steps all called "Cut" is a history nobody
+ * can read backwards. Named for what happened rather than for the tool.
+ */
+function labelFor(cut: KnifeCut): string {
+  if (cut.marked > 0 && cut.opened === 0 && cut.divided === 0) return "Insert point";
+  if (cut.opened > 0 && cut.divided === 0) return "Open contour";
+  return "Cut";
 }
 
 /** Leaving the canvas abandons the stroke; a half-drawn cut is not a cut. */

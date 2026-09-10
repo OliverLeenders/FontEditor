@@ -73,13 +73,30 @@ describe("cutting a single shape", () => {
     expect(cut.glyph.contours).toHaveLength(2);
   });
 
-  it("leaves the glyph alone when the stroke stops inside it", () => {
-    // In and not out: one crossing, which is a graze rather than a cut, and
-    // there is no honest pair of shapes to make from it.
+  it("marks the outline when the stroke stops inside it", () => {
+    // In and not out. There is no pair of shapes to make from that, but there
+    // is a place worth naming: the knife was used to put a point somewhere.
     const cut = cutGlyph(square(), at(-50, 200), at(200, 200), ids)!;
+
     expect(cut.crossings).toBe(1);
-    expect(cut.skipped).toBe(1);
+    expect(cut.marked).toBe(1);
+    expect(cut.opened).toBe(0);
     expect(cut.glyph.contours).toHaveLength(1);
+    expect(cut.glyph.contours[0]?.closed).toBe(true);
+  });
+
+  it("puts the point exactly where the stroke met the outline", () => {
+    const cut = cutGlyph(square(), at(-50, 200), at(200, 200), ids)!;
+    const on = cut.glyph.contours[0]!.nodes.filter(
+      (n) => Math.abs(n.pt.x) < 1e-6 && Math.abs(n.pt.y - 200) < 1e-6,
+    );
+    expect(on).toHaveLength(1);
+  });
+
+  it("keeps the shape when it only marks it", () => {
+    const before = glyphBounds(square())!;
+    const after = glyphBounds(cutGlyph(square(), at(-50, 200), at(200, 200), ids)!.glyph)!;
+    expect(after).toEqual(before);
   });
 });
 
@@ -131,14 +148,21 @@ describe("cutting a shape with a counter", () => {
 });
 
 describe("what a cut refuses", () => {
-  it("ignores an open contour", () => {
+  it("divides an open contour rather than closing anything across it", () => {
+    // A path has no inside, so there is no parity to satisfy and no chord to
+    // draw: a path that is cut is simply shorter paths.
     const open = glyph("v", {
       advance: 400,
       contours: [
         { ...rectContour(ids, { minX: 0, minY: 0, maxX: 200, maxY: 200 }), closed: false },
       ],
     });
-    expect(cutGlyph(open, at(-50, 100), at(250, 100), ids)).toBeNull();
+
+    const cut = cutGlyph(open, at(-50, 100), at(250, 100), ids)!;
+
+    expect(cut.divided).toBe(1);
+    expect(cut.glyph.contours).toHaveLength(2);
+    for (const c of cut.glyph.contours) expect(c.closed).toBe(false);
   });
 
   it("ignores a stroke of no length", () => {
@@ -147,5 +171,69 @@ describe("what a cut refuses", () => {
 
   it("leaves an empty glyph alone", () => {
     expect(cutGlyph(glyph("space", { advance: 250 }), at(0, 0), at(100, 100), ids)).toBeNull();
+  });
+});
+
+/**
+ * A stroke that goes through rather than stopping.
+ *
+ * The other half of the odd crossing. The outline has been broken, so the loop
+ * is opened at the crossing and becomes a path that begins and ends there — the
+ * drawing is unchanged, and what has gone is the join.
+ */
+describe("opening a loop", () => {
+  it("opens the contour where the stroke went through", () => {
+    // From outside the square, through it, and out the other side is two
+    // crossings and an ordinary cut. From outside to a point beyond it on the
+    // same side is one crossing, and the stroke ended in open air.
+    const cut = cutGlyph(square(), at(100, -50), at(100, 500), ids)!;
+    expect(cut.crossings).toBe(2);
+
+    // Straight through: an ordinary cut, two shapes, both closed.
+    expect(cut.opened).toBe(0);
+    expect(cut.glyph.contours).toHaveLength(2);
+  });
+
+  it("opens both the outer contour and the counter of a ring", () => {
+    // Into an `o` from outside to the middle: the outer contour once, the
+    // counter once, and the stroke stops in the hole — which is not ink.
+    const cut = cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
+
+    expect(cut.opened).toBe(2);
+    expect(cut.marked).toBe(0);
+    expect(cut.glyph.contours).toHaveLength(2);
+    for (const c of cut.glyph.contours) expect(c.closed).toBe(false);
+  });
+
+  it("leaves the drawing where it was when it opens a loop", () => {
+    const before = glyphBounds(ring())!;
+    const after = glyphBounds(cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!.glyph)!;
+
+    expect(after.minX).toBeCloseTo(before.minX, 6);
+    expect(after.maxX).toBeCloseTo(before.maxX, 6);
+    expect(after.minY).toBeCloseTo(before.minY, 6);
+    expect(after.maxY).toBeCloseTo(before.maxY, 6);
+  });
+
+  it("begins and ends the opened path at the same place", () => {
+    const cut = cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
+
+    for (const c of cut.glyph.contours) {
+      const first = c.nodes[0]!;
+      const last = c.nodes[c.nodes.length - 1]!;
+      expect(first.pt.x).toBeCloseTo(last.pt.x, 6);
+      expect(first.pt.y).toBeCloseTo(last.pt.y, 6);
+    }
+  });
+
+  it("has nothing before its first point or after its last", () => {
+    // An open path starts where it starts: a handle arriving at the first node
+    // would be describing a segment that is not there.
+    const cut = cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
+
+    for (const c of cut.glyph.contours) {
+      expect(c.nodes[0]?.in).toBeNull();
+      expect(c.nodes[c.nodes.length - 1]?.out).toBeNull();
+    }
   });
 });

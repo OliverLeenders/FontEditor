@@ -36,14 +36,22 @@ export function samePoint(p: Vec2, q: Vec2): boolean {
  * at a point is a degenerate outline rather than a repeat, and silently dropping
  * one of them would hide it.
  *
- * Only closed contours. An open one has no inside, so neither tool has anything
- * to say about crossing it.
+ * Closed contours by default. An open one has no inside, so the measure and the
+ * fill have nothing to say about crossing it — but the knife does: a stroke
+ * across an open path divides it, and that question is asked by passing
+ * `open`.
  */
-export function strokeCrossings(g: Glyph, a: Vec2, b: Vec2): StrokeCrossing[] {
+export function strokeCrossings(
+  g: Glyph,
+  a: Vec2,
+  b: Vec2,
+  options: { readonly open?: boolean } = {},
+): StrokeCrossing[] {
   const perContour = new Map<number, StrokeCrossing[]>();
 
   for (const [contourIndex, c] of g.contours.entries()) {
-    if (!c.closed || c.nodes.length < 2) continue;
+    if (c.nodes.length < 2) continue;
+    if (!c.closed && options.open !== true) continue;
 
     const kept: StrokeCrossing[] = [];
     for (let segmentIndex = 0; segmentIndex < segmentCount(c); segmentIndex++) {

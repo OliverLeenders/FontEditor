@@ -29,7 +29,7 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, n
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2182 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2192 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
@@ -368,6 +368,17 @@ between its own two handles to where the two curvatures agree. The handles do no
 both segments keep the directions they were drawn with, and the node lands exactly smooth
 as well as curvature-continuous. It is offered only where it would do something: a corner,
 a straight side or an already harmonious join has nothing to reconcile.
+
+**The knife does three things, and which one depends on where you stop.** Drawn all the
+way across a shape it divides it, which is what a knife is for. Stopped part way — one
+crossing rather than two — it has no pair of shapes to make, and then where the stroke
+ended is the question: **in the ink**, and it puts a point at the crossing and leaves the
+outline closed, which is the quick way to add a point exactly where you want one; **out
+the other side, or into a counter**, and it opens the loop there, so the contour becomes a
+path beginning and ending at the cut with the drawing unchanged. Cut into an `o` from
+outside to the middle and both the outer contour and the counter open, because the stroke
+went through both. An open path has no inside and no parity to satisfy, so a stroke across
+one simply divides it into shorter paths.
 
 **Two rulers.** Hold `M` and point at a stem: the reading is taken square to the outline,
 which is what a stem width is — a straight line dragged across a round letter measures a
