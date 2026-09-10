@@ -57,6 +57,64 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # The two things this repository actually ships, built.
+  #
+  # Neither is covered by the suite above: the tests import TypeScript source
+  # directly, so a bundle that will not build and a desktop shell that will not
+  # compile both pass every one of them. Both have broken here before — a stale
+  # import, a watcher that took the dev server down — and each time the first
+  # thing to notice was a person running it by hand.
+  #
+  # `cargo check` rather than a full build: what is worth catching is source
+  # that does not compile, and linking a release binary to find that out costs
+  # five minutes for no more information. The web bundle is built for real,
+  # because bundling is where its failures live.
+  build:
+    name: The bundle and the desktop shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the editor for production
+        run: pnpm --filter @fonteditor/editor build
+
+      # What a browser would be served, and what the desktop shell embeds. An
+      # empty one means the build reported success and produced nothing.
+      - name: Check something came out
+        run: |
+          test -f apps/editor/dist/index.html
+          test -n "$(ls apps/editor/dist/assets)"
+
+      # The shell is Rust against the system webview, so on Linux it wants
+      # webkit's headers to compile at all. None of this is needed to *run* the
+      # editor; it is the price of checking the shell on a machine that is not
+      # the one it is built for.
+      - name: The libraries the webview binds to
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev librsvg2-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/editor/src-tauri/target
+          key: cargo-${{ hashFiles('apps/editor/src-tauri/Cargo.lock') }}
+          restore-keys: cargo-
+
+      - name: Check the desktop shell compiles
+        run: cargo check --manifest-path apps/editor/src-tauri/Cargo.toml
+
   # A UFO that only this repository has ever read proves consistency, not
   # correctness: a misreading of the format shared by our writer and our reader
   # passes every test in the suite. fontTools is the reference implementation
