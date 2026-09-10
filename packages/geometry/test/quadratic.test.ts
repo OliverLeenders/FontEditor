@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { cubic, evaluate, evaluateQuadratic } from "../src/cubic.js";
-import { QUADRATIC_TOLERANCE, toQuadratics } from "../src/quadratic.js";
+import { type Cubic, cubic, evaluate, evaluateQuadratic } from "../src/cubic.js";
+import { QUADRATIC_TOLERANCE, toQuadratics, toQuadraticsTogether } from "../src/quadratic.js";
 import { vec } from "../src/vec2.js";
 
 /**
@@ -124,5 +124,64 @@ describe("converting a cubic", () => {
     // A run accepted at a whole unit by the same-parameter measure sits a
     // fraction of one from the curve as anybody would measure it.
     expect(nearest(c, run)).toBeLessThan(0.25);
+  });
+});
+
+/**
+ * The same curve in several masters, converted together.
+ *
+ * A delta is the difference between two points, so two masters must have the
+ * same points in the same order — and converting each on its own does not give
+ * that. How many quadratics a cubic needs depends on how much it bends, and a
+ * Black bends more than a Light.
+ */
+describe("converting masters together", () => {
+  /** The same segment drawn with more and more bend in it. */
+  const bent = (by: number): Cubic => ({
+    a: vec(0, 0),
+    c1: vec(100, by),
+    c2: vec(200, by),
+    b: vec(300, 0),
+  });
+
+  it("gives every master the same number of points", () => {
+    const runs = toQuadraticsTogether([bent(20), bent(400), bent(900)])!;
+
+    const counts = new Set(runs.map((r) => r.length));
+    expect(counts.size).toBe(1);
+  });
+
+  it("uses what the most demanding master needed", () => {
+    const gentle = bent(20);
+    const severe = bent(900);
+    const alone = Math.max(toQuadratics(gentle).length, toQuadratics(severe).length);
+
+    expect(toQuadraticsTogether([gentle, severe])![0]!.length).toBe(alone);
+  });
+
+  it("keeps every master within tolerance, not only the worst", () => {
+    const curves = [bent(20), bent(400), bent(900)];
+    const runs = toQuadraticsTogether(curves)!;
+
+    for (const [i, run] of runs.entries()) {
+      for (const [k, q] of run.entries()) {
+        for (const t of [0.25, 0.5, 0.75]) {
+          const on = evaluateQuadratic(q, t);
+          const wanted = evaluate(curves[i]!, (k + t) / run.length);
+          expect(Math.hypot(on.x - wanted.x, on.y - wanted.y)).toBeLessThanOrEqual(
+            QUADRATIC_TOLERANCE + 1e-9,
+          );
+        }
+      }
+    }
+  });
+
+  it("agrees with converting one curve alone when there is only one", () => {
+    const only = bent(300);
+    expect(toQuadraticsTogether([only])![0]!.length).toBe(toQuadratics(only).length);
+  });
+
+  it("has nothing to say about no curves at all", () => {
+    expect(toQuadraticsTogether([])).toBeNull();
   });
 });

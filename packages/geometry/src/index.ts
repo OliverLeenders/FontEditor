@@ -114,4 +114,4 @@ export type { Crossing } from "./cubic.js";
 export type { CurveMeeting } from "./cubic.js";
 export { intersectCubics, intersectSegmentCubic, selfIntersection, unitRoots } from "./cubic.js";
 
-export { QUADRATIC_TOLERANCE, toQuadratics } from "./quadratic.js";
+export { QUADRATIC_TOLERANCE, toQuadratics, toQuadraticsTogether } from "./quadratic.js";
