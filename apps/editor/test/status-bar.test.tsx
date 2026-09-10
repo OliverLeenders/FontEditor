@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
-import { cleanup, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { installBrowserGlobals } from "./browser-globals.js";
-import { installDomStubs, render } from "./render.js";
+import { freshStore, installDomStubs, render } from "./render.js";
 
 installBrowserGlobals();
 
@@ -58,5 +58,48 @@ describe("what the status bar counts", () => {
     cleanup();
     render(<StatusBar workspace="font" onShortcuts={() => undefined} />);
     expect(screen.queryByText("selected")).toBeNull();
+  });
+});
+
+/**
+ * The line for writing a font to a folder.
+ *
+ * A different thing from the autosave above it: that one writes to the
+ * browser's own store after a second's pause, this one writes a file per glyph
+ * when somebody presses Ctrl-S. Only the first was reported here, so the one
+ * that takes long enough to wonder about was the one that said nothing.
+ */
+describe("saving to a folder", () => {
+  it("counts the files as they go", () => {
+    const store = freshStore();
+    act(() => {
+      store.patch({
+        folder: { ...store.getState().folder, busy: true, progress: { done: 12, total: 40 } },
+      });
+    });
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />, store);
+
+    expect(screen.getByText(/saving 12 of 40 files/)).toBeTruthy();
+  });
+
+  it("says only that it is saving until it knows how much there is", () => {
+    // The total is not known until the writer has worked out which files
+    // differ, and until then there is no number anybody can honestly give.
+    const store = freshStore();
+    act(() => {
+      store.patch({
+        folder: { ...store.getState().folder, busy: true, progress: { done: 0, total: 0 } },
+      });
+    });
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />, store);
+
+    expect(screen.getByText(/saving…/)).toBeTruthy();
+  });
+
+  it("goes back to the autosave's word for it when the writing is done", () => {
+    const store = freshStore();
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />, store);
+
+    expect(screen.queryByText(/saving .* files/)).toBeNull();
   });
 });

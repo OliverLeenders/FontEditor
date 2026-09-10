@@ -171,6 +171,27 @@ export type FolderState = {
   readonly saved: FontDocument | null;
   readonly savedAt: number | null;
   readonly busy: boolean;
+  /**
+   * How far through writing the files it is, while it is writing them.
+   *
+   * `null` when nothing is being written. A count rather than a fraction: the
+   * writer knows exactly how many files it will write, and a number that moves
+   * is proof something is happening where a bar of unknown length is not.
+   */
+  readonly progress: { readonly done: number; readonly total: number } | null;
+  /**
+   * What the last save left in the folder, as a checksum per file.
+   *
+   * So the next save can write only what differs. Held here rather than read
+   * back off the disk because reading a file to find out whether it needs
+   * writing costs as much as writing it — and because this is a record of what
+   * this editor put there, which is the thing worth comparing against.
+   *
+   * Empty after a reload, which makes the next save write everything once. That
+   * is the honest answer: a folder this session has not written to is somebody
+   * else's, whatever the session before it did.
+   */
+  readonly written: ReadonlyMap<string, number>;
   readonly problem: string | null;
 };
 
@@ -180,6 +201,8 @@ export const NO_FOLDER: FolderState = {
   saved: null,
   savedAt: null,
   busy: false,
+  progress: null,
+  written: new Map(),
   problem: null,
 };
 

@@ -101,3 +101,100 @@ describe("reading a folder", () => {
     await expect(readFolder(folder)).rejects.toThrow(/deep/);
   });
 });
+
+/**
+ * Writing only what differs.
+ *
+ * A UFO is one file per glyph, so moving one point changes one file of several
+ * hundred — and writing the rest again is the whole of the wait somebody sees
+ * after pressing Ctrl-S. What makes it safe is that the comparison is against
+ * what *this* editor last wrote, not against what happens to be on the disk.
+ */
+describe("saving again", () => {
+  it("writes nothing the second time when nothing changed", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a", "b", "c"));
+
+    const first = await writeFolder(folder, entries);
+    expect(first.written).toBeGreaterThan(3);
+    expect(first.skipped).toBe(0);
+
+    const again = await writeFolder(folder, entries, { known: first.wrote });
+    expect(again.written).toBe(0);
+    expect(again.skipped).toBe(first.written);
+  });
+
+  it("writes the glyph that changed, and only it", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const first = await writeFolder(folder, ufoFiles(font("a", "b", "c")));
+
+    // The same font with one different advance: one `.glif` differs, and so
+    // does the `fontinfo` this test's font derives from its glyphs — nothing
+    // else in the archive has any reason to.
+    const moved = fontDocument(
+      [
+        glyph("a", { advance: 999, unicodes: [97] }),
+        glyph("b", { advance: 501, unicodes: [98] }),
+        glyph("c", { advance: 502, unicodes: [99] }),
+      ],
+      DEFAULT_FONT_INFO,
+    );
+
+    const again = await writeFolder(folder, ufoFiles(moved), { known: first.wrote });
+
+    expect(again.written).toBe(1);
+    expect(again.skipped).toBe(first.written - 1);
+    // And the file on disk is the new one, not the old.
+    expect(folder.all().get("glyphs/a.glif")).toContain('width="999"');
+  });
+
+  it("writes everything when it has no record of what is there", async () => {
+    // The first save after a folder is opened: what is on disk is somebody
+    // else's, whatever it looks like.
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a", "b"));
+    await writeFolder(folder, entries);
+
+    const again = await writeFolder(folder, entries);
+    expect(again.skipped).toBe(0);
+    expect(again.written).toBe(entries.length);
+  });
+
+  it("still takes away a glyph that has gone, having written nothing else", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const first = await writeFolder(folder, ufoFiles(font("a", "b", "c")));
+
+    const fewer = await writeFolder(folder, ufoFiles(font("a", "b")), { known: first.wrote });
+
+    expect(fewer.removed).toEqual(["c.glif"]);
+    expect(folder.all().has("glyphs/c.glif")).toBe(false);
+  });
+
+  it("counts the files it is about to write, and then each one", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const seen: [number, number][] = [];
+
+    const report = await writeFolder(folder, ufoFiles(font("a", "b")), {
+      onProgress: (done, total) => seen.push([done, total]),
+    });
+
+    // Nought of them before the first, and every step after.
+    expect(seen[0]).toEqual([0, report.written]);
+    expect(seen[seen.length - 1]).toEqual([report.written, report.written]);
+    expect(seen).toHaveLength(report.written + 1);
+  });
+
+  it("says there is nothing to do rather than counting to nothing", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a"));
+    const first = await writeFolder(folder, entries);
+
+    const seen: [number, number][] = [];
+    await writeFolder(folder, entries, {
+      known: first.wrote,
+      onProgress: (done, total) => seen.push([done, total]),
+    });
+
+    expect(seen).toEqual([[0, 0]]);
+  });
+});

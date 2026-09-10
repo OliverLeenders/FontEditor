@@ -67,3 +67,30 @@
   color: var(--accent);
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * The mark for work in progress, turning.
+ *
+ * The only animation in the editor, and it earns its place: writing a font to a
+ * folder is a file per glyph, and a still picture of a loader is indistinguish-
+ * able from an editor that has stopped. Slow — a turn and a half a second — so
+ * it reads as patience rather than as urgency.
+ */
+.turning {
+  display: inline-flex;
+  animation: turn 1.5s linear infinite;
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* Somebody who has asked not to be shown movement is not asking to be left
+   guessing, so the mark stays and stops rather than going away. */
+@media (prefers-reduced-motion: reduce) {
+  .turning {
+    animation: none;
+  }
+}

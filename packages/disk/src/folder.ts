@@ -2,6 +2,7 @@ import {
   DEFAULT_LAYER_DIRECTORY,
   type ZipEntry,
   type ZipFile,
+  crc32,
   defaultLayer,
   entryBytes,
 } from "@fonteditor/font-io";
@@ -60,10 +61,46 @@ async function walk(
 /** What writing a font to a folder did, and what it deliberately left alone. */
 export type WriteReport = {
   readonly written: number;
+  /** Files that are already what they would have been written as. */
+  readonly skipped: number;
   /** Glyph files that were there before and are not part of the font now. */
   readonly removed: readonly string[];
   /** Things the user should know were left as they were. */
   readonly notes: readonly string[];
+  /**
+   * What every file now holds, as a checksum, for the next save to compare.
+   *
+   * The caller keeps it and hands it back. Kept by the caller rather than read
+   * off the disk because reading a file to find out whether it needs writing
+   * costs as much as writing it — and because this is a record of what *we*
+   * put there, which is the thing worth comparing against.
+   */
+  readonly wrote: ReadonlyMap<string, number>;
+};
+
+export type WriteOptions = {
+  /**
+   * What the last save left in this folder, from its report.
+   *
+   * A file whose contents would be identical is not written again. That is
+   * nearly all of them: a UFO is one file per glyph, and moving one point
+   * changes one of the three hundred. Without this, saving after any edit
+   * rewrites the whole font a file at a time — which is slow enough on a real
+   * font to look like the editor has stopped.
+   *
+   * Absent for the first save after a folder is opened, which writes
+   * everything: what is on disk is somebody else's, and only what we wrote
+   * ourselves can be assumed to be what we think it is.
+   */
+  readonly known?: ReadonlyMap<string, number> | undefined;
+  /**
+   * Called as each file lands, with how many are done and how many there are.
+   *
+   * A count rather than a fraction: the writer knows exactly how many files it
+   * will write, and a number that moves is proof that something is happening
+   * where a bar of unknown length is not.
+   */
+  readonly onProgress?: ((done: number, total: number) => void) | undefined;
 };
 
 /**
@@ -82,6 +119,7 @@ export type WriteReport = {
 export async function writeFolder(
   folder: DiskFolder,
   entries: readonly ZipEntry[],
+  options: WriteOptions = {},
 ): Promise<WriteReport> {
   const notes: string[] = [];
 
@@ -95,7 +133,24 @@ export async function writeFolder(
     );
   }
 
-  for (const entry of entries) await writeFile(folder, entry.path, entryBytes(entry));
+  // What each file will hold, worked out before anything is written: the
+  // comparison is against what the last save put there, and the answer is also
+  // what this save hands back for the next one to compare against.
+  const wrote = new Map<string, number>();
+  const wanted: ZipEntry[] = [];
+  for (const entry of entries) {
+    const sum = crc32(entryBytes(entry));
+    wrote.set(entry.path, sum);
+    if (options.known?.get(entry.path) !== sum) wanted.push(entry);
+  }
+
+  let done = 0;
+  options.onProgress?.(0, wanted.length);
+  for (const entry of wanted) {
+    await writeFile(folder, entry.path, entryBytes(entry));
+    done += 1;
+    options.onProgress?.(done, wanted.length);
+  }
 
   const now = new Set(
     entries
@@ -119,7 +174,7 @@ export async function writeFolder(
     }
   }
 
-  return { written: entries.length, removed, notes };
+  return { written: wanted.length, skipped: entries.length - wanted.length, removed, notes, wrote };
 }
 
 /** Write one file, making the directories on the way to it. */

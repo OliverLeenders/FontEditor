@@ -12,6 +12,7 @@ import { readUfo, ufoFiles } from "@fonteditor/font-io";
 import { type FontDocument, randomIds } from "@fonteditor/font-model";
 
 import { type FontHost, adoptDocument, adoptImages, adoptLayers } from "./fonts.js";
+import { NO_FOLDER } from "./state.js";
 
 /**
  * The font as a folder on the user's disk.
@@ -131,7 +132,10 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
     throw new Error(`${folder.name} cannot be written to`);
   }
 
-  host.patch({ folder: { ...host.state().folder, busy: true, problem: null } });
+  const before = host.state().folder;
+  host.patch({
+    folder: { ...before, busy: true, problem: null, progress: { done: 0, total: 0 } },
+  });
   try {
     const document = host.state().session.editor.document;
     // The pictures and the other layers go with it. A folder holding a font
@@ -141,6 +145,17 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
     const written = await writeFolder(
       folder,
       ufoFiles(document, await host.disk.allImages(), host.state().layers),
+      {
+        // Only the files that differ from what the last save left. A UFO is one
+        // file per glyph, so moving one point changes one of several hundred,
+        // and rewriting the rest is the whole of the wait.
+        known: sameFolder(before, folder) ? before.written : undefined,
+        onProgress: (done, total) => {
+          host.patch({
+            folder: { ...host.state().folder, progress: { done, total } },
+          });
+        },
+      },
     );
 
     host.patch({
@@ -150,6 +165,8 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
         saved: document,
         savedAt: Date.now(),
         busy: false,
+        progress: null,
+        written: written.wrote,
         problem: null,
       },
     });
@@ -162,23 +179,29 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
     };
   } catch (error) {
     const problem = error instanceof Error ? error.message : String(error);
-    host.patch({ folder: { ...host.state().folder, busy: false, problem } });
+    host.patch({
+      folder: { ...host.state().folder, busy: false, progress: null, problem },
+    });
     throw error;
   }
+}
+
+/**
+ * Whether what the last save recorded is about the folder being written to.
+ *
+ * Save-as points at somewhere else, and a record of what is in *this* folder
+ * says nothing about what is in that one — so it writes everything, which is
+ * what saving into an empty folder has to do anyway.
+ */
+function sameFolder(state: { readonly name: string | null }, folder: DiskFolder): boolean {
+  return state.name !== null && state.name === folder.name;
 }
 
 /** Stop pointing at a folder, and stop remembering it for next time. */
 export async function forgetOpenFolder(host: FontHost): Promise<void> {
   host.setFolder(null);
   host.patch({
-    folder: {
-      name: null,
-      remembered: null,
-      saved: null,
-      savedAt: null,
-      busy: false,
-      problem: null,
-    },
+    folder: NO_FOLDER,
   });
   await forgetFolder();
 }

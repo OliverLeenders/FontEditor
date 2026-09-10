@@ -41,6 +41,14 @@ export function StatusBar({
   const storage = useStoreValue((s) => s.storage);
   const detail = useStoreValue((s) => s.storageDetail);
   const recovered = useStoreValue((s) => s.recovered);
+  // The save to a folder on disk, which is a different thing from the autosave
+  // above it: that one writes to the browser's own store after a second's
+  // pause, this one writes a file per glyph when somebody presses Ctrl-S. Only
+  // the first was reported here, so the one that takes long enough to wonder
+  // about was the one that said nothing.
+  const writing = useStoreValue((s) => s.folder.busy);
+  const wroteDone = useStoreValue((s) => s.folder.progress?.done ?? null);
+  const wroteTotal = useStoreValue((s) => s.folder.progress?.total ?? null);
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
 
   // Three scalar selectors rather than one returning the measurement: it is a
@@ -59,14 +67,20 @@ export function StatusBar({
   });
   const pinned = useStoreValue((s) => s.session.editor.measure !== null);
 
-  const saved =
-    storage === "unavailable"
+  const saved = writing
+    ? filesToGo(wroteDone, wroteTotal)
+    : storage === "unavailable"
       ? `not saving — ${detail}`
       : storage === "connecting"
         ? "connecting"
         : saveStatus === "idle"
           ? "saved"
           : saveStatus;
+
+  // Spinning, not merely drawn. The mark for "saving" was already a loader and
+  // already sat there through the wait — it just never moved, which makes it an
+  // icon somebody has to notice rather than a sign that something is happening.
+  const busy = writing || storage === "connecting" || saveStatus === "saving";
 
   const editing = workspace === "glyph";
 
@@ -98,7 +112,9 @@ export function StatusBar({
           storage === "unavailable" || saveStatus === "failed" ? styles.warn : ""
         }`}
       >
-        <SaveMark storage={storage} saveStatus={saveStatus} />
+        <span className={busy ? styles.turning : undefined}>
+          <SaveMark storage={storage} saveStatus={saveStatus} writing={writing} />
+        </span>
         {saved}
       </span>
       {recovered ? (
@@ -150,12 +166,29 @@ const HINTS: Record<ViewId, string> = {
 function SaveMark({
   storage,
   saveStatus,
+  writing,
 }: {
   storage: StorageState;
   saveStatus: AutosaveStatus;
+  /** Writing the font to a folder on disk, which outranks everything else. */
+  writing: boolean;
 }): React.JSX.Element {
+  if (writing) return <LoaderCircleIcon />;
   if (storage === "unavailable") return <CloudOffIcon />;
   if (storage === "connecting" || saveStatus === "saving") return <LoaderCircleIcon />;
   if (saveStatus === "failed") return <TriangleAlertIcon />;
   return <CircleCheckIcon />;
+}
+
+/**
+ * How much of the folder is written, in words.
+ *
+ * The total is not known until the writer has worked out which files differ,
+ * which is a moment after the save begins — so until it does, there is a
+ * number of files nobody can honestly give.
+ */
+function filesToGo(done: number | null, total: number | null): string {
+  if (total === null || done === null) return "saving…";
+  if (total === 0) return "saving…";
+  return `saving ${String(done)} of ${String(total)} files`;
 }
