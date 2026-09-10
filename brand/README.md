@@ -26,8 +26,18 @@ container is thirty lines of `struct` — no image library is installed for this
 
 Every size is **drawn at that size**, never drawn large and shrunk. Every edge
 in this mark is a straight line between two flat fills, and resampling spreads
-each of them over two or three pixels — which is what a blurry icon is. Two
-details also change with size, and they do not change at the same size:
+each of them over two or three pixels — which is what a blurry icon is.
+
+Three of those edges are vertical: the outer flank of each side face, and the
+seam between them. Those are **snapped to whole pixels** at every size. A
+vertical edge landing at 1.63 pixels is a column of 63%-opaque pixels running
+the full height of the icon, and that column is what makes a small icon look
+soft — the diagonals are honestly antialiased and look right that way. The left
+flank is rounded and the right one placed by reflection, so the block stays
+symmetrical and the seam lands on an exact half; everything else rides the same
+linear map, so the isometric proportions do not shift.
+
+Two details also change with size, and they do not change at the same size:
 
 | Size      | Nick | Letter |
 | --------- | ---- | ------ |

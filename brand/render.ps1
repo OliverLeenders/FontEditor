@@ -10,8 +10,36 @@ function Poly($pts) {
   return $a
 }
 function B($hex) { return New-Object System.Drawing.SolidBrush([System.Drawing.ColorTranslator]::FromHtml($hex)) }
-function Scale($pts, $k) {
-  $out = @(); foreach ($p in $pts) { $out += ,@(($k * $p[0]), ($k * $p[1])) }; return $out
+<#
+  The drawing at one size, with its straight edges put on whole pixels.
+
+  Three edges in this mark are vertical: the outer flank of each side face, and
+  the seam between them. A vertical edge landing at 1.63 pixels is drawn as a
+  column of 63%-opaque pixels down the whole height of the icon, and that column
+  is what makes a small icon look soft — not the diagonals, which are honestly
+  antialiased and look right that way.
+
+  So the flanks are rounded to whole pixels and the far one is placed by
+  reflection, which keeps the block symmetrical and puts the seam on an exact
+  half. Everything else is carried along by the same linear map, so the
+  isometric proportions do not shift: x runs from the left flank to the right,
+  y from the top vertex to the bottom.
+#>
+function Place($pts, $size) {
+  $k = $size / 100.0
+  $left = [math]::Max(1, [math]::Round(6.8 * $k))
+  $right = $size - $left
+  $top = [math]::Round(2.0 * $k)
+  $bottom = $size - $top
+
+  $sx = ($right - $left) / 86.4
+  $sy = ($bottom - $top) / 96.0
+
+  $out = @()
+  foreach ($p in $pts) {
+    $out += ,@(($left + ($p[0] - 6.8) * $sx), ($top + ($p[1] - 2) * $sy))
+  }
+  return $out
 }
 
 # The block, filling the square it is drawn in. An icon sits beside others in a
@@ -85,18 +113,17 @@ function Render($size) {
   $out = New-Object System.Drawing.Bitmap $size, $size
   $g = [System.Drawing.Graphics]::FromImage($out)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-  $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+  $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
   $g.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
   $g.Clear([System.Drawing.Color]::Transparent)
 
-  $k = $size / 100.0
-  $g.FillPolygon((B $C.left),  (Poly (Scale $BLOCK.left  $k)))
-  $g.FillPolygon((B $C.right), (Poly (Scale $BLOCK.right $k)))
-  $g.FillPolygon((B $C.nick), (Poly (Scale $nick $k)))
-  $g.FillPolygon((B $C.top),   (Poly (Scale $BLOCK.top   $k)))
+  $g.FillPolygon((B $C.left),  (Poly (Place $BLOCK.left  $size)))
+  $g.FillPolygon((B $C.right), (Poly (Place $BLOCK.right $size)))
+  $g.FillPolygon((B $C.nick),  (Poly (Place $nick        $size)))
+  $g.FillPolygon((B $C.top),   (Poly (Place $BLOCK.top   $size)))
   $wb = B $C.t
-  $g.FillPolygon($wb, (Poly (Scale $letter.bar  $k)))
-  $g.FillPolygon($wb, (Poly (Scale $letter.stem $k)))
+  $g.FillPolygon($wb, (Poly (Place $letter.bar  $size)))
+  $g.FillPolygon($wb, (Poly (Place $letter.stem $size)))
   $g.Dispose()
   return $out
 }
