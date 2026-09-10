@@ -33,6 +33,10 @@ export class Bytes {
     return this;
   }
 
+  i8(value: number): this {
+    return this.u8(value < 0 ? value + 0x100 : value);
+  }
+
   i16(value: number): this {
     return this.u16(value < 0 ? value + 0x10000 : value);
   }

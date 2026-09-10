@@ -8,6 +8,7 @@ import {
   toWoff2,
   exportUfo,
   exportVariableFont,
+  exportVariableTrueType,
 } from "@fonteditor/font-io";
 import { type Location, defaultLocation } from "@fonteditor/font-model";
 import { useState } from "react";
@@ -153,6 +154,32 @@ export function ExportFont(): React.JSX.Element {
     });
 
   /**
+   * The same, with quadratic outlines: `glyf` and `gvar` rather than CFF2.
+   *
+   * The flavour the web is actually served, because it is the one WOFF2 can
+   * take apart and compress. What it costs is the conversion — a cubic cannot
+   * be said exactly in quadratics — and one thing more than the static TTF
+   * costs: every master has to convert to the same points before a delta can be
+   * taken between them, so a light weight carries a point or two it would not
+   * have needed on its own.
+   */
+  const variableTrueType = (): void =>
+    void attemptAsync(async () => {
+      const project = store.getState().project;
+      const all = await store.allMasters();
+      const home = defaultLocation(project.axes);
+      const ordered = [
+        ...all.filter((m) => atHome(m.location, home, project.axes)),
+        ...all.filter((m) => !atHome(m.location, home, project.axes)),
+      ];
+
+      const out = exportVariableTrueType(project.axes, ordered, project.instances);
+      const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.ttf");
+      download(out.bytes, file, "font/ttf");
+      return { file, warnings: out.warnings };
+    });
+
+  /**
    * The same font, with quadratic outlines.
    *
    * A conversion rather than another way of writing the same numbers: a cubic
@@ -294,6 +321,14 @@ export function ExportFont(): React.JSX.Element {
       icon: DownloadIcon,
       disabled: glyphCount === 0 || axes === 0,
       run: variable,
+    });
+    items.push({
+      kind: "item",
+      label: "Variable TTF",
+      note: axes === 0 ? "needs an axis" : "quadratic, for the web",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0 || axes === 0,
+      run: variableTrueType,
     });
     items.push({
       kind: "item",

@@ -187,5 +187,23 @@ jobs:
       - name: Instantiate it at every master
         run: python tools/otf-check/check_vf.py "$RUNNER_TEMP/vf/Vary.otf" "$RUNNER_TEMP/vf/masters.json"
 
+      # The same question of the other flavour, and it cannot be asked the same
+      # way: quadratic outlines have no points in common with the cubic drawing,
+      # so each instance is compared with that master compiled on its own as a
+      # static TrueType font — as shapes, which is the only comparison there is.
+      - name: Instantiate the TrueType flavour at every master
+        run: >
+          python tools/otf-check/check_vf_ttf.py
+          "$RUNNER_TEMP/vf/Vary.ttf" "$RUNNER_TEMP/vf/masters.json" "$RUNNER_TEMP/vf"
+
+      # Three masters on one axis, which is what makes a region intermediate —
+      # a tuple that has to write its start and end rather than let them be
+      # implied. Two masters never produce one, so the proof font alone would
+      # leave that branch of the writer unexercised.
+      - name: Instantiate a three-master TrueType at every master
+        run: >
+          python tools/otf-check/check_vf_ttf.py
+          "$RUNNER_TEMP/vf/Three.ttf" "$RUNNER_TEMP/vf/three.json" "$RUNNER_TEMP/vf"
+
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"

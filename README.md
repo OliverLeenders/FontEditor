@@ -29,11 +29,11 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, n
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2193 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2204 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
-| 14    | What ships to a browser             | WOFF and WOFF2 done; the variable TrueType flavour is not                           |
+| 14    | What ships to a browser             | done                                                                                |
 
 ### What the table missed
 
@@ -227,12 +227,25 @@ Google's `woff2` — the same code `woff2_compress` and fontTools use. Writing a
 implementation of a format would mean having to prove ourselves right about it. The wasm
 is a megabyte and is fetched when somebody presses WOFF2, never at startup.
 
-What is left is **a variable font with `glyf` and `gvar`** rather than CFF2. It is the
-flavour the web actually serves, and it is the biggest single job left: the quadratic
-conversion that TTF export already does has to come out _point-compatible_ across every
-master before a delta can be taken between them, which the current converter has no
-reason to guarantee, and `gvar` wants the four phantom points along with the outline.
-Nothing else waits on it.
+**A variable font with `glyf` and `gvar` is done too**, which is the flavour the web
+actually serves — the one WOFF2 can take apart and compress. The table was not the hard
+part. Every master has to convert to the _same_ points before a delta can be taken between
+them, and three separate things decide how many points there are, each of which can answer
+differently for a Light than for a Black: how many quadratics a cubic becomes, whether a
+segment is drawn straight, and whether an on-curve point lands exactly on a midpoint and
+can be left out. All three are settled across the masters at once, and the same conversion
+feeds `glyf`, so the two tables cannot disagree about what points the font has.
+
+The four phantom points are how this flavour varies its spacing, and writing them as
+zeroes gives a font whose letters change shape and keep the spacing of the master they
+were compiled at — the same bug `HVAR` exists to fix, arrived at from the other direction.
+Both are written, and they agree.
+
+fontTools pins the font at each master and compares what comes out with that master
+compiled on its own — as shapes, since quadratic outlines have no points in common with
+the cubic drawing. A three-master family is checked as well as a two-master one, because
+only three masters on an axis produce an intermediate region: a tuple that has to write
+its start and end out rather than let them be implied.
 
 ## Getting started
 

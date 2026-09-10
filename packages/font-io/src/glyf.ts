@@ -1,4 +1,4 @@
-import { type Vec2, toQuadratics } from "@fonteditor/geometry";
+import { type Vec2, toQuadratics, toQuadraticsTogether } from "@fonteditor/geometry";
 import type { Contour, Glyph } from "@fonteditor/font-model";
 import { segmentCubic, segments } from "@fonteditor/font-model";
 
@@ -39,7 +39,18 @@ const whole = (n: number): number => Math.round(n);
  * In the order they are given, which must be the font's glyph order: `loca` is
  * addressed by glyph id and nothing here can look a name up.
  */
-export function glyfTable(glyphs: readonly Glyph[]): GlyfResult {
+export function glyfTable(
+  glyphs: readonly Glyph[],
+  /**
+   * The points to write, where the caller has already worked them out.
+   *
+   * A variable font needs every master converted to the same points, which is
+   * a question about all the masters at once and cannot be answered here — see
+   * {@link compatiblePoints}. Given them, this writes what it is told rather
+   * than converting again and disagreeing with `gvar` about what it wrote.
+   */
+  precomputed?: readonly (Drawn | undefined)[],
+): GlyfResult {
   const parts: Uint8Array[] = [];
   const offsets: number[] = [0];
 
@@ -47,8 +58,8 @@ export function glyfTable(glyphs: readonly Glyph[]): GlyfResult {
   let maxContours = 0;
   let at = 0;
 
-  for (const glyph of glyphs) {
-    const drawn = pointsOf(glyph);
+  for (const [index, glyph] of glyphs.entries()) {
+    const drawn = precomputed?.[index] ?? pointsOf(glyph);
     const data = drawn.contours.length === 0 ? new Uint8Array() : simpleGlyph(drawn);
 
     maxPoints = Math.max(
@@ -84,8 +95,11 @@ export function glyfTable(glyphs: readonly Glyph[]): GlyfResult {
 }
 
 /** A glyph as contours of points, each on the curve or off it. */
-type Drawn = {
-  readonly contours: readonly (readonly { pt: Vec2; on: boolean }[])[];
+/** One point of an outline, and whether the curve passes through it. */
+export type OutlinePoint = { readonly pt: Vec2; readonly on: boolean };
+
+export type Drawn = {
+  readonly contours: readonly (readonly OutlinePoint[])[];
 };
 
 /**
@@ -95,7 +109,7 @@ type Drawn = {
  * on-curve point, which is what a line is in this format.
  */
 function pointsOf(glyph: Glyph): Drawn {
-  const contours: { pt: Vec2; on: boolean }[][] = [];
+  const contours: OutlinePoint[][] = [];
 
   for (const contour of glyph.contours) {
     if (!contour.closed || contour.nodes.length < 2) continue;
@@ -107,11 +121,11 @@ function pointsOf(glyph: Glyph): Drawn {
   return { contours };
 }
 
-function contourPoints(contour: Contour): { pt: Vec2; on: boolean }[] {
+function contourPoints(contour: Contour): OutlinePoint[] {
   const start = contour.nodes[0]?.pt;
   if (start === undefined) return [];
 
-  const out: { pt: Vec2; on: boolean }[] = [{ pt: start, on: true }];
+  const out: OutlinePoint[] = [{ pt: start, on: true }];
 
   for (const segment of segments(contour)) {
     if (segment.kind === "line") {
@@ -140,14 +154,26 @@ function contourPoints(contour: Contour): { pt: Vec2; on: boolean }[] {
  * points in a curved glyph, and it costs nothing — the outline is identical
  * because the point was the midpoint by definition.
  */
-function implied(points: readonly { pt: Vec2; on: boolean }[]): { pt: Vec2; on: boolean }[] {
-  const out: { pt: Vec2; on: boolean }[] = [];
+function implied(points: readonly OutlinePoint[]): OutlinePoint[] {
+  const keep = keptPoints(points);
+  return points.filter((_, i) => keep[i] === true);
+}
 
-  for (const [i, point] of points.entries()) {
+/**
+ * Which points survive, as a mask.
+ *
+ * Separated from the filtering because a variable font has to make this
+ * decision for every master at once: whether a joint lands exactly on the
+ * midpoint depends on the coordinates, so one master can imply a point that
+ * another spells out — and two masters with different numbers of points have no
+ * deltas between them. The masks are combined and the same points kept in all.
+ */
+export function keptPoints(points: readonly OutlinePoint[]): boolean[] {
+  return points.map((point, i) => {
     const before = points[(i - 1 + points.length) % points.length];
     const after = points[(i + 1) % points.length];
 
-    if (
+    return !(
       point.on &&
       before !== undefined &&
       after !== undefined &&
@@ -157,13 +183,78 @@ function implied(points: readonly { pt: Vec2; on: boolean }[]): { pt: Vec2; on: 
       // midpoint only before rounding is not the midpoint a reader works out.
       whole(point.pt.x) === whole((before.pt.x + after.pt.x) / 2) &&
       whole(point.pt.y) === whole((before.pt.y + after.pt.y) / 2)
-    ) {
-      continue;
+    );
+  });
+}
+
+/**
+ * One glyph as drawn in every master, converted to the same points.
+ *
+ * The whole of what a variable TrueType font needs and a static one does not.
+ * A delta is the difference between two points, so every master must produce
+ * the same points in the same order — and three separate things here decide how
+ * many points there are, each of which can answer differently for a Light than
+ * for a Black:
+ *
+ *  - **How many quadratics a cubic becomes.** Settled by converting the masters
+ *    together, at the piece count the most demanding of them needs.
+ *  - **Whether a segment is a line.** A line is one point and a curve is more,
+ *    so a segment drawn straight in one master and bent in another is converted
+ *    as a curve in both.
+ *  - **Whether an on-curve point is implied.** Decided by whether a joint lands
+ *    exactly on a midpoint, which is a fact about coordinates. The masks are
+ *    combined, so a point is dropped only where every master would have.
+ *
+ * `null` where the masters do not correspond at all — a different number of
+ * contours, or of segments in one. That is a glyph the caller has to write from
+ * the default master alone, which is what the compatibility check is for.
+ */
+export function compatiblePoints(masters: readonly Glyph[]): Drawn[] | null {
+  const lists = masters.map((g) => g.contours.filter((c) => c.closed && c.nodes.length >= 2));
+  const first = lists[0];
+  if (first === undefined) return null;
+  if (lists.some((l) => l.length !== first.length)) return null;
+
+  const out: OutlinePoint[][][] = masters.map(() => []);
+
+  for (let ci = 0; ci < first.length; ci++) {
+    const here = lists.map((l) => l[ci]!);
+    const runs = here.map((c) => segments(c));
+    const count = runs[0]!.length;
+    if (runs.some((r) => r.length !== count)) return null;
+
+    const points: OutlinePoint[][] = here.map((c) => [{ pt: c.nodes[0]!.pt, on: true }]);
+
+    for (let si = 0; si < count; si++) {
+      const straight = runs.every((r) => r[si]!.kind === "line");
+      if (straight) {
+        for (const [m, r] of runs.entries())
+          points[m]!.push({ pt: segmentCubic(r[si]!).b, on: true });
+        continue;
+      }
+
+      const together = toQuadraticsTogether(runs.map((r) => segmentCubic(r[si]!)));
+      if (together === null) return null;
+      for (const [m, run] of together.entries()) {
+        for (const q of run) {
+          points[m]!.push({ pt: q.q, on: false });
+          points[m]!.push({ pt: q.b, on: true });
+        }
+      }
     }
-    out.push(point);
+
+    // The contour closes on its own start, so the last segment's end is the
+    // point it began with and is written once.
+    for (const list of points) if (list.length > 1) list.pop();
+
+    const masks = points.map(keptPoints);
+    const keep = masks[0]!.map((_, i) => masks.every((mask) => mask[i] === true));
+    for (const [m, list] of points.entries()) {
+      out[m]!.push(list.filter((_, i) => keep[i] === true));
+    }
   }
 
-  return out;
+  return out.map((contours) => ({ contours: contours.filter((c) => c.length > 0) }));
 }
 
 /** One simple glyph: its bounds, where its contours end, and its points. */

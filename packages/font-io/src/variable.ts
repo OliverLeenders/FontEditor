@@ -157,7 +157,7 @@ export function exportVariableFont(
  * cannot vary. Both are the compatibility check's business, and by the time a
  * font is being written the answer has to be a font.
  */
-function flattened(document: FontDocument, order: readonly string[]): Glyph[] {
+export function flattened(document: FontDocument, order: readonly string[]): Glyph[] {
   const ids = counterIds("v");
   const source: ComponentSource = { glyphOf: (name) => document.glyphs[name] ?? null };
 
