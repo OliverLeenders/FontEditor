@@ -1,14 +1,16 @@
 import {
   type DiskFolder,
+  accessTo,
   askAccess,
   forgetFolder,
   pickFolder,
   readFolder,
   recallFolder,
   rememberFolder,
+  textAt,
   writeFolder,
 } from "@fonteditor/disk";
-import { readUfo, ufoFiles } from "@fonteditor/font-io";
+import { crc32, readUfo, ufoFiles } from "@fonteditor/font-io";
 import { type FontDocument, randomIds } from "@fonteditor/font-model";
 
 import { type FontHost, adoptDocument, adoptImages, adoptLayers } from "./fonts.js";
@@ -150,6 +152,11 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
         // file per glyph, so moving one point changes one of several hundred,
         // and rewriting the rest is the whole of the wait.
         known: sameFolder(before, folder) ? before.written : undefined,
+        // A record made in an earlier session describes a folder nothing has
+        // watched since, so each file is asked whether anything else has
+        // touched it. Within a session nothing has, and asking would be a read
+        // per file for an answer that is always the same.
+        verify: !before.checked,
         onProgress: (done, total) => {
           host.patch({
             folder: { ...host.state().folder, progress: { done, total } },
@@ -167,9 +174,13 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
         busy: false,
         progress: null,
         written: written.wrote,
+        checked: true,
         problem: null,
       },
     });
+    // Kept with the handle, so the next session's first save is as small as
+    // this one was rather than a rewrite of the whole font.
+    await rememberFolder(folder, written.wrote);
 
     return {
       name: folder.name,
@@ -207,19 +218,90 @@ export async function forgetOpenFolder(host: FontHost): Promise<void> {
 }
 
 /**
- * Show, on the way in, which folder this editor was last working in.
+ * Pick up, on the way in, the folder this editor was last working in.
  *
- * Only the name. Reading the folder would replace the font that was recovered
- * from the working store, which is not something to do to somebody on the
- * strength of a handle in a database — so the name goes in the bar and the
- * click is theirs.
+ * Linked, not read. Reading would replace the font recovered from the working
+ * store — which is the one somebody left off in — with whatever is on disk, and
+ * that is a decision rather than a thing to do to them at startup. So the
+ * handle becomes the save target and the document stays as it was: Ctrl-S then
+ * writes where it wrote last time, with no folder to pick.
+ *
+ * What comes with it is the record of what that save left there, so the first
+ * save of a session is as small as any other. The record describes a folder
+ * nothing has watched since, though, so it is marked as wanting a check — see
+ * `writeTo`, which does it at the moment there is a gesture to do it under.
+ *
+ * Permission is the reason for that shape. A handle survives a reload and
+ * permission does not: asking needs a click behind it, so it cannot happen
+ * here. Where permission *has* survived — an installed app may keep it — the
+ * check happens here instead and the first save is silent.
  */
 export async function noteRememberedFolder(host: FontHost): Promise<void> {
   const remembered = await recallFolder();
   if (remembered === null) return;
   if (host.state().folder.name !== null) return;
-  host.patch({ folder: { ...host.state().folder, remembered: remembered.name } });
+
+  host.setFolder(remembered.folder, remembered.name);
+  host.patch({
+    folder: {
+      ...host.state().folder,
+      name: remembered.name,
+      remembered: null,
+      savedAt: remembered.at,
+      written: new Map(remembered.wrote),
+      // Nothing has looked at the folder since the last session, so what the
+      // record says about it is a belief rather than a fact.
+      checked: false,
+    },
+  });
+
+  // If permission outlived the restart there is nothing to wait for.
+  if ((await accessTo(remembered.folder, "readwrite")) === "granted") {
+    await checkFolder(host, remembered.folder);
+  }
 }
+
+/**
+ * Whether the folder still holds what the last save left in it.
+ *
+ * Three small files rather than all of them: `metainfo.plist` says it is still
+ * a UFO, `fontinfo.plist` moves whenever the font's own numbers do, and
+ * `glyphs/contents.plist` moves whenever a glyph is added or removed. Between
+ * them they catch "this is a different font now" for the price of three reads,
+ * which is what a startup can afford.
+ *
+ * It does not catch every case — somebody could edit one `.glif` and nothing
+ * else — and it does not have to: every file is checked against its own
+ * timestamp when the save comes to skip it. This is the coarse question asked
+ * early, so that a folder which is plainly not ours is said so before anything
+ * is written to it.
+ */
+async function checkFolder(host: FontHost, folder: DiskFolder): Promise<void> {
+  const state = host.state().folder;
+  const record = state.written;
+
+  const differs: string[] = [];
+  for (const path of SENTINELS) {
+    const was = record.get(path);
+    if (was === undefined) continue;
+    const now = await textAt(folder, path);
+    if (now === null || crc32(new TextEncoder().encode(now)) !== was.crc) differs.push(path);
+  }
+
+  host.patch({
+    folder: {
+      ...host.state().folder,
+      checked: true,
+      problem:
+        differs.length === 0
+          ? null
+          : `${folder.name} has changed since this editor last wrote to it — saving will write over it`,
+    },
+  });
+}
+
+/** The files worth reading to ask whether a folder is still the one we left. */
+const SENTINELS = ["metainfo.plist", "fontinfo.plist", "glyphs/contents.plist"];
 
 /** Whether a folder is empty, is a UFO already, or is somebody else's. */
 async function whatItHolds(folder: DiskFolder): Promise<"empty" | "ufo" | "other"> {

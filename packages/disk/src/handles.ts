@@ -22,7 +22,17 @@ export interface DiskWritable {
 export interface DiskFile {
   readonly kind: "file";
   readonly name: string;
-  getFile: () => Promise<{ arrayBuffer: () => Promise<ArrayBuffer> }>;
+  /**
+   * The file's contents, and when it last changed.
+   *
+   * `lastModified` is what says whether anything other than this editor has
+   * touched a file since it was written — the one question a checksum of our
+   * own writing cannot answer.
+   */
+  getFile: () => Promise<{
+    arrayBuffer: () => Promise<ArrayBuffer>;
+    readonly lastModified: number;
+  }>;
   createWritable: () => Promise<DiskWritable>;
 }
 

@@ -12,8 +12,27 @@ export class FakeFolder implements DiskFolder {
   readonly kind = "directory" as const;
   readonly files = new Map<string, string>();
   readonly folders = new Map<string, FakeFolder>();
+  /**
+   * When each file last changed, as a real filesystem would report it.
+   *
+   * A counter rather than a clock: the writer records the time it sees after
+   * writing and compares it on the next save, and two writes a millisecond
+   * apart on a real disk are two different times. A counter is that, without
+   * the test having to wait for a clock to move.
+   */
+  readonly times = new Map<string, number>();
+  private tick = 0;
 
-  constructor(readonly name: string) {}
+  /** Change a file the way something other than the editor would. */
+  touch(path: string, text: string): this {
+    this.put(path, text);
+    return this;
+  }
+
+  constructor(
+    readonly name: string,
+    private readonly root?: FakeFolder,
+  ) {}
 
   /** Put a file in, making the folders on the way, as a fixture would. */
   put(path: string, text: string): this {
@@ -21,7 +40,9 @@ export class FakeFolder implements DiskFolder {
     const file = parts.pop();
     if (file === undefined) throw new Error("no file name");
 
-    this.reach(parts).files.set(file, text);
+    const at = this.reach(parts);
+    at.files.set(file, text);
+    at.times.set(file, at.stamp());
     return this;
   }
 
@@ -32,7 +53,7 @@ export class FakeFolder implements DiskFolder {
 
     let next = this.folders.get(head);
     if (next === undefined) {
-      next = new FakeFolder(head);
+      next = new FakeFolder(head, this.root ?? this);
       this.folders.set(head, next);
     }
     return next.reach(parts.slice(1));
@@ -78,6 +99,13 @@ export class FakeFolder implements DiskFolder {
     await Promise.resolve();
   }
 
+  /** The next moment. Shared with the folders below, so times never repeat. */
+  private stamp(): number {
+    const root = this.root ?? this;
+    root.tick += 1;
+    return root.tick;
+  }
+
   private file(name: string): DiskFile {
     return {
       kind: "file",
@@ -88,6 +116,7 @@ export class FakeFolder implements DiskFolder {
             const bytes = new TextEncoder().encode(this.files.get(name) ?? "");
             return Promise.resolve(bytes.buffer);
           },
+          lastModified: this.times.get(name) ?? 0,
         }),
       createWritable: (): Promise<DiskWritable> => {
         let written = "";
@@ -98,6 +127,7 @@ export class FakeFolder implements DiskFolder {
           },
           close: () => {
             this.files.set(name, written);
+            this.times.set(name, this.stamp());
             return Promise.resolve();
           },
         });

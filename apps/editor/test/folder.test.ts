@@ -235,3 +235,72 @@ function glifName(store: Store): string {
   const contents = store.getState().session.editor.currentGlyph;
   return `${contents}.glif`;
 }
+
+/**
+ * Saving the same folder twice.
+ *
+ * A UFO is one file per glyph, so a save that rewrote all of them took long
+ * enough to look like the editor had stopped. The store keeps what the last
+ * save left, and hands it to the writer as the thing to compare against.
+ */
+describe("saving again", () => {
+  let store: Store;
+  beforeEach(() => {
+    store = freshStore();
+    offer(null);
+  });
+
+  it("writes nothing the second time when nothing has changed", async () => {
+    offer(await ufoOf(store));
+    await store.openFolder();
+
+    edit(store);
+    const first = await store.saveFolder();
+    expect(first.written).toBeGreaterThan(1);
+
+    const again = await store.saveFolder();
+    expect(again.written).toBe(0);
+  });
+
+  it("writes the glyph that moved, and not the rest of the font", async () => {
+    offer(await ufoOf(store));
+    await store.openFolder();
+    await store.saveFolder();
+
+    edit(store);
+    const again = await store.saveFolder();
+
+    // The glyph's own file, and the two indexes that name what is in the font.
+    expect(again.written).toBeLessThan(4);
+    expect(again.written).toBeGreaterThan(0);
+  });
+
+  it("keeps a record of what it left, for the session after this one", async () => {
+    offer(await ufoOf(store));
+    await store.openFolder();
+    await store.saveFolder();
+
+    const state = store.getState().folder;
+    expect(state.written.size).toBeGreaterThan(3);
+    expect(state.checked).toBe(true);
+    // Every entry says what the file held and when it was written.
+    for (const [, file] of state.written) {
+      expect(typeof file.crc).toBe("number");
+      expect(typeof file.at).toBe("number");
+    }
+  });
+
+  it("writes everything into a folder it has no record of", async () => {
+    offer(await ufoOf(store));
+    await store.openFolder();
+    await store.saveFolder();
+
+    // Save as, somewhere else: what the record says about the old folder says
+    // nothing at all about this one.
+    const elsewhere = new FakeFolder("Elsewhere.ufo");
+    offer(elsewhere);
+    const report = await store.saveFolderAs();
+
+    expect(report?.written).toBe(store.getState().folder.written.size);
+  });
+});

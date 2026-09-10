@@ -198,3 +198,82 @@ describe("saving again", () => {
     expect(seen).toEqual([[0, 0]]);
   });
 });
+
+/**
+ * A record made in an earlier session.
+ *
+ * Within one session this editor is the only thing that has written to the
+ * folder, so a checksum of its own writing is enough. Across a restart the
+ * record describes a folder nobody has looked at since — and a source somebody
+ * edited in another program would otherwise be skipped and left silently
+ * disagreeing with what the editor believes it wrote.
+ */
+describe("saving into a folder nothing has watched", () => {
+  it("still skips the files nothing has touched", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a", "b", "c"));
+    const first = await writeFolder(folder, entries);
+
+    const again = await writeFolder(folder, entries, { known: first.wrote, verify: true });
+
+    expect(again.written).toBe(0);
+    expect(again.notes).toEqual([]);
+  });
+
+  it("writes over a file something else changed, and says so", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a", "b", "c"));
+    const first = await writeFolder(folder, entries);
+
+    // Somebody opened the source in another editor between sessions.
+    folder.touch("glyphs/b.glif", "<glyph name='b'>edited elsewhere</glyph>");
+
+    const again = await writeFolder(folder, entries, { known: first.wrote, verify: true });
+
+    expect(again.written).toBe(1);
+    expect(again.notes.join(" ")).toMatch(/glyphs\/b\.glif had changed/);
+    // And what is there now is the font's, not the stranger's.
+    expect(folder.all().get("glyphs/b.glif")).not.toContain("edited elsewhere");
+  });
+
+  it("writes a file somebody deleted", async () => {
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a", "b"));
+    const first = await writeFolder(folder, entries);
+
+    const glyphs = await folder.getDirectoryHandle("glyphs");
+    await glyphs.removeEntry("a.glif");
+
+    const again = await writeFolder(folder, entries, { known: first.wrote, verify: true });
+
+    expect(again.written).toBe(1);
+    expect(folder.all().has("glyphs/a.glif")).toBe(true);
+  });
+
+  it("does not ask about timestamps when it has no reason to", async () => {
+    // The same folder within one session: nothing else can have touched it, and
+    // asking would be a read per file for an answer that is always the same.
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a", "b"));
+    const first = await writeFolder(folder, entries);
+
+    folder.touch("glyphs/b.glif", "<glyph name='b'>edited elsewhere</glyph>");
+    const again = await writeFolder(folder, entries, { known: first.wrote });
+
+    expect(again.written).toBe(0);
+    expect(folder.all().get("glyphs/b.glif")).toContain("edited elsewhere");
+  });
+
+  it("carries the record forward for the files it skipped", async () => {
+    // Or the save after this one would think it knew nothing about them.
+    const folder = new FakeFolder("Test.ufo");
+    const entries = ufoFiles(font("a", "b"));
+    const first = await writeFolder(folder, entries);
+
+    const second = await writeFolder(folder, entries, { known: first.wrote, verify: true });
+    expect([...second.wrote.keys()].sort()).toEqual([...first.wrote.keys()].sort());
+
+    const third = await writeFolder(folder, entries, { known: second.wrote, verify: true });
+    expect(third.written).toBe(0);
+  });
+});

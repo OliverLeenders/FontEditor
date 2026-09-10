@@ -1,4 +1,5 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@fonteditor/catalog";
+import type { WrittenFile } from "@fonteditor/disk";
 import type { ExtraLayer } from "@fonteditor/font-io";
 import { type EditSession, session as newSession } from "@fonteditor/edit-core";
 import { editorState } from "@fonteditor/tools";
@@ -191,7 +192,15 @@ export type FolderState = {
    * is the honest answer: a folder this session has not written to is somebody
    * else's, whatever the session before it did.
    */
-  readonly written: ReadonlyMap<string, number>;
+  readonly written: ReadonlyMap<string, WrittenFile>;
+  /**
+   * Whether anything has looked at the folder this session.
+   *
+   * False for a folder picked up from the last session on the way in: the
+   * record of what is in it is a belief until something reads it, and a save
+   * under that belief checks each file it means to skip.
+   */
+  readonly checked: boolean;
   readonly problem: string | null;
 };
 
@@ -203,6 +212,7 @@ export const NO_FOLDER: FolderState = {
   busy: false,
   progress: null,
   written: new Map(),
+  checked: true,
   problem: null,
 };
 

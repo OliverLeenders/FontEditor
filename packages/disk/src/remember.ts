@@ -1,3 +1,4 @@
+import type { WrittenFile } from "./folder.js";
 import type { DiskFolder } from "./handles.js";
 
 /**
@@ -24,10 +25,31 @@ export type RememberedFolder = {
   /** The folder's name when it was chosen, for showing before permission. */
   readonly name: string;
   readonly at: number;
+  /**
+   * What the last save left in it, so the next session's first save is not a
+   * rewrite of the whole font.
+   *
+   * Empty for a folder remembered before this was kept, and for one that has
+   * been opened but not yet written to — in both cases the next save writes
+   * everything, which is the right answer when nothing is known.
+   *
+   * A plain array of pairs rather than a `Map`: what goes into IndexedDB is
+   * structured-cloned, and while a `Map` survives that, an array is the shape
+   * that will still read the same if this is ever written by anything else.
+   */
+  readonly wrote: readonly (readonly [string, WrittenFile])[];
 };
 
-export async function rememberFolder(folder: DiskFolder): Promise<void> {
-  const remembered: RememberedFolder = { folder, name: folder.name, at: Date.now() };
+export async function rememberFolder(
+  folder: DiskFolder,
+  wrote: ReadonlyMap<string, WrittenFile> = new Map(),
+): Promise<void> {
+  const remembered: RememberedFolder = {
+    folder,
+    name: folder.name,
+    at: Date.now(),
+    wrote: [...wrote],
+  };
   await inStore("readwrite", (store) => store.put(remembered, KEY));
 }
 
@@ -38,7 +60,22 @@ export async function recallFolder(): Promise<RememberedFolder | null> {
   // Written by an older version of this editor, or by something else entirely.
   const candidate = found as Partial<RememberedFolder>;
   if (candidate.folder === undefined || typeof candidate.name !== "string") return null;
-  return { folder: candidate.folder, name: candidate.name, at: candidate.at ?? 0 };
+  return {
+    folder: candidate.folder,
+    name: candidate.name,
+    at: candidate.at ?? 0,
+    wrote: Array.isArray(candidate.wrote) ? candidate.wrote.filter(isWritten) : [],
+  };
+}
+
+/** Believe nothing about what is in the database: it may be older than this. */
+function isWritten(entry: unknown): entry is readonly [string, WrittenFile] {
+  if (!Array.isArray(entry) || entry.length !== 2) return false;
+  const [path, file] = entry as [unknown, unknown];
+  if (typeof path !== "string" || typeof file !== "object" || file === null) return false;
+
+  const written = file as Partial<WrittenFile>;
+  return typeof written.crc === "number" && typeof written.at === "number";
 }
 
 export async function forgetFolder(): Promise<void> {

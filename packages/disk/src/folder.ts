@@ -68,14 +68,29 @@ export type WriteReport = {
   /** Things the user should know were left as they were. */
   readonly notes: readonly string[];
   /**
-   * What every file now holds, as a checksum, for the next save to compare.
+   * What every file now holds, for the next save to compare against.
    *
    * The caller keeps it and hands it back. Kept by the caller rather than read
    * off the disk because reading a file to find out whether it needs writing
    * costs as much as writing it — and because this is a record of what *we*
    * put there, which is the thing worth comparing against.
    */
-  readonly wrote: ReadonlyMap<string, number>;
+  readonly wrote: ReadonlyMap<string, WrittenFile>;
+};
+
+/** What one file held when this editor last wrote it, and when that was. */
+export type WrittenFile = {
+  /** A checksum of the contents, which is what says whether to write again. */
+  readonly crc: number;
+  /**
+   * The file's modified time as the filesystem reported it just afterwards.
+   *
+   * Not for comparing contents — the checksum does that — but for telling
+   * whether anything *else* has touched the file since. Within a session
+   * nothing has, and asking would cost a read per file for an answer that is
+   * always the same; across a restart it is the only way to know.
+   */
+  readonly at: number;
 };
 
 export type WriteOptions = {
@@ -92,7 +107,20 @@ export type WriteOptions = {
    * everything: what is on disk is somebody else's, and only what we wrote
    * ourselves can be assumed to be what we think it is.
    */
-  readonly known?: ReadonlyMap<string, number> | undefined;
+  readonly known?: ReadonlyMap<string, WrittenFile> | undefined;
+  /**
+   * Check that nothing else has touched a file before skipping it.
+   *
+   * For a record made in an earlier session. Within one, this editor is the
+   * only thing that has written to the folder and the checksum is enough; after
+   * a restart the record describes a folder nobody has looked at since, and a
+   * source somebody edited in another program would be skipped and silently
+   * left disagreeing with what the editor believes it wrote.
+   *
+   * It costs one question per file about when it changed — far less than
+   * writing it, and far less than reading it.
+   */
+  readonly verify?: boolean | undefined;
   /**
    * Called as each file lands, with how many are done and how many there are.
    *
@@ -136,12 +164,29 @@ export async function writeFolder(
   // What each file will hold, worked out before anything is written: the
   // comparison is against what the last save put there, and the answer is also
   // what this save hands back for the next one to compare against.
-  const wrote = new Map<string, number>();
+  const sums = new Map<string, number>();
   const wanted: ZipEntry[] = [];
   for (const entry of entries) {
     const sum = crc32(entryBytes(entry));
-    wrote.set(entry.path, sum);
-    if (options.known?.get(entry.path) !== sum) wanted.push(entry);
+    sums.set(entry.path, sum);
+
+    const before = options.known?.get(entry.path);
+    if (before === undefined || before.crc !== sum) {
+      wanted.push(entry);
+      continue;
+    }
+    // The contents match what we wrote. Whether the file is still what we wrote
+    // is a different question, and one only worth asking across a restart.
+    if (options.verify === true && !(await untouched(folder, entry.path, before.at))) {
+      wanted.push(entry);
+      notes.push(`${entry.path} had changed since the last save, and was written over`);
+    }
+  }
+
+  const wrote = new Map<string, WrittenFile>();
+  for (const [path, crc] of sums) {
+    const before = options.known?.get(path);
+    if (before !== undefined && before.crc === crc) wrote.set(path, before);
   }
 
   let done = 0;
@@ -150,6 +195,10 @@ export async function writeFolder(
     await writeFile(folder, entry.path, entryBytes(entry));
     done += 1;
     options.onProgress?.(done, wanted.length);
+    wrote.set(entry.path, {
+      crc: sums.get(entry.path) ?? 0,
+      at: await modifiedAt(folder, entry.path),
+    });
   }
 
   const now = new Set(
@@ -177,6 +226,45 @@ export async function writeFolder(
   return { written: wanted.length, skipped: entries.length - wanted.length, removed, notes, wrote };
 }
 
+/**
+ * When a file last changed, or now if the filesystem will not say.
+ *
+ * "Now" is the forgiving answer: it means the next save trusts the checksum,
+ * which is what a filesystem with no timestamps leaves us with anyway.
+ */
+async function modifiedAt(folder: DiskFolder, path: string): Promise<number> {
+  const file = await fileAt(folder, path);
+  return file?.lastModified ?? Date.now();
+}
+
+/** Whether a file is still the one we wrote, by when it last changed. */
+async function untouched(folder: DiskFolder, path: string, at: number): Promise<boolean> {
+  const file = await fileAt(folder, path);
+  // Gone is not untouched. A file the record knows and the folder does not is
+  // one somebody deleted, and it has to be written again.
+  if (file === null) return false;
+  return file.lastModified <= at;
+}
+
+/** One file's handle, followed through the directories, or `null`. */
+async function fileAt(
+  folder: DiskFolder,
+  path: string,
+): Promise<{ readonly lastModified: number } | null> {
+  const parts = path.split("/");
+  const name = parts.pop();
+  if (name === undefined) return null;
+
+  try {
+    let at = folder;
+    for (const part of parts) at = await at.getDirectoryHandle(part);
+    return await (await at.getFileHandle(name)).getFile();
+  } catch {
+    // Not there, or the folder said no. Either way there is nothing to compare.
+    return null;
+  }
+}
+
 /** Write one file, making the directories on the way to it. */
 async function writeFile(folder: DiskFolder, path: string, data: Uint8Array): Promise<void> {
   const parts = path.split("/");
@@ -193,7 +281,7 @@ async function writeFile(folder: DiskFolder, path: string, data: Uint8Array): Pr
 }
 
 /** The text of a file, or `null` if it is not there. */
-async function textAt(folder: DiskFolder, path: string): Promise<string | null> {
+export async function textAt(folder: DiskFolder, path: string): Promise<string | null> {
   const parts = path.split("/");
   const name = parts.pop();
   if (name === undefined) return null;

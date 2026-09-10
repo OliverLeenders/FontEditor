@@ -16,8 +16,8 @@
 
 export type { Access, Askable, DiskFile, DiskFolder, DiskWritable } from "./handles.js";
 
-export type { WriteReport } from "./folder.js";
-export { MAX_DEPTH, readFolder, writeFolder } from "./folder.js";
+export type { WriteOptions, WriteReport, WrittenFile } from "./folder.js";
+export { MAX_DEPTH, readFolder, textAt, writeFolder } from "./folder.js";
 
 export { accessTo, askAccess, canOpenFolders, pickFolder } from "./access.js";
 
