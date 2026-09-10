@@ -268,13 +268,19 @@ the operating system's own webview at the editor. Building it needs a Rust toolc
 which ships with Windows 11.
 
 Tauri rather than Electron for one reason that matters here and one that does not. The one
-that does not is size: ~10 MB against ~150 MB, because the browser is the one already on
-the machine rather than a second copy of Chromium. The one that does is that using the
-system webview means using _a_ browser rather than a pinned one, and this editor is
-unusually dependent on browser APIs — the File System Access API for a folder on disk, the
-private filesystem for autosave, Web Locks so two windows cannot write the same project,
-and a worker. On Windows the system webview is WebView2, which is Chromium, so those are
-the same implementations the browser build is tested against.
+that does not is size: the installer is 2.4 MB against something like 150, because the
+browser is the one already on the machine rather than a second copy of Chromium. The one
+that does is the risk that buys: a system webview is _a_ browser rather than a pinned one,
+and this editor is unusually dependent on browser APIs — the File System Access API for a
+folder on disk, the private filesystem for autosave, Web Locks so two windows cannot write
+the same project, and a worker. Electron would have guaranteed all four by carrying its own
+Chromium.
+
+On Windows the system webview is WebView2, which is Chromium, and the File System Access
+API is there: the File menu offers _Open folder…_, which it only does when
+`showDirectoryPicker` exists. That was the question the whole choice rested on, and it is
+worth re-asking on any platform this is built for, because the answer is the platform's
+rather than ours.
 
 Nothing in `src-tauri` knows anything about fonts. It opens a window and gets out of the
 way: no commands, no plugins beyond a logger, and no Tauri API called from the editor —
