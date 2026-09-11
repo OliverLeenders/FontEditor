@@ -20,6 +20,8 @@ export function Projects(): React.JSX.Element {
 
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
+  // The font whose Forget is being asked about, if one is.
+  const [confirming, setConfirming] = useState<string | null>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -71,16 +73,49 @@ export function Projects(): React.JSX.Element {
                     {project.folder ?? "not saved to a folder"} · {since(project.openedAt)}
                   </span>
                 </button>
-                <button
-                  type="button"
-                  className={styles.forget}
-                  title="Take this off the list. The folder on disk is not touched."
-                  onClick={() => {
-                    void store.forgetProject(project.id);
-                  }}
-                >
-                  Forget
-                </button>
+                {confirming === project.id ? (
+                  <div
+                    className={styles.confirm}
+                    role="group"
+                    aria-label={`Forget ${project.name}?`}
+                  >
+                    <span className={styles.confirmText}>
+                      {project.folder === null
+                        ? "Never saved to a folder, so this is its only copy."
+                        : `${project.folder} stays on disk. Changes not saved to it are deleted.`}
+                    </span>
+                    <button
+                      type="button"
+                      className={project.folder === null ? styles.danger : styles.small}
+                      onClick={() => {
+                        setConfirming(null);
+                        void store.forgetProject(project.id);
+                      }}
+                    >
+                      {project.folder === null ? "Delete" : "Remove"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.small}
+                      onClick={() => {
+                        setConfirming(null);
+                      }}
+                    >
+                      Keep
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.forget}
+                    title="Take this off the list and delete Typewright's copy of it. The folder on disk is not touched."
+                    onClick={() => {
+                      setConfirming(project.id);
+                    }}
+                  >
+                    Forget
+                  </button>
+                )}
               </li>
             ))}
           </ul>

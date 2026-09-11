@@ -10,6 +10,8 @@ import {
   touchProject,
 } from "@typewright/disk";
 
+import { deleteWorkingCopy, forgottenCopies, workingCopies } from "@typewright/storage";
+
 import { confirmSaved, noteFolder } from "./folder.js";
 import type { FontHost } from "./fonts.js";
 import type { ProjectSummary } from "./state.js";
@@ -190,15 +192,42 @@ export async function startProject(name: string): Promise<void> {
 }
 
 /**
- * Forget a font, leaving the folder on disk alone.
+ * Forget a font: take it off the list, and delete Typewright's copy of it.
  *
- * The working copy is left too. It is keyed by the project's id, so nothing
- * will look in it again; deleting it would be the one irreversible thing in
- * this whole file, and "remove from the list" is not a request to destroy the
- * only copy of somebody's work.
+ * The folder on disk is never touched. The working copy goes with the record,
+ * because a copy nothing will ever open again is not being kept, only left —
+ * and the chooser asks first, in words that say which of the two a font is: one
+ * whose folder has it, or one whose working copy is the only copy there is.
+ *
+ * Never the font that is open, whose copy is being written to as this runs. And
+ * a copy another window has open is left for that window: the record is gone,
+ * so the next start sweeps it up once nothing holds it.
  */
 export async function forgetProject(host: FontHost, id: string): Promise<void> {
+  if (id === host.state().projects.current) return;
+
   await dropProject(id);
+  await deleteWorkingCopy(id);
   const all = await listProjects();
   host.patch({ projects: { ...host.state().projects, all: all.map(summaryOf) } });
+}
+
+/**
+ * Delete the working copies no font refers to.
+ *
+ * Left by a font forgotten while another window had it open, or forgotten
+ * before forgetting deleted anything. Run once, on the way in.
+ *
+ * Only when the list of fonts could be read and has something in it. By the
+ * time this runs there is always at least one — the way in makes sure of it —
+ * so an empty list means the list could not be read, and "no font refers to
+ * this copy" would then be true of every copy there is.
+ */
+export async function sweepForgotten(): Promise<void> {
+  const known = new Set((await listProjects()).map((it) => it.id));
+  if (known.size === 0) return;
+
+  for (const name of forgottenCopies(await workingCopies(), known)) {
+    await deleteWorkingCopy(name);
+  }
 }

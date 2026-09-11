@@ -76,6 +76,8 @@ export type { LoadedProject } from "./client.js";
 export { StorageClient } from "./client.js";
 
 export { OpfsFileStore, requestPersistence } from "./opfs.js";
+export type { Removal, WorkingRoot } from "./working-copies.js";
+export { deleteWorkingCopy, forgottenCopies, workingCopies } from "./working-copies.js";
 
 export { AT_ONCE, inParallel } from "./parallel.js";
 

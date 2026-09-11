@@ -156,3 +156,46 @@
   color: var(--ink-2);
   font-size: 0.75rem;
 }
+
+/*
+ * Asking about Forget, under the row it is about. Its own line, so the answer
+ * is never squeezed beside a name long enough to push it out of reach.
+ */
+.row {
+  flex-wrap: wrap;
+}
+
+.confirm {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 0.35rem;
+  align-items: center;
+  padding: 0.35rem 0.1rem 0.1rem;
+}
+
+.confirmText {
+  flex: 1;
+  color: var(--ink-2);
+  font-size: 0.72rem;
+}
+
+.small,
+.danger {
+  padding: 0.22rem 0.55rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.small:hover {
+  background: var(--surface-2);
+}
+
+/* Deleting the only copy of a font gets the colour for things that cannot be undone. */
+.danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}

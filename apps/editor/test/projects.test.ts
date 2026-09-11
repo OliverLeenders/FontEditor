@@ -263,3 +263,26 @@ describe("a save, as the next session finds it", () => {
     expect(second.unsavedOnDisk).toBe(false);
   });
 });
+
+describe("forgetting a font", () => {
+  it("takes it off the list", async () => {
+    const store = freshStore();
+    await saveProject({ ...newProject("Kept"), id: "a" });
+    await saveProject({ ...newProject("Dropped"), id: "b" });
+
+    await store.forgetProject("b");
+
+    expect(await projectById("b")).toBeNull();
+    expect(store.getState().projects.all.map((it) => it.id)).toEqual(["a"]);
+  });
+
+  it("never forgets the font that is open", async () => {
+    const store = freshStore();
+    await saveProject({ ...newProject("Open"), id: "a" });
+    store.patch({ projects: { ...store.getState().projects, current: "a" } });
+
+    await store.forgetProject("a");
+
+    expect(await projectById("a")).not.toBeNull();
+  });
+});

@@ -70,6 +70,7 @@ import {
   arrive,
   chosenOnReload,
   forgetProject,
+  sweepForgotten,
   noteProjects,
   showChooser,
   startProject,
@@ -660,6 +661,11 @@ export class EditorStore {
   /** Start a font that has no folder yet, and open it. */
   async startProject(name: string): Promise<void> {
     await startProject(name);
+  }
+
+  /** Delete the working copies of fonts that are no longer on the list. */
+  async sweepForgotten(): Promise<void> {
+    await sweepForgotten();
   }
 
   /** Take a font off the list. The folder on disk is not touched. */

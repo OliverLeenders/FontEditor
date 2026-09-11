@@ -248,6 +248,10 @@ export function App(): React.JSX.Element {
       const arrival = await store.decideArrival(skipRef.current);
       if (!running.yes) return;
 
+      // Copies left by fonts forgotten while another window had them open. Not
+      // awaited: nothing on screen waits for it.
+      void store.sweepForgotten();
+
       if (arrival.kind === "choose") {
         store.offerProjects(arrival.all);
         return;
