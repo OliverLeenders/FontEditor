@@ -4,7 +4,6 @@ import { session as newSession } from "@typewright/edit-core";
 import {
   type ExtraLayer,
   type FamilyImport,
-  importFont as parseFontFile,
   importUfo,
   looksLikeArchive,
   looksLikeFamily,
@@ -96,19 +95,7 @@ export async function importFont(
     if (family !== null) return await adoptFamilyFrom(host, family);
   }
 
-  const read = looksLikeUfo(fileName)
-    ? await readUfo(bytes)
-    : (() => {
-        const parsed = parseFontFile(bytes, randomIds());
-        return {
-          document: parsed.document,
-          images: new Map<string, Uint8Array>(),
-          layers: [] as readonly ExtraLayer[],
-          warnings: parsed.warnings.map((w) =>
-            w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
-          ),
-        };
-      })();
+  const read = looksLikeUfo(fileName) ? await readUfo(bytes) : await readBinary(bytes);
 
   await adoptDocument(host, read.document);
   await adoptImages(host, read.images);
@@ -164,6 +151,29 @@ async function adoptFamilyFrom(host: FontHost, family: FamilyImport): Promise<Im
       `${String(family.masters.length)} masters: ${family.masters.map((m) => m.name).join(", ")}`,
       ...family.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
     ],
+  };
+}
+
+/**
+ * An OTF or TTF, read with the font parser — which is fetched here, the first
+ * time a binary font is opened, rather than carried by every page load. See
+ * `@typewright/font-io/binary`.
+ */
+async function readBinary(bytes: ArrayBuffer): Promise<{
+  document: FontDocument;
+  warnings: string[];
+  images: ReadonlyMap<string, Uint8Array>;
+  layers: readonly ExtraLayer[];
+}> {
+  const { importFont } = await import("@typewright/font-io/binary");
+  const parsed = importFont(bytes, randomIds());
+  return {
+    document: parsed.document,
+    images: new Map<string, Uint8Array>(),
+    layers: [],
+    warnings: parsed.warnings.map((w) =>
+      w.glyph === null ? w.message : `${w.glyph}: ${w.message}`,
+    ),
   };
 }
 

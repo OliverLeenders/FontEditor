@@ -1,15 +1,4 @@
-import {
-  exportFamily,
-  exportInstances,
-  exportFileName,
-  exportFont,
-  exportTrueType,
-  toWoff,
-  toWoff2,
-  exportUfo,
-  exportVariableFont,
-  exportVariableTrueType,
-} from "@typewright/font-io";
+import { exportFamily, exportFileName, exportUfo, toWoff, toWoff2 } from "@typewright/font-io";
 import { type Location, defaultLocation } from "@typewright/font-model";
 import { useState } from "react";
 
@@ -34,6 +23,15 @@ type Status =
  * composite glyphs, and none of that survives a trip through this model. A
  * button that said "Save" would be promising something it cannot do.
  */
+/**
+ * The exporters that need a font parser, fetched the first time one is used.
+ *
+ * See `@typewright/font-io/binary`. A format that is only a wrapper round the
+ * TrueType flavour — WOFF, WOFF2 — still needs the TrueType flavour first, so
+ * it waits for this too.
+ */
+const binary = () => import("@typewright/font-io/binary");
+
 export function ExportFont(): React.JSX.Element {
   const store = useEditorStore();
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
@@ -71,19 +69,9 @@ export function ExportFont(): React.JSX.Element {
     }
   };
 
-  const attempt = (run: () => { file: string; warnings: readonly string[] }): void => {
-    try {
-      setStatus({ kind: "done", ...run() });
-    } catch (error) {
-      setStatus({
-        kind: "failed",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  };
-
   const otf = (): void =>
-    attempt(() => {
+    void attemptAsync(async () => {
+      const { exportFont } = await binary();
       const document = store.editor.document;
       const { bytes, warnings } = exportFont(document);
       const file = exportFileName(document);
@@ -124,6 +112,7 @@ export function ExportFont(): React.JSX.Element {
     void attemptAsync(async () => {
       const project = store.getState().project;
       const masters = await store.allMasters();
+      const { exportInstances } = await binary();
       const out = exportInstances(project.axes, masters, project.instances);
       download(out.bytes.slice().buffer, out.fileName, "application/zip");
       return { file: `${out.fileName} · ${String(out.files)} fonts`, warnings: out.warnings };
@@ -147,6 +136,7 @@ export function ExportFont(): React.JSX.Element {
         ...all.filter((m) => !atHome(m.location, home, project.axes)),
       ];
 
+      const { exportVariableFont } = await binary();
       const out = exportVariableFont(project.axes, ordered, project.instances);
       const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.otf");
       download(out.bytes, file, "font/otf");
@@ -173,6 +163,7 @@ export function ExportFont(): React.JSX.Element {
         ...all.filter((m) => !atHome(m.location, home, project.axes)),
       ];
 
+      const { exportVariableTrueType } = await binary();
       const out = exportVariableTrueType(project.axes, ordered, project.instances);
       const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.ttf");
       download(out.bytes, file, "font/ttf");
@@ -188,7 +179,8 @@ export function ExportFont(): React.JSX.Element {
    * exact, and is the one to hand to somebody who will edit it again.
    */
   const truetype = (): void =>
-    attempt(() => {
+    void attemptAsync(async () => {
+      const { exportTrueType } = await binary();
       const document = store.editor.document;
       const { bytes, warnings } = exportTrueType(document);
       const file = exportFileName(document).replace(/\.otf$/, ".ttf");
@@ -210,6 +202,7 @@ export function ExportFont(): React.JSX.Element {
    */
   const woff = (): void =>
     void attemptAsync(async () => {
+      const { exportTrueType } = await binary();
       const document = store.editor.document;
       const made = exportTrueType(document);
       const bytes = await toWoff(new Uint8Array(made.bytes));
@@ -227,6 +220,7 @@ export function ExportFont(): React.JSX.Element {
    */
   const woff2 = (): void =>
     void attemptAsync(async () => {
+      const { exportTrueType } = await binary();
       const document = store.editor.document;
       const made = exportTrueType(document);
       const out = await toWoff2(new Uint8Array(made.bytes));
