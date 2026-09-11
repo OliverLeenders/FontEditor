@@ -101,6 +101,32 @@ describe("what the editor does with its first moment", () => {
   });
 });
 
+describe("deciding what to open", () => {
+  it("gives the same answer however many times it is asked", async () => {
+    // React runs a start-up effect twice in development. Reading the font a
+    // reload was sent to open clears that note, so a second, independent
+    // decision would find nothing and show the list again.
+    await saveProject({ ...newProject("One"), id: "a" });
+    await saveProject({ ...newProject("Two"), id: "b" });
+    const store = freshStore();
+    localStorage.setItem("typewright.project", "b");
+
+    const first = await store.decideArrival(false);
+    const second = await store.decideArrival(false);
+
+    expect(first).toEqual({ kind: "open", id: "b" });
+    expect(second).toEqual(first);
+  });
+
+  it("covers the editor until something is decided", () => {
+    const store = freshStore();
+    expect(store.getState().projects.arriving).toBe(true);
+
+    store.offerProjects([]);
+    expect(store.getState().projects.arriving).toBe(false);
+  });
+});
+
 describe("the chooser on screen", () => {
   it("is not shown until something asks for it", () => {
     const store = freshStore();

@@ -87,7 +87,7 @@ const UNTITLED = "Untitled font";
 export async function noteProjects(host: FontHost, current: string | null): Promise<void> {
   const all = await listProjects();
   host.patch({
-    projects: { all: all.map(summaryOf), current, showing: false },
+    projects: { all: all.map(summaryOf), current, showing: false, arriving: false },
   });
   if (current === null) return;
 

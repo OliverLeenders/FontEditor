@@ -173,9 +173,22 @@ export type ProjectsState = {
   readonly current: string | null;
   /** Whether the chooser is on screen instead of the font. */
   readonly showing: boolean;
+  /**
+   * Whether the editor is still deciding what to open.
+   *
+   * True from the first frame until either the chooser is up or a font is
+   * loaded. Without it the first thing drawn is the starter font, which is
+   * neither the list nor the font about to open — a flash of a third thing.
+   */
+  readonly arriving: boolean;
 };
 
-export const NO_PROJECTS: ProjectsState = { all: [], current: null, showing: false };
+export const NO_PROJECTS: ProjectsState = {
+  all: [],
+  current: null,
+  showing: false,
+  arriving: true,
+};
 
 /**
  * Where the font stands with respect to a folder on the user's disk.

@@ -604,11 +604,21 @@ export class EditorStore {
    * A reload asking for a particular font wins over both. That is how the
    * chooser opens anything at all — see `switchTo`.
    */
-  async decideArrival(skipChooser: boolean): Promise<Arrival> {
-    const chosen = await chosenOnReload();
-    if (chosen !== null) return { kind: "open", id: chosen };
-    return await arrive(skipChooser);
+  decideArrival(skipChooser: boolean): Promise<Arrival> {
+    // Decided once per page, however many times it is asked. Reading which font
+    // a reload was sent to open also clears that note, so asking twice would
+    // get two different answers — and React asks twice in development, running
+    // every effect, cancelling it, and running it again. The first run took the
+    // note and was cancelled; the second found nothing and put the chooser back.
+    this.arrival ??= (async (): Promise<Arrival> => {
+      const chosen = await chosenOnReload();
+      if (chosen !== null) return { kind: "open", id: chosen };
+      return await arrive(skipChooser);
+    })();
+    return this.arrival;
   }
+
+  private arrival: Promise<Arrival> | null = null;
 
   /**
    * Put the list of fonts on screen with none of them open yet.
@@ -618,7 +628,7 @@ export class EditorStore {
    * starts the editor.
    */
   offerProjects(all: readonly ProjectSummary[]): void {
-    this.patch({ projects: { all, current: null, showing: true } });
+    this.patch({ projects: { all, current: null, showing: true, arriving: false } });
   }
 
   /**

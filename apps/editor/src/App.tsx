@@ -47,6 +47,7 @@ export function App(): React.JSX.Element {
   const ownership = useStoreValue((s) => s.ownership);
   const theme = useStoreValue((s) => s.theme);
   const showChooser = useStoreValue((s) => s.projects.showing);
+  const arriving = useStoreValue((s) => s.projects.arriving);
 
   // Read once, on the way in, but from a ref: the effect that asks must not be
   // re-run because the reader later changed their mind about being asked.
@@ -274,7 +275,12 @@ export function App(): React.JSX.Element {
           </button>
         </div>
       ) : null}
-      {showChooser ? <Projects /> : null}
+      {showChooser ? (
+        <Projects />
+      ) : arriving ? (
+        // Blank until there is something true to show: the list, or the font.
+        <div className={styles.arriving} aria-busy="true" />
+      ) : null}
       <TabBar current={view} onSelect={setView} glyphName={glyphName} />
       {view === "features" ? (
         <main className={styles.stage}>

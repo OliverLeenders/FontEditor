@@ -109,3 +109,14 @@
 .readOnly button:hover {
   background: rgba(255, 255, 255, 0.12);
 }
+
+/*
+ * What covers the editor while it decides what to open. The same ground as the
+ * list of fonts, so a start that ends at the list does not flicker on the way.
+ */
+.arriving {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: var(--ground);
+}
