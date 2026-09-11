@@ -124,7 +124,7 @@ export function FileMenu(): React.JSX.Element {
     kind: "item",
     label: "Fonts…",
     icon: FolderClockIcon,
-    note: "switch between the fonts you have open",
+    hint: "Switch to another font, or start a new one",
     disabled: working,
     run: () => {
       store.showProjects(true);
@@ -155,7 +155,7 @@ export function FileMenu(): React.JSX.Element {
         kind: "item",
         label: `Re-read ${folder.name}`,
         icon: FolderClockIcon,
-        note: "discards changes not saved to it",
+        hint: `Read ${folder.name} from disk again, discarding changes not saved to it`,
         disabled: working,
         run: () =>
           void attempt(async () => {

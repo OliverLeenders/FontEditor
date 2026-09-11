@@ -26,9 +26,23 @@
   font-size: 0.8rem;
   color: var(--ink);
 }
+/*
+ * A step lighter than the menu, not a slab of accent. The row under the pointer
+ * only has to be findable; inverting it makes every pass down the menu a
+ * flicker of blue and white.
+ */
 .item:hover {
-  background: var(--accent);
-  color: var(--surface);
+  background: var(--surface-2);
+}
+
+/*
+ * The words never break. A menu is read down its left edge, so a row that wraps
+ * is worse than a menu that is wider — and anything too long for one line
+ * belongs in the item's hint, not its row.
+ */
+.label,
+.note {
+  white-space: nowrap;
 }
 
 /*
@@ -51,7 +65,7 @@
   height: 0.85rem;
 }
 .item:hover .mark {
-  color: inherit;
+  color: var(--ink-2);
 }
 /*
  * The word after a label: a shortcut, a count, what a format is for.
@@ -64,10 +78,6 @@
   padding-left: 0.75rem;
   color: var(--ink-3);
   font-size: 0.92em;
-}
-.item:hover .note {
-  color: inherit;
-  opacity: 0.8;
 }
 
 .separator {

@@ -33,6 +33,14 @@ export type Item =
       readonly disabled?: boolean;
       /** A word after the label: a count, a key, a state. */
       readonly note?: string;
+      /**
+       * A sentence about the item, shown on hover rather than in the row.
+       *
+       * For what does not fit as a word. A sentence in the note column wraps,
+       * and a menu whose rows break across three lines is read a fragment at a
+       * time instead of down its left edge.
+       */
+      readonly hint?: string;
     }
   | { readonly kind: "separator" };
 
@@ -61,6 +69,7 @@ export function MenuItems({
             role="menuitemcheckbox"
             aria-checked={item.checked ?? false}
             disabled={item.disabled ?? false}
+            title={item.hint}
             className={styles.item}
             onClick={() => {
               item.run();
@@ -70,7 +79,7 @@ export function MenuItems({
             <span className={styles.mark} aria-hidden="true">
               <ItemMark item={item} />
             </span>
-            {item.label}
+            <span className={styles.label}>{item.label}</span>
             {/* A space of its own, so the name a screen reader reads out is
                 "Save Ctrl-S" rather than "SaveCtrl-S". */}
             {item.note === undefined ? null : (
