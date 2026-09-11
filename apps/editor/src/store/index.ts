@@ -43,15 +43,7 @@ import {
   MIN_PROOF_SIZE,
   MIN_SPACING_SIZE,
 } from "../limits.js";
-import {
-  type InspectorDock,
-  type InspectorPlacement,
-  type ThemeChoice,
-  MAX_DOCK_WIDTH,
-  MIN_DOCK_WIDTH,
-  clampInspector,
-  loadPreferences,
-} from "../preferences.js";
+import { type InspectorDock, type ThemeChoice, loadPreferences } from "../preferences.js";
 import { Persistence, type PersistenceReport } from "../persistence.js";
 import {
   type FolderReport,
@@ -64,6 +56,14 @@ import {
   unsaved,
 } from "./folder.js";
 import { type FontHost, type ImportReport, importFont, newFont, showDocument } from "./fonts.js";
+import {
+  dockInspector,
+  moveInspector,
+  reclampInspector,
+  resizeInspector,
+  toggleInspector,
+  toggleInspectorSection,
+} from "./inspector.js";
 import {
   type Arrival,
   arrive,
@@ -95,6 +95,7 @@ import {
   switchMaster,
 } from "./masters.js";
 import { defaults, remember, within } from "./settings.js";
+import { Snapshots } from "./snapshots.js";
 import { NO_FOLDER, type ProjectSummary, type StoreState, initialState } from "./state.js";
 
 // Re-exported so the panels that already read these from the store keep working;
@@ -127,16 +128,6 @@ export type { MasterReport } from "./masters.js";
 export { unsaved } from "./folder.js";
 
 /**
- * How long the font has to be worked on before another copy of it is kept.
- *
- * Long enough that the copies are worth having and few enough to keep — twenty
- * of them at five minutes covers the best part of two hours of work, which is
- * about as far back as anyone reaches before reaching for the file they
- * exported.
- */
-const SNAPSHOT_EVERY_MS = 5 * 60 * 1000;
-
-/**
  * The editor's state, held outside React.
  *
  * The reason is the canvas. A drag produces pointer events at sixty to a hundred
@@ -165,15 +156,8 @@ export class EditorStore {
    * passing it costs nothing.
    */
   private readonly host: FontHost;
-  /**
-   * When the last copy of the whole font was kept, and of what.
-   *
-   * The document as well as the time: nothing is worth copying twice, and a
-   * font left open in a window that is not being touched should not accumulate
-   * identical copies of itself.
-   */
-  private snapshotAt = 0;
-  private snapshotted: FontDocument | null = null;
+  /** Copies of the whole font, kept as it is worked on. See `snapshots.ts`. */
+  private readonly snapshots: Snapshots;
   /**
    * The folder on disk the font is being kept in, if it is.
    *
@@ -227,6 +211,7 @@ export class EditorStore {
         this.setCatalogQuery(changes);
       },
     };
+    this.snapshots = new Snapshots(this.host);
   }
 
   // ---- subscription ------------------------------------------------------
@@ -279,7 +264,7 @@ export class EditorStore {
     const session = applyToSession(this.state.session, outcome);
     if (session.pending === null) {
       this.disk.commit(session.editor.document);
-      this.considerSnapshot(session.editor.document);
+      this.snapshots.consider(session.editor.document);
     }
     // One patch, not two: each one wakes every listener, and a drag would
     // otherwise redraw and re-run every selector twice per pointer event.
@@ -290,67 +275,35 @@ export class EditorStore {
     );
   }
 
+  /**
+   * Replace the font's feature source.
+   *
+   * An edit to the document like any other, so it is undoable and saved — the
+   * feature file is part of the font rather than a setting about it.
+   */
+  setFeatures(features: string): void {
+    const document = setFeatures(this.editor.document, features);
+    if (document === this.editor.document) return;
+    this.applyTool(result({ ...this.editor, document }, [begin("Edit features"), commit]));
+  }
+
   // ---- snapshots ---------------------------------------------------------
 
-  /**
-   * Keep a copy of the whole font now and then, while it is being worked on.
-   *
-   * Undo is a session's memory and dies with the tab; autosave keeps up with
-   * what just happened, which is exactly no help when what just happened is the
-   * thing you want back. A copy every so often is the difference between "an
-   * hour ago" being a place you can return to and a thing you remember.
-   *
-   * Time rather than edit count, and only when the document has actually moved:
-   * a font is a megabyte or two of JSON, and the point is to have a few useful
-   * copies rather than a thousand identical ones.
-   */
-  private considerSnapshot(document: FontDocument): void {
-    if (document === this.snapshotted) return;
-    if (Date.now() - this.snapshotAt < SNAPSHOT_EVERY_MS) return;
-    void this.snapshot(document);
-  }
-
-  /**
-   * Keep a copy now, whatever the clock says.
-   *
-   * Called before anything that replaces the whole font — opening one, starting
-   * a new one, restoring an older copy — because that is the moment a way back
-   * is worth most and the moment the editor is about to stop having one.
-   */
+  /** Keep a copy of the whole font now, whatever the clock says. */
   async snapshot(document: FontDocument = this.editor.document): Promise<void> {
-    this.snapshotAt = Date.now();
-    this.snapshotted = document;
-    const entries = await this.disk.snapshot(document, this.snapshotAt);
-    this.patch({ snapshots: entries });
+    await this.snapshots.keep(document);
   }
 
-  /** Read the list back from disk, for whatever is about to show it. */
+  /** Read the list of copies back, for whatever is about to show it. */
   async refreshSnapshots(): Promise<void> {
-    this.patch({ snapshots: await this.disk.snapshots() });
+    await this.snapshots.refresh();
   }
 
-  /**
-   * Put an older copy of the font back on screen and on disk.
-   *
-   * A copy of what is open is kept first, so restoring is itself something you
-   * can come back from — which is the whole reason to trust the button at all.
-   *
-   * Not undoable, for the reason opening a font is not: a single ctrl-Z that
-   * silently swapped the whole font back would be alarming, and the history it
-   * restored would describe glyphs that are no longer open.
-   */
+  /** Put an older copy of the font back on screen and on disk. */
   async restoreSnapshot(
     at: number,
   ): Promise<{ glyphs: number; problems: readonly string[] } | null> {
-    const found = await this.disk.readSnapshot(at);
-    if (found === null) return null;
-
-    await this.snapshot();
-    showDocument(this.host, found.document, false);
-    await this.disk.replaceAll(found.document);
-    await this.refreshSnapshots();
-
-    return { glyphs: found.document.glyphOrder.length, problems: found.problems };
+    return await this.snapshots.restore(at);
   }
 
   /** Change something that is not the document — the camera, or which glyph. */
@@ -781,18 +734,6 @@ export class EditorStore {
     if (spacingMode !== this.state.spacingMode) this.patch({ spacingMode });
   }
 
-  /**
-   * Replace the font's feature source.
-   *
-   * An edit to the document like any other, so it is undoable and saved — the
-   * feature file is part of the font rather than a setting about it.
-   */
-  setFeatures(features: string): void {
-    const document = setFeatures(this.editor.document, features);
-    if (document === this.editor.document) return;
-    this.applyTool(result({ ...this.editor, document }, [begin("Edit features"), commit]));
-  }
-
   setProofText(proofText: string): void {
     this.patch({ proofText });
   }
@@ -851,53 +792,30 @@ export class EditorStore {
     this.patch({ stripText });
   }
 
+  // ---- where the inspector is -------------------------------------------
+
   moveInspector(x: number, y: number): void {
-    this.placeInspector({ ...this.state.inspector, ...clampInspector(x, y) });
+    moveInspector(this.host, x, y);
   }
 
-  /** Pull the inspector back into view — after a resize, or a restore from a larger window. */
   reclampInspector(): void {
-    const { x, y } = clampInspector(this.state.inspector.x, this.state.inspector.y);
-    if (x === this.state.inspector.x && y === this.state.inspector.y) return;
-    this.placeInspector({ ...this.state.inspector, x, y });
+    reclampInspector(this.host);
   }
 
-  /**
-   * Put the inspector in a column beside the drawing, or back over it.
-   *
-   * The floating position is kept while it is docked, so undocking puts it back
-   * where it was rather than in a corner.
-   */
-  /** How wide the docked column is, within what the layout will allow. */
   resizeInspector(width: number): void {
-    const wanted = Math.round(Math.min(MAX_DOCK_WIDTH, Math.max(MIN_DOCK_WIDTH, width)));
-    if (wanted === this.state.inspector.width) return;
-    this.placeInspector({ ...this.state.inspector, width: wanted });
+    resizeInspector(this.host, width);
   }
 
   dockInspector(dock: InspectorDock): void {
-    if (dock === this.state.inspector.dock) return;
-    this.placeInspector({ ...this.state.inspector, dock, open: true });
+    dockInspector(this.host, dock);
   }
 
-  /**
-   * Fold a section of the inspector, or unfold it.
-   *
-   * The *choice* is remembered rather than the state: a section nobody has
-   * touched follows the panel's own judgement, so one that starts closed opens
-   * itself when something is put in it, and one you closed stays closed.
-   */
   toggleInspectorSection(name: string, open: boolean): void {
-    const sections = { ...this.state.inspector.sections, [name]: open };
-    this.placeInspector({ ...this.state.inspector, sections });
+    toggleInspectorSection(this.host, name, open);
   }
 
   toggleInspector(): void {
-    this.placeInspector({ ...this.state.inspector, open: !this.state.inspector.open });
-  }
-
-  private placeInspector(inspector: InspectorPlacement): void {
-    this.remember({ inspector });
+    toggleInspector(this.host);
   }
 
   // ---- storage -----------------------------------------------------------
