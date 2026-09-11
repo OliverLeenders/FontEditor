@@ -36,7 +36,7 @@ async function originRoot(): Promise<WorkingRoot | null> {
   const storage = (globalThis.navigator as { storage?: StorageManager } | undefined)?.storage;
   if (typeof storage?.getDirectory !== "function") return null;
   try {
-    return (await storage.getDirectory()) as unknown as WorkingRoot;
+    return await storage.getDirectory();
   } catch {
     return null;
   }
