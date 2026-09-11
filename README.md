@@ -42,7 +42,7 @@ Several fonts are kept at once, each in a working copy of its own, and the progr
 | 15    | Several fonts, and a name           | done                                                                                |
 | 16    | The details a font is judged on     | next                                                                                |
 | 17    | Proving it where it will be used    | next                                                                                |
-| 18    | Keeping it maintainable             | two of three done: the tests and the store; the upgrades wait on a decision         |
+| 18    | Keeping it maintainable             | done, but for TypeScript 7, which the linter cannot read yet                        |
 | 19    | Releases                            | next                                                                                |
 | 20    | Two fonts side by side              | next                                                                                |
 
@@ -364,9 +364,19 @@ that will actually draw them.
   settings' setters are one line each on purpose, with what they share already in
   `settings.ts`, and moving them would give each a second one-liner to call it; the view is
   forty lines. Neither would read better anywhere else.
-- **Four major versions behind — not started.** React 19, Vite 8, Vitest 5 and TypeScript
-  7 are all released, and each means installing things, which is a decision rather than a
-  chore. None is urgent, and each is easier alone than all four together.
+- **Four major versions behind — three of them done.** React 19, Vite 8 and Vitest 5 are
+  in, with fast-check 4 beside them, each checked the way CI checks before the next began.
+  Vite and Vitest went in together because they cannot be separated — Vitest 5 will not
+  run on Vite 5 — and nothing in any config had to change. The build takes about a second
+  where it took seven; React 19's larger DOM package costs the startup bundle 50 KB, which
+  leaves it at 600 KB. Each version is one that has been out for a while rather than the
+  newest: the workspace refuses packages younger than a day, and pnpm's response to that
+  was to write itself an exemption without asking, which is not kept.
+- **TypeScript 7 — waiting on the linter.** The lint rules that read types come from
+  typescript-eslint, whose latest release accepts TypeScript below 6.1, and most of the
+  rules this repository holds itself to are that kind. TypeScript 7 would leave them unable
+  to run. 6.0.3 is inside that range and is the step available today; 7 is for when the
+  linter can read it.
 
 #### Phase 19 — Releases
 
