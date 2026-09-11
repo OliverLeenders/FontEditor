@@ -639,9 +639,7 @@ export class EditorStore {
    * the file other tools read behind the font in the editor.
    */
   get unsavedOnDisk(): boolean {
-    return (
-      this.state.folder.name !== null && unsaved(this.state.folder.saved, this.editor.document)
-    );
+    return this.state.folder.name !== null && unsaved(this.state.folder, this.editor.document);
   }
 
   /** Say which font is open, and what else there is to open. */

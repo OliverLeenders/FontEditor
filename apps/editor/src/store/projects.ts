@@ -10,7 +10,7 @@ import {
   touchProject,
 } from "@typewright/disk";
 
-import { noteFolder } from "./folder.js";
+import { confirmSaved, noteFolder } from "./folder.js";
 import type { FontHost } from "./fonts.js";
 import type { ProjectSummary } from "./state.js";
 
@@ -124,6 +124,7 @@ export async function noteProjects(host: FontHost, current: string | null): Prom
     at: project.savedAt ?? 0,
     wrote: project.wrote,
   });
+  await confirmSaved(host, project.savedHash);
 }
 
 /** Put the chooser on screen, or take it away. */

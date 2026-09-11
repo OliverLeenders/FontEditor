@@ -1,5 +1,6 @@
 import {
   type DiskFolder,
+  type WrittenFile,
   type ProjectRecord,
   type RememberedFolder,
   newProject,
@@ -9,6 +10,7 @@ import {
   accessTo,
   askAccess,
   forgetFolder,
+  hashOfWritten,
   pickFolder,
   readFolder,
   recallFolder,
@@ -16,11 +18,11 @@ import {
   textAt,
   writeFolder,
 } from "@typewright/disk";
-import { crc32, readUfo, ufoFiles } from "@typewright/font-io";
+import { crc32, entryBytes, readUfo, ufoFiles } from "@typewright/font-io";
 import { type FontDocument, randomIds } from "@typewright/font-model";
 
 import { type FontHost, adoptDocument, adoptImages, adoptLayers } from "./fonts.js";
-import { NO_FOLDER } from "./state.js";
+import { type FolderState, NO_FOLDER } from "./state.js";
 
 /**
  * The font as a folder on the user's disk.
@@ -167,20 +169,11 @@ export async function saveFolderAs(host: FontHost): Promise<SaveReport | null> {
   }
 
   const report = await writeTo(host, folder);
+  // The same font, kept somewhere else from now on. `writeTo` has already
+  // pointed the handle and the font's project at the new folder, together with
+  // the record of what it wrote there. Remembering the folder again here, with
+  // no record, is what used to make the next session's first save a rewrite.
   host.setFolder(folder, folder.name);
-  await rememberFolder(folder);
-
-  // The same font, kept somewhere else from now on. Its project follows it
-  // rather than a second one appearing for the same work.
-  const current = host.state().projects.current;
-  const project = current === null ? null : await projectById(current);
-  if (project !== null) {
-    await saveProject({
-      ...project,
-      folder,
-      name: nameOf(host.state().session.editor.document, folder),
-    });
-  }
 
   return report;
 }
@@ -231,12 +224,32 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
         progress: null,
         written: written.wrote,
         checked: true,
+        behind: false,
         problem: null,
       },
     });
     // Kept with the handle, so the next session's first save is as small as
     // this one was rather than a rewrite of the whole font.
     await rememberFolder(folder, written.wrote);
+
+    // And with the font's project, which is where the next session looks. The
+    // handle above is what an editor before projects read; a save that updated
+    // only the handle left every restart rewriting the whole folder, dating its
+    // last save to whenever the project was first recorded, and unable to say
+    // whether the font on screen was the one on disk.
+    const current = host.state().projects.current;
+    const project = current === null ? null : await projectById(current);
+    if (project !== null) {
+      const wrote = [...written.wrote];
+      await saveProject({
+        ...project,
+        folder,
+        name: nameOf(document, folder),
+        savedAt: host.state().folder.savedAt,
+        savedHash: hashOfWritten(wrote),
+        wrote,
+      });
+    }
 
     return {
       name: folder.name,
@@ -381,6 +394,41 @@ async function whatItHolds(folder: DiskFolder): Promise<"empty" | "ufo" | "other
 }
 
 /** Whether the font has moved since it was last written to its folder. */
-export function unsaved(saved: FontDocument | null, now: FontDocument): boolean {
-  return saved !== null && saved !== now;
+export function unsaved(folder: FolderState, now: FontDocument): boolean {
+  return folder.behind || (folder.saved !== null && folder.saved !== now);
+}
+
+/**
+ * Whether the font recovered on the way in is what the last save left on disk.
+ *
+ * The working copy survives a restart and the document the last save wrote does
+ * not, so there is nothing to compare by identity. What survives is the
+ * fingerprint of the files that save wrote. The font on screen is written out
+ * the same way — in memory, not to the folder — and fingerprinted, and the two
+ * either agree or they do not.
+ *
+ * Costs one serialisation of the font, once, after it has loaded. That is the
+ * price of the question, and it is the same work a save does before it writes.
+ */
+export async function confirmSaved(host: FontHost, savedHash: string | null): Promise<void> {
+  if (savedHash === null) return;
+
+  const before = host.state().folder;
+  const document = host.state().session.editor.document;
+  const entries = ufoFiles(document, await host.disk.allImages(), host.state().layers);
+  const now = hashOfWritten(
+    entries.map((entry): [string, WrittenFile] => [
+      entry.path,
+      { crc: crc32(entryBytes(entry)), at: 0 },
+    ]),
+  );
+
+  // A save that finished while this was reading knows better than it does.
+  const after = host.state().folder;
+  if (after.busy || after.saved !== before.saved) return;
+
+  const same = now === savedHash;
+  host.patch({
+    folder: { ...after, saved: same ? document : null, behind: !same },
+  });
 }

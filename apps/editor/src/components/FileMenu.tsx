@@ -35,7 +35,7 @@ import {
 export function FileMenu(): React.JSX.Element {
   const store = useEditorStore();
   const folder = useStoreValue((s) => s.folder);
-  const dirty = useStoreValue((s) => unsaved(s.folder.saved, s.session.editor.document));
+  const dirty = useStoreValue((s) => unsaved(s.folder, s.session.editor.document));
   const reading = useStoreValue((s) => s.ownership === "reading");
 
   const inputRef = useRef<HTMLInputElement>(null);

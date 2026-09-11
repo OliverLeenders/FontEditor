@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { installFakeIdb } from "../../../packages/disk/test/fake-idb.js";
+import { FakeFolder } from "../../../packages/disk/test/fake-folder.js";
 import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js";
 
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
 const { arrive } = await import("../src/store/projects.js");
-const { newProject, rememberFolder, saveProject } = await import("@typewright/disk");
+const { newProject, projectById, rememberFolder, saveProject } = await import("@typewright/disk");
 const { updateGlyph } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
@@ -193,5 +194,72 @@ describe("what closing would leave behind", () => {
     const store = freshStore();
     move(store);
     expect(store.unsavedOnDisk).toBe(false);
+  });
+});
+
+/** Put a folder behind the picker, as the browser would. */
+function offer(folder: FakeFolder): void {
+  (globalThis as { showDirectoryPicker?: unknown }).showDirectoryPicker = () =>
+    Promise.resolve(folder);
+}
+
+/** A store working on project `p`, saved once to a folder of its own. */
+async function savedOnce(): Promise<Store> {
+  const store = freshStore();
+  await saveProject({ ...newProject("Keep"), id: "p" });
+  store.patch({ projects: { ...store.getState().projects, current: "p" } });
+  offer(new FakeFolder("Keep.ufo"));
+  await store.saveFolderAs();
+  return store;
+}
+
+/** The same font, opened again by a store that never saw it saved. */
+function restarted(from: Store): Store {
+  const store = new EditorStore();
+  store.setEditor({ ...store.editor, document: from.editor.document });
+  return store;
+}
+
+describe("a save, as the next session finds it", () => {
+  it("is recorded on the font's project, where startup looks", async () => {
+    await savedOnce();
+
+    const project = await projectById("p");
+    expect(project?.folder?.name).toBe("Keep.ufo");
+    expect(project?.wrote.length).toBeGreaterThan(0);
+    expect(project?.savedHash).not.toBeNull();
+    expect(project?.savedAt).not.toBeNull();
+  });
+
+  it("carries what it wrote, so the first save after a restart is not a rewrite", async () => {
+    const first = await savedOnce();
+    const second = restarted(first);
+
+    await second.noteProjects("p");
+    expect(second.getState().folder.written.size).toBe(first.getState().folder.written.size);
+  });
+
+  it("recognises the font on screen as the one on disk", async () => {
+    const second = restarted(await savedOnce());
+
+    await second.noteProjects("p");
+    expect(second.unsavedOnDisk).toBe(false);
+  });
+
+  it("knows a font that moved on before the restart is behind its folder", async () => {
+    const second = restarted(await savedOnce());
+    move(second);
+
+    await second.noteProjects("p");
+    expect(second.unsavedOnDisk).toBe(true);
+  });
+
+  it("stops being behind once it is saved again", async () => {
+    const second = restarted(await savedOnce());
+    move(second);
+    await second.noteProjects("p");
+
+    await second.saveFolder();
+    expect(second.unsavedOnDisk).toBe(false);
   });
 });

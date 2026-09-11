@@ -242,6 +242,16 @@ export type FolderState = {
    * under that belief checks each file it means to skip.
    */
   readonly checked: boolean;
+  /**
+   * Whether the font is known to differ from what the last save left in the
+   * folder, when that save was in an earlier session.
+   *
+   * `saved` answers the question within a session, by identity. Across a
+   * restart there is no document to compare with — only the fingerprint of the
+   * files the last save wrote — so the answer arrives here instead, once the
+   * font on screen has been compared with that fingerprint.
+   */
+  readonly behind: boolean;
   readonly problem: string | null;
 };
 
@@ -254,6 +264,7 @@ export const NO_FOLDER: FolderState = {
   progress: null,
   written: new Map(),
   checked: true,
+  behind: false,
   problem: null,
 };
 
