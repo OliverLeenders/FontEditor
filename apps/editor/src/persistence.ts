@@ -273,6 +273,11 @@ export class Persistence {
     void this.autosave.flush();
   }
 
+  /** The same, and finished: for when there may be no later to finish it in. */
+  async flushNow(): Promise<void> {
+    await this.autosave.flush();
+  }
+
   /**
    * Keep a copy of the whole font as it is now.
    *

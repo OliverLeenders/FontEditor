@@ -969,6 +969,18 @@ export class EditorStore {
     });
   }
 
+  /**
+   * Everything `flush` does, awaited.
+   *
+   * For the desktop window's close, which happens after this returns and takes
+   * the page with it — where `flush` only starts the writes and trusts the page
+   * to be there when they finish.
+   */
+  async flushNow(): Promise<void> {
+    await this.disk.flushNow();
+    await parkCurrent(this.host);
+  }
+
   flush(): void {
     this.disk.flush();
     // The parked copy of the open master, brought up to date. It is what every

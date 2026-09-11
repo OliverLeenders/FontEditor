@@ -17,6 +17,8 @@ import { Inspector } from "./components/Inspector.js";
 import { FeaturesView } from "./components/FeaturesView.js";
 import { ProofView } from "./components/ProofView.js";
 import { Projects } from "./components/Projects.js";
+import { CloseWarning } from "./components/CloseWarning.js";
+import { desktop } from "./desktop.js";
 import { SpacingView } from "./components/SpacingView.js";
 import { Shortcuts } from "./components/Shortcuts.js";
 import { StatusBar } from "./components/StatusBar.js";
@@ -155,7 +157,9 @@ export function App(): React.JSX.Element {
       store.flush();
       // The browser shows its own words, not ours; all this does is ask for the
       // question to be asked at all.
-      if (store.unsavedOnDisk) event.preventDefault();
+      // In the desktop window the question is asked by `CloseWarning` instead,
+      // with the three answers this dialog cannot offer.
+      if (store.unsavedOnDisk && desktop() === null) event.preventDefault();
     };
     const onResize = (): void => store.reclampInspector();
 
@@ -275,6 +279,7 @@ export function App(): React.JSX.Element {
           </button>
         </div>
       ) : null}
+      <CloseWarning />
       {showChooser ? (
         <Projects />
       ) : arriving ? (
