@@ -49,8 +49,16 @@ export function KernGroups({
       if (ref.current !== null && !ref.current.contains(event.target as Node)) onOpenChange(false);
     };
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") onOpenChange(false);
+      if (event.key !== "Escape") return;
+      // Not while a field has it — the rule the bar's menus already keep. This
+      // listens on the window in the capture phase, so it runs before the
+      // field's own handler: a group name being abandoned with Escape closed the
+      // whole panel, when all the key meant was "not that name".
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) return;
+      onOpenChange(false);
     };
+    // Capture, so a press on something that stops propagation still closes it.
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("keydown", onKey, true);
     return () => {

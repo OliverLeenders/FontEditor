@@ -175,7 +175,7 @@ export function CurveSection(): React.JSX.Element {
             of the circle fitting each side, and how far apart the two are. One
             is a join the light crosses without a crease, and harmonising is
             what puts a join there. */}
-      <Field label="Curvature">
+      <Field label="Curvature" group>
         <div className={styles.curvature}>
           <span className={styles.readonly}>
             {radiusIn === null || radiusOut === null
