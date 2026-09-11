@@ -6,8 +6,7 @@ import styles from "./Projects.module.css";
 /**
  * Which font to work on.
  *
- * Shown on the way in when there is more than one, and from the File menu at
- * any time. Not a dialog: at startup there is nothing behind it yet, and a
+ * Shown every time the program starts, and from the File menu at any time. Not a dialog: at startup there is nothing behind it yet, and a
  * modal over an empty editor is a lie about what is loaded.
  *
  * The first button is the last font, focused, so the whole screen can be

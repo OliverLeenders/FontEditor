@@ -72,11 +72,10 @@ export type Preferences = {
   /** Show handles only where the work is. */
   readonly autoHideHandles: boolean;
   /**
-   * Whether to open the last font without asking which font.
+   * Whether to open the last font without showing the list of fonts first.
    *
-   * Off, so somebody with several is asked; the chooser does not appear at all
-   * for somebody with one, so the setting only ever matters once there is a
-   * real question to answer.
+   * Off: the list is the program's front door, shown on every start. This is
+   * for somebody who works on one font and would rather go straight in.
    */
   readonly skipChooser: boolean;
   /** Let a drag catch on the glyph's own points as well as the font's lines. */

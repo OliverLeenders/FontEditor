@@ -39,10 +39,10 @@ export function summaryOf(project: ProjectRecord): ProjectSummary {
  * What to do on the way in.
  *
  * `open` is a font to open straight away; `choose` is a list to put in front of
- * the reader first. The difference is not a preference alone — there is nothing
- * to choose between when there is one font, and nothing to choose *from* when
- * there are none, so the chooser appears only where it would be answering a
- * real question.
+ * the reader first. The list comes first every time the program starts, one
+ * font or several — it is the program's front door, not a question reserved
+ * for when there is a choice to make. Only a reader who has said they would
+ * rather go straight in skips it.
  */
 export type Arrival =
   | { readonly kind: "open"; readonly id: string }
@@ -57,16 +57,25 @@ export type Arrival =
  * a font open already and cannot simply change its mind.
  */
 export async function arrive(skipChooser: boolean): Promise<Arrival> {
-  const all = await openProjects();
+  let all = await openProjects();
 
-  // No record of anything: the editor that ran before this one, or a browser
-  // that has never opened a font. Either way there is one working copy to look
-  // in, and it is the one the editor has always looked in.
-  if (all.length === 0) return { kind: "open", id: FIRST_PROJECT };
-  if (all.length === 1 || skipChooser) return { kind: "open", id: all[0]!.id };
+  // No record of anything: a browser that has never opened a font, or work done
+  // before projects existed that was never saved to a folder. Either way there
+  // is one working copy the editor has always looked in, and it may hold a
+  // font — so it is listed rather than left where only an empty list would be
+  // shown, and "New font" the only way forward past somebody's own work.
+  if (all.length === 0) {
+    const untitled: ProjectRecord = { ...newProject(UNTITLED), id: FIRST_PROJECT };
+    await saveProject(untitled);
+    all = [untitled];
+  }
 
+  if (skipChooser) return { kind: "open", id: all[0]!.id };
   return { kind: "choose", all: all.map(summaryOf) };
 }
+
+/** What the working copy is called before anything has said what it holds. */
+const UNTITLED = "Untitled font";
 
 /**
  * Note in the store which font is open, and what else there is.
@@ -85,7 +94,26 @@ export async function noteProjects(host: FontHost, current: string | null): Prom
   await touchProject(current);
 
   const project = all.find((it) => it.id === current) ?? null;
-  if (project === null || project.folder === null) return;
+  if (project === null) return;
+
+  // Called by what the font calls itself, now that it is loaded. A record made
+  // before anything was read has only a placeholder, and a family renamed in
+  // Font Info should not go on being listed under its old name.
+  const { familyName, styleName } = host.state().session.editor.document.info;
+  const named = `${familyName} ${styleName}`.trim();
+  if (named !== "" && named !== project.name) {
+    await saveProject({ ...project, name: named, openedAt: Date.now() });
+    host.patch({
+      projects: {
+        ...host.state().projects,
+        all: host
+          .state()
+          .projects.all.map((it) => (it.id === current ? { ...it, name: named } : it)),
+      },
+    });
+  }
+
+  if (project.folder === null) return;
 
   // Linked, not read: reading would replace the font recovered from the working
   // copy with whatever is on disk, which is a decision rather than something to

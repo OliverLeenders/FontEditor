@@ -45,19 +45,21 @@ afterEach(() => {
 });
 
 describe("what the editor does with its first moment", () => {
-  it("opens the one working copy there has always been, when nothing is recorded", async () => {
+  it("lists the working copy there has always been, when nothing is recorded", async () => {
+    // It may hold somebody's font, done before projects existed and never saved
+    // to a folder. An empty list would leave "New font" the only way past it.
     const arrival = await arrive(false);
 
-    expect(arrival.kind).toBe("open");
-    expect(arrival.kind === "open" ? arrival.id : null).toBe("project");
+    expect(arrival.kind).toBe("choose");
+    expect(arrival.kind === "choose" ? arrival.all.map((it) => it.id) : []).toEqual(["project"]);
   });
 
-  it("does not ask when there is only one font to ask about", async () => {
+  it("asks even when there is only one font", async () => {
     await saveProject({ ...newProject("Only"), id: "only" });
 
     const arrival = await arrive(false);
-    expect(arrival.kind).toBe("open");
-    expect(arrival.kind === "open" ? arrival.id : null).toBe("only");
+    expect(arrival.kind).toBe("choose");
+    expect(arrival.kind === "choose" ? arrival.all.map((it) => it.name) : []).toEqual(["Only"]);
   });
 
   it("asks when there is more than one", async () => {
@@ -80,12 +82,22 @@ describe("what the editor does with its first moment", () => {
     expect(arrival.kind === "open" ? arrival.id : null).toBe("b");
   });
 
-  it("adopts the font of an editor that only ever knew one", async () => {
+  it("goes straight into the working copy for a reader who skips, with nothing recorded", async () => {
+    const arrival = await arrive(true);
+    expect(arrival.kind === "open" ? arrival.id : null).toBe("project");
+  });
+
+  it("lists the font of an editor that only ever knew one", async () => {
     await rememberFolder(folder("Times.ufo"));
 
     const arrival = await arrive(false);
-    // One font, so no question is asked — and it is the one that was there.
-    expect(arrival.kind === "open" ? arrival.id : null).toBe("project");
+    expect(arrival.kind === "choose" ? arrival.all.map((it) => it.id) : []).toEqual(["project"]);
+  });
+
+  it("does not add a second untitled font on the next start", async () => {
+    await arrive(false);
+    const arrival = await arrive(false);
+    expect(arrival.kind === "choose" ? arrival.all : []).toHaveLength(1);
   });
 });
 
