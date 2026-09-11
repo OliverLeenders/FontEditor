@@ -1,3 +1,4 @@
+import { FIRST_PROJECT } from "@typewright/disk";
 import type { FontDocument } from "@typewright/font-model";
 import {
   type ImageEntry,
@@ -10,6 +11,7 @@ import {
   ProjectLock,
   StorageClient,
   browserLocks,
+  projectLock,
   dirtyGlyphs,
   removedGlyphs,
   requestPersistence,
@@ -50,7 +52,12 @@ export type PersistenceReport = {
  */
 export class Persistence {
   private client: StorageClient | null = null;
-  private readonly lock: ProjectLock;
+  /**
+   * Null until a project has been opened, because the lock is named after it.
+   * Nothing writes before `open`, so there is no window in which this being
+   * absent means "unlocked" rather than "nothing to lock yet".
+   */
+  private lock: ProjectLock | null = null;
   private readonly autosave: Autosave;
   private lastJournalled: FontDocument | null = null;
   private owner = true;
@@ -60,14 +67,6 @@ export class Persistence {
    *   shows. Never called synchronously from the constructor.
    */
   constructor(private readonly report: (changes: PersistenceReport) => void) {
-    // Losing the lock has to stop writes at once, not at the next save: the tab
-    // that took it is now the truth, and this one still believes in the font it
-    // had.
-    this.lock = new ProjectLock(browserLocks(), () => {
-      this.owner = false;
-      this.report({ ownership: "reading", saveStatus: "idle" });
-    });
-
     this.autosave = new Autosave({
       journal: async (document) => {
         if (!this.owner) return;
@@ -99,6 +98,23 @@ export class Persistence {
     });
   }
 
+  /**
+   * The lock for one project, listening for the moment another tab takes it.
+   *
+   * Losing it has to stop writes at once, not at the next save: the tab that
+   * took it is now the truth, and this one still believes in the font it had.
+   */
+  private lockFor(project: string): ProjectLock {
+    return new ProjectLock(
+      browserLocks(),
+      () => {
+        this.owner = false;
+        this.report({ ownership: "reading", saveStatus: "idle" });
+      },
+      projectLock(project),
+    );
+  }
+
   /** Whether this tab may write. Every path to disk is gated on it. */
   get writable(): boolean {
     return this.owner;
@@ -119,12 +135,15 @@ export class Persistence {
    * The lock is taken *before* the read, so a tab that cannot write never
    * journals or saves on the way to finding that out.
    */
-  async open(worker: Worker): Promise<LoadedProject | null> {
+  async open(worker: Worker, project: string = FIRST_PROJECT): Promise<LoadedProject | null> {
     try {
       const client = new StorageClient(worker);
       this.client = client;
-      await client.open("project");
+      // The project's id names its directory, so two fonts are two working
+      // copies rather than one that the second one opened overwrites.
+      await client.open(project);
 
+      this.lock = this.lockFor(project);
       this.owner = await this.lock.tryAcquire();
       this.report({ ownership: this.owner ? "owner" : "reading" });
 
@@ -163,7 +182,7 @@ export class Persistence {
   /** Take the project over from whichever tab holds it. */
   async steal(): Promise<boolean> {
     if (this.owner) return false;
-    if (!(await this.lock.steal())) return false;
+    if (this.lock === null || !(await this.lock.steal())) return false;
     this.owner = true;
     this.report({ ownership: "owner" });
     return true;

@@ -28,7 +28,20 @@ export type LockManagerLike = {
   ): Promise<unknown>;
 };
 
-export const PROJECT_LOCK = "typewright/project";
+/**
+ * The lock one project's working copy is written under.
+ *
+ * Per project, not per editor. The lock is what makes a second window on the
+ * same font read-only, and that is the right answer for the same font and the
+ * wrong one for a different font — two windows on two fonts write to two
+ * directories and have nothing to disagree about.
+ */
+export function projectLock(id: string): string {
+  return `typewright/project/${id}`;
+}
+
+/** What a lock with nothing said about which project falls back to. */
+export const PROJECT_LOCK = projectLock("project");
 
 export function browserLocks(): LockManagerLike | null {
   const locks = (navigator as { locks?: LockManagerLike }).locks;

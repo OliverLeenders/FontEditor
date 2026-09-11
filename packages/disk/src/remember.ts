@@ -1,3 +1,4 @@
+import { HANDLES, databaseExists, inDatabase, inStore } from "./database.js";
 import type { WrittenFile } from "./folder.js";
 import type { DiskFolder } from "./handles.js";
 
@@ -10,24 +11,16 @@ import type { DiskFolder } from "./handles.js";
  * does *not* survive is permission — see `access.ts` — so this remembers where
  * the font is, and the user still has to say yes once per session.
  *
- * Deliberately small and deliberately forgiving: a browser with IndexedDB
- * disabled, or a private window, should mean "the editor forgets where the font
- * was", never "the editor will not start".
+ * One handle, for the font last worked in. Where several fonts are concerned
+ * this is the shortcut rather than the record: `projects.ts` keeps one of these
+ * per font, with the working copy and the lock that go with it. This stays
+ * because the question "which font was I in?" has a cheaper answer than reading
+ * the whole list, and because it is what the editor before projects wrote.
  */
 
-const DATABASE = "typewright-disk";
-
-/**
- * The database this used before the editor was named.
- *
- * Consulted once, when the new one is empty, and what is found there is copied
- * across rather than read from again. This is the one piece of remembered state
- * worth carrying over: it holds a live directory handle, and losing it means
- * being asked to find the font folder again — which is precisely what
- * remembering it was for.
- */
+/** The database this used before the editor was named. */
 const OLD_DATABASE = "fonteditor-disk";
-const STORE = "handles";
+
 const KEY = "ufo-folder";
 
 /** What was remembered, alongside how to say it to the user. */
@@ -61,17 +54,18 @@ export async function rememberFolder(
     at: Date.now(),
     wrote: [...wrote],
   };
-  await inStore("readwrite", (store) => store.put(remembered, KEY));
+  await inStore(HANDLES, "readwrite", (store) => store.put(remembered, KEY));
 }
 
 export async function recallFolder(): Promise<RememberedFolder | null> {
-  const here = await inStore("readonly", (store) => store.get(KEY));
+  const here = await inStore(HANDLES, "readonly", (store) => store.get(KEY));
   const found = here ?? (await fromOldDatabase());
   if (found === null || typeof found !== "object") return null;
 
   // Written by an older version of this editor, or by something else entirely.
   const candidate = found as Partial<RememberedFolder>;
   if (candidate.folder === undefined || typeof candidate.name !== "string") return null;
+
   const remembered: RememberedFolder = {
     folder: candidate.folder,
     name: candidate.name,
@@ -82,7 +76,7 @@ export async function recallFolder(): Promise<RememberedFolder | null> {
   // Found under the old name: move it, so this is asked once and never again.
   // If the write fails the folder is still returned — being remembered this
   // session matters more than being remembered next session.
-  if (here === null) await inStore("readwrite", (store) => store.put(remembered, KEY));
+  if (here === null) await inStore(HANDLES, "readwrite", (store) => store.put(remembered, KEY));
 
   return remembered;
 }
@@ -92,24 +86,18 @@ export async function recallFolder(): Promise<RememberedFolder | null> {
  *
  * Asks the browser which databases exist before opening one, because opening a
  * database creates it: without the question, every fresh installation would
- * leave behind an empty database named after a program that never ran here. A
- * browser that will not answer the question is asked the database directly,
- * which is the forgiving way round.
+ * leave behind an empty database named after a program that never ran here.
  */
 async function fromOldDatabase(): Promise<unknown> {
-  const factory = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
-  if (factory === undefined) return null;
+  if (!(await databaseExists(OLD_DATABASE))) return null;
 
-  if (typeof factory.databases === "function") {
-    try {
-      const existing = await factory.databases();
-      if (!existing.some((it) => it.name === OLD_DATABASE)) return null;
-    } catch {
-      // Fall through and ask the database itself.
-    }
-  }
-
-  return await inStore("readonly", (store) => store.get(KEY), OLD_DATABASE);
+  return await inDatabase({
+    database: OLD_DATABASE,
+    version: 1,
+    store: HANDLES,
+    mode: "readonly",
+    run: (store) => store.get(KEY),
+  });
 }
 
 /** Believe nothing about what is in the database: it may be older than this. */
@@ -123,56 +111,5 @@ function isWritten(entry: unknown): entry is readonly [string, WrittenFile] {
 }
 
 export async function forgetFolder(): Promise<void> {
-  await inStore("readwrite", (store) => store.delete(KEY));
-}
-
-/**
- * Run one request against the store, and turn every way it can go wrong into
- * `null`.
- *
- * IndexedDB's API is old enough to predate promises and pretends the database
- * might need upgrading on every open, so the ceremony is unavoidable; keeping
- * all of it in one place means the three functions above read like what they
- * mean.
- */
-async function inStore(
-  mode: IDBTransactionMode,
-  run: (store: IDBObjectStore) => IDBRequest,
-  database: string = DATABASE,
-): Promise<unknown> {
-  const factory = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
-  if (factory === undefined) return null;
-
-  return await new Promise<unknown>((resolve) => {
-    let open: IDBOpenDBRequest;
-    try {
-      open = factory.open(database, 1);
-    } catch {
-      resolve(null);
-      return;
-    }
-
-    open.onupgradeneeded = () => {
-      if (!open.result.objectStoreNames.contains(STORE)) open.result.createObjectStore(STORE);
-    };
-    open.onerror = () => resolve(null);
-    open.onsuccess = () => {
-      const opened = open.result;
-      try {
-        const request = run(opened.transaction(STORE, mode).objectStore(STORE));
-        request.onerror = () => {
-          opened.close();
-          resolve(null);
-        };
-        request.onsuccess = () => {
-          const value: unknown = request.result;
-          opened.close();
-          resolve(value ?? null);
-        };
-      } catch {
-        opened.close();
-        resolve(null);
-      }
-    };
-  });
+  await inStore(HANDLES, "readwrite", (store) => store.delete(KEY));
 }

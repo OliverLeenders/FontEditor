@@ -29,7 +29,7 @@ import {
 } from "@typewright/tools";
 import { type Axis, orderedMasters } from "@typewright/font-model";
 import type { ViewTransform } from "@typewright/view";
-import type { DiskFolder } from "@typewright/disk";
+import { type DiskFolder, FIRST_PROJECT } from "@typewright/disk";
 
 import { frameGlyph } from "../framing.js";
 import { type Decoded, ImageCache } from "../images.js";
@@ -822,8 +822,8 @@ export class EditorStore {
    * without OPFS should still give a usable editor that simply cannot remember
    * anything, which is why nothing here is allowed to throw.
    */
-  async connectStorage(worker: Worker): Promise<void> {
-    const loaded = await this.disk.open(worker);
+  async connectStorage(worker: Worker, project: string = FIRST_PROJECT): Promise<void> {
+    const loaded = await this.disk.open(worker, project);
     if (loaded === null) return;
 
     if (loaded.kind === "loaded") {

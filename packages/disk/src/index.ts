@@ -23,3 +23,17 @@ export { accessTo, askAccess, canOpenFolders, pickFolder } from "./access.js";
 
 export type { RememberedFolder } from "./remember.js";
 export { forgetFolder, recallFolder, rememberFolder } from "./remember.js";
+
+export type { ProjectRecord } from "./projects.js";
+export {
+  FIRST_PROJECT,
+  dropProject,
+  hashOfWritten,
+  listProjects,
+  newProject,
+  openProjects,
+  projectById,
+  projectFor,
+  saveProject,
+  touchProject,
+} from "./projects.js";

@@ -65,7 +65,7 @@ export {
 } from "./project.js";
 
 export type { LockGrant, LockManagerLike } from "./lock.js";
-export { PROJECT_LOCK, ProjectLock, browserLocks } from "./lock.js";
+export { PROJECT_LOCK, projectLock, ProjectLock, browserLocks } from "./lock.js";
 
 export type { AutosaveHooks, AutosaveOptions, AutosaveStatus } from "./autosave.js";
 export { Autosave, DEFAULT_DEBOUNCE_MS } from "./autosave.js";
