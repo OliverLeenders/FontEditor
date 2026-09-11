@@ -49,7 +49,7 @@ function selecting(
     for (const name of document.glyphOrder) {
       const glyph = document.glyphs[name];
       const nodes = (glyph?.contours ?? []).flatMap((c) =>
-        c.nodes.map((n) => ({ contourId: c.id, node: n as unknown as Node })),
+        c.nodes.map((n) => ({ contourId: c.id, node: n })),
       );
       const chosen = pick(nodes);
       if (chosen.length === 0) continue;
@@ -75,7 +75,7 @@ function nodeNow(store: Store, contourId: string, nodeId: string): Node {
   const glyph = store.editor.document.glyphs[store.editor.currentGlyph];
   const found = glyph?.contours.find((c) => c.id === contourId)?.nodes.find((n) => n.id === nodeId);
   if (found === undefined) throw new Error("the node is gone");
-  return found as unknown as Node;
+  return found;
 }
 
 const input = (label: string) => screen.getByLabelText<HTMLInputElement>(label);
