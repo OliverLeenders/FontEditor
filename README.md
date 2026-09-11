@@ -1,5 +1,7 @@
 # Typewright
 
+<img src="brand/mark.svg" alt="" width="88" align="right">
+
 A font editor that runs in a browser and ships as a desktop application. It draws,
 spaces, interpolates and exports a whole family — masters, instances, static fonts and
 variable fonts — and it offers **Tunni lines** as an additional way to control cubic
@@ -18,6 +20,7 @@ components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF, 
 both directions. A family is several masters, a `.designspace` and one `.ufo` each; a UFO folder on disk is opened and saved back to; everything autosaves
 to the browser's own store besides, and copies of the whole font are kept as you work.
 Guides and a picture to trace from sit behind the drawing; before it goes out, nineteen checks say what is wrong with it.
+Several fonts are kept at once, each in a working copy of its own, and the program opens on the list of them.
 
 | Phase |                                     | Status                                                                              |
 | ----- | ----------------------------------- | ----------------------------------------------------------------------------------- |
@@ -31,11 +34,12 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, n
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2267 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2281 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
 | 14    | What ships to a browser             | done                                                                                |
+| 15    | Several fonts, and a name           | done                                                                                |
 
 ### What the table missed
 
@@ -213,7 +217,7 @@ cannot be followed — a rename, a deletion, a loop — leaves the glyph exactly
 is reported twice over: in the export warnings, and as a preflight check. Silence would
 be the worst of the three, since the glyph still has spacing and nothing looks wrong.
 
-#### Phase 14 — What ships to a browser
+#### Phase 14 — What ships to a browser — done
 
 **WOFF and WOFF2 are done.** Neither is another drawing of the font: they are the same
 tables behind a header saying how big each was before it was squeezed, and a browser
@@ -248,6 +252,55 @@ compiled on its own — as shapes, since quadratic outlines have no points in co
 the cubic drawing. A three-master family is checked as well as a two-master one, because
 only three masters on an axis produce an intermediate region: a tuple that has to write
 its start and end out rather than let them be implied.
+
+#### Phase 15 — Several fonts, and a name — done
+
+**The editor is called Typewright now**, and has a mark to go with it: a piece of foundry
+type seen in the round, its nicks down the front and the letter standing on the inked face.
+It is drawn in `brand/`, and every icon size the desktop build needs is drawn from it by a
+script rather than shrunk from one large picture — at the size a taskbar shows it, that is
+the difference between a letter and a smudge. Three separate things kept a blurred icon on
+screen before it was right, and only one of them was the drawing: a build that linked a
+stale resource, and a window icon taken from whichever size the `.ico` happened to list
+first.
+
+**A font is a project, and there can be several.** There used to be one working copy, one
+write lock and one remembered folder, and opening a second font wrote over the first. Each
+font now has its own of all three, named by an id, so two windows on two different fonts
+both write, and opening a folder moves to that font's working copy before anything is
+written to it. The program opens on the list of fonts, with the last one first so that
+Enter picks up where you left off; somebody who works on one font can say they would rather
+go straight in. Forgetting a font takes it off the list and deletes Typewright's copy — never
+the folder on disk — and asks first, in words that say whether that copy is the only one. A
+copy another window has open is left for that window and swept up on a later start.
+
+**A save is remembered across a restart.** The project keeps the checksum of every file the
+last save wrote, so the first save of a session writes only what changed, and a fingerprint
+of them all, so that on the way in the editor can say whether the font it recovered is the
+one on disk. It finds out by writing the font out in memory and comparing: across a restart
+there is no saved document left to compare with.
+
+**Closing asks about the folder, not about the work.** The working copy already holds every
+change, so nothing is about to be lost; what can be behind is the UFO folder other tools
+read, and that is all either warning is about. The browser asks through `beforeunload`, in
+its own words. The desktop window holds its close request and hands it to the page, which
+asks with the three answers a browser cannot offer — save and close, close without saving,
+cancel — and a second press of the close button still closes a window whose page cannot
+answer.
+
+#### What next
+
+Not started, in the order they would be reached for.
+
+- **Releases.** A version number that means something, a signed installer, and updates that
+  arrive without a download page — what separates a program people install from a build
+  somebody made.
+- **A faster start.** The editor ships as a megabyte of JavaScript, most of it views nobody
+  has opened yet. Loading each when it is first opened would bring the first frame sooner.
+- **Two fonts side by side.** With a working copy and a lock per font, a second window on a
+  second font is most of the way there; what is left is the desktop build opening one.
+- **Reading it all back again.** Phases 11 to 15 came from reading the code once the first
+  ten were done. Doing that again is how the next list gets made.
 
 ## Getting started
 
@@ -298,9 +351,18 @@ worth re-asking on any platform this is built for, because the answer is the pla
 rather than ours.
 
 Nothing in `src-tauri` knows anything about fonts. It opens a window and gets out of the
-way: no commands, no plugins beyond a logger, and no Tauri API called from the editor —
-which is what keeps the browser and the desktop builds the same program rather than two
-that have started to drift.
+way: no plugins beyond a logger, and two commands, both about closing the window. Whether a
+close needs a question belongs to the page, the only side that knows whether the folder is
+behind, so the window hands the request over and waits to be told. The page reaches those
+commands through the bridge Tauri injects into every page it hosts rather than through
+`@tauri-apps/api`, and in a browser that bridge is simply not there — which is what keeps
+the browser and the desktop builds the same program rather than two that have started to
+drift.
+
+The desktop build keeps its working copies in a WebView2 profile of its own, under
+`%LOCALAPPDATA%\dev.typewright.app` on Windows. That is separate from any browser's, so a
+font started in one is not in the other until it has been saved to a folder and opened
+there.
 
 Use PgUp and PgDn to move between glyphs, and press `?` for every key at once. The
 toolbar is icons; every one names its shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
@@ -450,6 +512,8 @@ pnpm typecheck
 apps/
   editor/       The editor: shell, panels, and the canvas.
     src-tauri/  A window for it on the desktop. Rust, and nothing about fonts.
+
+brand/          The mark, and the script that draws every icon size from it.
 
 packages/
   geometry/     Vec2, cubic Béziers, and the Tunni-line kernel. Pure; no DOM.
