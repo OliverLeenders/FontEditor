@@ -17,6 +17,7 @@ export function preferencesOf(s: StoreState): Preferences {
     theme: s.theme,
     outlineWidth: s.outlineWidth,
     autoHideHandles: s.autoHideHandles,
+    skipChooser: s.skipChooser,
     snapPoints: s.snapPoints,
     showNeighbours: s.showNeighbours,
     showAnchors: s.showAnchors,

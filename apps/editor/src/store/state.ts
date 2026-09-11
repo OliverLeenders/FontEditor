@@ -62,6 +62,7 @@ export type StoreState = {
   readonly preview: Location | null;
   /** The font's own folder on the user's disk, and where saving it stands. */
   readonly folder: FolderState;
+  readonly projects: ProjectsState;
   /**
    * The pictures the font is traced from, as the store holds them.
    *
@@ -106,6 +107,7 @@ export type StoreState = {
   readonly showCurvature: boolean;
   /** Show handles only where the work is. On by default; the canvas is calmer. */
   readonly autoHideHandles: boolean;
+  readonly skipChooser: boolean;
   /**
    * Let a drag catch on the glyph's own points as well as the font's lines.
    *
@@ -148,6 +150,32 @@ export type StoreState = {
   readonly proofLeading: number;
   readonly viewport: { readonly width: number; readonly height: number };
 };
+
+/** A project as a list needs it: no handles, no per-file records. */
+export type ProjectSummary = {
+  readonly id: string;
+  readonly name: string;
+  /** The folder's name, or `null` for a font not yet given one. */
+  readonly folder: string | null;
+  readonly openedAt: number;
+  readonly savedAt: number | null;
+};
+
+/**
+ * Which font is open, and which others there are.
+ *
+ * The editor opens one font at a time, so this is not a workspace of several
+ * open documents. It is the answer to a question asked once, on the way in.
+ */
+export type ProjectsState = {
+  readonly all: readonly ProjectSummary[];
+  /** The one that is open, once one is. */
+  readonly current: string | null;
+  /** Whether the chooser is on screen instead of the font. */
+  readonly showing: boolean;
+};
+
+export const NO_PROJECTS: ProjectsState = { all: [], current: null, showing: false };
 
 /**
  * Where the font stands with respect to a folder on the user's disk.
@@ -235,6 +263,7 @@ export function initialState(preferences: Preferences): StoreState {
     project: project(starter),
     preview: null,
     folder: NO_FOLDER,
+    projects: NO_PROJECTS,
     images: [],
     layers: [],
     showImage: preferences.showImage,
@@ -246,6 +275,7 @@ export function initialState(preferences: Preferences): StoreState {
     showAnchors: preferences.showAnchors,
     showCurvature: preferences.showCurvature,
     autoHideHandles: preferences.autoHideHandles,
+    skipChooser: preferences.skipChooser,
     snapPoints: preferences.snapPoints,
     applyFeatures: preferences.applyFeatures,
     outlineWidth: preferences.outlineWidth,

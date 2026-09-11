@@ -62,8 +62,19 @@ import {
   reopenFolder,
   saveFolder,
   saveFolderAs,
+  unsaved,
 } from "./folder.js";
 import { type FontHost, type ImportReport, importFont, newFont, showDocument } from "./fonts.js";
+import {
+  type Arrival,
+  arrive,
+  chosenOnReload,
+  forgetProject,
+  noteProjects,
+  showChooser,
+  startProject,
+  switchTo,
+} from "./projects.js";
 import { type AddedImage, addImage, refreshImages, setImageOn } from "./images.js";
 import {
   type MasterReport,
@@ -84,7 +95,7 @@ import {
   switchMaster,
 } from "./masters.js";
 import { defaults, remember, within } from "./settings.js";
-import { NO_FOLDER, type StoreState, initialState } from "./state.js";
+import { NO_FOLDER, type ProjectSummary, type StoreState, initialState } from "./state.js";
 
 // Re-exported so the panels that already read these from the store keep working;
 // they live in `limits.ts` because the preferences need them too, and preferences
@@ -585,6 +596,69 @@ export class EditorStore {
     await noteRememberedFolder(this.host);
   }
 
+  // ---- which font is open -------------------------------------------------
+
+  /**
+   * What to do with the editor's first moment: open a font, or offer the list.
+   *
+   * A reload asking for a particular font wins over both. That is how the
+   * chooser opens anything at all — see `switchTo`.
+   */
+  async decideArrival(skipChooser: boolean): Promise<Arrival> {
+    const chosen = await chosenOnReload();
+    if (chosen !== null) return { kind: "open", id: chosen };
+    return await arrive(skipChooser);
+  }
+
+  /**
+   * Put the list of fonts on screen with none of them open yet.
+   *
+   * The startup case, and the reason `current` is null: nothing has been
+   * loaded, no lock taken, no folder linked. Answering the question is what
+   * starts the editor.
+   */
+  offerProjects(all: readonly ProjectSummary[]): void {
+    this.patch({ projects: { all, current: null, showing: true } });
+  }
+
+  /**
+   * Whether the font has changes the folder on disk does not have.
+   *
+   * Not "unsaved work" — the working copy has everything, and always has. This
+   * is the narrower and more useful question: whether closing now would leave
+   * the file other tools read behind the font in the editor.
+   */
+  get unsavedOnDisk(): boolean {
+    return (
+      this.state.folder.name !== null && unsaved(this.state.folder.saved, this.editor.document)
+    );
+  }
+
+  /** Say which font is open, and what else there is to open. */
+  async noteProjects(current: string | null): Promise<void> {
+    await noteProjects(this.host, current);
+  }
+
+  /** Show the list of fonts, or put it away. */
+  showProjects(showing: boolean): void {
+    showChooser(this.host, showing);
+  }
+
+  /** Open one of them, which reloads into it. */
+  openProject(id: string): void {
+    switchTo(id);
+  }
+
+  /** Start a font that has no folder yet, and open it. */
+  async startProject(name: string): Promise<void> {
+    await startProject(name);
+  }
+
+  /** Take a font off the list. The folder on disk is not touched. */
+  async forgetProject(id: string): Promise<void> {
+    await forgetProject(this.host, id);
+  }
+
   // ---- the pictures a font is traced from --------------------------------
 
   /** The decoded picture behind a name, or `null` while it is being read. */
@@ -670,6 +744,11 @@ export class EditorStore {
 
   toggleAutoHideHandles(): void {
     this.remember({ autoHideHandles: !this.state.autoHideHandles });
+  }
+
+  /** Whether to skip the chooser and open the last font. */
+  setSkipChooser(skip: boolean): void {
+    this.remember({ skipChooser: skip });
   }
 
   toggleSnapPoints(): void {

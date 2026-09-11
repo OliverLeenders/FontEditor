@@ -16,6 +16,7 @@ import { GlyphStrip } from "./components/GlyphStrip.js";
 import { Inspector } from "./components/Inspector.js";
 import { FeaturesView } from "./components/FeaturesView.js";
 import { ProofView } from "./components/ProofView.js";
+import { Projects } from "./components/Projects.js";
 import { SpacingView } from "./components/SpacingView.js";
 import { Shortcuts } from "./components/Shortcuts.js";
 import { StatusBar } from "./components/StatusBar.js";
@@ -45,6 +46,13 @@ export function App(): React.JSX.Element {
   const dock = useStoreValue((s) => s.inspector.dock);
   const ownership = useStoreValue((s) => s.ownership);
   const theme = useStoreValue((s) => s.theme);
+  const showChooser = useStoreValue((s) => s.projects.showing);
+
+  // Read once, on the way in, but from a ref: the effect that asks must not be
+  // re-run because the reader later changed their mind about being asked.
+  const skipChooser = useStoreValue((s) => s.skipChooser);
+  const skipRef = useRef(skipChooser);
+  skipRef.current = skipChooser;
 
   // The document carries the choice, and the canvases read it back through
   // `isDarkNow`. Done here rather than in the store so the store stays free of
@@ -133,7 +141,21 @@ export function App(): React.JSX.Element {
     const onKeyUp = (event: KeyboardEvent): void => {
       if (event.code === "Space") store.setPreviewing(false);
     };
-    const onUnload = (): void => store.flush();
+    /**
+     * On the way out: settle the working copy, and speak up about the folder.
+     *
+     * Two different things, and only one of them is a warning. The working copy
+     * has everything and is flushed without asking. What the folder on disk
+     * does not have is worth stopping for — and it is the *folder* that is
+     * behind, not the work, which is why nothing here says anything about
+     * losing changes.
+     */
+    const onUnload = (event: BeforeUnloadEvent): void => {
+      store.flush();
+      // The browser shows its own words, not ours; all this does is ask for the
+      // question to be asked at all.
+      if (store.unsavedOnDisk) event.preventDefault();
+    };
     const onResize = (): void => store.reclampInspector();
 
     window.addEventListener("keydown", onKeyDown);
@@ -204,10 +226,39 @@ export function App(): React.JSX.Element {
     };
   }, [store]);
 
+  /**
+   * The first moment: which font, and then that font.
+   *
+   * The question is asked before storage is opened, which is what makes it
+   * free — nothing has been loaded and no lock has been taken, so any of them
+   * costs what the first one costs. A reader with one font is never asked.
+   */
   useEffect(() => {
     const worker = new Worker(new URL("./storage.worker.ts", import.meta.url), { type: "module" });
-    void store.connectStorage(worker);
-    return () => worker.terminate();
+    // An object rather than a captured `let`, so that what the cleanup does to
+    // it is visible to everything reading it.
+    const running = { yes: true };
+
+    void (async () => {
+      const arrival = await store.decideArrival(skipRef.current);
+      if (!running.yes) return;
+
+      if (arrival.kind === "choose") {
+        store.offerProjects(arrival.all);
+        return;
+      }
+
+      await store.connectStorage(worker, arrival.id);
+      // Not guarded again. Noting which font is open is a write to the store
+      // and to the list of projects, and both are true whether or not this
+      // component is still on screen.
+      await store.noteProjects(arrival.id);
+    })();
+
+    return () => {
+      running.yes = false;
+      worker.terminate();
+    };
   }, [store]);
 
   return (
@@ -223,6 +274,7 @@ export function App(): React.JSX.Element {
           </button>
         </div>
       ) : null}
+      {showChooser ? <Projects /> : null}
       <TabBar current={view} onSelect={setView} glyphName={glyphName} />
       {view === "features" ? (
         <main className={styles.stage}>

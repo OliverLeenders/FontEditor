@@ -1,5 +1,11 @@
 import {
   type DiskFolder,
+  type ProjectRecord,
+  type RememberedFolder,
+  newProject,
+  projectById,
+  projectFor,
+  saveProject,
   accessTo,
   askAccess,
   forgetFolder,
@@ -82,11 +88,17 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
   // a damaged archive is: there is no partial font to fall back on.
   if ("reason" in read) throw new Error(`${folder.name}: ${read.reason}`);
 
+  // A font of its own, in a working copy of its own. This is the moment the
+  // editor stopped being a single-font program: opening a second font used to
+  // write over the first one's working copy, and now it moves to another.
+  const project = await moveToProjectFor(host, folder, read.document);
+
   await adoptDocument(host, read.document);
   await adoptImages(host, read.images);
   await adoptLayers(host, read.layers);
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
+  await saveProject({ ...project, name: nameOf(read.document, folder), folder });
 
   host.patch({ folder: { ...host.state().folder, saved: read.document, savedAt: null } });
 
@@ -97,6 +109,37 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
     glyphs: glyphOrder.length,
     warnings: read.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
   };
+}
+
+/**
+ * The project this folder belongs to, moved into.
+ *
+ * A folder already opened once has a project; a folder being opened for the
+ * first time gets one. Either way the working copy and the write lock become
+ * that project's before anything is written, because what follows writes the
+ * font into whichever working copy is open — and writing it into the last
+ * font's is the bug this exists to prevent.
+ */
+async function moveToProjectFor(
+  host: FontHost,
+  folder: DiskFolder,
+  document: FontDocument,
+): Promise<ProjectRecord> {
+  const found = await projectFor(folder);
+  const project = found ?? newProject(nameOf(document, folder), folder);
+  if (found === null) await saveProject(project);
+
+  if (host.state().projects.current === project.id) return project;
+
+  await host.disk.moveTo(project.id);
+  host.patch({ projects: { ...host.state().projects, current: project.id } });
+  return project;
+}
+
+/** What to call a font in a list of them. Its own name, or its folder's. */
+function nameOf(document: FontDocument, folder: DiskFolder): string {
+  const named = `${document.info.familyName} ${document.info.styleName}`.trim();
+  return named === "" ? folder.name : named;
 }
 
 /** Write the font back to the folder it came from. */
@@ -126,6 +169,19 @@ export async function saveFolderAs(host: FontHost): Promise<SaveReport | null> {
   const report = await writeTo(host, folder);
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
+
+  // The same font, kept somewhere else from now on. Its project follows it
+  // rather than a second one appearing for the same work.
+  const current = host.state().projects.current;
+  const project = current === null ? null : await projectById(current);
+  if (project !== null) {
+    await saveProject({
+      ...project,
+      folder,
+      name: nameOf(host.state().session.editor.document, folder),
+    });
+  }
+
   return report;
 }
 
@@ -239,6 +295,17 @@ export async function forgetOpenFolder(host: FontHost): Promise<void> {
 export async function noteRememberedFolder(host: FontHost): Promise<void> {
   const remembered = await recallFolder();
   if (remembered === null) return;
+  await noteFolder(host, remembered);
+}
+
+/**
+ * The same, for a folder named by a project record rather than by the single
+ * handle the editor kept when there was only one font.
+ *
+ * Two callers, one body: what has to happen to pick a folder back up does not
+ * depend on which note said where it is.
+ */
+export async function noteFolder(host: FontHost, remembered: RememberedFolder): Promise<void> {
   if (host.state().folder.name !== null) return;
 
   host.setFolder(remembered.folder, remembered.name);

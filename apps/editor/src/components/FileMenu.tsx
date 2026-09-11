@@ -47,14 +47,6 @@ export function FileMenu(): React.JSX.Element {
 
   const folders = canOpenFolders();
 
-  // Which folder this editor was working in last time. Only the name: opening
-  // it would replace the font just recovered from the working store, and that
-  // is a click, not a side effect of starting up.
-  useEffect(() => {
-    if (!folders) return;
-    void store.noteRememberedFolder();
-  }, [store, folders]);
-
   /** Run something that can fail, and say what happened either way. */
   const attempt = async (run: () => Promise<string | null>): Promise<void> => {
     setFailed(null);
@@ -127,6 +119,18 @@ export function FileMenu(): React.JSX.Element {
     },
   ];
 
+  items.push({ kind: "separator" });
+  items.push({
+    kind: "item",
+    label: "Fonts…",
+    icon: FolderClockIcon,
+    note: "switch between the fonts you have open",
+    disabled: working,
+    run: () => {
+      store.showProjects(true);
+    },
+  });
+
   if (folders) {
     items.push({ kind: "separator" });
     items.push({
@@ -141,11 +145,17 @@ export function FileMenu(): React.JSX.Element {
         }),
     });
 
-    if (folder.name === null && folder.remembered !== null) {
+    // Read the folder again, throwing away what is in the editor for what is on
+    // disk. Not the same as opening it: the folder is already open, and the
+    // reason to do this is that something else has changed it — a pull, another
+    // tool, an edit by hand — which is precisely when there is no picker to go
+    // through and nothing to pick.
+    if (folder.name !== null) {
       items.push({
         kind: "item",
-        label: `Reopen ${folder.remembered}`,
+        label: `Re-read ${folder.name}`,
         icon: FolderClockIcon,
+        note: "discards changes not saved to it",
         disabled: working,
         run: () =>
           void attempt(async () => {

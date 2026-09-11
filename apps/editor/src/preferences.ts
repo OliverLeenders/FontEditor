@@ -71,6 +71,14 @@ export type Preferences = {
   readonly outlineWidth: number;
   /** Show handles only where the work is. */
   readonly autoHideHandles: boolean;
+  /**
+   * Whether to open the last font without asking which font.
+   *
+   * Off, so somebody with several is asked; the chooser does not appear at all
+   * for somebody with one, so the setting only ever matters once there is a
+   * real question to answer.
+   */
+  readonly skipChooser: boolean;
   /** Let a drag catch on the glyph's own points as well as the font's lines. */
   readonly snapPoints: boolean;
   /** Draw the glyphs either side, from the strip text. */
@@ -141,6 +149,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
   outlineWidth: DEFAULT_OUTLINE_WIDTH,
   autoHideHandles: true,
+  skipChooser: false,
   snapPoints: true,
   showNeighbours: true,
   showAnchors: true,
@@ -192,6 +201,7 @@ export function loadPreferences(): Preferences {
       max: MAX_OUTLINE_WIDTH,
     }),
     autoHideHandles: boolean(raw["autoHideHandles"], DEFAULT_PREFERENCES.autoHideHandles),
+    skipChooser: boolean(raw["skipChooser"], DEFAULT_PREFERENCES.skipChooser),
     snapPoints: boolean(raw["snapPoints"], DEFAULT_PREFERENCES.snapPoints),
     showNeighbours: boolean(raw["showNeighbours"], DEFAULT_PREFERENCES.showNeighbours),
     showAnchors: boolean(raw["showAnchors"], DEFAULT_PREFERENCES.showAnchors),

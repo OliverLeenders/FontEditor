@@ -1,0 +1,158 @@
+/*
+ * Which font to work on.
+ *
+ * Covers the stage rather than floating over it: at startup there is nothing
+ * behind it yet, and a panel with an empty editor showing round the edges reads
+ * as something having failed to load.
+ */
+.pane {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  overflow: auto;
+  background: var(--ground);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  width: min(30rem, 100%);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.empty {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.resume {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.resume:hover {
+  border-color: var(--accent-ink);
+}
+
+.resumeWhat {
+  font-size: 0.95rem;
+}
+
+.resumeWhere,
+.where {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  gap: 0.3rem;
+  align-items: stretch;
+}
+
+.open {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+}
+
+.open:hover {
+  border-color: var(--rule-strong);
+  background: var(--surface-2);
+}
+
+.name {
+  font-size: 0.85rem;
+}
+
+.forget {
+  padding: 0 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-3);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.forget:hover {
+  border-color: var(--rule);
+  color: var(--danger);
+}
+
+.actions,
+.naming {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.actions button,
+.go {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.actions button:hover,
+.go:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.go:disabled {
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.field {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+}
+
+.skip {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.2rem;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+}

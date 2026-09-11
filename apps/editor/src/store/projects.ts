@@ -1,0 +1,175 @@
+import {
+  FIRST_PROJECT,
+  type ProjectRecord,
+  dropProject,
+  listProjects,
+  newProject,
+  openProjects,
+  projectById,
+  saveProject,
+  touchProject,
+} from "@typewright/disk";
+
+import { noteFolder } from "./folder.js";
+import type { FontHost } from "./fonts.js";
+import type { ProjectSummary } from "./state.js";
+
+/**
+ * Which font is open, and which others there are to open.
+ *
+ * The editor opens one font at a time — one working copy, one write lock, one
+ * folder — so this is not a workspace of several open documents. It is the
+ * question asked once, on the way in: which of them.
+ *
+ * Everything here is about *choosing*. What happens after the choice is the
+ * same code that has always run, with a name passed to it.
+ */
+
+export function summaryOf(project: ProjectRecord): ProjectSummary {
+  return {
+    id: project.id,
+    name: project.name,
+    folder: project.folder?.name ?? null,
+    openedAt: project.openedAt,
+    savedAt: project.savedAt,
+  };
+}
+
+/**
+ * What to do on the way in.
+ *
+ * `open` is a font to open straight away; `choose` is a list to put in front of
+ * the reader first. The difference is not a preference alone — there is nothing
+ * to choose between when there is one font, and nothing to choose *from* when
+ * there are none, so the chooser appears only where it would be answering a
+ * real question.
+ */
+export type Arrival =
+  | { readonly kind: "open"; readonly id: string }
+  | { readonly kind: "choose"; readonly all: readonly ProjectSummary[] };
+
+/**
+ * Decide what the editor does with its first moment.
+ *
+ * Called before storage is opened, which is what makes choosing free: nothing
+ * has been loaded, no lock has been taken, so picking any of them costs the
+ * same as picking the first. That is only true here — see `switchTo`, which has
+ * a font open already and cannot simply change its mind.
+ */
+export async function arrive(skipChooser: boolean): Promise<Arrival> {
+  const all = await openProjects();
+
+  // No record of anything: the editor that ran before this one, or a browser
+  // that has never opened a font. Either way there is one working copy to look
+  // in, and it is the one the editor has always looked in.
+  if (all.length === 0) return { kind: "open", id: FIRST_PROJECT };
+  if (all.length === 1 || skipChooser) return { kind: "open", id: all[0]!.id };
+
+  return { kind: "choose", all: all.map(summaryOf) };
+}
+
+/**
+ * Note in the store which font is open, and what else there is.
+ *
+ * And point the editor at that font's folder. This is where the folder comes
+ * from now: the single remembered handle said which folder the editor was last
+ * in, which was the same question as which font, and is not any more.
+ */
+export async function noteProjects(host: FontHost, current: string | null): Promise<void> {
+  const all = await listProjects();
+  host.patch({
+    projects: { all: all.map(summaryOf), current, showing: false },
+  });
+  if (current === null) return;
+
+  await touchProject(current);
+
+  const project = all.find((it) => it.id === current) ?? null;
+  if (project === null || project.folder === null) return;
+
+  // Linked, not read: reading would replace the font recovered from the working
+  // copy with whatever is on disk, which is a decision rather than something to
+  // do to somebody at startup.
+  await noteFolder(host, {
+    folder: project.folder,
+    name: project.folder.name,
+    at: project.savedAt ?? 0,
+    wrote: project.wrote,
+  });
+}
+
+/** Put the chooser on screen, or take it away. */
+export function showChooser(host: FontHost, showing: boolean): void {
+  host.patch({ projects: { ...host.state().projects, showing } });
+}
+
+/**
+ * Open a different font.
+ *
+ * By reloading, which is not a dodge. A font is a working copy, a write lock, a
+ * worker holding both, an autosave timer mid-flight and a document the whole
+ * interface is built over; swapping every one of those in place is a great deal
+ * of machinery to get subtly wrong, and the thing it would buy is half a second
+ * once in a while. A reload releases the lock by ending the tab that held it,
+ * and the editor's ordinary startup then does exactly what it does every other
+ * time.
+ *
+ * The choice is left where startup will look for it.
+ */
+export function switchTo(id: string): void {
+  try {
+    localStorage.setItem(CHOSEN, id);
+  } catch {
+    // A private window, or storage switched off. The reload then opens the most
+    // recent font, which is very nearly always the one just asked for anyway.
+  }
+  location.reload();
+}
+
+const CHOSEN = "typewright.project";
+
+/**
+ * The font a reload was asked to open, if it was asked for one.
+ *
+ * Read once and cleared, because it is an instruction for this startup rather
+ * than a setting. A font that has since been forgotten is ignored rather than
+ * opened into nothing.
+ */
+export async function chosenOnReload(): Promise<string | null> {
+  const id = taken();
+  if (id === null) return null;
+
+  return (await projectById(id)) === null ? null : id;
+}
+
+/** Read the instruction and clear it, or nothing if storage will not play. */
+function taken(): string | null {
+  try {
+    const id = localStorage.getItem(CHOSEN);
+    if (id !== null) localStorage.removeItem(CHOSEN);
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** Start a font with no folder yet, and open it. */
+export async function startProject(name: string): Promise<void> {
+  const project = newProject(name);
+  await saveProject(project);
+  switchTo(project.id);
+}
+
+/**
+ * Forget a font, leaving the folder on disk alone.
+ *
+ * The working copy is left too. It is keyed by the project's id, so nothing
+ * will look in it again; deleting it would be the one irreversible thing in
+ * this whole file, and "remove from the list" is not a request to destroy the
+ * only copy of somebody's work.
+ */
+export async function forgetProject(host: FontHost, id: string): Promise<void> {
+  await dropProject(id);
+  const all = await listProjects();
+  host.patch({ projects: { ...host.state().projects, all: all.map(summaryOf) } });
+}

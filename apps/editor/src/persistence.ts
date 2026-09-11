@@ -179,6 +179,42 @@ export class Persistence {
     }
   }
 
+  /**
+   * Leave this font's working copy and open another one's.
+   *
+   * Everything held is per-project and all of it has to change together: the
+   * directory the worker writes into, the lock that says this tab may write,
+   * and the journal's idea of what it last wrote. Doing it in this order
+   * matters — what is pending is flushed while the old copy is still the one
+   * being written to, and the lock on it is dropped before the new one is
+   * taken, so a tab moving between two fonts never holds both.
+   *
+   * Returns what is in the new working copy, which for a font opened for the
+   * first time is nothing at all.
+   */
+  async moveTo(project: string): Promise<LoadedProject | null> {
+    try {
+      if (this.owner) await this.autosave.flush();
+      this.lock?.releaseLock();
+      this.lock = null;
+
+      await this.client?.open(project);
+
+      this.lock = this.lockFor(project);
+      this.owner = await this.lock.tryAcquire();
+      this.report({ ownership: this.owner ? "owner" : "reading" });
+
+      // The journal compares against what it last wrote, and what it last wrote
+      // was to a different font. Nothing here is a change to this one.
+      this.lastJournalled = null;
+
+      return (await this.client?.load()) ?? null;
+    } catch (error) {
+      this.fail(error);
+      return null;
+    }
+  }
+
   /** Take the project over from whichever tab holds it. */
   async steal(): Promise<boolean> {
     if (this.owner) return false;

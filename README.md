@@ -31,7 +31,7 @@ Guides and a picture to trace from sit behind the drawing; before it goes out, n
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2216 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2250 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
