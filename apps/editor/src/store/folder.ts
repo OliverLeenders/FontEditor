@@ -13,7 +13,6 @@ import {
   hashOfWritten,
   pickFolder,
   readFolder,
-  recallFolder,
   rememberFolder,
   textAt,
   writeFolder,
@@ -67,21 +66,25 @@ export async function openFolder(host: FontHost): Promise<FolderReport | null> {
 }
 
 /**
- * Open the folder this editor was last pointed at.
+ * Read the open font's folder again, replacing what is in the editor.
+ *
+ * The folder linked to the font on screen — not the one this editor remembers
+ * opening last. Those were the same thing while there was one font, and stopped
+ * being the same as soon as there were two: after switching fonts, the
+ * remembered folder belongs to whichever font was last opened or saved, so
+ * re-reading "this" folder quietly read another font's.
  *
  * The handle outlives the tab; permission does not, so this asks for it again
- * and therefore has to be called from a click. Reading the folder rather than
- * merely relinking to it is the point: a link without a read would leave the
- * editor able to save a font over a folder holding a different one.
+ * and has to be called from a click.
  */
 export async function reopenFolder(host: FontHost): Promise<FolderReport | null> {
-  const remembered = await recallFolder();
-  if (remembered === null) return null;
+  const folder = host.folder();
+  if (folder === null) return null;
 
-  if (!(await askAccess(remembered.folder, "readwrite"))) {
-    throw new Error(`${remembered.name} is remembered, but this browser will not open it again`);
+  if (!(await askAccess(folder, "readwrite"))) {
+    throw new Error(`${folder.name} cannot be opened again from this window`);
   }
-  return await adoptFolder(host, remembered.folder);
+  return await adoptFolder(host, folder);
 }
 
 async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderReport> {
@@ -287,7 +290,7 @@ export async function forgetOpenFolder(host: FontHost): Promise<void> {
 }
 
 /**
- * Pick up, on the way in, the folder this editor was last working in.
+ * Pick up, on the way in, the folder of the font being opened.
  *
  * Linked, not read. Reading would replace the font recovered from the working
  * store — which is the one somebody left off in — with whatever is on disk, and
@@ -304,19 +307,6 @@ export async function forgetOpenFolder(host: FontHost): Promise<void> {
  * permission does not: asking needs a click behind it, so it cannot happen
  * here. Where permission *has* survived — an installed app may keep it — the
  * check happens here instead and the first save is silent.
- */
-export async function noteRememberedFolder(host: FontHost): Promise<void> {
-  const remembered = await recallFolder();
-  if (remembered === null) return;
-  await noteFolder(host, remembered);
-}
-
-/**
- * The same, for a folder named by a project record rather than by the single
- * handle the editor kept when there was only one font.
- *
- * Two callers, one body: what has to happen to pick a folder back up does not
- * depend on which note said where it is.
  */
 export async function noteFolder(host: FontHost, remembered: RememberedFolder): Promise<void> {
   if (host.state().folder.name !== null) return;

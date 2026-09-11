@@ -57,7 +57,6 @@ import {
   type FolderReport,
   type SaveReport,
   forgetOpenFolder,
-  noteRememberedFolder,
   openFolder,
   reopenFolder,
   saveFolder,
@@ -572,7 +571,7 @@ export class EditorStore {
     return await openFolder(this.host);
   }
 
-  /** Open the folder this editor was last working in. */
+  /** Read the open font's folder again, replacing what is in the editor. */
   async reopenFolder(): Promise<FolderReport | null> {
     return await reopenFolder(this.host);
   }
@@ -590,11 +589,6 @@ export class EditorStore {
   /** Stop pointing at a folder, and stop remembering it. */
   async forgetFolder(): Promise<void> {
     await forgetOpenFolder(this.host);
-  }
-
-  /** On the way in: say which folder this editor was last working in. */
-  async noteRememberedFolder(): Promise<void> {
-    await noteRememberedFolder(this.host);
   }
 
   // ---- which font is open -------------------------------------------------

@@ -8,7 +8,9 @@ installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
 const { arrive } = await import("../src/store/projects.js");
-const { newProject, projectById, rememberFolder, saveProject } = await import("@typewright/disk");
+const { newProject, projectById, rememberFolder, saveProject, writeFolder } =
+  await import("@typewright/disk");
+const { ufoFiles } = await import("@typewright/font-io");
 const { updateGlyph } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
@@ -284,5 +286,44 @@ describe("forgetting a font", () => {
     await store.forgetProject("a");
 
     expect(await projectById("a")).not.toBeNull();
+  });
+});
+
+/** A UFO folder holding the starter font under a family name of its own. */
+async function ufoNamed(store: Store, folderName: string, family: string): Promise<FakeFolder> {
+  const folder = new FakeFolder(folderName);
+  const document = store.editor.document;
+  await writeFolder(
+    folder,
+    ufoFiles({ ...document, info: { ...document.info, familyName: family } }),
+  );
+  return folder;
+}
+
+describe("re-reading the folder that is open", () => {
+  it("reads the open font's folder, not whichever folder was opened last", async () => {
+    const first = freshStore();
+    const times = await ufoNamed(first, "Times.ufo", "Times");
+    const helvetica = await ufoNamed(first, "Helvetica.ufo", "Helvetica");
+
+    offer(times);
+    await first.openFolder();
+    const timesProject = first.getState().projects.current;
+    // Opening a second font makes it the folder this editor remembers last.
+    offer(helvetica);
+    await first.openFolder();
+    expect(timesProject).not.toBeNull();
+
+    // A later start, on Times.
+    const second = new EditorStore();
+    await second.noteProjects(timesProject ?? "");
+    await second.reopenFolder();
+
+    expect(second.editor.document.info.familyName).toBe("Times");
+  });
+
+  it("does nothing when no folder is open", async () => {
+    const store = freshStore();
+    expect(await store.reopenFolder()).toBeNull();
   });
 });
