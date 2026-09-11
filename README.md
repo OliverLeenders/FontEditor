@@ -34,7 +34,7 @@ Several fonts are kept at once, each in a working copy of its own, and the progr
 | 7     | Spacing and kerning                 | done                                                                                |
 | 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2281 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and 2344 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                |
 | 12    | Not losing what was opened          | done                                                                                |
 | 13    | The family, named                   | done                                                                                |
@@ -42,7 +42,7 @@ Several fonts are kept at once, each in a working copy of its own, and the progr
 | 15    | Several fonts, and a name           | done                                                                                |
 | 16    | The details a font is judged on     | next                                                                                |
 | 17    | Proving it where it will be used    | next                                                                                |
-| 18    | Keeping it maintainable             | next                                                                                |
+| 18    | Keeping it maintainable             | two of three done: the tests and the store; the upgrades wait on a decision         |
 | 19    | Releases                            | next                                                                                |
 | 20    | Two fonts side by side              | next                                                                                |
 
@@ -350,14 +350,23 @@ that will actually draw them.
 
 #### Phase 18 — Keeping it maintainable
 
-- **The interface's missing tests.** Twenty-five components are rendered by no test, and
-  several have decisions in them: the Export menu, the kerning groups, the transform panel,
-  the point and curve sections of the inspector, the Proof, and the list of fonts. Those
-  first.
-- **Four major versions behind.** React 19, Vite 8, Vitest 5 and TypeScript 7 are all
-  released. None is urgent, and each is easier alone than all four together.
-- **The store's last large file.** `store/index.ts` is 991 lines after seven modules have
-  left it; the snapshots, the view and the settings are the next three to go.
+- **The interface's missing tests — done for the ones with decisions in them.** The Export
+  menu, the kerning groups, the transform panel, the point and curve sections of the
+  inspector, the Proof, and the list of fonts: 61 tests, asking what somebody using each
+  would ask. They found two bugs. The inspector named its buttons wrongly — a row wrapped in
+  a `<label>` gives its name to the first control inside it, so Corner was announced as
+  "Type Corner Smooth Tangent" — and Escape in a kerning group's name closed the whole
+  panel, because the panel's window listener ran before the field could keep the key.
+  Eighteen components are still untested; what is in them is mostly layout.
+- **The store's large file — done, as far as it should go.** The snapshots, which carry
+  state of their own, and the inspector's placement left `store/index.ts`, which is 917
+  lines now. The settings and the view stay, and this list was wrong to name them: the
+  settings' setters are one line each on purpose, with what they share already in
+  `settings.ts`, and moving them would give each a second one-liner to call it; the view is
+  forty lines. Neither would read better anywhere else.
+- **Four major versions behind — not started.** React 19, Vite 8, Vitest 5 and TypeScript
+  7 are all released, and each means installing things, which is a decision rather than a
+  chore. None is urgent, and each is easier alone than all four together.
 
 #### Phase 19 — Releases
 
