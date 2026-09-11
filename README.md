@@ -40,6 +40,11 @@ Several fonts are kept at once, each in a working copy of its own, and the progr
 | 13    | The family, named                   | done                                                                                |
 | 14    | What ships to a browser             | done                                                                                |
 | 15    | Several fonts, and a name           | done                                                                                |
+| 16    | The details a font is judged on     | next                                                                                |
+| 17    | Proving it where it will be used    | next                                                                                |
+| 18    | Keeping it maintainable             | next                                                                                |
+| 19    | Releases                            | next                                                                                |
+| 20    | Two fonts side by side              | next                                                                                |
 
 ### What the table missed
 
@@ -288,19 +293,84 @@ asks with the three answers a browser cannot offer — save and close, close wit
 cancel — and a second press of the close button still closes a window whose page cannot
 answer.
 
-#### What next
+**A lighter start.** The editor loaded 832 KB of JavaScript before a glyph was drawn, and
+the largest part of it was not React but opentype.js — measured by attributing every byte
+of a sourcemapped build back to its source, rather than guessed at. Nothing at startup
+needs a font parser: reading an OTF and writing one are both things somebody clicks. They
+load then now, from an entry point of their own, and the startup bundle is 559 KB (171 KB
+compressed, from 249).
 
-Not started, in the order they would be reached for.
+### What is next
 
-- **Releases.** A version number that means something, a signed installer, and updates that
-  arrive without a download page — what separates a program people install from a build
-  somebody made.
-- **A faster start.** The editor ships as a megabyte of JavaScript, most of it views nobody
-  has opened yet. Loading each when it is first opened would bring the first frame sooner.
-- **Two fonts side by side.** With a working copy and a lock per font, a second window on a
-  second font is most of the way there; what is left is the desktop build opening one.
-- **Reading it all back again.** Phases 11 to 15 came from reading the code once the first
-  ten were done. Doing that again is how the next list gets made.
+Found the same way phases 11 to 15 were: by reading the code back once the list above was
+done — this time with the bundle measured, every component checked for a test that renders
+it, and the exporter asked what it writes rather than what the model holds. In the order
+they would be reached for.
+
+#### Phase 16 — The details a font is judged on
+
+Small things, each noticed by whoever uses the font rather than whoever draws it.
+
+- **Vertical metrics that can be set.** A font carries three sets of ascender and
+  descender — `OS/2` typographic, `OS/2` Windows and `hhea` — a line gap, and a bit saying
+  which set to believe, and different platforms believe different ones. Today the exporter
+  leaves all of them to be worked out from the ascender and descender, which is right for a
+  first draft and wrong the moment a font has to set the same line height in a word
+  processor, a browser and a layout program. Font Info should show them, propose sensible
+  values, and let each be overridden.
+- **Accented glyphs built from their parts.** Anchors already place a component, and a mark
+  already says where it attaches. What is missing is saying `eacute = e + acutecomb` once
+  and having the glyph built — and kept in step when either part changes — for the few
+  hundred accented glyphs a Latin font needs.
+- **Duplicate a glyph**, the natural start for an alternate or a small capital; and **a
+  colour mark on a glyph**, the `public.markColor` every other UFO editor uses to say
+  "finished" or "look at this again", which a source already carries through here unseen.
+- **The embedding flag.** `OS/2 fsType` says what a document may do with a font embedded in
+  it. It is written as a default today, and it is a licence's decision rather than a
+  default's.
+
+#### Phase 17 — Proving it where it will be used
+
+Both files are checked against fontTools on every push, and neither against the things
+that will actually draw them.
+
+- **Shaping with the engine browsers use.** The Proof and the Spacing line shape with this
+  editor's own subset of `.fea`: no mark attachment, no bidirectional text. HarfBuzz is the
+  shaper nearly every browser and operating system uses, and it builds to WebAssembly.
+  Proofing with it would show a font as it will set — and would test the `GSUB` and `GPOS`
+  written here against something other than the code that wrote them. A dependency
+  decision, as WOFF2 was.
+- **Rendering checked in CI.** Rasterise the exported OTF and TTF with FreeType and compare
+  what comes out with the outlines as drawn, so a font that only looks right in a browser
+  is caught before a Windows preview finds the notch.
+- **Hinting.** The TrueType flavour carries no hinting instructions. That is a defensible
+  default — most text is drawn unhinted now — but Windows at small sizes is not most text.
+  A `gasp` table saying how to draw it at least; autohinting means ttfautohint, a C
+  program, and another dependency decision.
+
+#### Phase 18 — Keeping it maintainable
+
+- **The interface's missing tests.** Twenty-five components are rendered by no test, and
+  several have decisions in them: the Export menu, the kerning groups, the transform panel,
+  the point and curve sections of the inspector, the Proof, and the list of fonts. Those
+  first.
+- **Four major versions behind.** React 19, Vite 8, Vitest 5 and TypeScript 7 are all
+  released. None is urgent, and each is easier alone than all four together.
+- **The store's last large file.** `store/index.ts` is 991 lines after seven modules have
+  left it; the snapshots, the view and the settings are the next three to go.
+
+#### Phase 19 — Releases
+
+A version number that means something, a signed installer — an unsigned one meets a
+SmartScreen warning on its first run — updates that arrive without a download page, a
+licence where `Cargo.toml` has an empty string, and a content security policy for the
+desktop window, which has none. What separates a program people install from a build
+somebody made.
+
+#### Phase 20 — Two fonts side by side
+
+With a working copy and a write lock per font, a second window on a second font is most of
+the way there; what is left is the desktop build opening one.
 
 ## Getting started
 
