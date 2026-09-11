@@ -42,7 +42,7 @@ Several fonts are kept at once, each in a working copy of its own, and the progr
 | 15    | Several fonts, and a name           | done                                                                                |
 | 16    | The details a font is judged on     | next                                                                                |
 | 17    | Proving it where it will be used    | next                                                                                |
-| 18    | Keeping it maintainable             | done, but for TypeScript 7, which the linter cannot read yet                        |
+| 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                     |
 | 19    | Releases                            | next                                                                                |
 | 20    | Two fonts side by side              | next                                                                                |
 
@@ -372,11 +372,14 @@ that will actually draw them.
   leaves it at 600 KB. Each version is one that has been out for a while rather than the
   newest: the workspace refuses packages younger than a day, and pnpm's response to that
   was to write itself an exemption without asking, which is not kept.
-- **TypeScript 7 — waiting on the linter.** The lint rules that read types come from
+- **TypeScript 6 — done; 7 waits on the linter.** The lint rules that read types come from
   typescript-eslint, whose latest release accepts TypeScript below 6.1, and most of the
-  rules this repository holds itself to are that kind. TypeScript 7 would leave them unable
-  to run. 6.0.3 is inside that range and is the step available today; 7 is for when the
-  linter can read it.
+  rules this repository holds itself to are that kind — so 7 would leave them unable to run.
+  6.0.3 is inside that range and is in. Nothing had to change for it but one cast: the
+  browser's directory handle was cast to the handful of methods the storage code uses,
+  because TypeScript 5's DOM types had no way to list a directory. TypeScript 6's do, the
+  handle fits the type as it is, and the linter noticed the cast had nothing left to do. 7
+  is for when the linter can read it.
 
 #### Phase 19 — Releases
 
