@@ -40,7 +40,7 @@ Several fonts are kept at once, each in a working copy of its own, and the progr
 | 13    | The family, named                   | done                                                                                |
 | 14    | What ships to a browser             | done                                                                                |
 | 15    | Several fonts, and a name           | done                                                                                |
-| 16    | The details a font is judged on     | next                                                                                |
+| 16    | The details a font is judged on     | done                                                                                |
 | 17    | Proving it where it will be used    | next                                                                                |
 | 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                     |
 | 19    | Releases                            | next                                                                                |
@@ -311,23 +311,25 @@ they would be reached for.
 
 Small things, each noticed by whoever uses the font rather than whoever draws it.
 
-- **Vertical metrics that can be set.** A font carries three sets of ascender and
-  descender — `OS/2` typographic, `OS/2` Windows and `hhea` — a line gap, and a bit saying
-  which set to believe, and different platforms believe different ones. Today the exporter
-  leaves all of them to be worked out from the ascender and descender, which is right for a
-  first draft and wrong the moment a font has to set the same line height in a word
-  processor, a browser and a layout program. Font Info should show them, propose sensible
-  values, and let each be overridden.
-- **Accented glyphs built from their parts.** Anchors already place a component, and a mark
-  already says where it attaches. What is missing is saying `eacute = e + acutecomb` once
-  and having the glyph built — and kept in step when either part changes — for the few
-  hundred accented glyphs a Latin font needs.
-- **Duplicate a glyph**, the natural start for an alternate or a small capital; and **a
-  colour mark on a glyph**, the `public.markColor` every other UFO editor uses to say
-  "finished" or "look at this again", which a source already carries through here unseen.
-- **The embedding flag.** `OS/2 fsType` says what a document may do with a font embedded in
-  it. It is written as a default today, and it is a licence's decision rather than a
-  default's.
+- **Vertical metrics that can be set — done.** Font Info has a Line spacing section with
+  the three sets of ascender, descender and line gap — `OS/2` typographic, `OS/2` Windows
+  and `hhea` — and the flag saying which to believe. Each is empty until set, and empty
+  means what the exporter always derived, shown greyed in the box, so a font that sets
+  none of them exports as it did.
+- **Accented glyphs built from their parts — done.** The glyph browser builds the accented
+  glyphs of the selected set as composites. The recipe is Unicode's decomposition read
+  through the font's own characters, so no table is kept; marks are placed and stacked by
+  their anchors, go on a dotless i or j, and take their width from their letter. Clean up
+  re-attaches every composite after a letter's anchor has moved. Composites are drawn
+  wherever a glyph is shown, and can be aligned to anchors from inside themselves.
+- **Duplicate a glyph — done**, as `a.001`, `a.002` and on, straight after the original,
+  unencoded, and into renaming; and **a colour mark on a glyph — done**:
+  `public.markColor`, set from the browser's menu and shown along the foot of the cell,
+  read out of a glyph's `lib` and written back into it without disturbing the rest.
+- **The embedding flag — done.** `OS/2 fsType` is set in Font Info as a level —
+  installable, editable, preview and print, restricted — with the no-subsetting and
+  bitmaps-only flags beside it. A font exports as installable until somebody decides
+  otherwise, as it always did.
 
 #### Phase 17 — Proving it where it will be used
 
