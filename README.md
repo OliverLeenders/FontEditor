@@ -331,6 +331,26 @@ Small things, each noticed by whoever uses the font rather than whoever draws it
   bitmaps-only flags beside it. A font exports as installable until somebody decides
   otherwise, as it always did.
 
+The gaps phase 16 left, cleared before phase 17:
+
+- **Spacing keys that say more than a name.** A key is still a glyph name, now with the
+  grammar Glyphs uses: `o+10` adds units, `|b` takes the other side of `b` — a `d`'s left
+  from a `b`'s right — and a bare `|` keeps a glyph symmetrical. The Spacing view's fields
+  take a key as well as a number: `=o` sets one, a number typed over it replaces it, and
+  the key shows beside the number as a chip that drops it and keeps the number it gave.
+  The kern there is typed the same way.
+- **Composites spaced like letters.** Their sidebearings are measured through their
+  components, so the Spacing view and the inspector give an `ñ` the sides of the letter it
+  draws, and setting one moves the components together.
+- **Any glyph in a line of text.** `/a.001` and `/uni0301` put a glyph in the strip, the
+  Spacing line or the Proof by name; the name ends at a space or the next slash, and `//`
+  is a slash.
+- **The glyph browser picks several cells.** Ctrl adds one, shift takes a run, Ctrl-A takes
+  everything shown; colour marks, rounding and Delete act on all of them in one step.
+- **A binary's line metrics and embedding flag are read** into Font Info's overrides,
+  where they differ from what the exporter would derive.
+- **Tests for the glyph browser, Clean up and New glyph.**
+
 #### Phase 17 — Proving it where it will be used
 
 Both files are checked against fontTools on every push, and neither against the things
