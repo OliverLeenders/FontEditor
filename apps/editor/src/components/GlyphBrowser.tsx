@@ -1,12 +1,12 @@
 import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@typewright/catalog";
 import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@typewright/render";
 import {
-  deleteGlyph,
+  deleteGlyphs,
   duplicateGlyph,
   duplicateName,
   renameCurrentGlyph,
-  roundGlyphAt,
-  setMarkColor,
+  roundGlyphsAt,
+  setMarkColors,
 } from "@typewright/tools";
 import { MARK_COLORS, NOTDEF, drawableGlyph, sameMarkColor } from "@typewright/font-model";
 import {
@@ -63,6 +63,10 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   const surfaceRef = useRef<CanvasSurface | null>(null);
   const [focused, setFocused] = useState(0);
   const [width, setWidth] = useState(0);
+  // The cells picked with ctrl and shift, by name so that a pick survives the
+  // list being sorted, and where a shift-click runs from.
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  const [anchor, setAnchor] = useState(0);
 
   // Rebuilt only when the font changes, not on every keystroke: walking every
   // glyph's contours to ask "is this drawn?" is what would make typing in the
@@ -95,11 +99,27 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   const layout: GridLayout = useMemo(() => gridLayout(shown.length, width), [shown.length, width]);
   const columns = layout.columns;
 
+  /*
+   * What the menu and the Delete key act on: the cells picked, in the order
+   * shown, or the focused one where none are.
+   *
+   * Only what is shown counts. A glyph picked and then filtered out of sight is
+   * not deleted with the others, because nobody deletes what they cannot see
+   * on purpose.
+   */
+  const selection = useMemo(() => {
+    const names = shown.filter((entry) => picked.has(entry.name)).map((entry) => entry.name);
+    if (names.length > 0) return names;
+    const name = shown[focused]?.name;
+    return name === undefined ? [] : [name];
+  }, [shown, picked, focused]);
+  const selectionSet = useMemo(() => new Set(selection), [selection]);
+
   // What the frame callback reads. Held in a ref so that installing the surface
   // does not depend on it — otherwise the canvas would be torn down and rebuilt
   // on every keystroke.
-  const frame = useRef({ shown, document, focused, currentGlyph, layout });
-  frame.current = { shown, document, focused, currentGlyph, layout };
+  const frame = useRef({ shown, document, focused, currentGlyph, layout, selectionSet });
+  frame.current = { shown, document, focused, currentGlyph, layout, selectionSet };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -145,6 +165,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
             codePoint: entry.codePoint,
             focused: entry.name === focusedName,
             current: entry.name === state.currentGlyph,
+            selected: state.selectionSet.size > 1 && state.selectionSet.has(entry.name),
             markColor: state.document.glyphs[entry.name]?.markColor ?? null,
           },
         );
@@ -169,7 +190,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   // Redraw when what is shown changes. The canvas itself never re-renders.
   useEffect(() => {
     surfaceRef.current?.invalidate();
-  }, [shown, focused, currentGlyph, document, layout]);
+  }, [shown, focused, currentGlyph, document, layout, selectionSet]);
 
   // A filter that shortens the list must not strand focus past its end.
   useEffect(() => {
@@ -221,6 +242,9 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
     const index = shown.findIndex((entry) => entry.name === pendingRename);
     setPendingRename(null);
     if (index < 0) return;
+    // The copy on its own, so the next Delete is about it and not the original.
+    setPicked(new Set([pendingRename]));
+    setAnchor(index);
     setFocused(index);
     startRename(index);
   }, [pendingRename, shown]);
@@ -239,11 +263,19 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
     return { ...box, y: box.y - renameScroll };
   }, [renaming, layout, renameScroll]);
 
-  /** What the menu offers for one cell. */
+  /**
+   * What the menu offers for one cell, and for the others picked with it.
+   *
+   * A cell that is one of the picked ones speaks for all of them; one that is
+   * not speaks for itself, and has been picked alone by the time the menu
+   * opens. Renaming and duplicating are about one glyph and are offered for one.
+   */
   const cellItems = (index: number): Item[] => {
     const name = shown[index]?.name;
     if (name === undefined) return [];
-    const markColor = document.glyphs[name]?.markColor ?? null;
+    const names = selectionSet.has(name) ? selection : [name];
+    const several = names.length > 1;
+    const marks = names.map((each) => document.glyphs[each]?.markColor ?? null);
 
     return [
       { kind: "item", label: "Open", icon: PenToolIcon, run: () => openAt(index) },
@@ -253,7 +285,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         icon: TypeIcon,
         // `.notdef` is found by name when a font is written, so renaming it
         // loses the glyph rather than relabelling it.
-        disabled: name === NOTDEF,
+        disabled: several || name === NOTDEF,
         run: () => startRename(index),
       },
       {
@@ -261,7 +293,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         label: "Duplicate",
         icon: CopyPlusIcon,
         // A second `.notdef` is a glyph no font is allowed.
-        disabled: name === NOTDEF,
+        disabled: several || name === NOTDEF,
         run: () => {
           const copy = duplicateName(store.editor, name);
           store.applyTool(duplicateGlyph(store.editor, name));
@@ -274,36 +306,36 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         label: "Round coordinates",
         icon: GridIcon,
         run: () => {
-          store.setCurrentGlyph(name);
-          store.applyTool(roundGlyphAt(store.editor, name));
+          if (!several) store.setCurrentGlyph(name);
+          store.applyTool(roundGlyphsAt(store.editor, names));
         },
       },
       { kind: "separator" },
       // The colour marks, each drawn as itself and ticked when it is the one on
-      // this glyph: a row of words would have to be read, and a mark is
+      // every glyph picked: a row of words would have to be read, and a mark is
       // recognised.
       ...MARK_COLORS.map((mark): Item => ({
         kind: "item",
         label: mark.name,
         icon: markSwatch(mark.value),
-        checked: sameMarkColor(markColor, mark.value),
-        run: () => store.applyTool(setMarkColor(store.editor, name, mark.value)),
+        checked: marks.every((each) => sameMarkColor(each, mark.value)),
+        run: () => store.applyTool(setMarkColors(store.editor, names, mark.value)),
       })),
       {
         kind: "item",
         label: "No colour",
-        disabled: markColor === null,
-        run: () => store.applyTool(setMarkColor(store.editor, name, null)),
+        disabled: marks.every((each) => each === null),
+        run: () => store.applyTool(setMarkColors(store.editor, names, null)),
       },
       { kind: "separator" },
       {
         kind: "item",
-        label: "Delete",
+        label: several ? `Delete ${String(names.length)} glyphs` : "Delete",
         icon: TrashIcon,
         // Kept for the same reason it cannot be renamed: a font needs one, and
         // what the export would put back is a blank.
-        disabled: name === NOTDEF,
-        run: () => store.applyTool(deleteGlyph(store.editor, name)),
+        disabled: names.every((each) => each === NOTDEF),
+        run: () => store.applyTool(deleteGlyphs(store.editor, names)),
       },
     ];
   };
@@ -313,9 +345,40 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
     if (entry !== undefined) onOpen(entry.name);
   };
 
-  const moveFocus = (next: number): void => {
+  /**
+   * Pick a cell, the way a file browser does: a click picks one, ctrl or command
+   * adds one or takes it away, and shift takes the run from the last cell picked
+   * on its own. The focus goes with it, so the keyboard carries on from there.
+   */
+  const pick = (
+    index: number,
+    how: { readonly toggle: boolean; readonly extend: boolean },
+  ): void => {
+    const name = shown[index]?.name;
+    if (name === undefined) return;
+
+    if (how.extend) {
+      const from = Math.min(anchor, index);
+      const to = Math.max(anchor, index);
+      setPicked(new Set(shown.slice(from, to + 1).map((entry) => entry.name)));
+    } else if (how.toggle) {
+      const next = new Set(selection);
+      // The last one stays: picking nothing would leave the menu with nothing
+      // to be about but the focus, which is the cell just taken away.
+      if (next.has(name) && next.size > 1) next.delete(name);
+      else next.add(name);
+      setPicked(next);
+      setAnchor(index);
+    } else {
+      setPicked(new Set([name]));
+      setAnchor(index);
+    }
+    setFocused(index);
+  };
+
+  const moveFocus = (next: number, extend = false): void => {
     const clamped = Math.max(0, Math.min(shown.length - 1, next));
-    setFocused(clamped);
+    pick(clamped, { toggle: false, extend });
 
     const scroller = scrollRef.current;
     if (scroller === null) return;
@@ -403,6 +466,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               {shown.length === entries.length
                 ? `${String(entries.length)} glyphs`
                 : `${String(shown.length)} of ${String(entries.length)}`}
+              {selection.length > 1 ? ` · ${String(selection.length)} picked` : ""}
             </span>
           </div>
         </div>
@@ -416,6 +480,14 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
             aria-label="Glyphs"
             aria-rowcount={Math.ceil(shown.length / Math.max(1, columns))}
             onKeyDown={(event) => {
+              // Every glyph shown. Kept from reaching the window, where the same
+              // keys select every point of the open glyph.
+              if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
+                event.preventDefault();
+                event.stopPropagation();
+                setPicked(new Set(shown.map((entry) => entry.name)));
+                return;
+              }
               if (event.ctrlKey || event.metaKey) return;
               const moves: Record<string, number | undefined> = {
                 ArrowRight: focused + 1,
@@ -428,7 +500,12 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               const next = moves[event.key];
               if (next !== undefined) {
                 event.preventDefault();
-                moveFocus(next);
+                moveFocus(next, event.shiftKey);
+                return;
+              }
+              if (event.key === "Escape") {
+                setPicked(new Set());
+                setAnchor(focused);
                 return;
               }
               if (event.key === "Enter") {
@@ -446,8 +523,8 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               // friction rather than protection.
               if (event.key === "Delete" || event.key === "Backspace") {
                 event.preventDefault();
-                const name = shown[focused]?.name;
-                if (name !== undefined) store.applyTool(deleteGlyph(store.editor, name));
+                if (selection.length > 0) store.applyTool(deleteGlyphs(store.editor, selection));
+                setPicked(new Set());
               }
             }}
             onScroll={(event) => {
@@ -455,7 +532,9 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
             }}
             onClick={(event) => {
               const index = cellFromEvent(event, scrollRef.current, layout);
-              if (index !== null) setFocused(index);
+              if (index !== null) {
+                pick(index, { toggle: event.ctrlKey || event.metaKey, extend: event.shiftKey });
+              }
             }}
             onDoubleClick={(event) => {
               const index = cellFromEvent(event, scrollRef.current, layout);
@@ -465,7 +544,14 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               const index = cellFromEvent(event, scrollRef.current, layout);
               if (index === null) return;
               event.preventDefault();
-              setFocused(index);
+              // Pointing outside the picked cells picks the one pointed at, so
+              // the menu is never about glyphs other than the one under it.
+              const name = shown[index]?.name;
+              if (name !== undefined && !selectionSet.has(name)) {
+                pick(index, { toggle: false, extend: false });
+              } else {
+                setFocused(index);
+              }
               setMenu({ x: event.clientX, y: event.clientY, index });
             }}
           >

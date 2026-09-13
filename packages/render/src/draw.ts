@@ -847,13 +847,16 @@ export function drawGlyphThumbnail(
  * Named rather than passed as loose booleans because the two states read
  * differently and are easy to transpose: `current` is the glyph open in the
  * editor, `focused` is the one the keyboard is on. They are frequently not the
- * same cell.
+ * same cell. `selected` is one of the cells picked for the menu to act on,
+ * which takes the focus's ground without its outline, so several can be
+ * picked and one of them still be where the keyboard is.
  */
 export type GlyphCellState = {
   readonly name: string;
   readonly codePoint: number | null;
   readonly focused: boolean;
   readonly current: boolean;
+  readonly selected?: boolean;
   /** The glyph's colour mark, as the UFO writes it, or nothing. */
   readonly markColor?: string | null;
 };
@@ -884,7 +887,7 @@ export function drawGlyphCell(
   metrics: { unitsPerEm: number; ascender: number; descender: number },
   state: GlyphCellState,
 ): void {
-  if (state.current || state.focused) {
+  if (state.current || state.focused || state.selected === true) {
     ctx.fillStyle = state.current ? palette.cellCurrent : palette.cellFocus;
     ctx.beginPath();
     ctx.rect(box.x, box.y, box.width, box.height);

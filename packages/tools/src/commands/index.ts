@@ -88,11 +88,13 @@ export type { NewGlyph } from "./glyphs.js";
 export {
   createGlyphs,
   deleteGlyph,
+  deleteGlyphs,
   deleteRefusal,
   duplicateGlyph,
   duplicateName,
   renameCurrentGlyph,
   setMarkColor,
+  setMarkColors,
   renameRefusal,
 } from "./glyphs.js";
 
@@ -136,6 +138,7 @@ export {
 export {
   roundCoordinates,
   roundGlyphAt,
+  roundGlyphsAt,
   roundSelection,
   unroundedCount,
   unroundedSelected,

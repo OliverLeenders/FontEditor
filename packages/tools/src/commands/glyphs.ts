@@ -61,15 +61,36 @@ export function createGlyphs(
  * effect of a delete is the kind of help nobody asks for.
  */
 export function deleteGlyph(state: EditorState, name: GlyphName): ToolResult {
-  const document = removeGlyph(state.document, name);
-  if (document === null) return result(state);
+  return deleteGlyphs(state, [name]);
+}
 
-  const currentGlyph =
-    state.currentGlyph === name ? (document.glyphOrder[0] ?? "") : state.currentGlyph;
+/**
+ * Remove several glyphs, as one undo step.
+ *
+ * What the browser does with the cells picked in it. One step, because they
+ * were deleted in one go and should come back in one; the ones that cannot go —
+ * `.notdef`, a name no longer in the font — are passed over rather than
+ * spoiling the rest.
+ */
+export function deleteGlyphs(state: EditorState, names: readonly GlyphName[]): ToolResult {
+  let document = state.document;
+  const gone: GlyphName[] = [];
+  for (const name of names) {
+    const next = removeGlyph(document, name);
+    if (next === null) continue;
+    document = next;
+    gone.push(name);
+  }
+  if (gone.length === 0) return result(state);
+
+  const currentGlyph = gone.includes(state.currentGlyph)
+    ? (document.glyphOrder[0] ?? "")
+    : state.currentGlyph;
+  const label = gone.length === 1 ? `Delete ${gone[0]!}` : `Delete ${String(gone.length)} glyphs`;
 
   return result(
     { ...state, document, currentGlyph, selection: [], focusedSegment: null, hoveredSegment: null },
-    [begin(`Delete ${name}`, false), commit],
+    [begin(label, false), commit],
   );
 }
 
@@ -159,9 +180,22 @@ export function setMarkColor(
   name: GlyphName,
   color: string | null,
 ): ToolResult {
-  const document = updateGlyph(state.document, name, (g) =>
-    g.markColor === color ? null : { ...g, markColor: color },
-  );
-  if (document === null) return result(state);
+  return setMarkColors(state, [name], color);
+}
+
+/** Mark several glyphs with one colour, or take their marks away, in one undo step. */
+export function setMarkColors(
+  state: EditorState,
+  names: readonly GlyphName[],
+  color: string | null,
+): ToolResult {
+  let document = state.document;
+  for (const name of names) {
+    document =
+      updateGlyph(document, name, (g) =>
+        g.markColor === color ? null : { ...g, markColor: color },
+      ) ?? document;
+  }
+  if (document === state.document) return result(state);
   return done(state, { ...state, document }, color === null ? "Clear mark colour" : "Mark colour");
 }

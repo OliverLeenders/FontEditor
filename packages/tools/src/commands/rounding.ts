@@ -60,6 +60,23 @@ export function roundGlyphAt(state: EditorState, name: GlyphName): ToolResult {
 }
 
 /**
+ * Put several glyphs' coordinates on whole units, in one undo step.
+ *
+ * The cells picked in the browser, which is a decision about those glyphs and
+ * not about the font: between rounding one and rounding everything.
+ */
+export function roundGlyphsAt(state: EditorState, names: readonly GlyphName[]): ToolResult {
+  let document = state.document;
+  for (const name of names) {
+    const glyph = document.glyphs[name];
+    if (glyph === undefined) continue;
+    document = putGlyph(document, roundGlyph(glyph));
+  }
+  if (document === state.document) return result(state);
+  return done(state, { ...state, document }, names.length === 1 ? "Round glyph" : "Round glyphs");
+}
+
+/**
  * Put the selected points and handles on whole units, and nothing else.
  *
  * Literally what is selected: a selected on-curve point rounds its own
