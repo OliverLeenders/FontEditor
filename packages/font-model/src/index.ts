@@ -305,3 +305,5 @@ export {
 
 export type { CompositeBuild, CompositeProblem, GlyphLookup } from "./composites.js";
 export { attachComponents, buildComposite, compositePlan, compositeParts } from "./composites.js";
+
+export type { SectionStop } from "./measure.js";

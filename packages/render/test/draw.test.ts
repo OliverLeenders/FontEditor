@@ -781,3 +781,47 @@ describe("the curvature comb", () => {
     ).toBeGreaterThan(1);
   });
 });
+
+/**
+ * The section ruler's stops: a tick at each, and the angle the ruler meets
+ * each at. The points are far apart so no label is crowded out.
+ */
+describe("the section ruler's stops", () => {
+  it("labels the angle at every stop, edges and guides alike", () => {
+    const ctx = render({
+      ...base(ring()),
+      section: {
+        from: vec(0, 0),
+        to: vec(4000, 0),
+        crossings: [vec(0, 0)],
+        stops: [
+          { point: vec(0, 0), kind: "outline", angle: 90 },
+          { point: vec(4000, 0), kind: "guide", angle: 45 },
+        ],
+        spans: [],
+      },
+    });
+    const texts = ctx.texts();
+
+    expect(texts).toContain("90°");
+    expect(texts).toContain("45°");
+  });
+
+  it("says nothing about the angle where the outline has no direction", () => {
+    const ctx = render({
+      ...base(ring()),
+      section: {
+        from: vec(0, 0),
+        to: vec(4000, 0),
+        crossings: [vec(0, 0)],
+        stops: [{ point: vec(0, 0), kind: "outline", angle: null }],
+        spans: [{ from: vec(0, 0), to: vec(4000, 0), distance: 4000, ink: true }],
+      },
+    });
+    const texts = ctx.texts();
+
+    // The width is labelled, so text is being read; only the angle is missing.
+    expect(texts).toContain("4000");
+    expect(texts.some((t) => t.endsWith("°"))).toBe(false);
+  });
+});

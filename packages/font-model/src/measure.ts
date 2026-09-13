@@ -1,9 +1,10 @@
 import { type Vec2, project, tangent } from "@typewright/geometry";
 
 import { segmentAt, segmentCubic } from "./contour.js";
-import { strokeCrossings } from "./crossings.js";
+import { type StrokeCrossing, samePoint, strokeCrossings } from "./crossings.js";
 import { insideGlyph } from "./direction.js";
 import { type Glyph, glyphBounds } from "./glyph.js";
+import { type Guide, guideDirection } from "./guide.js";
 import type { ContourId } from "./ids.js";
 
 /**
@@ -212,11 +213,38 @@ export type SectionSpan = {
   readonly ink: boolean;
 };
 
+/**
+ * A place the section line stops: where it meets the outline or a guide.
+ *
+ * Carrying the angle it meets it at, which is the other number a ruler laid
+ * across a letter is for. How steep a diagonal is, how far a stem leans off the
+ * upright, whether a guide really is square to the stroke it was put against —
+ * each is the angle between the ruler and something it crosses.
+ */
+export type SectionStop = {
+  readonly point: Vec2;
+  /** How far along the line, 0 at `from` and 1 at `to`. */
+  readonly u: number;
+  readonly kind: "outline" | "guide";
+  /**
+   * The angle between the line and what it crosses, from 0 to 90 degrees.
+   *
+   * The smaller of the two angles either side, because which of them is "the"
+   * angle depends on which way the line was drawn, and a reading that flipped to
+   * its complement when the ruler was dragged the other way would be no use.
+   * `null` where the outline has no direction to measure against — a cusp.
+   */
+  readonly angle: number | null;
+};
+
 export type Section = {
   readonly from: Vec2;
   readonly to: Vec2;
   /** Where the line meets the outline, in the order it meets them. */
   readonly crossings: readonly Vec2[];
+  /** Everything the line stops at, outline and guides together, in order along it. */
+  readonly stops: readonly SectionStop[];
+  /** The stretches between one stop and the next. */
   readonly spans: readonly SectionSpan[];
 };
 
@@ -233,13 +261,36 @@ export type Section = {
  * parity from one end, so a line that starts inside the letter is read
  * correctly and a line that grazes a corner does not flip everything after it.
  */
-export function sectionAcross(g: Glyph, from: Vec2, to: Vec2): Section {
-  const crossings = strokeCrossings(g, from, to).map((crossing) => crossing.point);
+export function sectionAcross(
+  g: Glyph,
+  from: Vec2,
+  to: Vec2,
+  guides: readonly Guide[] = [],
+): Section {
+  const direction = { x: to.x - from.x, y: to.y - from.y };
+
+  const outline: SectionStop[] = strokeCrossings(g, from, to).map((crossing) => ({
+    point: crossing.point,
+    u: crossing.u,
+    kind: "outline",
+    angle: edgeAngle(g, crossing, direction),
+  }));
+
+  // The guides as stops of their own, so the ruler reads how far an edge is from
+  // the line it was drawn to — the question a guide is put down to answer.
+  const stops = [...outline];
+  for (const guide of guides) {
+    const stop = guideStop(guide, from, direction);
+    // A guide lying exactly on an edge the line already stops at says nothing
+    // new, and would put a span of no length between the two.
+    if (stop !== null && !stops.some((s) => samePoint(s.point, stop.point))) stops.push(stop);
+  }
+  stops.sort((l, r) => l.u - r.u);
 
   const spans: SectionSpan[] = [];
-  for (let i = 0; i + 1 < crossings.length; i++) {
-    const a = crossings[i]!;
-    const b = crossings[i + 1]!;
+  for (let i = 0; i + 1 < stops.length; i++) {
+    const a = stops[i]!.point;
+    const b = stops[i + 1]!.point;
     const middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
     spans.push({
       from: a,
@@ -249,5 +300,46 @@ export function sectionAcross(g: Glyph, from: Vec2, to: Vec2): Section {
     });
   }
 
-  return { from, to, crossings, spans };
+  return { from, to, crossings: outline.map((stop) => stop.point), stops, spans };
+}
+
+/** The angle between the line and the outline where it crosses, from the tangent there. */
+function edgeAngle(g: Glyph, crossing: StrokeCrossing, direction: Vec2): number | null {
+  const c = g.contours[crossing.contourIndex];
+  const segment = c === undefined ? null : segmentAt(c, crossing.segmentIndex);
+  if (segment === null) return null;
+  const along = tangent(segmentCubic(segment), crossing.t);
+  return along === null ? null : angleBetween(direction, along);
+}
+
+/**
+ * Where the line meets a guide, or `null` where it does not.
+ *
+ * A guide runs the whole canvas, so this is two lines meeting rather than a
+ * line meeting a segment, and the only ways to miss are to lie parallel to it
+ * or to stop short of it.
+ */
+function guideStop(guide: Guide, from: Vec2, direction: Vec2): SectionStop | null {
+  const along = guideDirection(guide);
+  const across = direction.x * along.y - direction.y * along.x;
+  if (Math.abs(across) < 1e-12) return null;
+
+  const offset = { x: guide.pt.x - from.x, y: guide.pt.y - from.y };
+  const u = (offset.x * along.y - offset.y * along.x) / across;
+  if (u < 0 || u > 1) return null;
+
+  return {
+    point: { x: from.x + direction.x * u, y: from.y + direction.y * u },
+    u,
+    kind: "guide",
+    angle: angleBetween(direction, along),
+  };
+}
+
+/** The smaller angle between two directions, in degrees from 0 to 90. */
+function angleBetween(a: Vec2, b: Vec2): number | null {
+  const lengths = Math.hypot(a.x, a.y) * Math.hypot(b.x, b.y);
+  if (lengths === 0) return null;
+  const cosine = Math.min(1, Math.abs(a.x * b.x + a.y * b.y) / lengths);
+  return (Math.acos(cosine) * 180) / Math.PI;
 }

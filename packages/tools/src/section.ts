@@ -83,5 +83,7 @@ export function shownSection(state: EditorState): Section | null {
   if (glyph === null || line === null) return null;
   if (line.from.x === line.to.x && line.from.y === line.to.y) return null;
 
-  return sectionAcross(glyph, line.from, line.to);
+  // The font's guides and the letter's own, both: the ruler stops at a line
+  // somebody drew to measure against, whichever of the two it belongs to.
+  return sectionAcross(glyph, line.from, line.to, [...state.document.guides, ...glyph.guides]);
 }

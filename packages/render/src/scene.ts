@@ -293,6 +293,12 @@ export type Scene = {
     readonly from: Vec2;
     readonly to: Vec2;
     readonly crossings: readonly Vec2[];
+    /** Everything the line stops at — edges and guides — with the angle it meets each at. */
+    readonly stops: readonly {
+      readonly point: Vec2;
+      readonly kind: "outline" | "guide";
+      readonly angle: number | null;
+    }[];
     readonly spans: readonly {
       readonly from: Vec2;
       readonly to: Vec2;

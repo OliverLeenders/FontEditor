@@ -1162,17 +1162,20 @@ export function drawSection(ctx: Canvas2D, s: Scene): void {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // A tick at every crossing, square to the line: the numbers are between them,
-  // and a number is only as trustworthy as the two ends it was taken from.
+  // A tick at every stop, square to the line: the numbers are between them, and
+  // a number is only as trustworthy as the two ends it was taken from. A guide's
+  // tick is longer, so a width that ends at a guide reads differently from one
+  // that ends at an edge.
   const along = Math.hypot(to.x - from.x, to.y - from.y);
   const across =
     along === 0 ? { x: 0, y: 0 } : { x: -(to.y - from.y) / along, y: (to.x - from.x) / along };
 
   ctx.beginPath();
-  for (const crossing of line.crossings) {
-    const p = toScreen(s.view, crossing);
-    ctx.moveTo(p.x - across.x * 5, p.y - across.y * 5);
-    ctx.lineTo(p.x + across.x * 5, p.y + across.y * 5);
+  for (const stop of line.stops) {
+    const p = toScreen(s.view, stop.point);
+    const reach = stop.kind === "guide" ? 8 : 5;
+    ctx.moveTo(p.x - across.x * reach, p.y - across.y * reach);
+    ctx.lineTo(p.x + across.x * reach, p.y + across.y * reach);
   }
   ctx.stroke();
 
@@ -1195,6 +1198,25 @@ export function drawSection(ctx: Canvas2D, s: Scene): void {
     ctx.strokeText(text, middle.x, middle.y);
     ctx.fillStyle = span.ink ? s.palette.sectionInk : s.palette.section;
     ctx.fillText(text, middle.x, middle.y);
+  }
+
+  // The angle at each stop, on the other side of the line from the widths, so
+  // the two kinds of number never share a place. A stop crowding the last one
+  // labelled is left out rather than drawn over it.
+  let labelled: Vec2 | null = null;
+  for (const stop of line.stops) {
+    if (stop.angle === null) continue;
+    const p = toScreen(s.view, stop.point);
+    if (labelled !== null && Math.hypot(p.x - labelled.x, p.y - labelled.y) < 30) continue;
+    labelled = p;
+
+    const text = `${String(Math.round(stop.angle * 10) / 10)}°`;
+    const place = { x: p.x - across.x * 13, y: p.y - across.y * 13 };
+    ctx.strokeStyle = s.palette.halo;
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, place.x, place.y);
+    ctx.fillStyle = s.palette.section;
+    ctx.fillText(text, place.x, place.y);
   }
 
   ctx.restore();
