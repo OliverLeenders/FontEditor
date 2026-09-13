@@ -15,6 +15,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isDarkNow, watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
+import { GridIcon, PenToolIcon, TrashIcon, TypeIcon } from "./icons.js";
 import { CleanUpMenu } from "./CleanUpMenu.js";
 import { ExportFont } from "./ExportFont.js";
 import { FileMenu } from "./FileMenu.js";
@@ -217,10 +218,11 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
     if (name === undefined) return [];
 
     return [
-      { kind: "item", label: "Open", run: () => openAt(index) },
+      { kind: "item", label: "Open", icon: PenToolIcon, run: () => openAt(index) },
       {
         kind: "item",
         label: "Rename…",
+        icon: TypeIcon,
         // `.notdef` is found by name when a font is written, so renaming it
         // loses the glyph rather than relabelling it.
         disabled: name === NOTDEF,
@@ -230,6 +232,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
       {
         kind: "item",
         label: "Round coordinates",
+        icon: GridIcon,
         run: () => {
           store.setCurrentGlyph(name);
           store.applyTool(roundGlyphAt(store.editor, name));
@@ -239,6 +242,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
       {
         kind: "item",
         label: "Delete",
+        icon: TrashIcon,
         // Kept for the same reason it cannot be renamed: a font needs one, and
         // what the export would put back is a blank.
         disabled: name === NOTDEF,
