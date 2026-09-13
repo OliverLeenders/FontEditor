@@ -121,6 +121,13 @@ export type FontInfo = {
    * first seven are worked out from the style map and never stored here.
    */
   readonly openTypeOS2Selection: readonly number[];
+  /**
+   * What a document may do with this font embedded in it, as `OS/2 fsType` bits by
+   * number: 1 restricted, 2 preview and print, 3 editable — one of those at most, and
+   * none meaning installable — then 8 no subsetting and 9 bitmaps only. A licence's
+   * decision, which is why it is empty until somebody makes it.
+   */
+  readonly openTypeOS2Type: readonly number[];
 };
 
 export const DEFAULT_FONT_INFO: FontInfo = {
@@ -166,6 +173,7 @@ export const DEFAULT_FONT_INFO: FontInfo = {
   openTypeOS2WinAscent: null,
   openTypeOS2WinDescent: null,
   openTypeOS2Selection: [],
+  openTypeOS2Type: [],
 };
 
 /**

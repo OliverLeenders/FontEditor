@@ -254,6 +254,14 @@ function os2Overrides(info: FontInfo): OtOS2Init {
   // 3 opentype.js writes: asking for them is changing one number.
   if (decidedSelection(info) !== 0) os2.version = 4;
 
+  // What a document may do with the font embedded in it. opentype.js writes 0,
+  // installable, whatever the licence says; a font that has decided says so here.
+  const embedding = info.openTypeOS2Type.reduce(
+    (bits, bit) => ([1, 2, 3, 8, 9].includes(bit) ? bits | (1 << bit) : bits),
+    0,
+  );
+  if (embedding !== 0) os2.fsType = embedding;
+
   if (info.openTypeOS2TypoAscender !== null) {
     os2.sTypoAscender = Math.round(info.openTypeOS2TypoAscender);
   }

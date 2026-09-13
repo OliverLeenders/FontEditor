@@ -35,13 +35,27 @@ type Field = {
    * with what would be worked out shown greyed in the box. A `flag` is one bit
    * of `openTypeOS2Selection`.
    */
-  readonly kind: "text" | "number" | "choice" | "override" | "flag";
+  readonly kind: "text" | "number" | "choice" | "override" | "flag" | "embedding";
   readonly hint: string;
   /** For a choice: the values it may take, in the order they are offered. */
   readonly options?: readonly string[];
   /** For a flag: which bit. */
   readonly bit?: number;
 };
+
+/** The four embedding levels, least restrictive first, and the `fsType` bit each is. */
+const EMBEDDING_LEVELS: readonly { readonly label: string; readonly bit: number | null }[] = [
+  { label: "Installable", bit: null },
+  { label: "Editable", bit: 3 },
+  { label: "Preview and print", bit: 2 },
+  { label: "Restricted", bit: 1 },
+];
+
+/** A field that holds a list of bits, read as one. */
+function bitsOf(info: FontInfo, key: keyof FontInfo): readonly number[] {
+  const value = info[key];
+  return Array.isArray(value) ? (value as readonly number[]) : [];
+}
 
 /** Which derived value each override stands in for. */
 const DERIVED: Partial<Record<keyof FontInfo, keyof VerticalMetrics>> = {
@@ -267,6 +281,34 @@ const SECTIONS: readonly { readonly title: string; readonly fields: readonly Fie
       },
     ],
   },
+  {
+    // A licence's decision rather than a default's, which is why it has a section
+    // of its own: it was written as installable for every font whatever its licence
+    // allowed, and that is a promise the font was making on nobody's authority.
+    title: "Embedding",
+    fields: [
+      {
+        key: "openTypeOS2Type",
+        label: "Embedding",
+        kind: "embedding",
+        hint: "What a document may do with this font embedded in it. The licence decides this.",
+      },
+      {
+        key: "openTypeOS2Type",
+        label: "No subsetting",
+        kind: "flag",
+        bit: 8,
+        hint: "The whole font must be embedded, never only the glyphs a document uses",
+      },
+      {
+        key: "openTypeOS2Type",
+        label: "Bitmaps only",
+        kind: "flag",
+        bit: 9,
+        hint: "Only bitmaps may be embedded, not the outlines",
+      },
+    ],
+  },
 ];
 
 export function FontInfoPanel(): React.JSX.Element {
@@ -292,7 +334,7 @@ export function FontInfoPanel(): React.JSX.Element {
           <h3 className={styles.heading}>{section.title}</h3>
           {section.fields.map((field) => (
             <Field
-              key={field.key}
+              key={field.label}
               field={field}
               info={info}
               store={store}
@@ -382,7 +424,7 @@ function Field({
   // Not asked of a flag, which has no draft: its box text would go into the
   // font's list of bits as a string, and be refused as one.
   const problem =
-    field.kind === "flag"
+    field.kind === "flag" || field.kind === "embedding"
       ? null
       : infoProblem({
           ...info,
@@ -416,6 +458,38 @@ function Field({
       input
     );
 
+  // The embedding level: one of four, stored as which of three bits is set, with
+  // the flags beside it left as they are.
+  if (field.kind === "embedding") {
+    const bits = bitsOf(info, field.key);
+    const level =
+      EMBEDDING_LEVELS.find((l) => l.bit !== null && bits.includes(l.bit)) ?? EMBEDDING_LEVELS[0]!;
+    return (
+      <label className={styles.field}>
+        <span className={styles.label}>{field.label}</span>
+        <select
+          className={styles.input}
+          value={level.label}
+          title={field.hint}
+          aria-label={field.label}
+          onChange={(event) => {
+            const chosen = EMBEDDING_LEVELS.find((l) => l.label === event.target.value);
+            if (chosen === undefined) return;
+            const flags = bits.filter((b) => b > 3);
+            const next = chosen.bit === null ? flags : [chosen.bit, ...flags].sort((a, b) => a - b);
+            store.applyTool(setInfo(store.editor, { [field.key]: next }));
+          }}
+        >
+          {EMBEDDING_LEVELS.map((l) => (
+            <option key={l.label} value={l.label}>
+              {l.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+
   // A flag writes straight through, as a choice does below.
   if (field.kind === "flag") {
     const bit = field.bit ?? 0;
@@ -425,15 +499,13 @@ function Field({
         <input
           type="checkbox"
           className={styles.check}
-          checked={info.openTypeOS2Selection.includes(bit)}
+          checked={bitsOf(info, field.key).includes(bit)}
           title={field.hint}
           aria-label={field.label}
           onChange={(event) => {
-            const others = info.openTypeOS2Selection.filter((b) => b !== bit);
-            const openTypeOS2Selection = event.target.checked
-              ? [...others, bit].sort((a, b) => a - b)
-              : others;
-            store.applyTool(setInfo(store.editor, { openTypeOS2Selection }));
+            const others = bitsOf(info, field.key).filter((b) => b !== bit);
+            const bits = event.target.checked ? [...others, bit].sort((a, b) => a - b) : others;
+            store.applyTool(setInfo(store.editor, { [field.key]: bits }));
           }}
         />
       </label>

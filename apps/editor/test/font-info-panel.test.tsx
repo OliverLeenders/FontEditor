@@ -202,3 +202,28 @@ describe("the line spacing overrides", () => {
     expect(store.editor.document.info.openTypeOS2Selection).toEqual([]);
   });
 });
+
+/**
+ * The embedding permissions: a level, and two flags beside it.
+ *
+ * One level at most, stored as a bit; the flags kept as they are when the level
+ * changes, and the level kept as it is when a flag does.
+ */
+describe("the embedding permissions", () => {
+  it("sets the level and the flags without disturbing each other", () => {
+    const { store } = openPanel();
+
+    fireEvent.change(screen.getByLabelText<HTMLSelectElement>("Embedding"), {
+      target: { value: "Preview and print" },
+    });
+    expect(store.editor.document.info.openTypeOS2Type).toEqual([2]);
+
+    fireEvent.click(screen.getByLabelText<HTMLInputElement>("No subsetting"));
+    expect(store.editor.document.info.openTypeOS2Type).toEqual([2, 8]);
+
+    fireEvent.change(screen.getByLabelText<HTMLSelectElement>("Embedding"), {
+      target: { value: "Installable" },
+    });
+    expect(store.editor.document.info.openTypeOS2Type).toEqual([8]);
+  });
+});

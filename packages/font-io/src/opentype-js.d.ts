@@ -161,6 +161,7 @@ declare module "opentype.js" {
     sTypoLineGap?: number;
     usWinAscent?: number;
     usWinDescent?: number;
+    fsType?: number;
   }
 
   /** One name record's translations. Only English is ever written here. */

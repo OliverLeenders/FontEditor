@@ -307,6 +307,7 @@ function readFontInfo(
     openTypeOS2WinAscent: distance(plistNumber(dict, "openTypeOS2WinAscent")),
     openTypeOS2WinDescent: distance(plistNumber(dict, "openTypeOS2WinDescent")),
     openTypeOS2Selection: selectionBits(dict),
+    openTypeOS2Type: embeddingBits(dict),
 
     openTypeNamePreferredFamilyName: text("openTypeNamePreferredFamilyName"),
     openTypeNamePreferredSubfamilyName: text("openTypeNamePreferredSubfamilyName"),
@@ -356,6 +357,25 @@ const below = (value: number | null): number | null =>
 /** A Windows ascent or descent, which the format stores as a distance. */
 const distance = (value: number | null): number | null =>
   value === null ? null : Math.abs(Math.round(value));
+
+/**
+ * The embedding permissions a source sets, as `fsType` bit numbers.
+ *
+ * Only the bits the format defines, and one level at most: a source that lists
+ * two gets the less restrictive, which is what the specification tells a reader
+ * to honour — and a font read in with two would refuse every later edit in Font
+ * Info.
+ */
+function embeddingBits(dict: PlistDict): number[] {
+  const listed = dict["openTypeOS2Type"];
+  if (!Array.isArray(listed)) return [];
+  const defined = listed.filter(
+    (bit): bit is number => typeof bit === "number" && [1, 2, 3, 8, 9].includes(bit),
+  );
+  const level = Math.max(0, ...defined.filter((bit) => bit <= 3));
+  const flags = [...new Set(defined.filter((bit) => bit > 3))];
+  return [...(level === 0 ? [] : [level]), ...flags].sort((a, b) => a - b);
+}
 
 /** The `fsSelection` bits a font sets itself, as a list of bit numbers. */
 function selectionBits(dict: PlistDict): number[] {

@@ -100,6 +100,12 @@ export function infoProblem(info: FontInfo): string | null {
   if (info.openTypeOS2Selection.some((bit) => !Number.isInteger(bit) || bit < 0 || bit > 15)) {
     return "The selection flags are bit numbers from 0 to 15.";
   }
+  if (info.openTypeOS2Type.some((bit) => ![1, 2, 3, 8, 9].includes(bit))) {
+    return "The embedding flags are bits 1, 2, 3, 8 and 9.";
+  }
+  if (info.openTypeOS2Type.filter((bit) => bit <= 3).length > 1) {
+    return "A font has one embedding level: editable, preview and print, or restricted.";
+  }
   return null;
 }
 

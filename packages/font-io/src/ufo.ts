@@ -337,6 +337,9 @@ function fontInfoPairs(document: FontDocument): Array<readonly [string, string]>
   if (info.openTypeOS2Selection.length > 0) {
     pairs.push(["openTypeOS2Selection", array(info.openTypeOS2Selection.map(int))]);
   }
+  if (info.openTypeOS2Type.length > 0) {
+    pairs.push(["openTypeOS2Type", array(info.openTypeOS2Type.map(int))]);
+  }
 
   text("openTypeNamePreferredFamilyName", info.openTypeNamePreferredFamilyName);
   text("openTypeNamePreferredSubfamilyName", info.openTypeNamePreferredSubfamilyName);
