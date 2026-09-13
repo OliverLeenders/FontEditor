@@ -1,8 +1,10 @@
 import {
+  type FontDocument,
   type GlyphName,
   type MetricKeys,
   centreGlyph,
   parseMetricKey,
+  resolvedMetrics,
   setAdvance,
   setLeftSidebearing,
   setRightSidebearing,
@@ -148,3 +150,93 @@ export function setMetricKey(
   return done(state, { ...state, document }, "Spacing key");
 }
 
+/**
+ * A measurement typed into a field that takes either a number or a key.
+ *
+ * The spacing view has one field per measurement rather than a number and a key
+ * side by side, so what is typed says which it is: `=` and a glyph is a key —
+ * `=o`, `=|b+10` — and a number is a number. Typing a number over a measurement
+ * that has a key means the number, so the key goes, and both happen in one undo
+ * step because they were one thing typed. A bare `=` drops the key and keeps the
+ * number it gave, as {@link unlinkMetricKey} does.
+ */
+export function spaceFromText(
+  state: EditorState,
+  glyphName: GlyphName,
+  which: keyof MetricKeys,
+  text: string,
+): ToolResult {
+  const typed = text.trim();
+  if (typed === "=") return unlinkMetricKey(state, glyphName, which);
+  if (typed.startsWith("=")) return setMetricKey(state, glyphName, which, typed);
+
+  const value = Number(typed);
+  if (typed === "" || !Number.isFinite(value) || state.document.glyphs[glyphName] === undefined) {
+    return result(state);
+  }
+
+  const unkeyed = withoutKey(state.document, glyphName, which);
+  const spaced = measuredIn({ ...state, document: unkeyed }, glyphName, which, value) ?? unkeyed;
+  if (spaced === state.document) return result(state);
+  return done(state, { ...state, document: spaced }, measurementLabel(which, glyphName));
+}
+
+/**
+ * Drop a key and keep the number it came to.
+ *
+ * The font is compiled with what the key resolves to, and that is also what the
+ * fields show, so a glyph whose key is simply emptied jumps back to wherever it
+ * was last drawn — which is rarely anywhere anybody wanted. Where the key could
+ * not be followed there is no number to keep, and the glyph is left as drawn.
+ */
+export function unlinkMetricKey(
+  state: EditorState,
+  glyphName: GlyphName,
+  which: keyof MetricKeys,
+): ToolResult {
+  const g = state.document.glyphs[glyphName];
+  if (g === undefined || g.metricKeys[which] === "") return result(state);
+
+  const resolved = resolvedMetrics(state.document, glyphName);
+  const kept = resolved === null ? null : which === "width" ? resolved.advance : resolved[which];
+  const unkeyed = withoutKey(state.document, glyphName, which);
+  const spaced =
+    kept === null
+      ? unkeyed
+      : (measuredIn({ ...state, document: unkeyed }, glyphName, which, kept) ?? unkeyed);
+
+  return done(state, { ...state, document: spaced }, "Spacing key");
+}
+
+/** The document with one of a glyph's keys emptied. */
+function withoutKey(
+  document: FontDocument,
+  glyphName: GlyphName,
+  which: keyof MetricKeys,
+): FontDocument {
+  return (
+    updateGlyph(document, glyphName, (g) =>
+      g.metricKeys[which] === "" ? null : { ...g, metricKeys: { ...g.metricKeys, [which]: "" } },
+    ) ?? document
+  );
+}
+
+/** The document with one measurement set, or `null` where that changes nothing. */
+function measuredIn(
+  state: EditorState,
+  glyphName: GlyphName,
+  which: keyof MetricKeys,
+  value: number,
+): FontDocument | null {
+  const out =
+    which === "width"
+      ? setGlyphAdvance(state, glyphName, value)
+      : setSidebearing(state, glyphName, which, value);
+  return out.state.document === state.document ? null : out.state.document;
+}
+
+function measurementLabel(which: keyof MetricKeys, glyphName: GlyphName): string {
+  const said =
+    which === "width" ? "Advance" : which === "left" ? "Left sidebearing" : "Right sidebearing";
+  return `${said} of ${glyphName}`;
+}

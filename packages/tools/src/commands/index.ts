@@ -108,6 +108,7 @@ export {
   nudgeKern,
   putGlyphInKernGroup,
   renameKernGroupTo,
+  setKernValue,
   takeGlyphFromKernGroup,
 } from "./kerning.js";
 
@@ -155,6 +156,8 @@ export {
   setGlyphAdvance,
   setMetricKey,
   setSidebearing,
+  spaceFromText,
+  unlinkMetricKey,
 } from "./spacing.js";
 
 export type { TransformOrigin } from "./transform.js";

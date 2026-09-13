@@ -127,6 +127,36 @@
   background: var(--surface);
 }
 
+/* A measurement and, where it has one, the key it is taken from. */
+.field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+/* The key as a chip: it reads as a fact about the number, and pressing it is
+   the way to be rid of it. */
+.key {
+  padding: 0 0.35rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+.key:hover {
+  background: none;
+}
+
+/* A key that cannot be followed, so the number beside it is only as drawn. */
+.broken {
+  border-color: var(--danger);
+  background: none;
+  color: var(--danger);
+}
+
 .hint {
   color: var(--ink-3, var(--ink-2));
 }

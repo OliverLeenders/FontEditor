@@ -3,11 +3,18 @@ import {
   kerningFor,
   nudgeKern,
   nudgeSidebearing,
-  setGlyphAdvance,
-  setSidebearing,
+  setKernValue,
+  spaceFromText,
+  unlinkMetricKey,
 } from "@typewright/tools";
 import { CanvasSurface, type RunScene, drawRun } from "@typewright/render";
-import { drawableGlyph, sidebearings } from "@typewright/font-model";
+import {
+  type MetricKeys,
+  NO_METRIC_KEYS,
+  drawableGlyph,
+  resolvedMetrics,
+  sidebearings,
+} from "@typewright/font-model";
 import {
   type ViewTransform,
   glyphAtX,
@@ -262,21 +269,22 @@ export function SpacingView({
   };
 
   /**
-   * The same two measurements, typed rather than stepped.
+   * The three measurements, typed rather than stepped.
    *
    * The arrows above are for feeling a fit out a unit at a time; a field is for
-   * the moment somebody already knows the number. Until now that meant leaving
-   * for the inspector and opening the letter there, which loses the line of
-   * text that showed why the spacing was wrong in the first place.
+   * the moment somebody already knows the number — or knows which letter it
+   * should be the same as, which is `=` and that letter's name. Until now either
+   * meant leaving for the inspector and opening the letter there, which loses
+   * the line of text that showed why the spacing was wrong in the first place.
    */
-  const commitBearing = (side: "left" | "right", value: number): void => {
+  const commitMeasurement = (which: keyof MetricKeys, text: string): void => {
     if (selectedName === null) return;
-    store.applyTool(setSidebearing(store.editor, selectedName, side, value));
+    store.applyTool(spaceFromText(store.editor, selectedName, which, text));
   };
 
-  const commitAdvance = (value: number): void => {
+  const unlink = (which: keyof MetricKeys): void => {
     if (selectedName === null) return;
-    store.applyTool(setGlyphAdvance(store.editor, selectedName, value));
+    store.applyTool(unlinkMetricKey(store.editor, selectedName, which));
   };
 
   // In kern mode the selection means the gap *before* the selected letter, so
@@ -296,6 +304,16 @@ export function SpacingView({
   const selectedGlyph = selectedName === null ? undefined : document.glyphs[selectedName];
   // Through the font, so an accented composite has the sides of the letter it draws.
   const bearings = selectedGlyph === undefined ? null : sidebearings(selectedGlyph, document);
+
+  // What the keys come to, which is what the font will be compiled with, and so
+  // what the fields show where a measurement has one that can be followed.
+  const keys = selectedGlyph?.metricKeys ?? NO_METRIC_KEYS;
+  const resolved = selectedName === null ? null : resolvedMetrics(document, selectedName);
+  const shown = (which: keyof MetricKeys, own: number): number => {
+    if (keys[which] === "" || resolved === null) return own;
+    return (which === "width" ? resolved.advance : resolved[which]) ?? own;
+  };
+  const broken = (which: keyof MetricKeys): boolean => keys[which] !== "" && resolved === null;
 
   return (
     <div className={styles.spacing}>
@@ -454,7 +472,17 @@ export function SpacingView({
                 <span className={styles.name}>
                   {previousName} {selectedName}
                 </span>
-                <Value label="Kern" value={pair?.value ?? 0} />
+                <SpacingField
+                  label="Kern"
+                  value={pair?.value ?? 0}
+                  keyText=""
+                  broken={false}
+                  onCommit={(text) =>
+                    store.applyTool(
+                      setKernValue(store.editor, previousName, selectedName, Number(text.trim())),
+                    )
+                  }
+                />
                 {/* Which rule applied, because adjusting a class moves far more
                     than the two letters in front of you. */}
                 {pair === null ? (
@@ -499,17 +527,21 @@ export function SpacingView({
               <span className={styles.hint}>no outline, so no sidebearings</span>
             ) : (
               <>
-                <NumberField
+                <SpacingField
                   label="Left"
-                  value={bearings.left}
-                  takenFrom={selectedGlyph?.metricKeys.left ?? ""}
-                  onCommit={(next) => commitBearing("left", next)}
+                  value={shown("left", bearings.left)}
+                  keyText={keys.left}
+                  broken={broken("left")}
+                  onCommit={(text) => commitMeasurement("left", text)}
+                  onUnlink={() => unlink("left")}
                 />
-                <NumberField
+                <SpacingField
                   label="Right"
-                  value={bearings.right}
-                  takenFrom={selectedGlyph?.metricKeys.right ?? ""}
-                  onCommit={(next) => commitBearing("right", next)}
+                  value={shown("right", bearings.right)}
+                  keyText={keys.right}
+                  broken={broken("right")}
+                  onCommit={(text) => commitMeasurement("right", text)}
+                  onUnlink={() => unlink("right")}
                 />
               </>
             )}
@@ -517,11 +549,13 @@ export function SpacingView({
                 glyph with no outline still has: a space is spaced by this number
                 and by nothing else, and this is the workspace for spacing it. */}
             {selectedGlyph === undefined ? null : (
-              <NumberField
+              <SpacingField
                 label="Advance"
-                value={selectedGlyph.advance}
-                takenFrom={selectedGlyph.metricKeys.width}
-                onCommit={commitAdvance}
+                value={shown("width", selectedGlyph.advance)}
+                keyText={keys.width}
+                broken={broken("width")}
+                onCommit={(text) => commitMeasurement("width", text)}
+                onUnlink={() => unlink("width")}
               />
             )}
             {bands.length > 1 ? (
@@ -534,52 +568,94 @@ export function SpacingView({
   );
 }
 
-function Value({ label, value }: { label: string; value: number }): React.JSX.Element {
-  return (
-    <span className={styles.value}>
-      <span className={styles.valueLabel}>{label}</span>
-      {Math.round(value)}
-    </span>
-  );
-}
-
 /**
- * One of a glyph's three measurements, typed.
+ * One measurement, typed: a number, or `=` and the glyph to take it from.
  *
  * A `<label>` around exactly one control, so the words beside the box are its
  * name rather than a caption near it — a row wrapped around several controls
  * gives its name to the first of them, which is how the inspector once
  * announced a button as three of its neighbours at once.
  *
- * Disabled where a metric key supplies the number, with the key in the tooltip:
- * the field would otherwise offer to write a value the font takes from another
- * glyph and would overwrite.
+ * Committed on Enter or on leaving the field rather than on every keystroke,
+ * which the number alone could afford: `=n` is on the way to `=nine`, and a
+ * field that wrote each step would space the letter from `n` for a moment and
+ * leave an undo step behind for it. While the field has focus it holds what is
+ * being typed, and it starts from the key where there is one, so the key can
+ * be read and edited rather than only replaced.
+ *
+ * A key shows beside the number as a button, since what it most needs to offer
+ * is a way out: pressing it keeps the number and drops the key.
  */
-function NumberField({
+function SpacingField({
   label,
   value,
-  takenFrom,
+  keyText,
+  broken,
   onCommit,
+  onUnlink,
 }: {
   label: string;
+  /** The number to show, which is what the key comes to where there is one. */
   value: number;
-  /** The glyph this measurement comes from, or "" when it is the glyph's own. */
-  takenFrom: string;
-  onCommit: (value: number) => void;
+  /** The key this measurement comes from, or "" when it is the glyph's own. */
+  keyText: string;
+  /** Whether the key cannot be followed, so the number is only as drawn. */
+  broken: boolean;
+  onCommit: (text: string) => void;
+  onUnlink?: () => void;
 }): React.JSX.Element {
+  const [draft, setDraft] = useState<string | null>(null);
+  const initial = keyText === "" ? String(Math.round(value)) : `=${keyText}`;
+
+  const commit = (): void => {
+    if (draft === null) return;
+    setDraft(null);
+    if (draft.trim() !== initial) onCommit(draft);
+  };
+
   return (
-    <label className={styles.value}>
-      <span className={styles.valueLabel}>{label}</span>
-      <input
-        type="number"
-        className={styles.input}
-        value={Math.round(value)}
-        disabled={takenFrom !== ""}
-        title={takenFrom === "" ? label : `Taken from ${takenFrom}`}
-        onChange={(event) => {
-          onCommit(Number(event.target.value));
-        }}
-      />
-    </label>
+    <span className={styles.field}>
+      <label className={styles.value}>
+        <span className={styles.valueLabel}>{label}</span>
+        <input
+          type="text"
+          className={styles.input}
+          spellCheck={false}
+          value={draft ?? String(Math.round(value))}
+          title={
+            onUnlink === undefined
+              ? label
+              : keyText === ""
+                ? `${label}: a number, or = and a glyph to take it from, such as =o or =|b+10`
+                : `Taken from ${keyText}`
+          }
+          onFocus={() => setDraft(initial)}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commit();
+            if (event.key === "Escape") {
+              setDraft(null);
+              event.currentTarget.blur();
+            }
+          }}
+        />
+      </label>
+      {keyText === "" || onUnlink === undefined ? null : (
+        <button
+          type="button"
+          className={broken ? `${styles.key} ${styles.broken}` : styles.key}
+          aria-label={`Stop taking ${label.toLowerCase()} from ${keyText}`}
+          title={
+            broken
+              ? `${keyText} cannot be followed, so this is the number as drawn. Click to drop the key.`
+              : `Taken from ${keyText}. Click to keep the number and drop the key.`
+          }
+          onClick={onUnlink}
+        >
+          ={keyText} ×
+        </button>
+      )}
+    </span>
   );
 }

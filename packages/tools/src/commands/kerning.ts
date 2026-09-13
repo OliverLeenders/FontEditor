@@ -69,6 +69,38 @@ function classOf(of: ReadonlyMap<GlyphName, string>, glyphName: GlyphName): stri
 }
 
 /**
+ * Set the kerning between two glyphs to a number.
+ *
+ * The typed counterpart of {@link nudgeKern}, written to the same pair it would
+ * write to — the class governing the two where there is one — for the same
+ * reason. Not coalescing, unlike the nudge: a typed number is a decision, and
+ * one undo step should put it back.
+ */
+export function setKernValue(
+  state: EditorState,
+  left: GlyphName,
+  right: GlyphName,
+  value: number,
+): ToolResult {
+  if (!Number.isFinite(value)) return result(state);
+  const wanted = Math.round(value);
+
+  const index = kernIndex(state.document.kerning);
+  const existing = kernMatch(index, left, right);
+  const first = existing?.first ?? classOf(index.firstOf, left);
+  const second = existing?.second ?? classOf(index.secondOf, right);
+
+  const kerning = setKern(state.document.kerning, first, second, wanted);
+  if (kerning === state.document.kerning) return result(state);
+
+  return done(
+    state,
+    { ...state, document: setKerning(state.document, kerning) },
+    `Kern ${first} ${second}`,
+  );
+}
+
+/**
  * Pin a pair at its current value, breaking it out of the class governing it.
  *
  * The way to correct one pair without disturbing the category it belongs to.
