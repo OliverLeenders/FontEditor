@@ -523,6 +523,7 @@ export function snappingFor(
   options: GestureOptions,
   started: Glyph,
   moving: Selection,
+  exceptGuide: GuideId | null = null,
 ): Snapping {
   if (options.snap === false || input.modifiers.ctrl) return NO_SNAPPING;
 
@@ -539,6 +540,14 @@ export function snappingFor(
   const upright: SnapLine[] = [];
   const level: SnapLine[] = [];
   for (const g of [...state.document.guides, ...(glyph?.guides ?? [])]) {
+    // Never the one being dragged. These lines are rebuilt from the document
+    // every frame, so a dragged guide's own line sits exactly under the pointer
+    // and catches it: the guide then holds still until the pointer has pulled a
+    // whole `stay` away, jumps to it, and catches itself again at the new place.
+    // That is a guide moving in steps of ten screen pixels rather than one
+    // following the hand, and it is why guides could only be aligned by zooming
+    // in until ten pixels was worth less than a unit.
+    if (g.id === exceptGuide) continue;
     if (isVertical(g)) upright.push(metricLine(g.pt.x, "guide"));
     else if (isHorizontal(g)) level.push(metricLine(g.pt.y, "guide"));
   }
@@ -707,7 +716,7 @@ const CONTINUE: Continuations = {
     // against the drawing — level with an overshoot, up the edge of a stem —
     // which is exactly what those lines are.
     const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
-    const snapping = snappingFor(state, input, options, started, []);
+    const snapping = snappingFor(state, input, options, started, [], gesture.guideId);
     const snapped = snapPoint(input.point, snapping, gesture.snapped);
 
     const moved = movedGuideIn(

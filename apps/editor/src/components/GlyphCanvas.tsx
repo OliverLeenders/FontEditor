@@ -1,8 +1,11 @@
 import { CanvasSurface, drawScene } from "@typewright/render";
 import {
+  type EditorState,
   type ToolOptions,
   BOX_HANDLE_PIXELS,
   doubleClick,
+  guideById,
+  pickGuide,
   pickTarget,
   keyDown,
   keyUp,
@@ -12,6 +15,7 @@ import {
   pointerUp,
   selectionBox,
 } from "@typewright/tools";
+import { type GuideId, isHorizontal, isVertical } from "@typewright/font-model";
 import {
   type BoxHandle,
   BOX_STEM_PIXELS,
@@ -235,6 +239,10 @@ export function GlyphCanvas({
       canvas.style.cursor = "move";
       return;
     }
+    if (editor.gesture?.kind === "dragGuide") {
+      canvas.style.cursor = guideCursor(editor, editor.gesture.guideId);
+      return;
+    }
 
     const point = toDesign(editor.view, surface.toCanvasPoint(event));
 
@@ -267,7 +275,14 @@ export function GlyphCanvas({
 
     const reach = screenTolerance(editor.view, HIT_PIXELS) * (PICK_TOLERANCE_SCALE.originLine ?? 1);
     const near = Math.abs(point.x) <= reach || Math.abs(point.x - glyph.advance) <= reach;
-    if (!near && !inside) {
+
+    // A guide crosses the whole canvas, so unlike the margins it can be under
+    // the pointer anywhere — which would cost the hit index on every move if it
+    // were asked in the same breath. It is not: `pickGuide` is arithmetic over a
+    // handful of lines, so an ordinary move over empty canvas still builds
+    // nothing, and the index below is built only once a guide is actually there.
+    const guideId = pickGuide(editor, point);
+    if (!near && !inside && guideId === null) {
       canvas.style.cursor = "";
       return;
     }
@@ -275,6 +290,13 @@ export function GlyphCanvas({
     const target = targetAt(point);
     if (target?.kind === "originLine" || target?.kind === "advanceLine") {
       canvas.style.cursor = "ew-resize";
+      return;
+    }
+    // Last of the three, in the order `pointerDown` takes them: a guide loses
+    // the press to anything on the outline and to the selection it lies across,
+    // so it may only promise a drag where neither of those would take it.
+    if (guideId !== null && target === null && !inside) {
+      canvas.style.cursor = guideCursor(editor, guideId);
       return;
     }
     // Only where the press would actually move the selection: anything pickable
@@ -401,6 +423,22 @@ export function GlyphCanvas({
  * the crosshair: not a picture of what it does, but distinct from the eight
  * beside it, which is the job.
  */
+/**
+ * The cursor over a guide, which says which way it will move.
+ *
+ * A guide is dragged by the same hand as a margin and earns the same promise.
+ * Which way depends on the guide: an upright one moves across, a level one up
+ * and down, and an angled one — which snaps to nothing and is placed by eye —
+ * moves both ways at once.
+ */
+function guideCursor(editor: EditorState, id: GuideId): string {
+  const found = guideById(editor, id);
+  if (found === null) return "";
+  if (isVertical(found.guide)) return "ew-resize";
+  if (isHorizontal(found.guide)) return "ns-resize";
+  return "move";
+}
+
 function cursorForHandle(handle: BoxHandle): string {
   if (handle.action === "rotate") return "crosshair";
 

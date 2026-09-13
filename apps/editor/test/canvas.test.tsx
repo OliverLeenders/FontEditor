@@ -11,7 +11,8 @@ installBrowserGlobals();
 const { GlyphCanvas } = await import("../src/components/GlyphCanvas.js");
 const { toScreen } = await import("@typewright/view");
 const { tunniLambdas, tunniPoint } = await import("@typewright/geometry");
-const { segmentCubic, segments } = await import("@typewright/font-model");
+const { counterIds, segmentCubic, segments } = await import("@typewright/font-model");
+const { addGuideAt } = await import("@typewright/tools");
 
 /** The store, named for the tests: the components are imported dynamically. */
 type Store = ReturnType<typeof freshStore>;
@@ -448,3 +449,77 @@ function fakeContext(): unknown {
     },
   });
 }
+
+/**
+ * The cursor over a guide.
+ *
+ * A guide is dragged by the same hand as a margin, and had nothing to say for
+ * itself: a line the height of the window looks like a rule, so without a
+ * cursor there is no sign it can be taken hold of at all.
+ *
+ * Which cursor depends on the guide, because the answer is what the drag will
+ * do: an upright one moves across, a level one up and down, and an angled one —
+ * which snaps to nothing and is placed by eye — moves both ways at once.
+ *
+ * Every point below is far from the outline and from both margins, so nothing
+ * else is claiming the press. That is the promise being kept: a guide loses the
+ * press to anything on the outline, so it may only offer a drag where it would
+ * actually get one.
+ */
+describe("the cursor over a guide", () => {
+  const putGuide = (store: Store, x: number, y: number, angle: number): void => {
+    act(() => {
+      store.applyTool(addGuideAt(store.editor, { x, y }, angle, "font", counterIds()));
+    });
+  };
+
+  const hover = (canvas: HTMLCanvasElement, store: Store, x: number, y: number): void => {
+    act(() => {
+      fireEvent.pointerMove(canvas, at(store, x, y));
+    });
+  };
+
+  it("offers to move an upright guide across", () => {
+    const { store, canvas } = onCanvas();
+    putGuide(store, 1200, 0, 90);
+
+    hover(canvas, store, 1200, -300);
+    expect(canvas.style.cursor).toBe("ew-resize");
+  });
+
+  it("offers to move a level guide up and down", () => {
+    const { store, canvas } = onCanvas();
+    putGuide(store, 0, -300, 0);
+
+    hover(canvas, store, 1200, -300);
+    expect(canvas.style.cursor).toBe("ns-resize");
+  });
+
+  it("offers both ways at once for an angled guide, which lines up with no axis", () => {
+    const { store, canvas } = onCanvas();
+    putGuide(store, 1200, -300, 45);
+
+    hover(canvas, store, 1200, -300);
+    expect(canvas.style.cursor).toBe("move");
+  });
+
+  it("keeps the cursor through the drag, when the guide has left the pointer behind", () => {
+    const { store, canvas } = onCanvas();
+    putGuide(store, 1200, 0, 90);
+
+    act(() => {
+      fireEvent.pointerDown(canvas, { button: 0, ...at(store, 1200, -300) });
+    });
+    hover(canvas, store, 1260, -300);
+    expect(store.editor.gesture?.kind).toBe("dragGuide");
+    expect(canvas.style.cursor).toBe("ew-resize");
+  });
+
+  it("says nothing where there is no guide", () => {
+    const { store, canvas } = onCanvas();
+    putGuide(store, 1200, 0, 90);
+
+    hover(canvas, store, 600, -300);
+    expect(canvas.style.cursor).toBe("");
+  });
+});
