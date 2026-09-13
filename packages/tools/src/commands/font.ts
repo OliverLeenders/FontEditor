@@ -71,6 +71,35 @@ export function infoProblem(info: FontInfo): string | null {
   if (info.openTypeOS2VendorID !== "" && info.openTypeOS2VendorID.length > 4) {
     return "A vendor id is four characters.";
   }
+
+  // The vertical metrics, where they are set. Whole units in the range the
+  // tables hold, and signs as the format has them: a descender is below the
+  // baseline, and the Windows values are distances. A line gap's sign is left
+  // alone — a negative one is legal, and refusing it would refuse every other
+  // edit to a font that came in with one.
+  for (const value of [
+    info.openTypeHheaAscender,
+    info.openTypeHheaDescender,
+    info.openTypeHheaLineGap,
+    info.openTypeOS2TypoAscender,
+    info.openTypeOS2TypoDescender,
+    info.openTypeOS2TypoLineGap,
+    info.openTypeOS2WinAscent,
+    info.openTypeOS2WinDescent,
+  ]) {
+    if (value === null) continue;
+    if (!Number.isInteger(value)) return "Vertical metrics are whole numbers.";
+    if (Math.abs(value) > 32767) return "Vertical metrics must be between -32767 and 32767.";
+  }
+  if ((info.openTypeHheaDescender ?? 0) > 0 || (info.openTypeOS2TypoDescender ?? 0) > 0) {
+    return "A descender is below the baseline, so it is zero or negative.";
+  }
+  if ((info.openTypeOS2WinAscent ?? 0) < 0 || (info.openTypeOS2WinDescent ?? 0) < 0) {
+    return "The Windows ascent and descent are distances, so they are zero or more.";
+  }
+  if (info.openTypeOS2Selection.some((bit) => !Number.isInteger(bit) || bit < 0 || bit > 15)) {
+    return "The selection flags are bit numbers from 0 to 15.";
+  }
   return null;
 }
 

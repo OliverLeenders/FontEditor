@@ -148,3 +148,57 @@ describe("the font info panel", () => {
     expect(screen.getByLabelText<HTMLInputElement>("Units per em").value).toBe(String(before));
   });
 });
+
+/**
+ * The line spacing section: numbers that may be left empty.
+ *
+ * Empty is a value here, not a half-typed one. It means "work it out", and the
+ * box shows what that comes to, greyed — so the two things these ask are that
+ * the greyed number is there, and that emptying a box sets it back to it.
+ */
+describe("the line spacing overrides", () => {
+  it("shows what an unset metric would come out as", () => {
+    openPanel();
+    const gap = screen.getByLabelText<HTMLInputElement>("Typo line gap");
+
+    expect(gap.value).toBe("");
+    expect(gap.placeholder).toBe("0");
+  });
+
+  it("sets an override, and empties back to derived", () => {
+    const { store } = openPanel();
+    const gap = screen.getByLabelText<HTMLInputElement>("hhea line gap");
+
+    fireEvent.focus(gap);
+    fireEvent.change(gap, { target: { value: "120" } });
+    fireEvent.keyDown(gap, { key: "Enter" });
+    expect(store.editor.document.info.openTypeHheaLineGap).toBe(120);
+
+    fireEvent.focus(gap);
+    fireEvent.change(gap, { target: { value: "" } });
+    fireEvent.keyDown(gap, { key: "Enter" });
+    expect(store.editor.document.info.openTypeHheaLineGap).toBeNull();
+  });
+
+  it("refuses a descender above the baseline, and leaves the font alone", () => {
+    const { store } = openPanel();
+    const descender = screen.getByLabelText<HTMLInputElement>("Typo descender");
+
+    fireEvent.focus(descender);
+    fireEvent.change(descender, { target: { value: "200" } });
+    fireEvent.keyDown(descender, { key: "Enter" });
+
+    expect(store.editor.document.info.openTypeOS2TypoDescender).toBeNull();
+  });
+
+  it("turns the typo metrics flag on and off", () => {
+    const { store } = openPanel();
+    const flag = screen.getByLabelText<HTMLInputElement>("Use typo metrics");
+
+    fireEvent.click(flag);
+    expect(store.editor.document.info.openTypeOS2Selection).toEqual([7]);
+
+    fireEvent.click(flag);
+    expect(store.editor.document.info.openTypeOS2Selection).toEqual([]);
+  });
+});

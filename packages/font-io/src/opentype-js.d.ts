@@ -142,7 +142,25 @@ declare module "opentype.js" {
     weightClass?: number;
     widthClass?: number;
     fsSelection?: number;
-    tables?: { os2?: { achVendID?: string } };
+    tables?: { os2?: OtOS2Init };
+  }
+
+  /**
+   * What `OS/2` is told rather than left to work out.
+   *
+   * Verified against the installed build: the constructor merges these over its
+   * own defaults, and the table writer merges them again over what it derives
+   * from the glyphs — so each one set here is the one written. `version` is
+   * among them because bits 7 to 9 of `fsSelection` mean nothing before 4.
+   */
+  export interface OtOS2Init {
+    achVendID?: string;
+    version?: number;
+    sTypoAscender?: number;
+    sTypoDescender?: number;
+    sTypoLineGap?: number;
+    usWinAscent?: number;
+    usWinDescent?: number;
   }
 
   /** One name record's translations. Only English is ever written here. */

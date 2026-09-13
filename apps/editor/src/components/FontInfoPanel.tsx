@@ -1,6 +1,12 @@
-import { type FontInfo, STYLE_MAP_STYLES } from "@typewright/font-model";
+import {
+  type FontInfo,
+  type VerticalMetrics,
+  STYLE_MAP_STYLES,
+  USE_TYPO_METRICS_BIT,
+  derivedVerticalMetrics,
+} from "@typewright/font-model";
 import { infoProblem, setInfo } from "@typewright/tools";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FontInfoPanel.module.css";
@@ -24,10 +30,29 @@ import { Stepper } from "./Stepper.js";
 type Field = {
   readonly key: keyof FontInfo;
   readonly label: string;
-  readonly kind: "text" | "number" | "choice";
+  /**
+   * An `override` is a number that may be left empty, meaning "work it out",
+   * with what would be worked out shown greyed in the box. A `flag` is one bit
+   * of `openTypeOS2Selection`.
+   */
+  readonly kind: "text" | "number" | "choice" | "override" | "flag";
   readonly hint: string;
   /** For a choice: the values it may take, in the order they are offered. */
   readonly options?: readonly string[];
+  /** For a flag: which bit. */
+  readonly bit?: number;
+};
+
+/** Which derived value each override stands in for. */
+const DERIVED: Partial<Record<keyof FontInfo, keyof VerticalMetrics>> = {
+  openTypeOS2TypoAscender: "typoAscender",
+  openTypeOS2TypoDescender: "typoDescender",
+  openTypeOS2TypoLineGap: "typoLineGap",
+  openTypeHheaAscender: "hheaAscender",
+  openTypeHheaDescender: "hheaDescender",
+  openTypeHheaLineGap: "hheaLineGap",
+  openTypeOS2WinAscent: "winAscent",
+  openTypeOS2WinDescent: "winDescent",
 };
 
 /**
@@ -90,6 +115,71 @@ const SECTIONS: readonly { readonly title: string; readonly fields: readonly Fie
         label: "Italic angle",
         kind: "number",
         hint: "Degrees from upright. Negative leans to the right, as an italic does.",
+      },
+    ],
+  },
+  {
+    // Three sets of the same two numbers, because three kinds of software read
+    // three different ones — and the line height a font sets differs between a
+    // browser, a word processor and a layout program exactly as far as these
+    // disagree. Empty is "work it out", which is what every font exported before
+    // these could be set, so leaving them alone changes nothing.
+    title: "Line spacing",
+    fields: [
+      {
+        key: "openTypeOS2Selection",
+        label: "Use typo metrics",
+        kind: "flag",
+        bit: USE_TYPO_METRICS_BIT,
+        hint: "Tell Windows to space lines by the typographic values below rather than the clipping box. What modern fonts do.",
+      },
+      {
+        key: "openTypeOS2TypoAscender",
+        label: "Typo ascender",
+        kind: "override",
+        hint: "OS/2 typographic ascender: the line height the specification says everybody should use",
+      },
+      {
+        key: "openTypeOS2TypoDescender",
+        label: "Typo descender",
+        kind: "override",
+        hint: "OS/2 typographic descender. Zero or negative.",
+      },
+      {
+        key: "openTypeOS2TypoLineGap",
+        label: "Typo line gap",
+        kind: "override",
+        hint: "Extra space between lines, added to the typographic ascender and descender",
+      },
+      {
+        key: "openTypeHheaAscender",
+        label: "hhea ascender",
+        kind: "override",
+        hint: "What macOS and most browsers space lines by",
+      },
+      {
+        key: "openTypeHheaDescender",
+        label: "hhea descender",
+        kind: "override",
+        hint: "The hhea descender. Zero or negative.",
+      },
+      {
+        key: "openTypeHheaLineGap",
+        label: "hhea line gap",
+        kind: "override",
+        hint: "Extra space between lines on macOS and in browsers",
+      },
+      {
+        key: "openTypeOS2WinAscent",
+        label: "Win ascent",
+        kind: "override",
+        hint: "How far above the baseline Windows draws before clipping. Anything taller is cut off.",
+      },
+      {
+        key: "openTypeOS2WinDescent",
+        label: "Win descent",
+        kind: "override",
+        hint: "How far below the baseline Windows draws, as a positive distance. Anything deeper is cut off.",
       },
     ],
   },
@@ -182,6 +272,10 @@ const SECTIONS: readonly { readonly title: string; readonly fields: readonly Fie
 export function FontInfoPanel(): React.JSX.Element {
   const store = useEditorStore();
   const info = useStoreValue((s) => s.session.editor.document.info);
+  const document = useStoreValue((s) => s.session.editor.document);
+  // What each empty override would come out as. Measuring the Windows box walks
+  // every glyph, so it is worked out once per document rather than per field.
+  const derived = useMemo(() => derivedVerticalMetrics(document), [document]);
   const reading = useStoreValue((s) => s.ownership === "reading");
 
   return (
@@ -197,7 +291,13 @@ export function FontInfoPanel(): React.JSX.Element {
         <section key={section.title} className={styles.section}>
           <h3 className={styles.heading}>{section.title}</h3>
           {section.fields.map((field) => (
-            <Field key={field.key} field={field} info={info} store={store} />
+            <Field
+              key={field.key}
+              field={field}
+              info={info}
+              store={store}
+              derived={derivedFor(field, derived)}
+            />
           ))}
         </section>
       ))}
@@ -219,13 +319,20 @@ function Field({
   field,
   info,
   store,
+  derived,
 }: {
   field: Field;
   info: FontInfo;
   store: ReturnType<typeof useEditorStore>;
+  /** For an override: what an empty box comes out as. */
+  derived: number | null;
 }): React.JSX.Element {
-  const settled = String(info[field.key]);
+  const current = info[field.key];
+  const settled = current === null ? "" : String(current);
+  const numeric = field.kind === "number" || field.kind === "override";
   const [draft, setDraft] = useState(settled);
+  /** An override left empty, which is a value of its own: "work it out". */
+  const cleared = field.kind === "override" && draft.trim() === "";
   const [editing, setEditing] = useState(false);
   /**
    * Set by Escape, read by the blur it causes.
@@ -254,13 +361,14 @@ function Field({
 
     const number = Number(draft);
     // A box on its way to a number holds things that are not one: "-" before
-    // the digits, "" before anything. Neither is a value to write.
-    if (field.kind === "number" && (draft.trim() === "" || !Number.isFinite(number))) {
+    // the digits, "" before anything. Neither is a value to write — except that
+    // an override's empty box is exactly one, and it means "work it out".
+    if (numeric && !cleared && (draft.trim() === "" || !Number.isFinite(number))) {
       setDraft(settled);
       return;
     }
 
-    const value: string | number = field.kind === "number" ? number : draft;
+    const value: string | number | null = cleared ? null : numeric ? number : draft;
 
     const patch = { [field.key]: value } as Partial<FontInfo>;
     const problem = infoProblem({ ...info, ...patch });
@@ -271,15 +379,24 @@ function Field({
     store.applyTool(setInfo(store.editor, patch));
   };
 
-  const problem = infoProblem({
-    ...info,
-    ...({ [field.key]: field.kind === "number" ? Number(draft) : draft } as Partial<FontInfo>),
-  });
+  // Not asked of a flag, which has no draft: its box text would go into the
+  // font's list of bits as a string, and be refused as one.
+  const problem =
+    field.kind === "flag"
+      ? null
+      : infoProblem({
+          ...info,
+          ...({
+            [field.key]: cleared ? null : numeric ? Number(draft) : draft,
+          } as Partial<FontInfo>),
+        });
 
   const stepped = (input: React.JSX.Element): React.JSX.Element =>
-    field.kind === "number" ? (
+    numeric ? (
       <Stepper
-        value={Number.isFinite(Number(draft)) ? Number(draft) : null}
+        // An empty override steps from what it would come out as, so the first
+        // press moves the number shown in the box rather than jumping from zero.
+        value={cleared ? derived : Number.isFinite(Number(draft)) ? Number(draft) : null}
         label={field.label}
         // The em is a grid people speak of in round hundreds; the rest are
         // units, and a unit is the smallest thing there is.
@@ -298,6 +415,30 @@ function Field({
     ) : (
       input
     );
+
+  // A flag writes straight through, as a choice does below.
+  if (field.kind === "flag") {
+    const bit = field.bit ?? 0;
+    return (
+      <label className={styles.field}>
+        <span className={styles.label}>{field.label}</span>
+        <input
+          type="checkbox"
+          className={styles.check}
+          checked={info.openTypeOS2Selection.includes(bit)}
+          title={field.hint}
+          aria-label={field.label}
+          onChange={(event) => {
+            const others = info.openTypeOS2Selection.filter((b) => b !== bit);
+            const openTypeOS2Selection = event.target.checked
+              ? [...others, bit].sort((a, b) => a - b)
+              : others;
+            store.applyTool(setInfo(store.editor, { openTypeOS2Selection }));
+          }}
+        />
+      </label>
+    );
+  }
 
   // A choice writes straight through: there is no half-typed state to protect
   // and nothing to abandon, so a draft would only delay the answer.
@@ -331,8 +472,9 @@ function Field({
       {stepped(
         <input
           className={styles.input}
-          type={field.kind === "number" ? "number" : "text"}
+          type={numeric ? "number" : "text"}
           value={draft}
+          placeholder={field.kind === "override" && derived !== null ? String(derived) : undefined}
           title={field.hint}
           aria-label={field.label}
           aria-invalid={editing && problem !== null}
@@ -365,4 +507,12 @@ function Field({
       ) : null}
     </label>
   );
+}
+
+/** What an override's empty box would come out as; `null` for any other field. */
+function derivedFor(field: Field, metrics: VerticalMetrics): number | null {
+  const which = DERIVED[field.key];
+  if (field.kind !== "override" || which === undefined) return null;
+  const value = metrics[which];
+  return typeof value === "number" ? value : null;
 }

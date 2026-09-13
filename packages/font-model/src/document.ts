@@ -95,6 +95,32 @@ export type FontInfo = {
   /** The four-slot family this file belongs to, for software that only has four. */
   readonly styleMapFamilyName: string;
   readonly styleMapStyleName: StyleMapStyle;
+
+  /*
+   * The vertical metrics, three sets of them. See `vertical-metrics.ts` for who
+   * reads which.
+   *
+   * Each is `null` until somebody sets it, and `null` means "derive it", which
+   * is what the exporter did before any of these could be set: a font that sets
+   * none of them exports as it always has. Named as the UFO names them, so an
+   * absent key reads back as `null` and a `null` is written as no key at all.
+   */
+  readonly openTypeHheaAscender: number | null;
+  readonly openTypeHheaDescender: number | null;
+  readonly openTypeHheaLineGap: number | null;
+  readonly openTypeOS2TypoAscender: number | null;
+  readonly openTypeOS2TypoDescender: number | null;
+  readonly openTypeOS2TypoLineGap: number | null;
+  /** Positive, as the format stores it: how far above the baseline GDI clips. */
+  readonly openTypeOS2WinAscent: number | null;
+  /** Positive too: how far *below* the baseline, not a coordinate. */
+  readonly openTypeOS2WinDescent: number | null;
+  /**
+   * The `fsSelection` bits a font decides rather than derives, by number: 7 is
+   * "use the typographic metrics", 8 and 9 are the WWS and oblique flags. The
+   * first seven are worked out from the style map and never stored here.
+   */
+  readonly openTypeOS2Selection: readonly number[];
 };
 
 export const DEFAULT_FONT_INFO: FontInfo = {
@@ -130,6 +156,16 @@ export const DEFAULT_FONT_INFO: FontInfo = {
 
   styleMapFamilyName: "",
   styleMapStyleName: "regular",
+
+  openTypeHheaAscender: null,
+  openTypeHheaDescender: null,
+  openTypeHheaLineGap: null,
+  openTypeOS2TypoAscender: null,
+  openTypeOS2TypoDescender: null,
+  openTypeOS2TypoLineGap: null,
+  openTypeOS2WinAscent: null,
+  openTypeOS2WinDescent: null,
+  openTypeOS2Selection: [],
 };
 
 /**

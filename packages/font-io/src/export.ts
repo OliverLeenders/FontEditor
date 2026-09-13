@@ -2,6 +2,7 @@ import {
   type ComponentSource,
   type Contour,
   type FontDocument,
+  type FontInfo,
   type Glyph,
   type IdFactory,
   type StyleMapStyle,
@@ -21,8 +22,8 @@ import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
 import { compileFeatures } from "./features.js";
 import { compileMarks } from "./marks.js";
-import { withTable } from "./sfnt.js";
-import type { OtGlyph, OtPath } from "opentype.js";
+import { readTablesOf, withTable } from "./sfnt.js";
+import type { OtGlyph, OtOS2Init, OtPath } from "opentype.js";
 
 /**
  * Writing a font out.
@@ -230,6 +231,73 @@ const STYLE_NAMES: Readonly<Record<StyleMapStyle, string>> = {
  * directions: an upright face of a family called Bold, and an italic drawn
  * without any slant at all.
  */
+/**
+ * The `fsSelection` bits a font decides for itself: 7, 8 and 9.
+ *
+ * The first seven are left out even where a source lists them, because they are
+ * the style map's to say. A font whose bold bit disagrees with its style map is
+ * one an operating system files under two different names.
+ */
+function decidedSelection(info: FontInfo): number {
+  let bits = 0;
+  for (const bit of info.openTypeOS2Selection) if (bit >= 7 && bit <= 9) bits |= 1 << bit;
+  return bits;
+}
+
+/** What `OS/2` is told, where the font has decided, rather than left to derive. */
+function os2Overrides(info: FontInfo): OtOS2Init {
+  const os2: OtOS2Init = {};
+  if (info.openTypeOS2VendorID.trim() !== "") {
+    os2.achVendID = info.openTypeOS2VendorID.slice(0, 4).padEnd(4, " ");
+  }
+  // Bits 7 to 9 are only defined from version 4, which is the same length as the
+  // 3 opentype.js writes: asking for them is changing one number.
+  if (decidedSelection(info) !== 0) os2.version = 4;
+
+  if (info.openTypeOS2TypoAscender !== null) {
+    os2.sTypoAscender = Math.round(info.openTypeOS2TypoAscender);
+  }
+  if (info.openTypeOS2TypoDescender !== null) {
+    os2.sTypoDescender = Math.round(info.openTypeOS2TypoDescender);
+  }
+  if (info.openTypeOS2TypoLineGap !== null) {
+    os2.sTypoLineGap = Math.round(info.openTypeOS2TypoLineGap);
+  }
+  if (info.openTypeOS2WinAscent !== null) os2.usWinAscent = Math.round(info.openTypeOS2WinAscent);
+  if (info.openTypeOS2WinDescent !== null) {
+    os2.usWinDescent = Math.round(info.openTypeOS2WinDescent);
+  }
+  return os2;
+}
+
+/**
+ * The line metrics `hhea` is told, where the font sets them.
+ *
+ * opentype.js builds `hhea` from the ascender and descender alone, with no line
+ * gap, and unlike `OS/2` takes no overrides for it. So the three numbers are
+ * written into the finished table instead: they sit at fixed offsets straight
+ * after its version, and the table is spliced back so the checksums are right.
+ */
+function withHheaMetrics(bytes: ArrayBuffer, info: FontInfo): ArrayBuffer {
+  const ascender = info.openTypeHheaAscender;
+  const descender = info.openTypeHheaDescender;
+  const lineGap = info.openTypeHheaLineGap;
+  if (ascender === null && descender === null && lineGap === null) return bytes;
+
+  const font = new Uint8Array(bytes);
+  const hhea = readTablesOf(font).find((t) => t.tag === "hhea");
+  if (hhea === undefined) return bytes;
+
+  const table = hhea.data.slice();
+  const view = new DataView(table.buffer);
+  if (ascender !== null) view.setInt16(4, Math.round(ascender));
+  if (descender !== null) view.setInt16(6, Math.round(descender));
+  if (lineGap !== null) view.setInt16(8, Math.round(lineGap));
+
+  const out = withTable(font, "hhea", table);
+  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
+}
+
 function selectionOf(style: StyleMapStyle): number {
   const ITALIC = 1;
   const BOLD = 32;
@@ -344,10 +412,8 @@ export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x"
     italicAngle: info.italicAngle,
     weightClass: info.openTypeOS2WeightClass,
     widthClass: info.openTypeOS2WidthClass,
-    fsSelection: selectionOf(info.styleMapStyleName),
-    ...(info.openTypeOS2VendorID.trim() === ""
-      ? {}
-      : { tables: { os2: { achVendID: info.openTypeOS2VendorID.slice(0, 4).padEnd(4, " ") } } }),
+    fsSelection: selectionOf(info.styleMapStyleName) | decidedSelection(info),
+    tables: { os2: os2Overrides(info) },
 
     glyphs,
   });
@@ -377,7 +443,7 @@ export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x"
   if (mapFamily !== family) setName(font, "preferredFamily", family);
   if (mapStyle !== style) setName(font, "preferredSubfamily", style);
 
-  const bytes = font.toArrayBuffer();
+  const bytes = withHheaMetrics(font.toArrayBuffer(), info);
 
   // opentype.js writes no GPOS, so the kerning goes in afterwards. Glyph ids
   // are positions in the list just built, which is the order they were added.

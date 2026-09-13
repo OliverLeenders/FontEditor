@@ -329,8 +329,19 @@ function readInfo(raw: Record<string, unknown>): FontInfo {
 
   for (const [key, fallback] of Object.entries(DEFAULT_FONT_INFO)) {
     const value = raw[key];
-    if (typeof fallback === "number") {
+    // A `null` default is an override: a number the font decided, or nothing,
+    // meaning derive it. Without this branch it fell to the string one below,
+    // and every override a font set was dropped the next time it was opened.
+    if (typeof fallback === "number" || fallback === null) {
       if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+    } else if (Array.isArray(fallback)) {
+      // The one list, of `fsSelection` bit numbers.
+      if (Array.isArray(value)) {
+        out[key] = value.filter(
+          (bit): bit is number =>
+            typeof bit === "number" && Number.isInteger(bit) && bit >= 0 && bit <= 15,
+        );
+      }
     } else if (typeof value === "string") {
       out[key] = value;
     }

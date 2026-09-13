@@ -294,6 +294,20 @@ function readFontInfo(
     openTypeOS2WeightClass: number("openTypeOS2WeightClass"),
     openTypeOS2WidthClass: number("openTypeOS2WidthClass"),
 
+    // Signs as the format has them, whatever the file says — the reason the
+    // descender above is read the way it is. Hand-written sources get these
+    // backwards often enough, and a font read in with a positive descender here
+    // is one whose every later edit in Font Info is refused.
+    openTypeHheaAscender: whole(plistNumber(dict, "openTypeHheaAscender")),
+    openTypeHheaDescender: below(plistNumber(dict, "openTypeHheaDescender")),
+    openTypeHheaLineGap: whole(plistNumber(dict, "openTypeHheaLineGap")),
+    openTypeOS2TypoAscender: whole(plistNumber(dict, "openTypeOS2TypoAscender")),
+    openTypeOS2TypoDescender: below(plistNumber(dict, "openTypeOS2TypoDescender")),
+    openTypeOS2TypoLineGap: whole(plistNumber(dict, "openTypeOS2TypoLineGap")),
+    openTypeOS2WinAscent: distance(plistNumber(dict, "openTypeOS2WinAscent")),
+    openTypeOS2WinDescent: distance(plistNumber(dict, "openTypeOS2WinDescent")),
+    openTypeOS2Selection: selectionBits(dict),
+
     openTypeNamePreferredFamilyName: text("openTypeNamePreferredFamilyName"),
     openTypeNamePreferredSubfamilyName: text("openTypeNamePreferredSubfamilyName"),
 
@@ -332,6 +346,25 @@ function readGuides(dict: PlistDict, ids: IdFactory): Guide[] {
     else if (y !== null) out.push(guide(ids.guide(), { x: 0, y }, 0, name, color));
   }
   return out;
+}
+
+/** A metric the file set, in whole units; `null` where it set nothing. */
+const whole = (value: number | null): number | null => (value === null ? null : Math.round(value));
+/** A descender: below the baseline, so never positive. */
+const below = (value: number | null): number | null =>
+  value === null ? null : -Math.abs(Math.round(value));
+/** A Windows ascent or descent, which the format stores as a distance. */
+const distance = (value: number | null): number | null =>
+  value === null ? null : Math.abs(Math.round(value));
+
+/** The `fsSelection` bits a font sets itself, as a list of bit numbers. */
+function selectionBits(dict: PlistDict): number[] {
+  const listed = dict["openTypeOS2Selection"];
+  if (!Array.isArray(listed)) return [];
+  return listed.filter(
+    (bit): bit is number =>
+      typeof bit === "number" && Number.isInteger(bit) && bit >= 0 && bit <= 15,
+  );
 }
 
 /** The four names this key is allowed to have, and the default for anything else. */

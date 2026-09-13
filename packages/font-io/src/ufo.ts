@@ -320,6 +320,24 @@ function fontInfoPairs(document: FontDocument): Array<readonly [string, string]>
   number("openTypeOS2WeightClass", info.openTypeOS2WeightClass);
   number("openTypeOS2WidthClass", info.openTypeOS2WidthClass);
 
+  // The vertical metrics only where the font has set them. An absent key is the
+  // UFO's own way of saying "work it out", and writing the derived value instead
+  // would turn every font saved here into one that had decided.
+  const decided = (key: string, value: number | null): void => {
+    if (value !== null) pairs.push([key, int(value)]);
+  };
+  decided("openTypeHheaAscender", info.openTypeHheaAscender);
+  decided("openTypeHheaDescender", info.openTypeHheaDescender);
+  decided("openTypeHheaLineGap", info.openTypeHheaLineGap);
+  decided("openTypeOS2TypoAscender", info.openTypeOS2TypoAscender);
+  decided("openTypeOS2TypoDescender", info.openTypeOS2TypoDescender);
+  decided("openTypeOS2TypoLineGap", info.openTypeOS2TypoLineGap);
+  decided("openTypeOS2WinAscent", info.openTypeOS2WinAscent);
+  decided("openTypeOS2WinDescent", info.openTypeOS2WinDescent);
+  if (info.openTypeOS2Selection.length > 0) {
+    pairs.push(["openTypeOS2Selection", array(info.openTypeOS2Selection.map(int))]);
+  }
+
   text("openTypeNamePreferredFamilyName", info.openTypeNamePreferredFamilyName);
   text("openTypeNamePreferredSubfamilyName", info.openTypeNamePreferredSubfamilyName);
 

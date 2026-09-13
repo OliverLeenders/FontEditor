@@ -88,3 +88,9 @@
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
+
+/* A flag sits at the start of its column, where the boxes above begin. */
+.check {
+  justify-self: start;
+  margin: 0;
+}

@@ -295,3 +295,10 @@ export type { Region, Support } from "./variation.js";
 export { masterWeights, supportScalar, supportsFor } from "./variation.js";
 
 export { interpolateFont, interpolateGlyph } from "./interpolate.js";
+
+export type { VerticalMetrics } from "./vertical-metrics.js";
+export {
+  USE_TYPO_METRICS_BIT,
+  derivedVerticalMetrics,
+  verticalMetrics,
+} from "./vertical-metrics.js";
