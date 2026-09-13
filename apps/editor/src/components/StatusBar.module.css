@@ -61,6 +61,15 @@
   text-overflow: ellipsis;
 }
 
+/* A complaint from the file system, which can be a whole sentence. Held to one
+   line with the rest of it in the tooltip, so a long one cannot push the keys
+   and the save mark off the end of the window. */
+.problem {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 22rem;
+}
+
 /* The one line here that changes as the pointer moves, so it is given a colour
    that says "live" rather than sitting among the settled facts. */
 .measure {

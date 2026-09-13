@@ -304,3 +304,52 @@ describe("saving again", () => {
     expect(report?.written).toBe(store.getState().folder.written.size);
   });
 });
+
+/**
+ * What Ctrl-S means, as one method rather than the same choice written twice.
+ *
+ * The shortcut used to live in the File menu's own component — which is mounted
+ * only in the font view, so the key did nothing in the four workspaces where
+ * most of the work happens. It lives on the window now, and the menu item and
+ * the key ask the store the same question so they cannot drift apart.
+ */
+describe("saving where the shortcut means to", () => {
+  let store: Store;
+  beforeEach(() => {
+    store = freshStore();
+    offer(null);
+  });
+
+  it("asks for a folder when there is not one yet", async () => {
+    offer(new FakeFolder("Elsewhere.ufo"));
+
+    const report = await store.saveToFolder();
+
+    expect(report?.name).toBe("Elsewhere.ufo");
+    expect(store.getState().folder.name).toBe("Elsewhere.ufo");
+  });
+
+  it("writes to the folder it is already working in, without asking again", async () => {
+    offer(await ufoOf(store));
+    await store.openFolder();
+    edit(store);
+
+    // Nothing behind the picker now. Asking would throw, so a save that asked
+    // for a folder it already has could not pass this quietly.
+    offer(null);
+    const report = await store.saveToFolder();
+
+    expect(report?.written).toBeGreaterThan(0);
+  });
+
+  it("will not start a second save over a running one", () => {
+    expect(store.canSaveToFolder).toBe(true);
+    store.patch({ folder: { ...store.getState().folder, busy: true } });
+    expect(store.canSaveToFolder).toBe(false);
+  });
+
+  it("will not write from a tab that is only reading", () => {
+    store.patch({ ownership: "reading" });
+    expect(store.canSaveToFolder).toBe(false);
+  });
+});

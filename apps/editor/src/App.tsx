@@ -1,3 +1,4 @@
+import { canOpenFolders } from "@typewright/disk";
 import { randomIds } from "@typewright/font-model";
 import {
   clipboardText,
@@ -95,6 +96,20 @@ export function App(): React.JSX.Element {
       if (modified && event.key.toLowerCase() === "y") {
         event.preventDefault();
         store.redo();
+        return;
+      }
+
+      // Saving is not a drawing shortcut either. This used to live in the File
+      // menu's own component, which is mounted only in the font view — so
+      // Ctrl-S did nothing in the four workspaces where most of the work
+      // happens, including the one for drawing. What the save has to say for
+      // itself is on the status bar, which is on screen wherever the shortcut
+      // now is.
+      if (modified && event.key.toLowerCase() === "s") {
+        // Saving the page is never what somebody wants from a font editor.
+        event.preventDefault();
+        if (!canOpenFolders() || !store.canSaveToFolder) return;
+        void store.saveToFolder();
         return;
       }
 

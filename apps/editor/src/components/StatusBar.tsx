@@ -49,6 +49,11 @@ export function StatusBar({
   const writing = useStoreValue((s) => s.folder.busy);
   const wroteDone = useStoreValue((s) => s.folder.progress?.done ?? null);
   const wroteTotal = useStoreValue((s) => s.folder.progress?.total ?? null);
+  // What the last write to disk failed with. It has to be said here now that
+  // Ctrl-S works in every workspace: the File menu that used to show the answer
+  // is mounted only in the font view, and a save that fails in silence is worse
+  // than one that never started.
+  const problem = useStoreValue((s) => s.folder.problem);
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
 
   // Three scalar selectors rather than one returning the measurement: it is a
@@ -123,6 +128,12 @@ export function StatusBar({
           recovered unsaved work
         </span>
       ) : null}
+      {problem === null ? null : (
+        <span className={`${styles.state} ${styles.warn}`} title={problem}>
+          <TriangleAlertIcon />
+          <span className={styles.problem}>{problem}</span>
+        </span>
+      )}
       {/* The line that already carried a keyboard and a few of the keys is
           where somebody would look for the rest of them, so it is the way in
           rather than a second control beside it. */}

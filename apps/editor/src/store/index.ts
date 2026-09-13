@@ -539,6 +539,34 @@ export class EditorStore {
     return await saveFolderAs(this.host);
   }
 
+  /**
+   * Save where Ctrl-S means to: to the folder if there is one, and otherwise by
+   * asking for one.
+   *
+   * One method rather than the choice written twice, because the shortcut and
+   * the File menu item are the same instruction and must not drift apart. The
+   * shortcut lives on the window in `App`, so it works in every workspace
+   * rather than only where the menu happens to be mounted.
+   */
+  async saveToFolder(): Promise<SaveReport | null> {
+    return this.host.state().folder.name === null
+      ? await saveFolderAs(this.host)
+      : await saveFolder(this.host);
+  }
+
+  /**
+   * Whether a save to disk could happen now.
+   *
+   * Asked by the Ctrl-S shortcut, which lives on the window and therefore has
+   * no render of its own to read these from: a save while one is already
+   * running would write the folder twice over, and a tab that is only reading
+   * must not write at all.
+   */
+  get canSaveToFolder(): boolean {
+    const state = this.host.state();
+    return !state.folder.busy && state.ownership !== "reading";
+  }
+
   /** Stop pointing at a folder, and stop remembering it. */
   async forgetFolder(): Promise<void> {
     await forgetOpenFolder(this.host);

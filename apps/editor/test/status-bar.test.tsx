@@ -102,4 +102,34 @@ describe("saving to a folder", () => {
 
     expect(screen.queryByText(/saving .* files/)).toBeNull();
   });
+
+  /*
+   * A save that fails has to say so here, and here is the only place left that
+   * can. Ctrl-S used to live in the File menu's own component, which is mounted
+   * only in the font view and showed the answer itself; the shortcut now works
+   * in every workspace, so in four of the five there is no menu on screen to
+   * say anything. A save failing in silence is worse than one that never
+   * started — the work is not on disk and nothing on screen disagrees.
+   */
+  it("says what a failed save failed with, in every workspace", () => {
+    for (const workspace of ["glyph", "font", "spacing", "features", "proof"] as const) {
+      const store = freshStore();
+      act(() => {
+        store.patch({
+          folder: { ...store.getState().folder, problem: "The folder is read-only" },
+        });
+      });
+      render(<StatusBar workspace={workspace} onShortcuts={() => undefined} />, store);
+
+      expect(screen.getByText("The folder is read-only")).toBeTruthy();
+      cleanup();
+    }
+  });
+
+  it("says nothing about a problem when there is none", () => {
+    const store = freshStore();
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />, store);
+
+    expect(screen.queryByText(/read-only/)).toBeNull();
+  });
 });

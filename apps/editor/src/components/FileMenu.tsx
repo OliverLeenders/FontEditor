@@ -1,5 +1,5 @@
 import { canOpenFolders } from "@typewright/disk";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { unsaved } from "../store/index.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -73,32 +73,16 @@ export function FileMenu(): React.JSX.Element {
       return `${done.family} · ${String(done.glyphs)} glyphs${warnings}`;
     });
 
+  // The same instruction as Ctrl-S, through the same store method: the shortcut
+  // itself lives on the window in `App`, because this component is mounted only
+  // in the font view and the key has to work in every workspace.
   const save = (): Promise<void> =>
     attempt(async () => {
-      const done = folder.name === null ? await store.saveFolderAs() : await store.saveFolder();
+      const done = await store.saveToFolder();
       if (done === null) return null;
       const removed = done.removed === 0 ? "" : `, ${String(done.removed)} removed`;
       return `Saved ${String(done.written)} files to ${done.name}${removed}`;
     });
-
-  // Ctrl-S lives here rather than with the other shortcuts because this is
-  // where the answer can be shown. It saves wherever the menu item would — to
-  // the folder if there is one, and otherwise by asking for one.
-  useEffect(() => {
-    if (!folders) return;
-
-    const onKey = (event: KeyboardEvent): void => {
-      if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "s") return;
-      // Saving the page is never what someone wants from a font editor.
-      event.preventDefault();
-      if (reading || folder.busy || busy) return;
-      void save();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-    };
-  });
 
   const working = busy || folder.busy || reading;
 
