@@ -40,6 +40,78 @@ export type ResolvedMetrics = {
   readonly right: number | null;
 };
 
+/**
+ * A key, read.
+ *
+ * What a key field holds is a glyph name, with a little more said about it where
+ * that is wanted — the grammar Glyphs uses, so somebody who has spaced a family
+ * there types what their hands already know:
+ *
+ * - `o` — the same side of `o`.
+ * - `|b` — the other side of `b`: a `d`'s left side is a `b`'s right, turned round.
+ * - `|` — this glyph's own other side, which is how an `o` is kept symmetrical.
+ * - `o+10`, `|b-5` — any of those, and a number of units more or less.
+ *
+ * A leading `=` is allowed and ignored, because that is how the spacing view tells
+ * a key from a number, and a key copied out of there should still read. Only whole
+ * units are added: a font is written in them, and a fraction would be rounded away
+ * when it is compiled.
+ *
+ * The offset is read off the end, and only where it is a number, so a name with a
+ * hyphen in it — `a-cy` — is a name rather than `a` less something.
+ */
+export type MetricKeyReference = {
+  /** The glyph named, or `""` for this glyph's own other side. */
+  readonly glyph: GlyphName;
+  /** Take the other side of it: its right side for a left key, and the reverse. */
+  readonly opposite: boolean;
+  readonly offset: number;
+};
+
+/** An optional `=`, an optional bar, a name, and any number of whole `+n` and `-n`. */
+const KEY = /^=?\s*(\|)?\s*([^\s|]*?)\s*((?:[+-]\s*\d+\s*)*)$/;
+
+/** What a key says, or `null` where it cannot be read at all. */
+export function parseMetricKey(text: string): MetricKeyReference | null {
+  const found = KEY.exec(text.trim());
+  if (found === null) return null;
+
+  const opposite = found[1] !== undefined;
+  const glyph = found[2] ?? "";
+  // A bare `=` names nothing. A bare bar names this glyph's other side.
+  if (glyph === "" && !opposite) return null;
+
+  let offset = 0;
+  for (const term of (found[3] ?? "").matchAll(/([+-])\s*(\d+)/g)) {
+    const size = Number(term[2] ?? "0");
+    offset += term[1] === "-" ? -size : size;
+  }
+  return { glyph, opposite, offset };
+}
+
+/** Whether a key points back at the glyph that holds it. */
+function isOwn(key: MetricKeyReference, holder: GlyphName): boolean {
+  return key.glyph === "" || key.glyph === holder;
+}
+
+type ReadKeys = {
+  readonly left: MetricKeyReference | null;
+  readonly right: MetricKeyReference | null;
+  readonly width: MetricKeyReference | null;
+};
+
+/** A glyph's three keys read, `null` for each it leaves empty, or `null` if one cannot be read. */
+function readKeys(g: Glyph): ReadKeys | null {
+  const read = (text: string): MetricKeyReference | null | undefined =>
+    text === "" ? null : (parseMetricKey(text) ?? undefined);
+
+  const left = read(g.metricKeys.left);
+  const right = read(g.metricKeys.right);
+  const width = read(g.metricKeys.width);
+  if (left === undefined || right === undefined || width === undefined) return null;
+  return { left, right, width };
+}
+
 /** Why a key could not be followed. */
 export type MetricKeyProblem = {
   readonly glyph: GlyphName;
@@ -70,6 +142,11 @@ const MAX_DEPTH = 16;
  * advance alone; setting the width says what the advance is regardless. So the
  * coarsest goes last and wins, which is what somebody who set both a width key
  * and a side key meant by setting the width key.
+ *
+ * A side taken from the glyph's own other side waits for that side to be
+ * settled first, whatever it is keyed to, so `|` on the left of an `o` whose
+ * right comes from `c` gives both sides the `c`'s number. Both sides taken from
+ * each other settles neither, and is refused like any other loop.
  */
 export function resolvedMetrics(
   document: FontDocument,
@@ -80,6 +157,9 @@ export function resolvedMetrics(
   const g = glyphNamed(document, name);
   if (g === null || depth > MAX_DEPTH || seen.includes(name)) return null;
 
+  const keys = readKeys(g);
+  if (keys === null) return null;
+
   const own = sidebearings(g, document);
   let advance = g.advance;
   let left = own?.left ?? null;
@@ -87,28 +167,57 @@ export function resolvedMetrics(
 
   const trail = [...seen, name];
 
-  if (g.metricKeys.left !== "") {
-    const from = resolvedMetrics(document, g.metricKeys.left, depth + 1, trail);
-    if (from === null || from.left === null || left === null) return null;
+  /** The number a side key asks for, read off another glyph or this one as it stands. */
+  const taken = (key: MetricKeyReference, side: "left" | "right"): number | null => {
+    const wanted = key.opposite ? (side === "left" ? "right" : "left") : side;
+    let value: number | null;
+    if (isOwn(key, name)) {
+      // A side from the same side of itself says nothing, and followed once per
+      // pass with an offset it would say something different every time.
+      if (!key.opposite) return null;
+      value = wanted === "left" ? left : right;
+    } else {
+      const from = resolvedMetrics(document, key.glyph, depth + 1, trail);
+      value = from === null ? null : from[wanted];
+    }
+    return value === null ? null : value + key.offset;
+  };
+
+  const settleLeft = (): boolean => {
+    if (keys.left === null) return true;
+    const value = taken(keys.left, "left");
+    if (value === null || left === null) return false;
     // The outline moves, and the advance moves with it: adding space on the
     // left adds space on the left rather than taking it off the right.
-    advance += from.left - left;
-    left = from.left;
-  }
+    advance += value - left;
+    left = value;
+    return true;
+  };
 
-  if (g.metricKeys.right !== "") {
-    const from = resolvedMetrics(document, g.metricKeys.right, depth + 1, trail);
-    if (from === null || from.right === null || right === null) return null;
-    advance += from.right - right;
-    right = from.right;
-  }
+  const settleRight = (): boolean => {
+    if (keys.right === null) return true;
+    const value = taken(keys.right, "right");
+    if (value === null || right === null) return false;
+    advance += value - right;
+    right = value;
+    return true;
+  };
 
-  if (g.metricKeys.width !== "") {
-    const from = resolvedMetrics(document, g.metricKeys.width, depth + 1, trail);
+  const leftWaits = keys.left !== null && isOwn(keys.left, name);
+  const rightWaits = keys.right !== null && isOwn(keys.right, name);
+  if (leftWaits && rightWaits) return null;
+  const settled = leftWaits ? settleRight() && settleLeft() : settleLeft() && settleRight();
+  if (!settled) return null;
+
+  if (keys.width !== null) {
+    // A width has no other side, and a glyph's width from itself is its width.
+    if (keys.width.opposite || isOwn(keys.width, name)) return null;
+    const from = resolvedMetrics(document, keys.width.glyph, depth + 1, trail);
     if (from === null) return null;
+    const wanted = from.advance + keys.width.offset;
     // The right side absorbs it, the left being where the outline sits.
-    if (right !== null) right += from.advance - advance;
-    advance = from.advance;
+    if (right !== null) right += wanted - advance;
+    advance = wanted;
   }
 
   return { advance, left, right };
@@ -194,14 +303,40 @@ function spacedTo(document: FontDocument, g: Glyph, wanted: ResolvedMetrics): Gl
 
 /** Which of the three keys is the broken one, said in a few words. */
 function saysWhy(document: FontDocument, g: Glyph): string {
-  const named = [g.metricKeys.left, g.metricKeys.right, g.metricKeys.width].filter((n) => n !== "");
-  const missing = named.filter((n) => glyphNamed(document, n) === null);
+  const written = [g.metricKeys.left, g.metricKeys.right, g.metricKeys.width].filter(
+    (text) => text !== "",
+  );
+  const unreadable = written.filter((text) => parseMetricKey(text) === null);
+  if (unreadable.length > 0) {
+    return `has a spacing key that cannot be read: ${unreadable.join(", ")}`;
+  }
+
+  const keys = readKeys(g);
+  const others = [keys?.left, keys?.right, keys?.width]
+    .filter((key): key is MetricKeyReference => key !== null && key !== undefined)
+    .filter((key) => !isOwn(key, g.name))
+    .map((key) => key.glyph);
+  const missing = [...new Set(others.filter((n) => glyphNamed(document, n) === null))];
 
   if (missing.length > 0) {
     return `is spaced from ${missing.join(", ")}, which ${missing.length === 1 ? "is" : "are"} not in this font`;
   }
   if (sidebearings(g, document) === null) {
     return "is spaced from another glyph but has no outline to move";
+  }
+  if (keys?.width !== null && keys?.width !== undefined) {
+    if (keys.width.opposite || isOwn(keys.width, g.name)) {
+      return `takes its width from “${g.metricKeys.width}”, and a width has no other side to take`;
+    }
+  }
+  const sides = [keys?.left, keys?.right].filter(
+    (key): key is MetricKeyReference => key !== null && key !== undefined && isOwn(key, g.name),
+  );
+  if (sides.some((key) => !key.opposite)) {
+    return "takes a side from the same side of itself, which says nothing";
+  }
+  if (sides.length === 2) {
+    return "takes each side from the other, so neither is settled";
   }
   return "is spaced from a glyph that is spaced from it, round a loop";
 }

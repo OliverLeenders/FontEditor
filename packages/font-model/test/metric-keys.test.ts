@@ -4,7 +4,7 @@ import { component } from "../src/component.js";
 import { fontDocument } from "../src/document.js";
 import { glyph } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
-import { resolvedMetrics, withResolvedMetrics } from "../src/metric-keys.js";
+import { parseMetricKey, resolvedMetrics, withResolvedMetrics } from "../src/metric-keys.js";
 import { sidebearings } from "../src/metrics.js";
 import { rectContour } from "../src/shapes.js";
 
@@ -88,6 +88,81 @@ describe("following a key", () => {
   it("has nothing to say about a glyph that says nothing", () => {
     const font = fontDocument([box("n", 40, 300, 50)]);
     expect(resolvedMetrics(font, "n")).toEqual({ advance: 390, left: 40, right: 50 });
+  });
+});
+
+describe("what a key can say", () => {
+  it("reads a name, a bar for the other side, and whole offsets", () => {
+    expect(parseMetricKey("o")).toEqual({ glyph: "o", opposite: false, offset: 0 });
+    expect(parseMetricKey("=|b+10")).toEqual({ glyph: "b", opposite: true, offset: 10 });
+    expect(parseMetricKey("n - 5")).toEqual({ glyph: "n", opposite: false, offset: -5 });
+    expect(parseMetricKey("n+10-3")).toEqual({ glyph: "n", opposite: false, offset: 7 });
+    expect(parseMetricKey("|")).toEqual({ glyph: "", opposite: true, offset: 0 });
+  });
+
+  it("keeps a hyphen that is not followed by a number as part of the name", () => {
+    expect(parseMetricKey("a-cy")).toEqual({ glyph: "a-cy", opposite: false, offset: 0 });
+  });
+
+  it("reads nothing out of an empty key, or one with a space in its name", () => {
+    expect(parseMetricKey("")).toBeNull();
+    expect(parseMetricKey("=")).toBeNull();
+    expect(parseMetricKey("n m")).toBeNull();
+  });
+
+  it("adds the offset to the side it takes", () => {
+    const font = fontDocument([box("n", 40, 300, 50), box("m", 10, 500, 10, { left: "n+10" })]);
+    expect(resolvedMetrics(font, "m")?.left).toBe(50);
+  });
+
+  it("takes the other side of a glyph behind a bar", () => {
+    // A d's left side is a b's right, turned round.
+    const font = fontDocument([box("b", 60, 300, 35), box("d", 10, 300, 60, { left: "|b" })]);
+    expect(resolvedMetrics(font, "d")).toEqual({ advance: 395, left: 35, right: 60 });
+  });
+
+  it("keeps a glyph symmetrical with a bare bar", () => {
+    const font = fontDocument([box("o", 10, 300, 40, { left: "|" })]);
+    expect(resolvedMetrics(font, "o")).toMatchObject({ left: 40, right: 40 });
+  });
+
+  it("settles the other side first, whatever that side is keyed to", () => {
+    const font = fontDocument([
+      box("c", 30, 300, 25),
+      box("o", 10, 300, 40, { left: "|", right: "c" }),
+    ]);
+    expect(resolvedMetrics(font, "o")).toMatchObject({ left: 25, right: 25 });
+  });
+
+  it("refuses both sides taken from each other, and a width with a bar", () => {
+    const font = fontDocument([
+      box("zero", 40, 300, 40),
+      box("o", 10, 300, 40, { left: "|", right: "|" }),
+      box("one", 10, 300, 40, { width: "|zero" }),
+    ]);
+    expect(resolvedMetrics(font, "o")).toBeNull();
+    expect(resolvedMetrics(font, "one")).toBeNull();
+
+    const says = withResolvedMetrics(font).problems.map((p) => p.says);
+    expect(says).toEqual([
+      expect.stringMatching(/neither is settled/),
+      expect.stringMatching(/no other side/),
+    ]);
+  });
+
+  it("moves a glyph kept symmetrical with an offset only once", () => {
+    // Followed in passes, a side taken from its own other side plus ten must
+    // not gain another ten on every pass.
+    const font = fontDocument([box("o", 10, 300, 40, { left: "|+10" })]);
+    expect(sidebearings(withResolvedMetrics(font).document.glyphs["o"]!)).toEqual({
+      left: 50,
+      right: 40,
+    });
+  });
+
+  it("says which key it could not read", () => {
+    const font = fontDocument([box("m", 10, 500, 10, { left: "n m" })]);
+    expect(withResolvedMetrics(font).problems[0]?.says).toMatch(/cannot be read: n m/);
   });
 });
 

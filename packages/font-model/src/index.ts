@@ -102,8 +102,8 @@ export {
   insideGlyph,
 } from "./direction.js";
 
-export type { MetricKeyProblem, ResolvedMetrics } from "./metric-keys.js";
-export { resolvedMetrics, withResolvedMetrics } from "./metric-keys.js";
+export type { MetricKeyProblem, MetricKeyReference, ResolvedMetrics } from "./metric-keys.js";
+export { parseMetricKey, resolvedMetrics, withResolvedMetrics } from "./metric-keys.js";
 
 export type { MetricLine, Sidebearings } from "./metrics.js";
 export {

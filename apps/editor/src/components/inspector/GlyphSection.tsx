@@ -198,7 +198,7 @@ export function GlyphSection(): React.JSX.Element {
             list="typewright-glyph-names"
             placeholder="left"
             aria-label="Left sidebearing taken from"
-            title="Take the left sidebearing from this glyph"
+            title="Take the left sidebearing from a glyph: o, o+10, |b for its right side, or | for this glyph's right"
             spellCheck={false}
             value={leftKey}
             onChange={(event) => commitKey("left", event.target.value)}
@@ -208,7 +208,7 @@ export function GlyphSection(): React.JSX.Element {
             list="typewright-glyph-names"
             placeholder="right"
             aria-label="Right sidebearing taken from"
-            title="Take the right sidebearing from this glyph"
+            title="Take the right sidebearing from a glyph: o, o+10, |d for its left side, or | for this glyph's left"
             spellCheck={false}
             value={rightKey}
             onChange={(event) => commitKey("right", event.target.value)}
@@ -218,7 +218,7 @@ export function GlyphSection(): React.JSX.Element {
             list="typewright-glyph-names"
             placeholder="width"
             aria-label="Advance taken from"
-            title="Take the whole advance from this glyph"
+            title="Take the whole advance from a glyph: zero, or zero+20"
             spellCheck={false}
             value={widthKey}
             onChange={(event) => commitKey("width", event.target.value)}

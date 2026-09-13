@@ -2,6 +2,7 @@ import {
   type GlyphName,
   type MetricKeys,
   centreGlyph,
+  parseMetricKey,
   setAdvance,
   setLeftSidebearing,
   setRightSidebearing,
@@ -114,11 +115,13 @@ export function centreCurrentGlyph(state: EditorState): ToolResult {
 /**
  * Say where a glyph takes one of its three measurements from.
  *
- * An empty name means its own, which is what nearly every glyph says. Nothing
- * checks that the glyph named exists: a key is typed a character at a time, and
- * refusing `n` on the way to `nine` would make the field unusable. A key that
- * points nowhere is reported when the font is compiled, which is when it
- * matters.
+ * An empty key means its own, which is what nearly every glyph says. A key is
+ * a glyph name with perhaps an offset or a bar for the other side — see
+ * `parseMetricKey` — and a leading `=` is taken off, since that is how a key is
+ * told from a number where both are typed into one field. Nothing checks that
+ * the glyph named exists: a key is typed a character at a time, and refusing
+ * `n` on the way to `nine` would make the field unusable. A key that points
+ * nowhere is reported when the font is compiled, which is when it matters.
  *
  * Not coalescing, unlike the nudges: this is a decision rather than an
  * adjustment, and one undo step should put it back.
@@ -129,13 +132,15 @@ export function setMetricKey(
   which: keyof MetricKeys,
   from: string,
 ): ToolResult {
-  const trimmed = from.trim();
+  const trimmed = from.trim().replace(/^=\s*/, "");
+  const read = parseMetricKey(trimmed);
 
   const document = updateGlyph(state.document, glyphName, (g) => {
     if (g.metricKeys[which] === trimmed) return null;
-    // A glyph spaced from itself is a loop of one, and refusing it here saves
-    // the reader from ever having to explain what that means.
-    if (trimmed === glyphName) return null;
+    // A glyph spaced from the same side of itself is a loop of one, and
+    // refusing it here saves the reader from ever having to explain what that
+    // means. Its *other* side is a different matter: that is a symmetrical `o`.
+    if (read !== null && read.glyph === glyphName && !read.opposite) return null;
     return { ...g, metricKeys: { ...g.metricKeys, [which]: trimmed } };
   });
   if (document === null) return result(state);
