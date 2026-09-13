@@ -6,8 +6,8 @@ import {
   type Glyph,
   type IdFactory,
   addGlyphComponent,
-  attachmentOffset,
   component,
+  componentLanding,
   contourBounds,
   counterIds,
   decomposedGlyph,
@@ -59,7 +59,14 @@ export function addComponent(state: EditorState, base: string, ids: IdFactory): 
   if (wouldRecurse(componentSource(state), owner.name, base)) return result(state);
 
   const placed = component(ids.component(), base);
-  const offset = attachmentOffset(owner, accent, placed.transform);
+  // Landed on the anchors on offer once it is there: the glyph's own, and the
+  // ones its other components bring — which is all a composite has, so adding a
+  // dieresis to an `ä` that holds only an `a` would otherwise land at the origin.
+  const offset = componentLanding(
+    { ...owner, components: [...owner.components, placed] },
+    (name) => state.document.glyphs[name] ?? null,
+    placed.id,
+  );
   const landed = offset === null ? placed : placedComponent(placed, offset.x, offset.y);
 
   const document = editCurrentGlyph(state, (g) => addGlyphComponent(g, landed));
@@ -156,11 +163,11 @@ export function flipComponent(state: EditorState, id: ComponentId, axis: FlipAxi
  */
 export function attachmentFor(state: EditorState, id: ComponentId): Vec2 | null {
   const owner = currentGlyph(state);
-  const placed = owner?.components.find((c) => c.id === id);
-  if (owner === null || placed === undefined) return null;
-
-  const accent = glyphNamed(state.document, placed.base);
-  return accent === null ? null : attachmentOffset(owner, accent, placed.transform);
+  if (owner === null) return null;
+  // The glyph's own anchors and the ones its other components bring. A composite
+  // has only the second kind, and asking the glyph alone greyed this out in
+  // every accented letter built from its parts.
+  return componentLanding(owner, (name) => state.document.glyphs[name] ?? null, id);
 }
 
 /**

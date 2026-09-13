@@ -309,3 +309,5 @@ export { attachComponents, buildComposite, compositePlan, compositeParts } from 
 export type { SectionStop } from "./measure.js";
 
 export { drawableGlyph } from "./drawable.js";
+
+export { componentLanding } from "./composites.js";

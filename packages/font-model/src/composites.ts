@@ -4,7 +4,7 @@ import { isMarkAnchor, pairedName } from "./anchor.js";
 import { type Component, component, placedComponent } from "./component.js";
 import { type FontDocument, glyphForCodePoint, putGlyph } from "./document.js";
 import { type Glyph, NO_METRIC_KEYS, glyph } from "./glyph.js";
-import type { IdFactory } from "./ids.js";
+import type { ComponentId, IdFactory } from "./ids.js";
 import { glyphNameForCodePoint } from "./names.js";
 
 /**
@@ -73,6 +73,35 @@ export function attachComponents(
   // tells the glyphs it would change from the ones it would not.
   const changed = components.some((c, i) => c !== owner.components[i]);
   return { components: changed ? components : owner.components, unplaced };
+}
+
+/**
+ * Where one component would land on its anchors, with the others as they are.
+ *
+ * For aligning a single component, which is a different question from
+ * re-attaching the lot. The anchors on offer are the glyph's own and the ones
+ * the components before it bring — a composite has only the second kind, and
+ * asking the glyph alone made alignment unavailable in every accented letter
+ * built from its parts. Those earlier components are taken where they sit, not
+ * where a re-attach would put them: aligning an acute to a dieresis should land
+ * it on the dieresis on screen, not quietly assume the dieresis moved too.
+ *
+ * `null` where the component is not there, or has no mark anchor pairing with
+ * anything on offer — the letter itself, or an accent with nothing to land on.
+ */
+export function componentLanding(owner: Glyph, glyphOf: GlyphLookup, id: ComponentId): Vec2 | null {
+  const offered = new Map<string, Vec2>();
+  for (const a of owner.anchors) if (!isMarkAnchor(a)) offered.set(a.name, a.pt);
+
+  for (const c of owner.components) {
+    const placed = glyphOf(c.base);
+    if (c.id === id) return placed === null ? null : landing(placed, c, offered);
+    if (placed === null) continue;
+    for (const a of placed.anchors) {
+      if (!isMarkAnchor(a)) offered.set(a.name, applyAffine(c.transform, a.pt));
+    }
+  }
+  return null;
 }
 
 /** Where a component lands on the anchors on offer, or `null`. */
