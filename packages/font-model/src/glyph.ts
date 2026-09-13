@@ -74,6 +74,12 @@ export type Glyph = {
    * `metric-keys.ts` for what the three mean and when they are followed.
    */
   readonly metricKeys: MetricKeys;
+  /**
+   * The colour a designer marked this glyph with, as the UFO writes it: `"r,g,b,a"`,
+   * each from 0 to 1. `null` for none. A flag for the designer — "done", "look at
+   * this again" — and nothing the compiled font carries. See `mark-color.ts`.
+   */
+  readonly markColor: string | null;
 };
 
 /**
@@ -114,6 +120,7 @@ export type GlyphInit = {
   readonly image?: ImageRef | null;
   readonly kept?: readonly string[];
   readonly metricKeys?: MetricKeys;
+  readonly markColor?: string | null;
 };
 
 export function glyph(name: string, init: GlyphInit = {}): Glyph {
@@ -128,6 +135,7 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     image: init.image ?? null,
     kept: init.kept ?? [],
     metricKeys: init.metricKeys ?? NO_METRIC_KEYS,
+    markColor: init.markColor ?? null,
   };
 }
 

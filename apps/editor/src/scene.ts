@@ -55,6 +55,7 @@ const EMPTY: Glyph = {
   image: null,
   kept: [],
   metricKeys: NO_METRIC_KEYS,
+  markColor: null,
 };
 
 /** Resolved component outlines are throwaway; their ids never leave the frame. */

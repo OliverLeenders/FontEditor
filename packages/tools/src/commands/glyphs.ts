@@ -7,6 +7,8 @@ import {
   removeGlyph,
   renameGlyph as renameInDocument,
   renameProblem,
+  setGlyphOrder,
+  updateGlyph,
 } from "@typewright/font-model";
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import type { EditorState } from "../state.js";
@@ -99,4 +101,67 @@ export function deleteRefusal(state: EditorState, name: GlyphName): "missing" | 
 /** Why renaming the open glyph would be refused, or `null` if it would not be. */
 export function renameRefusal(state: EditorState, to: string): RenameProblem | null {
   return renameProblem(state.document, state.currentGlyph, to.trim());
+}
+
+/**
+ * The name a copy of a glyph gets: the first free of `a.001`, `a.002`, and on.
+ *
+ * Numbered from the name without a number of its own, so copying `a.001` gives
+ * `a.002` rather than `a.001.001`. Numbered at all because a copy is a starting
+ * point — an alternate, a small capital, a letter that looks like this one —
+ * and what it is for is decided when it is renamed, straight after.
+ */
+export function duplicateName(state: EditorState, name: GlyphName): GlyphName {
+  const stem = name.replace(/\.\d{3}$/, "");
+  for (let n = 1; ; n++) {
+    const candidate = `${stem}.${String(n).padStart(3, "0")}`;
+    if (state.document.glyphs[candidate] === undefined) return candidate;
+  }
+}
+
+/**
+ * Copy a glyph, placed straight after the original.
+ *
+ * Unencoded: two glyphs claiming one character is a fault the preflight reports,
+ * and the copy is almost never meant to take the original's place. Its colour
+ * mark is not copied either, because a mark says something about the glyph it
+ * was put on — "done" is not true of a copy nobody has touched.
+ */
+export function duplicateGlyph(state: EditorState, name: GlyphName): ToolResult {
+  const source = state.document.glyphs[name];
+  if (source === undefined) return result(state);
+
+  const copy = duplicateName(state, name);
+  const withCopy = putGlyph(state.document, {
+    ...source,
+    name: copy,
+    unicodes: [],
+    markColor: null,
+  });
+  const order = withCopy.glyphOrder.filter((each) => each !== copy);
+  order.splice(order.indexOf(name) + 1, 0, copy);
+  const document = setGlyphOrder(withCopy, order);
+
+  return result({ ...state, document, currentGlyph: copy, selection: [] }, [
+    begin(`Duplicate ${name}`, false),
+    commit,
+  ]);
+}
+
+/**
+ * Mark a glyph with a colour, or take its mark away.
+ *
+ * Named rather than current, since it is done from the browser to whichever cell
+ * was pointed at. One undo step each: a mark is a decision about a glyph.
+ */
+export function setMarkColor(
+  state: EditorState,
+  name: GlyphName,
+  color: string | null,
+): ToolResult {
+  const document = updateGlyph(state.document, name, (g) =>
+    g.markColor === color ? null : { ...g, markColor: color },
+  );
+  if (document === null) return result(state);
+  return done(state, { ...state, document }, color === null ? "Clear mark colour" : "Mark colour");
 }

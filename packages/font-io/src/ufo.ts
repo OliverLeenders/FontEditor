@@ -13,6 +13,7 @@ import {
   segments,
 } from "@typewright/font-model";
 
+import { type XmlElement, childNamed, parseXml, writeXml } from "./xml.js";
 import { DEFAULT_LAYER_DIRECTORY, type ExtraLayer, layerContentsPlist } from "./ufo-layers.js";
 import { type ZipEntry, zip } from "./zip.js";
 
@@ -251,7 +252,7 @@ export function glif(g: Glyph): string {
   // Last, and unread: a note, an image, a lib — whatever this glyph
   // was read carrying that the model has no field for. Written back exactly as
   // it arrived, because saving a font must not take things out of it.
-  for (const element of g.kept) lines.push(element);
+  for (const element of withMarkColor(g.kept, g.markColor)) lines.push(element);
 
   lines.push("</glyph>", "");
   return lines.join("\n");
@@ -621,4 +622,42 @@ export function exportUfo(
   }));
 
   return { bytes: zip(files), fileName: `${root}.zip`, files: files.length };
+}
+
+/**
+ * A glyph's kept elements, with its colour mark put back into its `lib`.
+ *
+ * Into the lib the glyph already has, when it has one: a second `lib` element is
+ * not a glif, and the rest of the first is somebody else's data that has to come
+ * out as it went in. A glyph with no lib gets one holding the colour alone.
+ */
+function withMarkColor(kept: readonly string[], markColor: string | null): readonly string[] {
+  if (markColor === null) return kept;
+
+  const text = (value: string): { readonly text: string } => ({ text: value });
+  const entry: XmlElement[] = [
+    { name: "key", attributes: {}, children: [text("public.markColor")] },
+    { name: "string", attributes: {}, children: [text(markColor)] },
+  ];
+  const fresh: XmlElement = {
+    name: "lib",
+    attributes: {},
+    children: [{ name: "dict", attributes: {}, children: entry }],
+  };
+
+  const at = kept.findIndex((element) => element.trimStart().startsWith("<lib"));
+  const lib = at < 0 ? null : parseXml(kept[at]!);
+  const dict = lib === null ? null : childNamed(lib, "dict");
+  if (at < 0) return [...kept, writeXml(fresh, "\t")];
+  if (lib === null || dict === null) {
+    return kept.map((element, i) => (i === at ? writeXml(fresh, "\t") : element));
+  }
+
+  const merged: XmlElement = {
+    ...lib,
+    children: lib.children.map((c) =>
+      c === dict ? { ...dict, children: [...entry, ...dict.children] } : c,
+    ),
+  };
+  return kept.map((element, i) => (i === at ? writeXml(merged, "\t") : element));
 }

@@ -128,6 +128,8 @@ export type StoredGlyph = {
     readonly right?: string;
     readonly width?: string;
   };
+  /** The glyph's colour mark, as `"r,g,b,a"`. Written only when there is one. */
+  readonly markColor?: string;
 };
 
 /** A guide: a point, an angle, and what it is called. */
@@ -192,6 +194,7 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     ...(g.image === null ? {} : { image: encodeImage(g.image) }),
     ...(g.kept.length === 0 ? {} : { kept: [...g.kept] }),
     ...(hasMetricKeys(g.metricKeys) ? { metricKeys: writtenKeys(g.metricKeys) } : {}),
+    ...(g.markColor === null ? {} : { markColor: g.markColor }),
   };
 }
 
@@ -543,6 +546,7 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
       image: decodeImage(source["image"]),
       kept,
       metricKeys: readMetricKeys(source["metricKeys"]),
+      markColor: typeof source["markColor"] === "string" ? source["markColor"] : null,
     }),
   );
 }

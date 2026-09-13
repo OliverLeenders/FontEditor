@@ -89,7 +89,10 @@ export {
   createGlyphs,
   deleteGlyph,
   deleteRefusal,
+  duplicateGlyph,
+  duplicateName,
   renameCurrentGlyph,
+  setMarkColor,
   renameRefusal,
 } from "./glyphs.js";
 

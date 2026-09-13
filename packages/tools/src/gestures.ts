@@ -86,6 +86,7 @@ export const EMPTY_GLYPH: Glyph = {
   image: null,
   kept: [],
   metricKeys: NO_METRIC_KEYS,
+  markColor: null,
 };
 
 // ---------------------------------------------------------------------------

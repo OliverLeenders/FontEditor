@@ -1,7 +1,14 @@
 import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@typewright/catalog";
 import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@typewright/render";
-import { deleteGlyph, renameCurrentGlyph, roundGlyphAt } from "@typewright/tools";
-import { NOTDEF, drawableGlyph } from "@typewright/font-model";
+import {
+  deleteGlyph,
+  duplicateGlyph,
+  duplicateName,
+  renameCurrentGlyph,
+  roundGlyphAt,
+  setMarkColor,
+} from "@typewright/tools";
+import { MARK_COLORS, NOTDEF, drawableGlyph, sameMarkColor } from "@typewright/font-model";
 import {
   type GridLayout,
   cellBox,
@@ -15,7 +22,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isDarkNow, watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
-import { GridIcon, PenToolIcon, TrashIcon, TypeIcon } from "./icons.js";
+import { CopyPlusIcon, GridIcon, PenToolIcon, TrashIcon, TypeIcon } from "./icons.js";
+import { markSwatch } from "./MarkSwatch.js";
 import { CleanUpMenu } from "./CleanUpMenu.js";
 import { ExportFont } from "./ExportFont.js";
 import { FileMenu } from "./FileMenu.js";
@@ -137,6 +145,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
             codePoint: entry.codePoint,
             focused: entry.name === focusedName,
             current: entry.name === state.currentGlyph,
+            markColor: state.document.glyphs[entry.name]?.markColor ?? null,
           },
         );
       }
@@ -199,6 +208,24 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   };
 
   /**
+   * A copy waiting to be renamed, by name.
+   *
+   * The copy is not in the list until the store has it and the list has been
+   * worked out again, so the rename is started once it turns up rather than
+   * straight after the command — at which point there is no cell to put it on.
+   * A copy filtered out of the set on screen is simply not renamed here.
+   */
+  const [pendingRename, setPendingRename] = useState<string | null>(null);
+  useEffect(() => {
+    if (pendingRename === null) return;
+    const index = shown.findIndex((entry) => entry.name === pendingRename);
+    setPendingRename(null);
+    if (index < 0) return;
+    setFocused(index);
+    startRename(index);
+  }, [pendingRename, shown]);
+
+  /**
    * Where the cell being renamed is on screen.
    *
    * `null` once it scrolls out of view, which also takes the field away — a
@@ -216,6 +243,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   const cellItems = (index: number): Item[] => {
     const name = shown[index]?.name;
     if (name === undefined) return [];
+    const markColor = document.glyphs[name]?.markColor ?? null;
 
     return [
       { kind: "item", label: "Open", icon: PenToolIcon, run: () => openAt(index) },
@@ -228,6 +256,18 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         disabled: name === NOTDEF,
         run: () => startRename(index),
       },
+      {
+        kind: "item",
+        label: "Duplicate",
+        icon: CopyPlusIcon,
+        // A second `.notdef` is a glyph no font is allowed.
+        disabled: name === NOTDEF,
+        run: () => {
+          const copy = duplicateName(store.editor, name);
+          store.applyTool(duplicateGlyph(store.editor, name));
+          setPendingRename(copy);
+        },
+      },
       { kind: "separator" },
       {
         kind: "item",
@@ -237,6 +277,23 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           store.setCurrentGlyph(name);
           store.applyTool(roundGlyphAt(store.editor, name));
         },
+      },
+      { kind: "separator" },
+      // The colour marks, each drawn as itself and ticked when it is the one on
+      // this glyph: a row of words would have to be read, and a mark is
+      // recognised.
+      ...MARK_COLORS.map((mark): Item => ({
+        kind: "item",
+        label: mark.name,
+        icon: markSwatch(mark.value),
+        checked: sameMarkColor(markColor, mark.value),
+        run: () => store.applyTool(setMarkColor(store.editor, name, mark.value)),
+      })),
+      {
+        kind: "item",
+        label: "No colour",
+        disabled: markColor === null,
+        run: () => store.applyTool(setMarkColor(store.editor, name, null)),
       },
       { kind: "separator" },
       {

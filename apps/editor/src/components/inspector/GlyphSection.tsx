@@ -236,4 +236,5 @@ const EMPTY_GLYPH = {
   image: null,
   kept: [],
   metricKeys: NO_METRIC_KEYS,
+  markColor: null,
 };

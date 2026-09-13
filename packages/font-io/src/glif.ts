@@ -23,6 +23,7 @@ import {
   childrenNamed,
   isElement,
   parseXml,
+  textOf,
   writeXml,
 } from "./xml.js";
 
@@ -133,6 +134,7 @@ export function parseGlif(
     else guides.push(read);
   }
 
+  const { kept, markColor } = keptOf(root);
   return glyph(name, {
     unicodes,
     advance,
@@ -141,7 +143,8 @@ export function parseGlif(
     anchors,
     guides,
     image: parseImage(childNamed(root, "image")),
-    kept: keptOf(root),
+    kept,
+    markColor,
   });
 }
 
@@ -212,13 +215,50 @@ export function parseImage(element: XmlElement | null): ImageRef | null {
  * Kept as text rather than parsed, deliberately. Parsing would mean deciding
  * what these mean, and the whole point is that we do not know.
  */
-function keptOf(root: XmlElement): string[] {
-  const out: string[] = [];
+function keptOf(root: XmlElement): { kept: string[]; markColor: string | null } {
+  const kept: string[] = [];
+  let markColor: string | null = null;
   for (const child of root.children) {
     if (!isElement(child) || MODELLED.has(child.name)) continue;
-    out.push(writeXml(child, "\t"));
+    if (child.name === "lib") {
+      // One key of the lib is modelled, the mark colour, and the rest are kept.
+      const read = withoutMarkColor(child);
+      markColor = read.markColor;
+      if (read.lib !== null) kept.push(writeXml(read.lib, "\t"));
+      continue;
+    }
+    kept.push(writeXml(child, "\t"));
   }
-  return out;
+  return { kept, markColor };
+}
+
+/** The lib key a glyph's colour mark is kept under, by the UFO's own convention. */
+const MARK_COLOR_KEY = "public.markColor";
+
+/**
+ * A glyph's `lib` with its mark colour taken out.
+ *
+ * The colour is read into the model, so it must not also ride along in what is
+ * kept, or saving would write it twice. Everything else in the lib is somebody
+ * else's and stays exactly as it was; a lib that held nothing but the colour is
+ * not kept at all, since an empty one says nothing.
+ */
+function withoutMarkColor(lib: XmlElement): { lib: XmlElement | null; markColor: string | null } {
+  const dict = childNamed(lib, "dict");
+  if (dict === null) return { lib, markColor: null };
+
+  const entries = dict.children.filter(isElement);
+  const at = entries.findIndex((e) => e.name === "key" && textOf(e).trim() === MARK_COLOR_KEY);
+  const key = entries[at];
+  const value = entries[at + 1];
+  if (key === undefined || value?.name !== "string") return { lib, markColor: null };
+
+  const remaining = dict.children.filter((c) => c !== key && c !== value);
+  const markColor = textOf(value).trim();
+  if (!remaining.some(isElement)) return { lib: null, markColor };
+
+  const children = lib.children.map((c) => (c === dict ? { ...dict, children: remaining } : c));
+  return { lib: { ...lib, children }, markColor };
 }
 
 /** A format-1 anchor: one point, of type `move`, carrying a name. */

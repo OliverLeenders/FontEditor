@@ -311,3 +311,6 @@ export type { SectionStop } from "./measure.js";
 export { drawableGlyph } from "./drawable.js";
 
 export { componentLanding } from "./composites.js";
+
+export type { MarkColor } from "./mark-color.js";
+export { MARK_COLORS, parseMarkColor, sameMarkColor } from "./mark-color.js";

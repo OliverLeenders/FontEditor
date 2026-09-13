@@ -82,8 +82,8 @@ describe("drawGlyphCell", () => {
       .all("moveTo")
       .concat(ctx.all("lineTo"))
       .map((o) => o.args[1] ?? 0);
-    // 26px of the 92px cell is reserved for the name and code point.
-    expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height - 26);
+    // 30px of the 92px cell is reserved for the name, the code point and the mark.
+    expect(Math.max(...ys)).toBeLessThanOrEqual(box.y + box.height - 30);
   });
 
   it("constrains label width so a long name cannot spill out of its cell", () => {
@@ -98,5 +98,40 @@ describe("formatCodePoint", () => {
   it("pads to four digits and goes wider when it must", () => {
     expect(formatCodePoint(0x41)).toBe("U+0041");
     expect(formatCodePoint(0x1f600)).toBe("U+1F600");
+  });
+});
+
+/**
+ * A colour-marked cell: a bar along its foot, clear of the code point, and a
+ * faint wash of the same colour behind the letter that stops at the labels.
+ */
+describe("a colour-marked cell", () => {
+  const BAR = "rgba(255, 0, 0, 1)";
+  const WASH = "rgba(255, 0, 0, 0.15)";
+  const rectIn = (ctx: RecordingContext, colour: string) =>
+    ctx.all("rect").find((o) => o.fillStyle === colour)!;
+
+  it("draws the bar, and a faint wash of the same colour behind the letter", () => {
+    const ctx = draw(square, { markColor: "1,0,0,1" });
+    expect(ctx.filledIn(BAR)).toHaveLength(1);
+    expect(ctx.filledIn(WASH)).toHaveLength(1);
+  });
+
+  it("keeps the wash off the labels", () => {
+    const wash = rectIn(draw(square, { markColor: "1,0,0,1" }), WASH);
+    const [, top = 0, , height = 0] = wash.args;
+    expect(top + height).toBeLessThanOrEqual(box.y + box.height - 30);
+  });
+
+  it("leaves room between the code point and the bar", () => {
+    const ctx = draw(square, { markColor: "1,0,0,1" });
+    const code = ctx.all("fillText").find((o) => o.text === "U+0041")!;
+    const barTop = rectIn(ctx, BAR).args[1] ?? 0;
+    expect((code.args[1] ?? 0) + 4).toBeLessThanOrEqual(barTop);
+  });
+
+  it("draws neither for a cell with no mark", () => {
+    const ctx = draw(square);
+    expect(ctx.all("fill").some((o) => o.fillStyle.startsWith("rgba(255, 0, 0"))).toBe(false);
   });
 });

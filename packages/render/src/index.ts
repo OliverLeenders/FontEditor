@@ -47,3 +47,5 @@ export { drawProof, drawRun } from "./run.js";
 
 export type { FrameCallback } from "./surface.js";
 export { CanvasSurface } from "./surface.js";
+
+export { markColorCss } from "./draw.js";

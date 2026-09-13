@@ -1,13 +1,14 @@
 import { type Vec2, handleIntersection } from "@typewright/geometry";
 import {
-  type Guide,
-  guideDirection,
   type Contour,
   type Glyph,
+  type Guide,
   type Node,
   type Segment,
-  segmentCubic,
   filledContours,
+  guideDirection,
+  parseMarkColor,
+  segmentCubic,
   segmentTunniPoint,
   segmentTunniStatus,
   segments,
@@ -853,10 +854,19 @@ export type GlyphCellState = {
   readonly codePoint: number | null;
   readonly focused: boolean;
   readonly current: boolean;
+  /** The glyph's colour mark, as the UFO writes it, or nothing. */
+  readonly markColor?: string | null;
 };
 
-/** Room reserved under the artwork for the name and code point. */
-const CELL_LABEL_HEIGHT = 26;
+/**
+ * Room reserved under the artwork for the name, the code point, and the colour
+ * mark's bar below them, with a gap between the code point and the bar so the
+ * two do not read as one line.
+ */
+const CELL_LABEL_HEIGHT = 30;
+
+/** How strongly a mark's colour washes the letter's ground: a tint, not a fill. */
+const MARK_WASH = 0.15;
 
 /**
  * One cell of the glyph browser: the glyph, its name, and its code point.
@@ -881,6 +891,20 @@ export function drawGlyphCell(
     ctx.fill();
   }
 
+  // The mark, twice over. A faint wash of its colour behind the letter, so a
+  // marked cell reads as marked wherever the eye lands on it; and a bar along the
+  // foot of the cell, which is what is seen down a whole column at a glance. The
+  // wash stops at the labels, which stay on the plain ground to stay legible, and
+  // goes down before the border so it cannot cover a focused cell's outline.
+  const markColor = state.markColor ?? null;
+  const wash = markColor === null ? null : markColorCss(markColor, MARK_WASH);
+  if (wash !== null) {
+    ctx.fillStyle = wash;
+    ctx.beginPath();
+    ctx.rect(box.x + 1, box.y + 1, box.width - 2, box.height - CELL_LABEL_HEIGHT - 1);
+    ctx.fill();
+  }
+
   // Half-pixel inset so a one-pixel border lands on a pixel rather than
   // straddling two and rendering as a soft two-pixel line.
   ctx.strokeStyle = state.focused ? palette.marqueeStroke : palette.cellRule;
@@ -888,6 +912,14 @@ export function drawGlyphCell(
   ctx.beginPath();
   ctx.rect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
   ctx.stroke();
+
+  const bar = markColor === null ? null : markColorCss(markColor);
+  if (bar !== null) {
+    ctx.fillStyle = bar;
+    ctx.beginPath();
+    ctx.rect(box.x + 1, box.y + box.height - 4, box.width - 2, 3);
+    ctx.fill();
+  }
 
   if (glyph !== null) {
     drawGlyphThumbnail(
@@ -907,11 +939,12 @@ export function drawGlyphCell(
   const inset = box.width - 8;
 
   ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
-  ctx.fillText(state.name, centre, box.y + box.height - 14, inset);
+  ctx.fillText(state.name, centre, box.y + box.height - 18, inset);
 
   if (state.codePoint !== null) {
     ctx.font = "9px ui-monospace, SFMono-Regular, Menlo, monospace";
-    ctx.fillText(formatCodePoint(state.codePoint), centre, box.y + box.height - 4, inset);
+    // Five pixels clear of the mark's bar, which starts four up from the foot.
+    ctx.fillText(formatCodePoint(state.codePoint), centre, box.y + box.height - 9, inset);
   }
 }
 
@@ -1290,4 +1323,17 @@ export function drawCurvatureComb(ctx: Canvas2D, s: Scene): void {
   }
 
   ctx.restore();
+}
+
+/**
+ * A UFO mark colour as a CSS colour, or `null` for one that does not parse.
+ *
+ * `opacity` scales the mark's own alpha, for the same colour drawn as a tint.
+ */
+export function markColorCss(value: string, opacity = 1): string | null {
+  const rgba = parseMarkColor(value);
+  if (rgba === null) return null;
+  const [r, g, b, a] = rgba;
+  const channel = (n: number): string => String(Math.round(n * 255));
+  return `rgba(${channel(r)}, ${channel(g)}, ${channel(b)}, ${String(a * opacity)})`;
 }
