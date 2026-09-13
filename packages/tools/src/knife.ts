@@ -68,10 +68,11 @@ export function pointerUp(
  * The knife divides a shape, joins two into one, or simply puts a point in, and
  * a history of steps all called "Cut" is one nobody can read backwards. Naming
  * the marking case apart is the one that matters: it changed nothing about the
- * shape, so an undo that came back to it would otherwise look like a no-op.
+ * shape, so an undo that came back to it would otherwise look like a no-op. A
+ * stroke that cuts one stem and only marks another is a cut, and says so.
  */
 function labelFor(cut: KnifeCut): string {
-  if (cut.marked > 0 && cut.divided === 0)
+  if (cut.marked > 0 && cut.chords === 0 && cut.divided === 0)
     return cut.marked === 1 ? "Insert point" : "Insert points";
   return "Cut";
 }

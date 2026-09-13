@@ -2,6 +2,7 @@ import { type Cubic, type Vec2, subcurve } from "@typewright/geometry";
 
 import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { type StrokeCrossing, byContour, samePoint, strokeCrossings } from "./crossings.js";
+import { insideGlyph } from "./direction.js";
 import type { Glyph } from "./glyph.js";
 import type { IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
@@ -15,8 +16,8 @@ import { type Node, node } from "./node.js";
  *
  * A knife that only split contours open would be easy and nearly useless: what
  * you want from cutting a shape is two shapes. So the crossings are sorted along
- * the *stroke* and paired off consecutively. Each pair spans a stretch of the
- * stroke that lies inside the glyph, and those stretches are the new edges.
+ * the *stroke* and paired off wherever the stretch between two of them lies
+ * inside the ink, and those stretches are the new edges.
  *
  * That pairing is what makes the general case fall out rather than needing a
  * case of its own. Cut across an `o` and the stroke meets the outer contour, the
@@ -33,12 +34,11 @@ import { type Node, node } from "./node.js";
  * `o` was not. One shape where there were two, and the hole is gone: the slit
  * has no width yet, and pulling it open is drawing rather than cutting.
  *
- * An odd number of crossings in total is the one case with no pairing at all.
- * The stroke came in and did not come out, so there is no chord to close and
- * nothing to divide — but there is a place worth naming, so a point goes in at
- * each crossing and every contour keeps its shape. That is the knife used to
- * mark rather than to cut, and it is how a point gets put exactly where a
- * stroke crosses an edge.
+ * A crossing whose stretch of ink runs to an end of the stroke has no partner.
+ * The stroke came in and did not come out, so there is no chord to close there —
+ * but there is a place worth naming, so a point goes in and the contour keeps
+ * its shape. That is the knife used to mark rather than to cut, and it is how a
+ * point gets put exactly where a stroke crosses an edge.
  */
 
 export type KnifeCut = {
@@ -51,6 +51,8 @@ export type KnifeCut = {
   readonly marked: number;
   /** Open contours the stroke divided. */
   readonly divided: number;
+  /** Stretches of ink the stroke closed across: the new edges a cut made. */
+  readonly chords: number;
 };
 
 /** A crossing after the contours have been split, when it is a node of its own. */
@@ -99,42 +101,9 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
     divided += 1;
   }
 
-  // Parity is asked of the stroke, not of each contour. Every pair of crossings
-  // along it spans a stretch inside the ink, and that stretch is an edge of the
-  // result — whether its two ends are on one contour or on two.
-  const closedCrossings = [...cutting.values()].reduce((n, list) => n + list.length, 0);
-
-  if (closedCrossings % 2 === 1) {
-    // Nothing to pair, so nothing is divided. The crossings are still places
-    // worth naming, and a point goes in at each.
-    let marked = 0;
-    for (const [index, list] of cutting) {
-      const source = g.contours[index]!;
-      const { contour: withNodes, meetings } = splitAtCrossings(source, list, ids, index);
-      if (meetings.length === 0) continue;
-      replaced.set(index, [withNodes]);
-      marked += meetings.length;
-    }
-    return {
-      glyph: replaced.size === 0 ? g : { ...g, contours: rebuilt(g.contours, replaced, []) },
-      crossings,
-      skipped: 0,
-      marked,
-      divided,
-    };
-  }
-
-  const marked = 0;
-  const skipped = 0;
   if (cutting.size === 0) {
-    if (replaced.size === 0) return { glyph: g, crossings, skipped, marked, divided };
-    return {
-      glyph: { ...g, contours: rebuilt(g.contours, replaced, []) },
-      crossings,
-      skipped,
-      marked,
-      divided,
-    };
+    const glyph = replaced.size === 0 ? g : { ...g, contours: rebuilt(g.contours, replaced, []) };
+    return { glyph, crossings, skipped: 0, marked: 0, divided, chords: 0 };
   }
 
   // Split every cut contour so each crossing is a node of its own.
@@ -149,29 +118,64 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
   for (const entry of split.values()) meetings.push(...entry.meetings);
   meetings.sort((l, r) => l.u - r.u);
 
-  // Consecutive pairs along the stroke. An odd one out cannot happen here, since
-  // every contour contributed an even number.
+  // Pairs along the stroke, but only where the stretch between two crossings is
+  // ink. Counting pairs off by parity assumes the stroke began outside the
+  // letter; one that begins inside a stem pairs the wrong way round, and the
+  // stretch it closes across is the white between two stems — a `v` cut from
+  // stem to stem grew a bar across its mouth. Asking the midpoint, as the section
+  // ruler does, is right wherever the stroke starts.
   const partner = new Map<string, Meeting>();
   const key = (m: Meeting): string => `${String(m.contour)}:${String(m.index)}`;
-  for (let i = 0; i + 1 < meetings.length; i += 2) {
+  const pointOf = (m: Meeting): Vec2 | null =>
+    split.get(m.contour)?.contour.nodes[m.index]?.pt ?? null;
+
+  for (let i = 0; i + 1 < meetings.length;) {
     const first = meetings[i]!;
     const second = meetings[i + 1]!;
-    partner.set(key(first), second);
-    partner.set(key(second), first);
+    const a = pointOf(first);
+    const b = pointOf(second);
+    if (a !== null && b !== null && insideGlyph(g, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })) {
+      partner.set(key(first), second);
+      partner.set(key(second), first);
+      i += 2;
+    } else {
+      i += 1;
+    }
   }
 
-  const loops = walk(split, partner, meetings, key, ids);
+  // A crossing left without a partner is a stretch of ink that runs to an end of
+  // the stroke. Nothing closes across it, but it is still a place worth naming,
+  // so it stays as a point on the outline.
+  const paired = meetings.filter((m) => partner.has(key(m)));
+  const marked = meetings.length - paired.length;
+
+  // A contour with no chord of its own keeps its shape, with the points put in;
+  // only the ones a chord leaves or arrives at are walked into new loops.
+  const walking = new Map<number, { contour: Contour; meetings: Meeting[] }>();
+  for (const [index, entry] of split) {
+    const own = entry.meetings.filter((m) => partner.has(key(m)));
+    if (own.length > 0) walking.set(index, { contour: entry.contour, meetings: own });
+    else if (entry.meetings.length > 0) replaced.set(index, [entry.contour]);
+  }
+
+  if (walking.size === 0) {
+    const glyph = replaced.size === 0 ? g : { ...g, contours: rebuilt(g.contours, replaced, []) };
+    return { glyph, crossings, skipped: 0, marked, divided, chords: 0 };
+  }
+
+  const loops = walk(walking, partner, paired, key, ids);
   if (loops === null) {
-    return { glyph: g, crossings, skipped: skipped + cutting.size, marked: 0, divided: 0 };
+    return { glyph: g, crossings, skipped: cutting.size, marked: 0, divided: 0, chords: 0 };
   }
 
-  for (const index of cutting.keys()) replaced.set(index, []);
+  for (const index of walking.keys()) replaced.set(index, []);
   return {
     glyph: { ...g, contours: rebuilt(g.contours, replaced, loops) },
     crossings,
-    skipped,
+    skipped: 0,
     marked,
     divided,
+    chords: paired.length / 2,
   };
 }
 
