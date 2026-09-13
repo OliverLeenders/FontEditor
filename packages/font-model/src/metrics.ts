@@ -1,7 +1,9 @@
-import type { Vec2 } from "@typewright/geometry";
+import type { Rect, Vec2 } from "@typewright/geometry";
 
+import { movedComponent } from "./component.js";
 import { type Contour } from "./contour.js";
-import type { FontInfo } from "./document.js";
+import type { FontDocument, FontInfo } from "./document.js";
+import { drawableGlyph } from "./drawable.js";
 import { type Glyph, glyphBounds } from "./glyph.js";
 import { translateNode } from "./node.js";
 
@@ -29,21 +31,43 @@ export type Sidebearings = {
  * `null` rather than zero, because a space has no left edge to measure from and
  * reporting `0` would invite an interface to show a number that means nothing
  * and to let someone drag it. A blank glyph has an advance and nothing else.
+ *
+ * `document` is what a composite is measured through. An `ä` is two references
+ * and no contours of its own, so measured alone it has no outline and no sides,
+ * which is how the spacing view came to say so of every accented letter. Given
+ * the font, the components are drawn in first and the sides are the drawn
+ * letter's. Left out, only the glyph's own contours count.
  */
-export function sidebearings(g: Glyph): Sidebearings | null {
-  const box = glyphBounds(g);
+export function sidebearings(g: Glyph, document?: FontDocument): Sidebearings | null {
+  const box = outlineBounds(g, document);
   if (box === null) return null;
   return { left: box.minX, right: g.advance - box.maxX };
+}
+
+/** The box a glyph's ink fills: its contours, and its components where the font is known. */
+function outlineBounds(g: Glyph, document: FontDocument | undefined): Rect | null {
+  if (document === undefined || g.components.length === 0) return glyphBounds(g);
+  return glyphBounds(drawableGlyph(document, g));
 }
 
 function translateContour(c: Contour, delta: Vec2): Contour {
   return { ...c, nodes: c.nodes.map((n) => translateNode(n, delta)) };
 }
 
-/** Move every contour of a glyph, leaving the advance alone. */
+/**
+ * Move every contour and component of a glyph, leaving the advance alone.
+ *
+ * Components go too, because they are part of the ink: moving a composite's
+ * outline means moving the letters it places, together, so an accent stays
+ * over the letter it was put on.
+ */
 export function translateGlyph(g: Glyph, delta: Vec2): Glyph {
   if (delta.x === 0 && delta.y === 0) return g;
-  return { ...g, contours: g.contours.map((c) => translateContour(c, delta)) };
+  return {
+    ...g,
+    contours: g.contours.map((c) => translateContour(c, delta)),
+    components: g.components.map((c) => movedComponent(c, delta.x, delta.y)),
+  };
 }
 
 /**
@@ -55,10 +79,11 @@ export function translateGlyph(g: Glyph, delta: Vec2): Glyph {
  * would do. This is what every other editor does, and the reason is that the two
  * sides are judged against different neighbours.
  *
- * `null` for a glyph with no outline: there is nothing to move.
+ * `null` for a glyph with no outline: there is nothing to move. `document`
+ * measures a composite through its components, as {@link sidebearings} does.
  */
-export function setLeftSidebearing(g: Glyph, value: number): Glyph | null {
-  const current = sidebearings(g);
+export function setLeftSidebearing(g: Glyph, value: number, document?: FontDocument): Glyph | null {
+  const current = sidebearings(g, document);
   if (current === null) return null;
 
   const delta = value - current.left;
@@ -71,8 +96,12 @@ export function setLeftSidebearing(g: Glyph, value: number): Glyph | null {
  *
  * The outline does not move, so the left sidebearing is untouched.
  */
-export function setRightSidebearing(g: Glyph, value: number): Glyph | null {
-  const box = glyphBounds(g);
+export function setRightSidebearing(
+  g: Glyph,
+  value: number,
+  document?: FontDocument,
+): Glyph | null {
+  const box = outlineBounds(g, document);
   if (box === null) return null;
 
   const advance = box.maxX + value;
@@ -90,8 +119,8 @@ export function setRightSidebearing(g: Glyph, value: number): Glyph | null {
  * {@link setLeftSidebearing}, which would move the advance along with it and so
  * leave the glyph exactly as off-centre as it started.
  */
-export function centreGlyph(g: Glyph): Glyph | null {
-  const box = glyphBounds(g);
+export function centreGlyph(g: Glyph, document?: FontDocument): Glyph | null {
+  const box = outlineBounds(g, document);
   if (box === null) return null;
 
   const margin = (g.advance - (box.maxX - box.minX)) / 2;

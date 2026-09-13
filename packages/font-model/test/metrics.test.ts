@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { component } from "../src/component.js";
 import { contour } from "../src/contour.js";
+import { fontDocument } from "../src/document.js";
 import { counterIds } from "../src/ids.js";
 import { glyph } from "../src/glyph.js";
 import {
@@ -47,6 +49,57 @@ describe("sidebearings", () => {
   it("can be negative when the outline overhangs the origin", () => {
     const overhanging = translateGlyph(boxGlyph(), { x: -150, y: 0 });
     expect(sidebearings(overhanging)).toEqual({ left: -50, right: 250 });
+  });
+});
+
+/**
+ * A composite has no contours of its own, so its sides are the sides of what it
+ * draws. Measured alone it has none, which is what the spacing view used to say.
+ */
+describe("the sidebearings of a composite", () => {
+  const font = () => {
+    const n = boxGlyph();
+    const built = glyph("ntilde", { advance: 500, components: [component(ids.component(), "n")] });
+    return { font: fontDocument([n, built]), built };
+  };
+
+  it("has none measured alone, and the drawn letter's measured through the font", () => {
+    const { font: document, built } = font();
+    expect(sidebearings(built)).toBeNull();
+    expect(sidebearings(built, document)).toEqual({ left: 100, right: 100 });
+  });
+
+  it("moves every component to set the left side, and the advance with them", () => {
+    const { font: document, built } = font();
+    const moved = setLeftSidebearing(built, 160, document)!;
+
+    expect(moved.components[0]?.transform.xOffset).toBe(60);
+    expect(moved.advance).toBe(560);
+    // The base glyph is not touched: only where this glyph places it.
+    expect(sidebearings(document.glyphs["n"]!)).toEqual({ left: 100, right: 100 });
+  });
+
+  it("sets the right side by the advance alone", () => {
+    const { font: document, built } = font();
+    const wider = setRightSidebearing(built, 40, document)!;
+    expect(wider.advance).toBe(440);
+    expect(wider.components).toBe(built.components);
+  });
+
+  it("centres by moving the components", () => {
+    const { font: document, built } = font();
+    const lopsided = setLeftSidebearing(built, 0, document)!;
+    const centred = centreGlyph(lopsided, document)!;
+    const sb = sidebearings(centred, document)!;
+    expect(sb.left).toBeCloseTo(sb.right, 10);
+  });
+});
+
+describe("translateGlyph", () => {
+  it("moves components along with contours, since both are ink", () => {
+    const g = glyph("x", { components: [component(ids.component(), "n")] });
+    const moved = translateGlyph(g, { x: 10, y: -5 });
+    expect(moved.components[0]?.transform).toMatchObject({ xOffset: 10, yOffset: -5 });
   });
 });
 

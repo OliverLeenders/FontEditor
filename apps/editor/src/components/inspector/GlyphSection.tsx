@@ -32,15 +32,20 @@ export function GlyphSection(): React.JSX.Element {
   );
   // Two selectors rather than one returning an object: a fresh object every time
   // would compare unequal and re-render the panel on every store notification.
+  // Measured through the font, so a composite has the sides of the letter it draws.
   const leftBearing = useStoreValue(
     (s) =>
-      sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)
-        ?.left ?? null,
+      sidebearings(
+        s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH,
+        s.session.editor.document,
+      )?.left ?? null,
   );
   const rightBearing = useStoreValue(
     (s) =>
-      sidebearings(s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH)
-        ?.right ?? null,
+      sidebearings(
+        s.session.editor.document.glyphs[s.session.editor.currentGlyph] ?? EMPTY_GLYPH,
+        s.session.editor.document,
+      )?.right ?? null,
   );
 
   // Three scalars again rather than the keys as an object, for the reason the
@@ -99,8 +104,9 @@ export function GlyphSection(): React.JSX.Element {
    */
   const commitBearing = (side: "left" | "right", value: number): void => {
     if (!Number.isFinite(value)) return;
+    const font = store.editor.document;
     const document = editCurrentGlyph(store.editor, (g) =>
-      side === "left" ? setLeftSidebearing(g, value) : setRightSidebearing(g, value),
+      side === "left" ? setLeftSidebearing(g, value, font) : setRightSidebearing(g, value, font),
     );
     if (document === null) return;
     store.applyTool(

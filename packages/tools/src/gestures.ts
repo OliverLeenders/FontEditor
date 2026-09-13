@@ -371,7 +371,7 @@ export function startMarginDrag(
         origin: input.point,
         side,
         startAdvance: glyph.advance,
-        startLeft: sidebearings(glyph)?.left ?? null,
+        startLeft: sidebearings(glyph, state.document)?.left ?? null,
         before: state.document,
         moved: false,
       },
@@ -760,7 +760,11 @@ const CONTINUE: Continuations = {
         : gesture.startLeft === null
           ? null
           : updateGlyph(gesture.before, state.currentGlyph, (g) =>
-              setLeftSidebearing(g, toGrid((gesture.startLeft ?? 0) + delta.x, snapping)),
+              setLeftSidebearing(
+                g,
+                toGrid((gesture.startLeft ?? 0) + delta.x, snapping),
+                gesture.before,
+              ),
             );
 
     return {

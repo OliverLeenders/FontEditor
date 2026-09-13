@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { component } from "../src/component.js";
 import { fontDocument } from "../src/document.js";
 import { glyph } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
@@ -123,6 +124,27 @@ describe("resolving a whole font before it is compiled", () => {
       expect.stringMatching(/round a loop/),
       expect.stringMatching(/round a loop/),
     ]);
+  });
+
+  it("spaces a composite by the letter it draws, moving it only once", () => {
+    // `a` takes its left side from `n` and moves; `aacute` places the `a` and
+    // takes its left side from `n` too. Measured where the `a` used to be, the
+    // composite would be moved a second time on top of the `a` moving under it.
+    const font = fontDocument([
+      box("n", 40, 300, 50),
+      box("a", 10, 300, 10, { left: "n" }),
+      glyph("aacute", {
+        advance: 320,
+        components: [component(ids.component(), "a")],
+        metricKeys: { left: "n", right: "", width: "" },
+      }),
+    ]);
+
+    const { document, problems } = withResolvedMetrics(font);
+
+    expect(problems).toEqual([]);
+    expect(sidebearings(document.glyphs["a"]!)?.left).toBe(40);
+    expect(sidebearings(document.glyphs["aacute"]!, document)?.left).toBe(40);
   });
 
   it("says a glyph with no outline has no side to take", () => {

@@ -34,12 +34,13 @@ export function nudgeSidebearing(
 ): ToolResult {
   if (delta === 0) return result(state);
 
+  // Measured through the font, so a composite is spaced by the letter it draws.
   const document = updateGlyph(state.document, glyphName, (g) => {
-    const current = sidebearings(g);
+    const current = sidebearings(g, state.document);
     if (current === null) return null;
     return side === "left"
-      ? setLeftSidebearing(g, current.left + delta)
-      : setRightSidebearing(g, current.right + delta);
+      ? setLeftSidebearing(g, current.left + delta, state.document)
+      : setRightSidebearing(g, current.right + delta, state.document);
   });
   if (document === null) return result(state);
 
@@ -67,10 +68,12 @@ export function setSidebearing(
   const wanted = Math.round(value);
 
   const document = updateGlyph(state.document, glyphName, (g) => {
-    const current = sidebearings(g);
+    const current = sidebearings(g, state.document);
     if (current === null) return null;
     if ((side === "left" ? current.left : current.right) === wanted) return null;
-    return side === "left" ? setLeftSidebearing(g, wanted) : setRightSidebearing(g, wanted);
+    return side === "left"
+      ? setLeftSidebearing(g, wanted, state.document)
+      : setRightSidebearing(g, wanted, state.document);
   });
   if (document === null) return result(state);
 
@@ -104,7 +107,7 @@ export function setGlyphAdvance(
 
 /** Equal space either side, within the advance the glyph already has. */
 export function centreCurrentGlyph(state: EditorState): ToolResult {
-  const document = editCurrentGlyph(state, (g) => centreGlyph(g));
+  const document = editCurrentGlyph(state, (g) => centreGlyph(g, state.document));
   return done(state, document === null ? null : { ...state, document }, "Centre glyph");
 }
 
@@ -139,3 +142,4 @@ export function setMetricKey(
 
   return done(state, { ...state, document }, "Spacing key");
 }
+

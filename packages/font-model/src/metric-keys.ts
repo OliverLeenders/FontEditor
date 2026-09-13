@@ -80,7 +80,7 @@ export function resolvedMetrics(
   const g = glyphNamed(document, name);
   if (g === null || depth > MAX_DEPTH || seen.includes(name)) return null;
 
-  const own = sidebearings(g);
+  const own = sidebearings(g, document);
   let advance = g.advance;
   let left = own?.left ?? null;
   let right = own?.right ?? null;
@@ -126,8 +126,32 @@ export function resolvedMetrics(
  * reported. Silence would be worse than either alternative: the glyph is
  * spaced, so nothing looks broken, and it is spaced by a rule that stopped
  * working some edits ago.
+ *
+ * Done in passes until nothing moves, because a composite's ink is its base
+ * glyphs' ink. When `a` is moved by its key, `aacute` moves with it; a single
+ * pass measured the composite where the `a` used to be and moved it a second
+ * time. The next pass measures it where the `a` now is and puts it right. A
+ * font needs as many passes as its components are deep, and the depth guard
+ * bounds that as it bounds the chain of keys.
  */
 export function withResolvedMetrics(document: FontDocument): {
+  readonly document: FontDocument;
+  readonly problems: readonly MetricKeyProblem[];
+} {
+  const first = resolvingPass(document);
+  let out = first.document;
+
+  for (let pass = 1; pass < MAX_DEPTH && out !== document; pass++) {
+    const next = resolvingPass(out).document;
+    if (next === out) break;
+    out = next;
+  }
+
+  return { document: out, problems: first.problems };
+}
+
+/** Every key in the font followed once, measured against the font as it stands. */
+function resolvingPass(document: FontDocument): {
   readonly document: FontDocument;
   readonly problems: readonly MetricKeyProblem[];
 } {
@@ -144,7 +168,7 @@ export function withResolvedMetrics(document: FontDocument): {
       continue;
     }
 
-    const spaced = spacedTo(g, wanted);
+    const spaced = spacedTo(document, g, wanted);
     if (spaced !== g) out = updateGlyph(out, name, () => spaced) ?? out;
   }
 
@@ -152,14 +176,14 @@ export function withResolvedMetrics(document: FontDocument): {
 }
 
 /** One glyph, moved and widened to the spacing its keys asked for. */
-function spacedTo(g: Glyph, wanted: ResolvedMetrics): Glyph {
+function spacedTo(document: FontDocument, g: Glyph, wanted: ResolvedMetrics): Glyph {
   let out = g;
 
   if (wanted.left !== null && g.metricKeys.left !== "") {
-    out = setLeftSidebearing(out, wanted.left) ?? out;
+    out = setLeftSidebearing(out, wanted.left, document) ?? out;
   }
   if (wanted.right !== null && g.metricKeys.right !== "") {
-    out = setRightSidebearing(out, wanted.right) ?? out;
+    out = setRightSidebearing(out, wanted.right, document) ?? out;
   }
   if (g.metricKeys.width !== "") {
     out = out.advance === wanted.advance ? out : { ...out, advance: wanted.advance };
@@ -176,7 +200,7 @@ function saysWhy(document: FontDocument, g: Glyph): string {
   if (missing.length > 0) {
     return `is spaced from ${missing.join(", ")}, which ${missing.length === 1 ? "is" : "are"} not in this font`;
   }
-  if (sidebearings(g) === null) {
+  if (sidebearings(g, document) === null) {
     return "is spaced from another glyph but has no outline to move";
   }
   return "is spaced from a glyph that is spaced from it, round a loop";

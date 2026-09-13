@@ -294,7 +294,8 @@ export function SpacingView({
   };
 
   const selectedGlyph = selectedName === null ? undefined : document.glyphs[selectedName];
-  const bearings = selectedGlyph === undefined ? null : sidebearings(selectedGlyph);
+  // Through the font, so an accented composite has the sides of the letter it draws.
+  const bearings = selectedGlyph === undefined ? null : sidebearings(selectedGlyph, document);
 
   return (
     <div className={styles.spacing}>
