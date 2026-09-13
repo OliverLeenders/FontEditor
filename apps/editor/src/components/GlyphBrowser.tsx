@@ -1,7 +1,7 @@
 import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@typewright/catalog";
 import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@typewright/render";
 import { deleteGlyph, renameCurrentGlyph, roundGlyphAt } from "@typewright/tools";
-import { NOTDEF } from "@typewright/font-model";
+import { NOTDEF, drawableGlyph } from "@typewright/font-model";
 import {
   type GridLayout,
   cellBox,
@@ -123,9 +123,11 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
 
         // Content coordinates to viewport coordinates. The canvas stays the size
         // of the viewport however tall the grid gets; only this offset moves.
+        const cellGlyph = entry.drawn ? state.document.glyphs[entry.name] : undefined;
         drawGlyphCell(
           ctx,
-          entry.drawn ? (state.document.glyphs[entry.name] ?? null) : null,
+          // Components drawn in, so a composite shows the letter it is made of.
+          cellGlyph === undefined ? null : drawableGlyph(state.document, cellGlyph),
           { x: box.x, y: box.y - scrollTop, width: box.width, height: box.height },
           palette,
           metrics,

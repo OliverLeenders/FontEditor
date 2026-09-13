@@ -283,3 +283,32 @@ describe("an instance between the masters", () => {
     expect(sceneFor(store.getState(), SIZE).instance).toEqual([]);
   });
 });
+
+const { component: placeComponent, putGlyph } = await import("@typewright/font-model");
+
+/**
+ * A composite beside the canvas is drawn by its components.
+ *
+ * The neighbours are drawn from their contours, and a composite has none, so an
+ * accented letter built from its parts stood beside the glyph being edited as a
+ * blank — and the gap measured to it was measured to nothing.
+ */
+describe("a composite among the neighbours", () => {
+  it("comes with its components drawn in", () => {
+    const store = new EditorStore();
+    const before = store.editor.document;
+    const h = before.glyphs["h"]!;
+    expect(h.contours.length).toBeGreaterThan(0);
+
+    // `e` rebuilt as nothing but a reference to `h`.
+    const document = putGlyph(before, {
+      ...before.glyphs["e"]!,
+      contours: [],
+      components: [placeComponent("neighbour-test", "h")],
+    });
+
+    const e = neighboursFor(document, "l", "hello").find((n) => n.glyph.name === "e")!;
+    expect(e.glyph.components).toEqual([]);
+    expect(e.glyph.contours).toHaveLength(h.contours.length);
+  });
+});

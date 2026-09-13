@@ -128,8 +128,8 @@ export type PlacedGlyph = {
  * cursor sitting *inside* a letter is `null` too, because that is the other
  * ruler's question and answering it here would give two readings for one place.
  *
- * Components are not resolved, for the same reason the canvas does not draw a
- * neighbour's: what is measured is what is on screen.
+ * Components are measured only if they come resolved, which the neighbours
+ * beside the canvas do: what is measured is what is on screen.
  */
 export function measureGap(placed: readonly PlacedGlyph[], at: Vec2): Measurement | null {
   const edges: { readonly left: number; readonly right: number }[] = [];

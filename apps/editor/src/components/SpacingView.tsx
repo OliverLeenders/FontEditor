@@ -7,7 +7,7 @@ import {
   setSidebearing,
 } from "@typewright/tools";
 import { CanvasSurface, type RunScene, drawRun } from "@typewright/render";
-import { sidebearings } from "@typewright/font-model";
+import { drawableGlyph, sidebearings } from "@typewright/font-model";
 import {
   type ViewTransform,
   glyphAtX,
@@ -130,7 +130,8 @@ export function SpacingView({
 
       const scene: RunScene = {
         glyphs: state.run.glyphs.map((p) => ({
-          glyph: p.glyph,
+          // Components drawn in, or a composite is a gap in the line.
+          glyph: drawableGlyph(state.document, p.glyph),
           x: p.x,
           advance: p.advance,
           dx: p.dx,

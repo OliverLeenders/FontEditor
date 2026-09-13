@@ -1,4 +1,5 @@
 import { CanvasSurface, type ProofScene, drawProof } from "@typewright/render";
+import { drawableGlyph } from "@typewright/font-model";
 import { layoutParagraph, wheelIntent } from "@typewright/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -104,8 +105,9 @@ export function ProofView(): React.JSX.Element {
   // size. Null when nothing is waiting.
   const wantedScroll = useRef<number | null>(null);
 
-  const frame = useRef({ lines, size, unitsPerEm });
-  frame.current = { lines, size, unitsPerEm };
+  // The document too, for the components each glyph is drawn with.
+  const frame = useRef({ lines, size, unitsPerEm, document });
+  frame.current = { lines, size, unitsPerEm, document };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -121,7 +123,8 @@ export function ProofView(): React.JSX.Element {
       const scene: ProofScene = {
         lines: state.lines.map((line) => ({
           glyphs: line.run.glyphs.map((p) => ({
-            glyph: p.glyph,
+            // Components drawn in, or a composite is a gap in the proof.
+            glyph: drawableGlyph(state.document, p.glyph),
             x: p.x,
             advance: p.advance,
             dx: p.dx,

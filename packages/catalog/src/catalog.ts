@@ -18,7 +18,11 @@ export type CatalogEntry = {
   readonly advance: number;
   readonly contourCount: number;
   readonly nodeCount: number;
-  /** Has an outline. A space is encoded and perfectly valid, but not drawn. */
+  /**
+   * Has an outline, of its own or by reference. A space is encoded and perfectly
+   * valid, but not drawn; an `ä` built from an `a` and a dieresis has no contours
+   * and is drawn all the same.
+   */
   readonly drawn: boolean;
   readonly block: UnicodeBlock | null;
 };
@@ -39,7 +43,10 @@ function entryFor(g: Glyph): CatalogEntry {
     advance: g.advance,
     contourCount: g.contours.length,
     nodeCount,
-    drawn: nodeCount > 0,
+    // Components count: a composite is drawn by reference, and counting nodes
+    // alone filed every accented letter under "Not yet drawn" and gave its cell
+    // nothing to show.
+    drawn: nodeCount > 0 || g.components.length > 0,
     block: codePoint === null ? null : blockOf(codePoint),
   };
 }

@@ -8,6 +8,7 @@ import {
   type Glyph,
   type PlacedGlyph,
   NO_METRIC_KEYS,
+  drawableGlyph,
   filledContours,
   glyphBounds,
   glyphForCodePoint,
@@ -101,7 +102,9 @@ export function neighboursFor(
     const g = document.glyphs[names[i]!];
     if (g === undefined) break;
     x -= g.advance;
-    out.push({ glyph: g, x });
+    // Components drawn in: a composite beside the canvas is otherwise a blank,
+    // and the gap measured to it is measured to nothing.
+    out.push({ glyph: drawableGlyph(document, g), x });
   }
 
   // Rightwards: each step starts after everything before it.
@@ -109,7 +112,7 @@ export function neighboursFor(
   for (let i = at + 1; i < names.length && i - at <= reach; i++) {
     const g = document.glyphs[names[i]!];
     if (g === undefined) break;
-    out.push({ glyph: g, x });
+    out.push({ glyph: drawableGlyph(document, g), x });
     x += g.advance;
   }
 
