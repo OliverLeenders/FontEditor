@@ -1,5 +1,5 @@
-import type { FontDocument, Glyph, GlyphName } from "@typewright/font-model";
-import { glyphsForString, kernIndex, kernValue } from "@typewright/font-model";
+import type { FontDocument, Glyph, GlyphName, TextToken } from "@typewright/font-model";
+import { glyphsForString, kernIndex, kernValue, textTokens } from "@typewright/font-model";
 
 /**
  * One glyph placed in a line of text.
@@ -77,7 +77,7 @@ export type Positioner = (names: readonly string[]) => readonly (Adjustment | nu
  */
 function shapedGlyphs(
   document: FontDocument,
-  text: string,
+  text: string | readonly TextToken[],
   shape: Shaper | undefined,
 ): Array<Glyph | null> {
   const direct = glyphsForString(document, text);
@@ -111,10 +111,13 @@ function shapedGlyphs(
  * `position` runs later still, on the same surviving glyphs, because a rule
  * about a glyph is a rule about the glyph that is there — not about the ones a
  * ligature was made from.
+ *
+ * `text` may name glyphs with a slash — see `textTokens` — and may be handed in
+ * already read, which is how a paragraph lays out the words it has split.
  */
 export function layoutRun(
   document: FontDocument,
-  text: string,
+  text: string | readonly TextToken[],
   shape?: Shaper,
   position?: Positioner,
 ): GlyphRun {
@@ -209,6 +212,11 @@ export type ProofLine = {
  *
  * The width and the leading are in design units, so nothing here knows what size
  * the proof is being shown at. That is the caller's transform.
+ *
+ * Words are split after the text is read rather than before, because the space
+ * that ends a glyph name — `/a.001 b` — belongs to the name. Split as a string,
+ * that space was a gap between two words, and joined back it was a space in the
+ * line.
  */
 export function layoutParagraph(
   document: FontDocument,
@@ -229,10 +237,10 @@ export function layoutParagraph(
       continue;
     }
 
-    let current = "";
-    for (const word of paragraph.split(" ").filter((w) => w !== "")) {
-      const candidate = current === "" ? word : `${current} ${word}`;
-      if (current !== "" && layoutRun(document, candidate, shape, position).width > measure) {
+    let current: readonly TextToken[] = [];
+    for (const word of wordsOf(textTokens(paragraph))) {
+      const candidate = current.length === 0 ? word : [...current, SPACE, ...word];
+      if (current.length > 0 && layoutRun(document, candidate, shape, position).width > measure) {
         lines.push({ run: layoutRun(document, current, shape, position), y });
         y += leading;
         current = word;
@@ -245,6 +253,24 @@ export function layoutParagraph(
   }
 
   return lines;
+}
+
+const SPACE: TextToken = { kind: "character", text: " ", codePoint: 0x20 };
+
+/** Read text split into its words at the spaces, with the spaces themselves dropped. */
+function wordsOf(tokens: readonly TextToken[]): TextToken[][] {
+  const words: TextToken[][] = [];
+  let word: TextToken[] = [];
+  for (const token of tokens) {
+    if (token.kind === "character" && token.text === " ") {
+      if (word.length > 0) words.push(word);
+      word = [];
+    } else {
+      word.push(token);
+    }
+  }
+  if (word.length > 0) words.push(word);
+  return words;
 }
 
 /** The width of the widest line, for a caller that wants to centre the block. */

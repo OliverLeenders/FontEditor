@@ -303,6 +303,7 @@ export function ProofView(): React.JSX.Element {
         className={styles.text}
         value={text}
         aria-label="Proof text"
+        title="Text to set, with any glyph by name after a slash: /a.001, /uni0301"
         spellCheck={false}
         rows={3}
         onChange={(event) => store.setProofText(event.target.value)}

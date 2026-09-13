@@ -1,5 +1,5 @@
 import type { Glyph } from "@typewright/font-model";
-import { glyphsForString } from "@typewright/font-model";
+import { glyphsForString, textTokens } from "@typewright/font-model";
 import { drawGlyphThumbnail } from "@typewright/render";
 import { useEffect, useRef } from "react";
 
@@ -15,7 +15,9 @@ import styles from "./GlyphStrip.module.css";
  * you are editing beside the ones it will actually stand next to.
  *
  * A character the font has nothing for is shown as a gap rather than skipped, so
- * what you typed and what you see stay in step.
+ * what you typed and what you see stay in step. A glyph with no key to type it
+ * by is reached by name after a slash — `/a.001`, `/uni0301` — as it is in the
+ * Spacing line and the Proof.
  */
 export function GlyphStrip(): React.JSX.Element {
   const store = useEditorStore();
@@ -23,7 +25,8 @@ export function GlyphStrip(): React.JSX.Element {
   const document = useStoreValue((s) => s.session.editor.document);
   const current = useStoreValue((s) => s.session.editor.currentGlyph);
 
-  const found = glyphsForString(document, text);
+  const tokens = textTokens(text);
+  const found = glyphsForString(document, tokens);
 
   return (
     <div className={styles.strip}>
@@ -32,6 +35,7 @@ export function GlyphStrip(): React.JSX.Element {
         value={text}
         spellCheck={false}
         aria-label="Glyphs to show"
+        title="Letters, or a glyph by name after a slash: /a.001, /uni0301"
         onChange={(event) => store.setStripText(event.target.value)}
       />
       <div className={styles.cells}>
@@ -40,7 +44,7 @@ export function GlyphStrip(): React.JSX.Element {
             <span
               key={`gap-${String(index)}`}
               className={styles.missing}
-              title={`No glyph for “${[...text][index] ?? "?"}”`}
+              title={`No glyph for “${tokens[index]?.text.trim() ?? "?"}”`}
             />
           ) : (
             <GlyphCell

@@ -69,6 +69,17 @@ describe("layoutParagraph", () => {
     expect(texts(layoutParagraph(font(), "a?b", 100000, LEADING))).toEqual(["ab"]);
   });
 
+  it("sets a glyph named after a slash, and does not count the space that ends the name", () => {
+    // Split as a string, the space after the name was a gap between two words
+    // and came back as a space in the line.
+    expect(texts(layoutParagraph(font(), "/a/b c", 100000, LEADING))).toEqual(["abc"]);
+    expect(texts(layoutParagraph(font(), "/a  b", 100000, LEADING))).toEqual(["a b"]);
+  });
+
+  it("wraps at the spaces between named glyphs as it does between letters", () => {
+    expect(texts(layoutParagraph(font(), "/a/b  /c/d", 300, LEADING))).toEqual(["ab", "cd"]);
+  });
+
   it("gives an empty text one empty line rather than nothing", () => {
     // A page with no lines and a page with one blank line look the same; a
     // caller that has to handle both does not.

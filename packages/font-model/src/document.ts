@@ -1,6 +1,7 @@
 import type { Glyph } from "./glyph.js";
 import type { Guide } from "./guide.js";
 import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js";
+import { type TextToken, codePointFromName, textTokens } from "./text.js";
 
 export type GlyphName = string;
 
@@ -407,20 +408,36 @@ export function glyphForCodePoint(document: FontDocument, codePoint: number): Gl
 }
 
 /**
- * Resolve a string to glyphs, one entry per character, `null` where the font has
- * nothing for it.
+ * The glyph one piece of typed text stands for, or `null`.
  *
- * Iterating the string directly rather than by index so astral characters —
- * anything above U+FFFF, which is two UTF-16 units — resolve as one character
- * instead of two broken halves.
+ * A character is found by its code point. A name is found as a name first, and
+ * then, where it spells a code point — `uni0301` — by that: the name a glyph
+ * would be given is how somebody who does not know what this font called its
+ * acute reaches it anyway.
  */
-export function glyphsForString(document: FontDocument, text: string): Array<Glyph | null> {
-  const out: Array<Glyph | null> = [];
-  for (const character of text) {
-    const codePoint = character.codePointAt(0);
-    out.push(codePoint === undefined ? null : glyphForCodePoint(document, codePoint));
-  }
-  return out;
+export function glyphForToken(document: FontDocument, token: TextToken): Glyph | null {
+  if (token.kind === "character") return glyphForCodePoint(document, token.codePoint);
+
+  const named = document.glyphs[token.name];
+  if (named !== undefined) return named;
+  const codePoint = codePointFromName(token.name);
+  return codePoint === null ? null : glyphForCodePoint(document, codePoint);
+}
+
+/**
+ * Resolve typed text to glyphs, one entry per character or glyph name, `null`
+ * where the font has nothing for it.
+ *
+ * Names are written after a slash — see `textTokens` — so every glyph can be put
+ * in a line, not only the ones with a key. Text already read can be handed in
+ * as it is, for a caller that needs the pieces as well as the glyphs.
+ */
+export function glyphsForString(
+  document: FontDocument,
+  text: string | readonly TextToken[],
+): Array<Glyph | null> {
+  const tokens = typeof text === "string" ? textTokens(text) : text;
+  return tokens.map((token) => glyphForToken(document, token));
 }
 
 /** Replace the font's feature source, leaving everything else alone. */

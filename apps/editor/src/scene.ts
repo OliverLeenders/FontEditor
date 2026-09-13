@@ -11,7 +11,7 @@ import {
   drawableGlyph,
   filledContours,
   glyphBounds,
-  glyphForCodePoint,
+  glyphsForString,
   metricLines,
   randomIds,
   resolveGlyphComponents,
@@ -83,14 +83,11 @@ export function neighboursFor(
   reach = 2,
 ): NeighbourGlyph[] {
   // The model's own lookup rather than a scan written out again here: it is
-  // indexed, and this runs once per character on every frame.
-  const names: string[] = [];
-  for (const character of text) {
-    const codePoint = character.codePointAt(0);
-    if (codePoint === undefined) continue;
-    const found = glyphForCodePoint(document, codePoint);
-    if (found !== null) names.push(found.name);
-  }
+  // indexed, and this runs once per character on every frame. It also reads
+  // glyph names after a slash, so an `/a.001` in the strip has neighbours too.
+  const names = glyphsForString(document, text)
+    .filter((found): found is Glyph => found !== null)
+    .map((found) => found.name);
 
   const at = names.indexOf(currentGlyph);
   if (at < 0) return [];

@@ -323,6 +323,7 @@ export function SpacingView({
           className={styles.text}
           value={text}
           aria-label="Text to space"
+          title="Letters, or a glyph by name after a slash: /a.001, /uni0301"
           spellCheck={false}
           onChange={(event) => store.setSpacingText(event.target.value)}
         />

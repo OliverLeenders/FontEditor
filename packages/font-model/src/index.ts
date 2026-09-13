@@ -102,6 +102,9 @@ export {
   insideGlyph,
 } from "./direction.js";
 
+export type { TextToken } from "./text.js";
+export { codePointFromName, textTokens } from "./text.js";
+
 export type { MetricKeyProblem, MetricKeyReference, ResolvedMetrics } from "./metric-keys.js";
 export { parseMetricKey, resolvedMetrics, withResolvedMetrics } from "./metric-keys.js";
 
@@ -156,6 +159,7 @@ export {
   fontDocument,
   glyphCount,
   glyphForCodePoint,
+  glyphForToken,
   glyphNamed,
   glyphsForString,
   orderedGlyphs,
