@@ -2,6 +2,7 @@ import {
   type GlyphName,
   type MetricKeys,
   centreGlyph,
+  setAdvance,
   setLeftSidebearing,
   setRightSidebearing,
   sidebearings,
@@ -44,6 +45,61 @@ export function nudgeSidebearing(
 
   const label = side === "left" ? "Left sidebearing" : "Right sidebearing";
   return result({ ...state, document }, [begin(`${label} of ${glyphName}`), commit]);
+}
+
+/**
+ * Set one sidebearing of a named glyph outright.
+ *
+ * The nudge above moves a measurement by a step; this is told what the
+ * measurement should be, which is what a typed field means. Named rather than
+ * current for the same reason the nudge is.
+ *
+ * Not coalescing, unlike the nudge: a typed number is a decision, and one undo
+ * step should put it back.
+ */
+export function setSidebearing(
+  state: EditorState,
+  glyphName: GlyphName,
+  side: "left" | "right",
+  value: number,
+): ToolResult {
+  if (!Number.isFinite(value)) return result(state);
+  const wanted = Math.round(value);
+
+  const document = updateGlyph(state.document, glyphName, (g) => {
+    const current = sidebearings(g);
+    if (current === null) return null;
+    if ((side === "left" ? current.left : current.right) === wanted) return null;
+    return side === "left" ? setLeftSidebearing(g, wanted) : setRightSidebearing(g, wanted);
+  });
+  if (document === null) return result(state);
+
+  const label = side === "left" ? "Left sidebearing" : "Right sidebearing";
+  return done(state, { ...state, document }, `${label} of ${glyphName}`);
+}
+
+/**
+ * Set a named glyph's advance outright.
+ *
+ * Beside the sidebearings because it is the third of the same three numbers, and
+ * a glyph with no outline — a space — has this one and no others.
+ */
+export function setGlyphAdvance(
+  state: EditorState,
+  glyphName: GlyphName,
+  value: number,
+): ToolResult {
+  if (!Number.isFinite(value)) return result(state);
+  // Never negative: an advance is how far the pen moves on, and a font with a
+  // letter that moves it backwards is not a font anybody meant to make.
+  const wanted = Math.max(0, Math.round(value));
+
+  const document = updateGlyph(state.document, glyphName, (g) =>
+    g.advance === wanted ? null : setAdvance(g, wanted),
+  );
+  if (document === null) return result(state);
+
+  return done(state, { ...state, document }, `Advance of ${glyphName}`);
 }
 
 /** Equal space either side, within the advance the glyph already has. */

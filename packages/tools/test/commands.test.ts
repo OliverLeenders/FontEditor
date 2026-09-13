@@ -82,6 +82,8 @@ import {
   insertPointOnSegment,
   moveCoordinateTo,
   nudgeSidebearing,
+  setGlyphAdvance,
+  setSidebearing,
   nodeHvLocked,
   renameCurrentGlyph,
   renameRefusal,
@@ -534,6 +536,100 @@ describe("nudgeSidebearing", () => {
     const right = nudgeSidebearing(state, "n", "right", 1).effects[0];
     expect(left).toMatchObject({ label: "Left sidebearing of n" });
     expect(right).toMatchObject({ label: "Right sidebearing of n" });
+  });
+});
+
+/**
+ * The typed numbers, as against the stepped ones above.
+ *
+ * These are what the spacing view's fields write. The letter being spaced is
+ * named rather than current — it is whichever one is selected in a line of
+ * text — which is the whole reason these exist beside the inspector's, and the
+ * first thing worth asserting.
+ */
+describe("setSidebearing and setGlyphAdvance", () => {
+  const named = () => {
+    const ids = counterIds();
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(100, 0)),
+        node(ids.node(), vec(400, 0)),
+        node(ids.node(), vec(400, 700)),
+      ],
+      true,
+    );
+    const document = fontDocument([
+      glyph("n", { unicodes: [0x6e], advance: 500, contours: [c] }),
+      glyph("space", { unicodes: [0x20], advance: 250 }),
+    ]);
+    return editorState({ document, view: { scale: 1, tx: 0, ty: 0 }, currentGlyph: "space" });
+  };
+
+  const bearings = (s: EditorState, name: string) => sidebearings(s.document.glyphs[name]!)!;
+
+  it("sets the left bearing of a glyph that is not the current one", () => {
+    const state = named();
+    expect(state.currentGlyph).toBe("space");
+
+    const { state: next } = setSidebearing(state, "n", "left", 40);
+    expect(bearings(next, "n").left).toBe(40);
+    // Held, exactly as the nudge holds it: the advance moves instead.
+    expect(bearings(next, "n").right).toBe(bearings(state, "n").right);
+  });
+
+  it("sets the right bearing by changing the advance alone", () => {
+    const state = named();
+    const { state: next } = setSidebearing(state, "n", "right", 30);
+    expect(bearings(next, "n").right).toBe(30);
+    expect(bearings(next, "n").left).toBe(100);
+  });
+
+  it("rounds what it is given, because a font is written in whole units", () => {
+    const state = named();
+    expect(bearings(setSidebearing(state, "n", "left", 40.4).state, "n").left).toBe(40);
+  });
+
+  it("does nothing when the number is already what it says", () => {
+    const state = named();
+    const out = setSidebearing(state, "n", "left", bearings(state, "n").left);
+    expect(out.state).toBe(state);
+    expect(out.effects).toEqual([]);
+  });
+
+  it("refuses a number that is not one, rather than writing NaN into the font", () => {
+    const state = named();
+    // What an emptied field sends: `Number("")` is 0, but `Number("-")` is NaN.
+    expect(setSidebearing(state, "n", "left", Number.NaN).state).toBe(state);
+    expect(setGlyphAdvance(state, "n", Number.NaN).state).toBe(state);
+  });
+
+  it("declines on a glyph with no outline, which has no sidebearings to set", () => {
+    const state = named();
+    expect(setSidebearing(state, "space", "left", 10).state.document).toBe(state.document);
+  });
+
+  it("sets the advance of a glyph with no outline, which is all a space has", () => {
+    const state = named();
+    const { state: next } = setGlyphAdvance(state, "space", 300);
+    expect(next.document.glyphs["space"]!.advance).toBe(300);
+  });
+
+  it("never lets an advance go negative", () => {
+    const state = named();
+    expect(setGlyphAdvance(state, "space", -50).state.document.glyphs["space"]!.advance).toBe(0);
+  });
+
+  it("is one undo step rather than a coalescing one: a typed number is a decision", () => {
+    const state = named();
+    expect(setSidebearing(state, "n", "left", 40).effects[0]).toMatchObject({
+      label: "Left sidebearing of n",
+      coalesce: false,
+    });
+    expect(setGlyphAdvance(state, "space", 300).effects[0]).toMatchObject({
+      label: "Advance of space",
+      coalesce: false,
+    });
   });
 });
 

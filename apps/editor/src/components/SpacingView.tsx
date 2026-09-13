@@ -1,4 +1,11 @@
-import { breakOutKern, kerningFor, nudgeKern, nudgeSidebearing } from "@typewright/tools";
+import {
+  breakOutKern,
+  kerningFor,
+  nudgeKern,
+  nudgeSidebearing,
+  setGlyphAdvance,
+  setSidebearing,
+} from "@typewright/tools";
 import { CanvasSurface, type RunScene, drawRun } from "@typewright/render";
 import { sidebearings } from "@typewright/font-model";
 import {
@@ -253,6 +260,24 @@ export function SpacingView({
     store.applyTool(nudgeSidebearing(store.editor, selectedName, side, delta));
   };
 
+  /**
+   * The same two measurements, typed rather than stepped.
+   *
+   * The arrows above are for feeling a fit out a unit at a time; a field is for
+   * the moment somebody already knows the number. Until now that meant leaving
+   * for the inspector and opening the letter there, which loses the line of
+   * text that showed why the spacing was wrong in the first place.
+   */
+  const commitBearing = (side: "left" | "right", value: number): void => {
+    if (selectedName === null) return;
+    store.applyTool(setSidebearing(store.editor, selectedName, side, value));
+  };
+
+  const commitAdvance = (value: number): void => {
+    if (selectedName === null) return;
+    store.applyTool(setGlyphAdvance(store.editor, selectedName, value));
+  };
+
   // In kern mode the selection means the gap *before* the selected letter, so
   // the pair is it and the one preceding it.
   const previousName =
@@ -472,10 +497,30 @@ export function SpacingView({
               <span className={styles.hint}>no outline, so no sidebearings</span>
             ) : (
               <>
-                <Value label="Left" value={bearings.left} />
-                <Value label="Right" value={bearings.right} />
-                <Value label="Advance" value={document.glyphs[selectedName]?.advance ?? 0} />
+                <NumberField
+                  label="Left"
+                  value={bearings.left}
+                  takenFrom={selectedGlyph?.metricKeys.left ?? ""}
+                  onCommit={(next) => commitBearing("left", next)}
+                />
+                <NumberField
+                  label="Right"
+                  value={bearings.right}
+                  takenFrom={selectedGlyph?.metricKeys.right ?? ""}
+                  onCommit={(next) => commitBearing("right", next)}
+                />
               </>
+            )}
+            {/* Outside that branch, because the advance is the one measurement a
+                glyph with no outline still has: a space is spaced by this number
+                and by nothing else, and this is the workspace for spacing it. */}
+            {selectedGlyph === undefined ? null : (
+              <NumberField
+                label="Advance"
+                value={selectedGlyph.advance}
+                takenFrom={selectedGlyph.metricKeys.width}
+                onCommit={commitAdvance}
+              />
             )}
             {bands.length > 1 ? (
               <span className={styles.hint}>{bands.length} occurrences, all moving together</span>
@@ -493,5 +538,46 @@ function Value({ label, value }: { label: string; value: number }): React.JSX.El
       <span className={styles.valueLabel}>{label}</span>
       {Math.round(value)}
     </span>
+  );
+}
+
+/**
+ * One of a glyph's three measurements, typed.
+ *
+ * A `<label>` around exactly one control, so the words beside the box are its
+ * name rather than a caption near it — a row wrapped around several controls
+ * gives its name to the first of them, which is how the inspector once
+ * announced a button as three of its neighbours at once.
+ *
+ * Disabled where a metric key supplies the number, with the key in the tooltip:
+ * the field would otherwise offer to write a value the font takes from another
+ * glyph and would overwrite.
+ */
+function NumberField({
+  label,
+  value,
+  takenFrom,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  /** The glyph this measurement comes from, or "" when it is the glyph's own. */
+  takenFrom: string;
+  onCommit: (value: number) => void;
+}): React.JSX.Element {
+  return (
+    <label className={styles.value}>
+      <span className={styles.valueLabel}>{label}</span>
+      <input
+        type="number"
+        className={styles.input}
+        value={Math.round(value)}
+        disabled={takenFrom !== ""}
+        title={takenFrom === "" ? label : `Taken from ${takenFrom}`}
+        onChange={(event) => {
+          onCommit(Number(event.target.value));
+        }}
+      />
+    </label>
   );
 }

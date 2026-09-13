@@ -108,6 +108,25 @@
   letter-spacing: 0.06em;
 }
 
+/* Sized to the widest number a sidebearing plausibly holds, so the three fields
+   keep their places as the digits change under them. */
+.input {
+  width: 4.5rem;
+  padding: 0.1rem 0.3rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.input:disabled {
+  color: var(--ink-2);
+  background: var(--surface);
+}
+
 .hint {
   color: var(--ink-3, var(--ink-2));
 }
