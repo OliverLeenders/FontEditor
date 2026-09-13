@@ -6,17 +6,20 @@ import {
   type Glyph,
   type IdFactory,
   DEFAULT_FONT_INFO,
+  derivedVerticalMetrics,
   fontDocument,
   EMPTY_KERNING,
   component,
   glyph,
   groupKey,
+  setFontInfo,
   setKern,
   setKernGroup,
   setKerning,
 } from "@typewright/font-model";
 
 import { contoursFromCommands } from "./commands.js";
+import { embeddingBits, setBits } from "./embedding.js";
 import { type SourceKernSide, type SourceKerning } from "./readkern.js";
 import { type SourceFont, type SourceGlyph, parseFont } from "./source.js";
 
@@ -83,17 +86,22 @@ function uniqueName(preferred: string, taken: Set<string>): string {
 function infoFrom(source: SourceFont): FontInfo {
   const em = source.unitsPerEm > 0 ? source.unitsPerEm : 1000;
   const usable = (value: number | null): value is number => value !== null && value > 0;
+  const typo = source.os2;
   // The identity fields keep their defaults: this reader is given outlines and
-  // metrics by the parser and does not go looking in `name` and `OS/2` for the
-  // rest. A binary opened here is a font to draw from, not a source to save
-  // back over, so what is not read is not at risk of being written away.
+  // metrics by the parser and does not go looking in `name` for the rest. A
+  // binary opened here is a font to draw from, not a source to save back over,
+  // so what is not read is not at risk of being written away.
   return {
     ...DEFAULT_FONT_INFO,
     familyName: source.familyName ?? "Untitled",
     styleName: source.styleName ?? "Regular",
     unitsPerEm: em,
-    ascender: source.ascender,
-    descender: source.descender,
+    // The typographic pair where the font has one, because that is what the
+    // exporter writes from these two; `hhea`'s, where it differs, is an
+    // override of its own and is read as one below.
+    ascender: typo !== undefined && typo.typoAscender !== 0 ? typo.typoAscender : source.ascender,
+    descender:
+      typo !== undefined && typo.typoDescender !== 0 ? typo.typoDescender : source.descender,
     xHeight: usable(source.xHeight) ? source.xHeight : em * 0.5,
     capHeight: usable(source.capHeight) ? source.capHeight : em * 0.7,
   };
@@ -158,10 +166,47 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
     warnings.push({ glyph: null, message: "This font contains no glyphs." });
   }
 
-  return {
-    document: setKerning(fontDocument(glyphs, info), kerningFrom(source.kerning, names)),
-    warnings,
-  };
+  const document = setKerning(fontDocument(glyphs, info), kerningFrom(source.kerning, names));
+  return { document: withLineMetrics(document, source), warnings };
+}
+
+/**
+ * The line metrics and the embedding flag the file carries, as Font Info's
+ * overrides.
+ *
+ * Each is kept only where it differs from what the exporter would derive from
+ * this very document, because an override equal to the derived number says
+ * nothing — and a font that set none would otherwise open with every field in
+ * Line spacing filled in, as though somebody had decided each of them. Compared
+ * after the glyphs are in, since the Windows box is derived from how far they
+ * reach.
+ */
+function withLineMetrics(document: FontDocument, source: SourceFont): FontDocument {
+  const { hhea, os2 } = source;
+  if (hhea === undefined && os2 === undefined) return document;
+
+  const derived = derivedVerticalMetrics(document);
+  const unlike = (value: number | undefined, from: number): number | null =>
+    value === undefined || Math.round(value) === from ? null : Math.round(value);
+
+  // Bits 7 to 9 of `fsSelection` are the ones a font sets for itself; the rest
+  // are the style map's, which the exporter works out from the style.
+  const selection =
+    os2 === undefined ? [] : setBits(os2.fsSelection).filter((bit) => bit >= 7 && bit <= 9);
+
+  return setFontInfo(document, {
+    ...document.info,
+    openTypeHheaAscender: unlike(hhea?.ascender, derived.hheaAscender),
+    openTypeHheaDescender: unlike(hhea?.descender, derived.hheaDescender),
+    openTypeHheaLineGap: unlike(hhea?.lineGap, derived.hheaLineGap),
+    openTypeOS2TypoAscender: unlike(os2?.typoAscender, derived.typoAscender),
+    openTypeOS2TypoDescender: unlike(os2?.typoDescender, derived.typoDescender),
+    openTypeOS2TypoLineGap: unlike(os2?.typoLineGap, derived.typoLineGap),
+    openTypeOS2WinAscent: unlike(os2?.winAscent, derived.winAscent),
+    openTypeOS2WinDescent: unlike(os2?.winDescent, derived.winDescent),
+    openTypeOS2Selection: selection,
+    openTypeOS2Type: os2 === undefined ? [] : embeddingBits(setBits(os2.fsType)),
+  });
 }
 
 /**

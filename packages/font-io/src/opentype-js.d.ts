@@ -83,7 +83,22 @@ declare module "opentype.js" {
     names: OtNames;
     readonly outlinesFormat: string;
     readonly tables: {
-      readonly os2?: { readonly sxHeight?: number; readonly sCapHeight?: number };
+      readonly os2?: {
+        readonly sxHeight?: number;
+        readonly sCapHeight?: number;
+        readonly fsType?: number;
+        readonly fsSelection?: number;
+        readonly sTypoAscender?: number;
+        readonly sTypoDescender?: number;
+        readonly sTypoLineGap?: number;
+        readonly usWinAscent?: number;
+        readonly usWinDescent?: number;
+      };
+      readonly hhea?: {
+        readonly ascender: number;
+        readonly descender: number;
+        readonly lineGap: number;
+      };
       /** Parsed GPOS, typed as loosely and for the same reason as GSUB below. */
       readonly gpos?: {
         readonly features: readonly { readonly tag: string }[];

@@ -37,14 +37,38 @@ export type SourceGlyph = {
   readonly components: readonly SourceComponent[];
 };
 
+/** The three numbers `hhea` says a line is made of. */
+export type SourceHhea = {
+  readonly ascender: number;
+  readonly descender: number;
+  readonly lineGap: number;
+};
+
+/** What `OS/2` says about lines and embedding, as the file has it. */
+export type SourceOs2 = {
+  readonly typoAscender: number;
+  readonly typoDescender: number;
+  readonly typoLineGap: number;
+  /** A distance above the baseline, as the format stores it. */
+  readonly winAscent: number;
+  /** A distance below the baseline, positive, as the format stores it. */
+  readonly winDescent: number;
+  readonly fsSelection: number;
+  readonly fsType: number;
+};
+
 export type SourceFont = {
   readonly familyName: string | null;
   readonly styleName: string | null;
   readonly unitsPerEm: number;
+  /** `hhea`'s, which is what the parser offers first. */
   readonly ascender: number;
   readonly descender: number;
   readonly xHeight: number | null;
   readonly capHeight: number | null;
+  /** Absent where the file has no such table, which a font may leave out. */
+  readonly hhea?: SourceHhea;
+  readonly os2?: SourceOs2;
   /** `truetype` or `cff` — recorded for diagnostics, not acted on. */
   readonly outlines: string;
   readonly glyphs: readonly SourceGlyph[];
@@ -179,6 +203,7 @@ export function parseFont(bytes: ArrayBuffer): SourceFont {
   }
 
   const os2 = font.tables.os2;
+  const hhea = font.tables.hhea;
   return {
     familyName: readName(font.names, "fontFamily"),
     styleName: readName(font.names, "fontSubfamily"),
@@ -187,6 +212,22 @@ export function parseFont(bytes: ArrayBuffer): SourceFont {
     descender: font.descender,
     xHeight: os2?.sxHeight ?? null,
     capHeight: os2?.sCapHeight ?? null,
+    ...(hhea === undefined
+      ? {}
+      : { hhea: { ascender: hhea.ascender, descender: hhea.descender, lineGap: hhea.lineGap } }),
+    ...(os2 === undefined
+      ? {}
+      : {
+          os2: {
+            typoAscender: os2.sTypoAscender ?? 0,
+            typoDescender: os2.sTypoDescender ?? 0,
+            typoLineGap: os2.sTypoLineGap ?? 0,
+            winAscent: os2.usWinAscent ?? 0,
+            winDescent: os2.usWinDescent ?? 0,
+            fsSelection: os2.fsSelection ?? 0,
+            fsType: os2.fsType ?? 0,
+          },
+        }),
     outlines: font.outlinesFormat,
     glyphs: readGlyphs(font),
     kerning: readKerning(font),
