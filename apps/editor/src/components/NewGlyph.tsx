@@ -1,11 +1,11 @@
 import { codePointsOfSet, glyphSet } from "@typewright/catalog";
-import { glyphNameForCodePoint } from "@typewright/font-model";
-import { type NewGlyph as GlyphSpec, createGlyphs } from "@typewright/tools";
-import { useState } from "react";
+import { compositePlan, glyphNameForCodePoint, randomIds } from "@typewright/font-model";
+import { type NewGlyph as GlyphSpec, buildComposites, createGlyphs } from "@typewright/tools";
+import { useMemo, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./OpenFont.module.css";
-import { SquarePlusIcon } from "./icons.js";
+import { CopyPlusIcon, SquarePlusIcon } from "./icons.js";
 
 /**
  * What someone typed, read as either a name or a character.
@@ -83,6 +83,13 @@ export function NewGlyph(): React.JSX.Element {
     );
   };
 
+  // The accented characters of the set the font could build from what it has.
+  // Remembered against the document, since answering walks the whole set.
+  const plan = useMemo(() => {
+    const wanted = codePointsOfSet(query.set);
+    return wanted === null ? null : compositePlan(document, wanted);
+  }, [query.set, document]);
+
   const setLabel = glyphSet(query.set)?.label ?? query.set;
 
   return (
@@ -111,6 +118,39 @@ export function NewGlyph(): React.JSX.Element {
           Add {missing.length} missing
         </button>
       ) : null}
+      {/* Shown, disabled, when every accent is stuck for want of an anchor:
+          letters and marks drawn and nothing appearing would look like the
+          feature was not there, when it is one anchor away. */}
+      {plan !== null && (plan.buildable.length > 0 || plan.problems.length > 0) && !reading ? (
+        <button
+          type="button"
+          className={styles.button}
+          title={buildTitle(plan, setLabel)}
+          disabled={plan.buildable.length === 0}
+          onClick={() =>
+            store.applyTool(
+              buildComposites(
+                store.editor,
+                plan.buildable.map((build) => build.codePoint),
+                randomIds(),
+              ),
+            )
+          }
+        >
+          <CopyPlusIcon />
+          Build {plan.buildable.length} accented
+        </button>
+      ) : null}
     </>
   );
+}
+
+/** What building the accents would do, and what is keeping the rest back. */
+function buildTitle(plan: ReturnType<typeof compositePlan>, setLabel: string): string {
+  const stuck =
+    plan.problems.length === 0
+      ? ""
+      : ` ${String(plan.problems.length)} more have an accent with nothing to land on: give the letter a top or bottom anchor, and the accent a _top or _bottom one.`;
+  if (plan.buildable.length === 0) return stuck.trim();
+  return `Build the ${String(plan.buildable.length)} accented glyphs of ${setLabel} from their letters and marks.${stuck}`;
 }

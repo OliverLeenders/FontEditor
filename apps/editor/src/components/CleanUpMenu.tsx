@@ -1,11 +1,16 @@
-import { roundCoordinates, unroundedCount } from "@typewright/tools";
+import {
+  detachedComposites,
+  reattachComposites,
+  roundCoordinates,
+  unroundedCount,
+} from "@typewright/tools";
 import { useEffect, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import type { Item } from "./MenuItems.js";
 import styles from "./OpenFont.module.css";
-import { GridIcon, MopIcon } from "./icons.js";
+import { AnchorIcon, GridIcon, MopIcon } from "./icons.js";
 
 /** How long the result of the last tidy stays on screen. */
 const NOTE_MS = 4000;
@@ -13,7 +18,7 @@ const NOTE_MS = 4000;
 /**
  * The edits that are done to the whole font at once.
  *
- * One so far, and a menu for one thing looks like an odd shape — but this is
+ * Two so far, which is a short menu — but this is
  * where "remove every overlap" and "delete the glyphs nothing refers to" go,
  * and each of them is the same kind of thing: a sweep over the font that is one
  * undo step and that nobody does while drawing. As a loose button in the bar,
@@ -54,6 +59,24 @@ export function CleanUpMenu(): React.JSX.Element {
         }
         store.applyTool(roundCoordinates(store.editor));
         setNote(count === 1 ? "Rounded 1 glyph." : `Rounded ${String(count)} glyphs.`);
+      },
+    },
+    {
+      // For after a letter's anchor has moved: composites keep their accents
+      // where they were put until asked, so a hand-nudged accent is never
+      // overwritten by somebody dragging an anchor on a different glyph.
+      kind: "item",
+      label: "Re-attach accents",
+      icon: AnchorIcon,
+      disabled: reading,
+      run: () => {
+        const count = detachedComposites(store.editor).length;
+        if (count === 0) {
+          setNote("Every accent was already on its anchors.");
+          return;
+        }
+        store.applyTool(reattachComposites(store.editor));
+        setNote(count === 1 ? "Re-attached 1 glyph." : `Re-attached ${String(count)} glyphs.`);
       },
     },
   ];

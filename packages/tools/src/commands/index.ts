@@ -18,6 +18,8 @@
  * names a file below it.
  */
 
+export { buildComposites, detachedComposites, reattachComposites } from "./composites.js";
+
 export {
   addComponent,
   attachComponent,

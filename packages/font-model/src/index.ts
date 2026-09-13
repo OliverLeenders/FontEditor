@@ -302,3 +302,6 @@ export {
   derivedVerticalMetrics,
   verticalMetrics,
 } from "./vertical-metrics.js";
+
+export type { CompositeBuild, CompositeProblem, GlyphLookup } from "./composites.js";
+export { attachComponents, buildComposite, compositePlan, compositeParts } from "./composites.js";
