@@ -31,6 +31,8 @@ export function exportTrueType(document: FontDocument): ExportResult {
   bytes = withTable(bytes, "loca", loca);
   bytes = withTable(bytes, "maxp", maxp(glyphs.length, maxPoints, maxContours));
   bytes = withTable(bytes, "head", headWith(bytes, longLoca));
+  bytes = withTable(bytes, "gasp", GASP);
+  bytes = withTable(bytes, "prep", PREP);
   // Last: a font may not have both, and the one being replaced is the one every
   // reader would otherwise prefer.
   bytes = withTable(bytes, "CFF ", new Uint8Array());
@@ -45,12 +47,49 @@ export function exportTrueType(document: FontDocument): ExportResult {
 }
 
 /**
+ * How Windows should draw a font with no hinting: smoothed, at every size.
+ *
+ * Left to itself, Windows decides per size whether to smooth a TrueType font,
+ * and at some sizes and settings an unhinted one comes out in hard black pixels
+ * — which, with nothing snapping its stems to the grid, is as ragged as text
+ * gets. One range, up to the largest size there is, with every flag set: what
+ * Google Fonts' own fixer writes for an unhinted font and what its checks ask
+ * for. Grid-fitting is among the flags and does nothing here, there being no
+ * instructions to fit by; it is the right value if the font is ever hinted.
+ */
+const GASP = new Bytes()
+  .u16(1) // version 1, which has the two symmetric (ClearType) flags
+  .u16(1) // one range
+  .u16(0xffff) // up to every size
+  .u16(0x000f) // grid-fit, grayscale, symmetric grid-fit, symmetric smoothing
+  .done();
+
+/**
+ * The control program, turning dropout control on and nothing else.
+ *
+ * A stroke thinner than a pixel can fall between pixel centres and not be drawn
+ * at all; dropout control fills it in. A hinted font turns it on in its own
+ * instructions, and an unhinted one has none, so this is the whole program:
+ * `SCANCTRL` 511 — on at every size, rotated or stretched — and `SCANTYPE` 4,
+ * the mode that avoids stubs. It is the program Google Fonts adds to an unhinted
+ * font alongside the `gasp` above.
+ */
+const PREP = new Uint8Array([
+  ...[0xb8, 0x01, 0xff], // PUSHW[] 511
+  ...[0x85], // SCANCTRL[]
+  ...[0xb0, 0x04], // PUSHB[] 4
+  ...[0x8d], // SCANTYPE[]
+]);
+
+/**
  * `maxp` version 1.0, which is the one a TrueType font has.
  *
  * A CFF font's is version 0.5 and says only how many glyphs there are; this one
  * tells a rasteriser how much room to set aside before it starts. The hinting
- * fields are all zero because nothing here writes any instructions — the
- * outlines are unhinted, which is what a font from this editor has always been.
+ * fields are zero because nothing here writes any glyph instructions — the
+ * outlines are unhinted, which is what a font from this editor has always been —
+ * except the stack, which the control program above pushes one value onto at a
+ * time.
  */
 function maxp(glyphs: number, maxPoints: number, maxContours: number): Uint8Array {
   return new Bytes()
@@ -65,7 +104,7 @@ function maxp(glyphs: number, maxPoints: number, maxContours: number): Uint8Arra
     .u16(0) // storage
     .u16(0) // function definitions
     .u16(0) // instruction definitions
-    .u16(0) // stack elements
+    .u16(1) // stack elements: the control program's one value at a time
     .u16(0) // the longest instruction sequence, of which there are none
     .u16(0) // component elements
     .u16(0) // component depth
