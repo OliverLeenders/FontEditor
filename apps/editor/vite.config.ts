@@ -1,8 +1,36 @@
+import { readFileSync } from "node:fs";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
+
+/**
+ * The licence and the third-party notices, beside `index.html` in the build.
+ *
+ * The bundle drops the comments a library's copyright notice lived in, so the
+ * notices file is where those licences' conditions are met — for anyone the
+ * editor is served to, and in the desktop app, which embeds this directory.
+ */
+function legalFiles(): Plugin {
+  const files = {
+    "LICENSE.txt": "../../LICENSE",
+    "THIRD_PARTY_NOTICES.txt": "../../THIRD_PARTY_NOTICES.txt",
+  };
+  return {
+    name: "typewright:legal-files",
+    apply: "build",
+    generateBundle() {
+      for (const [fileName, from] of Object.entries(files)) {
+        this.emitFile({
+          type: "asset",
+          fileName,
+          source: readFileSync(new URL(from, import.meta.url)),
+        });
+      }
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), legalFiles()],
   server: {
     port: 5174,
     // Fail rather than pick another port. The desktop shell is told to load

@@ -1,0 +1,320 @@
+/**
+ * Write THIRD_PARTY_NOTICES.txt: every piece of somebody else's work that the
+ * web build or the desktop app contains, with the notice and licence text its
+ * licence asks to travel with it.
+ *
+ * Almost everything here is under a licence whose one condition is exactly
+ * that — keep the copyright notice and the permission notice with every copy —
+ * and a bundler that inlines a library strips the comment the notice lived in.
+ * So the notices are collected here instead, and the build puts this file
+ * beside the editor.
+ *
+ * Two kinds of source. The npm packages and the Rust crates are read from what
+ * is installed, through `pnpm licenses list` and `cargo metadata`, so a
+ * dependency added or upgraded shows up without anyone remembering it. What no
+ * package manifest records — icons copied into the source, a program fetched
+ * for the desktop build, code compiled into somebody's WebAssembly — is
+ * written below by hand, from the texts in `texts/`.
+ *
+ *   node tools/notices/generate-notices.mjs           write the file
+ *   node tools/notices/generate-notices.mjs --check   fail if it is out of date
+ *
+ * The Rust crates are every crate in the lock file, for every platform, which
+ * includes some that only run while the app is being compiled. Listing a crate
+ * that is not shipped costs a few lines; missing one that is costs a licence.
+ */
+
+import { execSync } from "node:child_process";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, "..", "..");
+const output = join(root, "THIRD_PARTY_NOTICES.txt");
+const check = process.argv.includes("--check");
+
+const WIDTH = 78;
+const heavy = "=".repeat(WIDTH);
+const light = "-".repeat(WIDTH);
+
+/** Line endings, a byte-order mark and trailing spaces are how two copies of one text differ. */
+function tidy(text) {
+  return text
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trimEnd())
+    .join("\n")
+    .replace(/^\n+|\n+$/g, "");
+}
+
+function bundled(name) {
+  return tidy(readFileSync(join(here, "texts", name), "utf8"));
+}
+
+/**
+ * A licence's standard text, for a package that names its licence and ships no
+ * file of it. The template's own copyright line is dropped: it holds
+ * placeholders, and the package's real holders are given beside it.
+ */
+function standard(id) {
+  return bundled(`${id}.txt`)
+    .split("\n")
+    .filter((line) => !/^Copyright.*<(year|owner|copyright holders)>/.test(line))
+    .join("\n")
+    .replace(/^\n+/, "");
+}
+
+const STANDARD = ["MIT", "Apache-2.0", "Zlib", "ISC", "BSD-3-Clause", "Unicode-3.0", "MPL-2.0"];
+
+/**
+ * The standard texts that satisfy an SPDX expression: one of each `OR`, all of
+ * each `AND`. `MIT/Apache-2.0` is the older spelling of an `OR`.
+ */
+function standardTexts(expression) {
+  return expression
+    .replace(/[()]/g, "")
+    .split(/\s+AND\s+/)
+    .map((group) => {
+      const options = group.split(/\s+OR\s+|\s*\/\s*/).map((id) => id.replace(/\s+WITH\s+.*$/, ""));
+      const id = STANDARD.find((known) => options.includes(known));
+      if (id === undefined) throw new Error(`no standard text for any of: ${group}`);
+      return id;
+    });
+}
+
+const LICENCE_FILE = /^(licen[cs]e|copying|copyright|notice|unlicense)([-._].*)?$/i;
+const SOURCE_FILE = /\.(rs|js|mjs|cjs|ts|json|toml|py|c|h|html)$/i;
+
+/** The licence files a package ships in its top directory, read. */
+function licenceFiles(directory, extra) {
+  const names = readdirSync(directory).filter(
+    (name) =>
+      LICENCE_FILE.test(name) &&
+      !SOURCE_FILE.test(name) &&
+      statSync(join(directory, name)).isFile(),
+  );
+  if (extra && !names.includes(extra)) names.push(extra);
+  return names.sort().map((name) => tidy(readFileSync(join(directory, name), "utf8")));
+}
+
+function heading(title) {
+  return [heavy, title, heavy, ""].join("\n");
+}
+
+function entry(title, ...paragraphs) {
+  return [light, title, light, "", paragraphs.filter((p) => p !== "").join("\n\n"), ""].join("\n");
+}
+
+function run(command) {
+  return execSync(command, { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+}
+
+// --- Copied into the source ---------------------------------------------------
+
+const copied = [
+  heading("Copied into Typewright's source"),
+  entry(
+    "Lucide icons",
+    "The icons in apps/editor/src/components/icons are Lucide's path data, copied\n" +
+      "from the lucide-static package. Some Lucide icons derive from Feather.",
+    "https://lucide.dev",
+    bundled("lucide.txt"),
+  ),
+  entry(
+    "Tunni lines",
+    "The Tunni lines concept was devised by Eduardo Tunni and Fontlab Ltd., and is\n" +
+      "used in the FontLab font editor.",
+    "The maths in packages/geometry/src/tunni.ts was ported from Tunni-Lines, a\n" +
+      "prototype by Typewright's author, published with FontLab Ltd.'s permission on\n" +
+      "the condition that Eduardo Tunni and FontLab are credited. As an additional\n" +
+      "term under section 7(b) of the GNU GPL version 3, any redistribution of the\n" +
+      "Tunni-line feature, including the Tunni point, must keep the sentence above,\n" +
+      "word for word.",
+    "https://github.com/OliverLeenders/Tunni-Lines",
+  ),
+];
+
+// --- npm packages -------------------------------------------------------------
+
+/**
+ * What an npm package contains beyond its own code. Both of these are
+ * WebAssembly compiled from C and C++ projects with licences of their own.
+ */
+const EMBEDDED = {
+  harfbuzzjs: [
+    "Its WebAssembly is HarfBuzz, compiled with Emscripten. The Emscripten runtime\n" +
+      "and the parts of musl libc compiled in with it are under the licences given\n" +
+      "for woff2-encoder, below.",
+    "HarfBuzz: https://harfbuzz.github.io",
+    bundled("harfbuzz.txt"),
+  ],
+  "woff2-encoder": [
+    "Its WebAssembly is Google's WOFF2 and Brotli, compiled with Emscripten.",
+    bundled("woff2-encoder-third-party.txt"),
+  ],
+};
+
+const npm = Object.values(JSON.parse(run("pnpm licenses list --prod --json")))
+  .flat()
+  .sort((a, b) => a.name.localeCompare(b.name));
+
+for (const name of Object.keys(EMBEDDED)) {
+  if (!npm.some((p) => p.name === name)) {
+    throw new Error(`${name} is no longer a dependency; take it out of EMBEDDED`);
+  }
+}
+
+const packages = [
+  heading("In the web application and the desktop application"),
+  ...npm.flatMap((p) =>
+    p.versions.map((version, i) => {
+      const files = licenceFiles(p.paths[i]);
+      const texts =
+        files.length > 0
+          ? files
+          : [
+              `Copyright: ${p.author ?? p.name + " authors"}`,
+              ...standardTexts(p.license).map(standard),
+            ];
+      return entry(
+        `${p.name} ${version}`,
+        [`Licence: ${p.license}`, p.homepage].filter(Boolean).join("\n"),
+        ...texts,
+        ...(EMBEDDED[p.name] ?? []),
+      );
+    }),
+  ),
+];
+
+// --- The desktop application --------------------------------------------------
+
+const metadata = JSON.parse(
+  run(
+    "cargo metadata --format-version 1 --locked --manifest-path apps/editor/src-tauri/Cargo.toml",
+  ),
+);
+const crates = metadata.packages
+  .filter((p) => p.source !== null)
+  .sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version));
+
+if (!crates.some((p) => p.name === "webview2-com-sys")) {
+  throw new Error("webview2-com-sys is no longer a dependency; take the WebView2 loader out");
+}
+
+const desktop = [
+  heading("In the desktop application only"),
+  entry(
+    "ttfautohint",
+    "The desktop application runs ttfautohint 1.8.4 by Werner Lemberg for its\n" +
+      "hinted TrueType export, and installs it beside itself. It is taken from the\n" +
+      "ttfautohint-py 0.6.1 wheels published by the fontTools project, built\n" +
+      "statically with FreeType and with HarfBuzz, whose licence is given for\n" +
+      "harfbuzzjs, above. ttfautohint is available under the FreeType License or\n" +
+      "the GNU General Public License version 2; it is distributed here under the\n" +
+      "FreeType License.",
+    "Portions of this software are copyright (c) 2011-2022 The FreeType Project\n" +
+      "(www.freetype.org). All rights reserved.",
+    "https://freetype.org/ttfautohint/",
+    bundled("FTL.txt"),
+  ),
+  entry(
+    "Microsoft WebView2 loader",
+    "On Windows, the desktop application includes the WebView2 loader from\n" +
+      "Microsoft's WebView2 SDK, through the webview2-com-sys crate.",
+    "https://www.nuget.org/packages/Microsoft.Web.WebView2",
+    bundled("webview2-sdk.txt"),
+  ),
+  entry(
+    "The Rust standard library",
+    "Compiled into the desktop application. Copyright (c) The Rust Project\n" +
+      "Contributors. Available under the MIT License or the Apache License 2.0;\n" +
+      "used here under the MIT License.",
+    "https://www.rust-lang.org",
+    standard("MIT"),
+  ),
+];
+
+/** One copy of each distinct licence text, however many crates share it. */
+const texts = new Map();
+function textNumber(text) {
+  const key = text.replace(/\s+/g, " ");
+  if (!texts.has(key)) texts.set(key, { number: texts.size + 1, text, users: [] });
+  return texts.get(key);
+}
+
+const crateEntries = crates.map((p) => {
+  const directory = dirname(p.manifest_path);
+  const files = licenceFiles(directory, p.license_file ?? undefined);
+  const lines = [
+    `${p.name} ${p.version}`,
+    `  Licence: ${p.license ?? "see its licence file"}`,
+    `  Source: https://crates.io/crates/${p.name}/${p.version}`,
+  ];
+  let found;
+  if (files.length > 0) {
+    found = files.map(textNumber);
+  } else {
+    if (p.license === null)
+      throw new Error(`${p.name} ${p.version} names no licence and ships none`);
+    if (p.authors.length > 0) lines.push(`  Copyright: ${p.authors.join(", ")}`);
+    found = standardTexts(p.license).map((id) => textNumber(standard(id)));
+  }
+  for (const t of found) t.users.push(`${p.name} ${p.version}`);
+  lines.push(`  Licence text: ${found.map((t) => `[${t.number}]`).join(", ")}`);
+  return lines.join("\n");
+});
+
+desktop.push(
+  entry(
+    "Rust crates",
+    "The desktop application is compiled from these crates. The list is every crate\n" +
+      "in its lock file, for every platform it can be built for, so it includes some\n" +
+      "that run only while it is being compiled. Each crate's licence texts are\n" +
+      "numbered, and given after the list.",
+    crateEntries.join("\n\n"),
+  ),
+  heading("Licence texts of the Rust crates"),
+  ...[...texts.values()].map((t) =>
+    entry(`[${t.number}]`, `Used by: ${t.users.join(", ")}`, t.text),
+  ),
+);
+
+// --- Writing it ---------------------------------------------------------------
+
+const notices = `${[
+  "Third-party notices for Typewright",
+  "",
+  "Typewright is free software, under the GNU General Public License version 3 or,",
+  "at your option, any later version; its text is in LICENSE. Typewright contains",
+  "or is built from the work of others, listed here with the copyright notices and",
+  "licence texts their licences ask to be kept with every copy.",
+  "",
+  "This file is written by tools/notices/generate-notices.mjs. Change that, not this.",
+  "",
+  ...copied,
+  ...packages,
+  ...desktop,
+].join("\n")}\n`.replace(/\n{3,}/g, "\n\n");
+
+if (check) {
+  let current = "";
+  try {
+    current = readFileSync(output, "utf8");
+  } catch {
+    // Missing counts as out of date.
+  }
+  if (tidy(current) !== tidy(notices)) {
+    console.error(
+      "THIRD_PARTY_NOTICES.txt is out of date. Run: node tools/notices/generate-notices.mjs",
+    );
+    process.exit(1);
+  }
+  console.log("THIRD_PARTY_NOTICES.txt is up to date.");
+} else {
+  writeFileSync(output, notices);
+  console.log(
+    `Wrote THIRD_PARTY_NOTICES.txt: ${npm.length} npm packages, ${crates.length} Rust crates, ${texts.size} distinct crate licence texts.`,
+  );
+}

@@ -117,9 +117,10 @@ export default tseslint.config(
   },
 
   {
-    // Scripts run by Node for the build, such as fetching ttfautohint: plain
-    // JavaScript like the config, and with Node's globals rather than a page's.
-    files: ["**/scripts/**/*.mjs"],
+    // Scripts run by Node for the build, such as fetching ttfautohint or writing
+    // the third-party notices: plain JavaScript like the config, and with Node's
+    // globals rather than a page's.
+    files: ["**/scripts/**/*.mjs", "tools/**/*.mjs"],
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: {
       globals: {

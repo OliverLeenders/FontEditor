@@ -120,6 +120,12 @@ jobs:
       - name: Check the desktop shell compiles
         run: cargo check --manifest-path apps/editor/src-tauri/Cargo.toml
 
+      # Both builds ship THIRD_PARTY_NOTICES.txt, written from what pnpm and cargo
+      # have installed. A dependency added or upgraded without writing it again
+      # would ship without its notice, so that fails here instead.
+      - name: Check the third-party notices are up to date
+        run: node tools/notices/generate-notices.mjs --check
+
   # A UFO that only this repository has ever read proves consistency, not
   # correctness: a misreading of the format shared by our writer and our reader
   # passes every test in the suite. fontTools is the reference implementation
