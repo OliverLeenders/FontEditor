@@ -374,8 +374,9 @@ that will actually draw them.
   is caught before a Windows preview finds the notch.
 - **Hinting.** The TrueType flavour carries no hinting instructions. That is a defensible
   default — most text is drawn unhinted now — but Windows at small sizes is not most text.
-  A `gasp` table saying how to draw it at least; autohinting means ttfautohint, a C
-  program, and another dependency decision.
+  **The `gasp` table — done:** it says to smooth every size, and a `prep` program turns
+  dropout control on, which is what Google Fonts adds to an unhinted font. Autohinting
+  means ttfautohint, a C program, and another dependency decision.
 
 #### Phase 18 — Keeping it maintainable
 
