@@ -34,10 +34,13 @@ import numpy as np
 # large share of a glyph a dozen pixels tall.
 SIZES = {16: 0.12, 48: 0.05, 256: 0.02}
 
-# Samples per pixel along each side, for the drawing's coverage. FreeType
-# measures the area under each pixel exactly; sixty-four samples measure it to
-# within a sixty-fourth, which is well inside every tolerance above.
-SAMPLES = 8
+# Rows of samples per pixel, for the drawing's coverage. Along each row the
+# coverage is measured exactly — the filled lengths are added into the pixels
+# they cross — so the only approximation is vertical, and it is a thirty-second
+# of a pixel at a horizontal edge. Sampling across as well was not good enough:
+# an eight-unit hairline is a third of a pixel wide at 48 pixels, and eight
+# samples a pixel put its ink in the wrong column by a third of its own width.
+ROWS = 16
 
 # Steps per curve when the drawing is flattened: a chord error far below a
 # sampled pixel at the largest size.
@@ -88,38 +91,53 @@ def contains(polygon, points):
     return ((crosses & (at > px)).sum(axis=1) % 2) == 1
 
 
-def inside(polygon, xs, ys):
-    """Every sample inside one polygon, a row of samples at a time."""
+def spans(polygon, y):
+    """Where a horizontal line at `y` is inside one polygon: (starts, ends)."""
     x0, y0, x1, y1 = edges(polygon)
-    grid = np.zeros((len(ys), len(xs)), dtype=bool)
-    for row, y in enumerate(ys):
-        crosses = (y0 <= y) != (y1 <= y)
-        if not crosses.any():
-            continue
-        at = x0[crosses] + (y - y0[crosses]) * (x1[crosses] - x0[crosses]) / (
-            y1[crosses] - y0[crosses]
-        )
-        at.sort()
-        grid[row] = (np.searchsorted(at, xs) % 2) == 1
-    return grid
+    crosses = (y0 <= y) != (y1 <= y)
+    if not crosses.any():
+        return np.empty(0), np.empty(0)
+    at = x0[crosses] + (y - y0[crosses]) * (x1[crosses] - x0[crosses]) / (y1[crosses] - y0[crosses])
+    at.sort()
+    return at[0::2], at[1::2]
 
 
 def drawn(polygons, left, top, width, height):
     """The drawing's coverage of each pixel, 0 to 1, rows from the top."""
-    step = 1 / SAMPLES
-    xs = left + (np.arange(width * SAMPLES) + 0.5) * step
-    ys = top - (np.arange(height * SAMPLES) + 0.5) * step
-
-    winding = np.zeros((len(ys), len(xs)), dtype=int)
+    senses = []
     for i, polygon in enumerate(polygons):
         depth = sum(
             1 for j, other in enumerate(polygons) if j != i and contains(other, polygon).all()
         )
-        sense = 1 if depth % 2 == 0 else -1
-        winding += sense * inside(polygon, xs, ys)
+        senses.append(1 if depth % 2 == 0 else -1)
 
-    filled = (winding > 0).astype(float)
-    return filled.reshape(height, SAMPLES, width, SAMPLES).mean(axis=(1, 3))
+    columns = left + np.arange(width + 1, dtype=float)
+    coverage = np.zeros((height, width))
+
+    for row in range(height):
+        for sample in range(ROWS):
+            y = top - row - (sample + 0.5) / ROWS
+            # Every place the winding changes along the line, and by how much.
+            xs, steps = [], []
+            for polygon, sense in zip(polygons, senses):
+                starts, ends = spans(polygon, y)
+                xs += [starts, ends]
+                steps += [np.full(len(starts), sense), np.full(len(ends), -sense)]
+            if not xs:
+                continue
+            at = np.concatenate(xs)
+            if len(at) == 0:
+                continue
+            order = np.argsort(at, kind="stable")
+            at = at[order]
+            winding = np.cumsum(np.concatenate(steps)[order])
+            # Filled length up to each change, then read off at every column
+            # boundary: the difference is what lies inside each pixel.
+            filled = np.concatenate([[0.0], np.cumsum(np.diff(at) * (winding[:-1] > 0))])
+            under = np.interp(columns, at, filled, left=0.0, right=filled[-1])
+            coverage[row] += np.diff(under)
+
+    return coverage / ROWS
 
 
 def rendered(face, code_point, size):
