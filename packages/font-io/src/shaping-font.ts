@@ -1,6 +1,6 @@
 import type { FontDocument } from "@typewright/font-model";
 
-import { layoutTables, withLayoutTables } from "./export.js";
+import { layoutTables, withLayoutTables, writableUnicodes } from "./export.js";
 import { withAdvances } from "./hmtx.js";
 import { opentype } from "./opentype.js";
 import type { OtGlyph } from "opentype.js";
@@ -95,7 +95,12 @@ function compiled(
   advances: readonly number[],
 ): ArrayBuffer {
   const glyphs: OtGlyph[] = glyphNames.map((name, id) => {
-    const unicodes = [...(document.glyphs[name]?.unicodes ?? []), NAMED_GLYPH_BASE + id];
+    // Code point zero only where the export would write it, or opentype.js
+    // refuses the whole font and the preview falls back without a word.
+    const unicodes = [
+      ...writableUnicodes(name, document.glyphs[name]?.unicodes ?? []),
+      NAMED_GLYPH_BASE + id,
+    ];
     return new opentype.Glyph({
       name,
       advanceWidth: Math.max(0, Math.round(advances[id] ?? 0)),

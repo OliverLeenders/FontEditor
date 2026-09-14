@@ -223,6 +223,20 @@ function notdefFirst(document: FontDocument): { names: string[]; synthesised: bo
  * nobody.
  */
 
+/**
+ * The code points a glyph can be written with.
+ *
+ * Code point zero belongs to `.null`, and opentype.js refuses to write a font
+ * in which any other glyph has it — not the glyph, the whole font. Fonts do
+ * carry such a glyph, a `NULL` or `uni0000` left by a converter, and a font that
+ * could not be exported at all over one mapping of a character nobody types is
+ * the wrong trade. So zero is left out of every other glyph's code points; the
+ * glyph, its outline and its other code points are written as they are.
+ */
+export function writableUnicodes(name: string, unicodes: readonly number[]): number[] {
+  return name === ".null" ? [...unicodes] : unicodes.filter((codePoint) => codePoint !== 0);
+}
+
 /** The style-map style as the `name` table spells it. */
 const STYLE_NAMES: Readonly<Record<StyleMapStyle, string>> = {
   regular: "Regular",
@@ -406,11 +420,18 @@ export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x"
     }
 
     // Several code points can map to one glyph, and dropping the extras would
-    // quietly unmap characters the font used to cover.
-    const first = g.unicodes[0];
+    // quietly unmap characters the font used to cover — so the only one ever
+    // left out is the one the format reserves, and it is said.
+    const unicodes = writableUnicodes(g.name, g.unicodes);
+    if (unicodes.length < g.unicodes.length) {
+      warnings.push(
+        `${g.name}: U+0000 is left out of the character map, which keeps it for a glyph named .null.`,
+      );
+    }
+    const first = unicodes[0];
     if (first !== undefined) {
       init.unicode = first;
-      init.unicodes = [...g.unicodes];
+      init.unicodes = unicodes;
     }
     glyphs.push(new opentype.Glyph(init));
   }
