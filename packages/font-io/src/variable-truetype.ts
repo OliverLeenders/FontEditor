@@ -4,6 +4,7 @@ import { orderedGlyphs } from "@typewright/font-model";
 import { type NamedInstance, fvarTable, statTable } from "./fvar.js";
 import { type Drawn, compatiblePoints, glyfTable } from "./glyf.js";
 import { type GlyphVariation, gvarTable } from "./gvar.js";
+import { withLeftSideBearings } from "./hmtx.js";
 import { withNames } from "./names.js";
 import { readTablesOf, withSfntVersion, withTable } from "./sfnt.js";
 import { exportTrueType } from "./truetype.js";
@@ -57,10 +58,13 @@ export function exportVariableTrueType(
   // A glyph whose masters could not be matched is left for `glyfTable` to
   // convert on its own, which is what a static font would have done with it.
   const defaults = points.map((it) => it?.[0]);
-  const { glyf, loca, longLoca, maxPoints, maxContours } = glyfTable(drawn[0]!, defaults);
+  const { glyf, loca, longLoca, maxPoints, maxContours, xMins } = glyfTable(drawn[0]!, defaults);
 
   bytes = withTable(bytes, "glyf", glyf);
   bytes = withTable(bytes, "loca", loca);
+  // The default master's points can differ from the static flavour's by a unit
+  // where they were converted together, so the sidebearings follow them.
+  bytes = withLeftSideBearings(bytes, xMins);
   bytes = withTable(bytes, "maxp", maxpFrom(bytes, maxPoints, maxContours));
   bytes = withTable(bytes, "head", headLoca(bytes, longLoca));
 

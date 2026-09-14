@@ -28,6 +28,13 @@ export type GlyfResult = {
   /** What `maxp` has to declare, which is the worst of every glyph. */
   readonly maxPoints: number;
   readonly maxContours: number;
+  /**
+   * Each glyph's leftmost point as written, `null` for one with no outline.
+   *
+   * What `hmtx` has to say each left sidebearing is: a TrueType rasteriser puts
+   * the outline where the sidebearing says, not where its points are.
+   */
+  readonly xMins: readonly (number | null)[];
 };
 
 /** Round to whole units, which is the only thing this format can hold. */
@@ -57,10 +64,16 @@ export function glyfTable(
   let maxPoints = 0;
   let maxContours = 0;
   let at = 0;
+  const xMins: (number | null)[] = [];
 
   for (const [index, glyph] of glyphs.entries()) {
     const drawn = precomputed?.[index] ?? pointsOf(glyph);
     const data = drawn.contours.length === 0 ? new Uint8Array() : simpleGlyph(drawn);
+    xMins.push(
+      drawn.contours.length === 0
+        ? null
+        : Math.min(...drawn.contours.flat().map((p) => whole(p.pt.x))),
+    );
 
     maxPoints = Math.max(
       maxPoints,
@@ -91,7 +104,7 @@ export function glyfTable(
     else loca.u16(offset / 2);
   }
 
-  return { glyf: glyf.done(), loca: loca.done(), longLoca, maxPoints, maxContours };
+  return { glyf: glyf.done(), loca: loca.done(), longLoca, maxPoints, maxContours, xMins };
 }
 
 /** A glyph as contours of points, each on the curve or off it. */

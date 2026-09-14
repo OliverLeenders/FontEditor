@@ -3,6 +3,7 @@ import type { FontDocument } from "@typewright/font-model";
 import { Bytes } from "./bytes.js";
 import { type ExportResult, exportFont, flattenedGlyphs } from "./export.js";
 import { glyfTable } from "./glyf.js";
+import { withLeftSideBearings } from "./hmtx.js";
 import { readTablesOf, withSfntVersion, withTable } from "./sfnt.js";
 
 /**
@@ -25,10 +26,12 @@ export function exportTrueType(document: FontDocument): ExportResult {
   let bytes: Uint8Array = new Uint8Array(base.bytes);
 
   const glyphs = flattenedGlyphs(document);
-  const { glyf, loca, longLoca, maxPoints, maxContours } = glyfTable(glyphs);
+  const { glyf, loca, longLoca, maxPoints, maxContours, xMins } = glyfTable(glyphs);
 
   bytes = withTable(bytes, "glyf", glyf);
   bytes = withTable(bytes, "loca", loca);
+  // From the points as written, which are what a rasteriser measures against.
+  bytes = withLeftSideBearings(bytes, xMins);
   bytes = withTable(bytes, "maxp", maxp(glyphs.length, maxPoints, maxContours));
   bytes = withTable(bytes, "head", headWith(bytes, longLoca));
   bytes = withTable(bytes, "gasp", GASP);

@@ -381,17 +381,29 @@ export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x"
     const g = document.glyphs[name];
     if (g === undefined) continue;
 
+    const path = pathFor(
+      g,
+      unioned(g, directed(flatten(g, document, ids)), ids, warnings),
+      warnings,
+    );
     const init: {
       name: string;
       advanceWidth: number;
       path: OtPath;
+      leftSideBearing?: number;
       unicode?: number;
       unicodes?: number[];
     } = {
       name: g.name,
       advanceWidth: Math.max(0, Math.round(g.advance)),
-      path: pathFor(g, unioned(g, directed(flatten(g, document, ids)), ids, warnings), warnings),
+      path,
     };
+    // Said, because opentype.js writes zero for a sidebearing it is not given,
+    // and zero is where nearly no outline starts. Floored, as a bound on an
+    // integer grid is: the outline starts at or right of it.
+    if (path.commands.length > 0) {
+      init.leftSideBearing = Math.floor(path.getBoundingBox().x1);
+    }
 
     // Several code points can map to one glyph, and dropping the extras would
     // quietly unmap characters the font used to cover.

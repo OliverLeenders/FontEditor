@@ -31,6 +31,8 @@ declare module "opentype.js" {
     curveTo(x1: number, y1: number, x2: number, y2: number, x: number, y: number): void;
     quadraticCurveTo(x1: number, y1: number, x: number, y: number): void;
     close(): void;
+    /** The box the drawn path fills, curve extremes included. */
+    getBoundingBox(): { x1: number; y1: number; x2: number; y2: number };
   }
 
   /** A TrueType composite reference, as the `glyf` parser produces it. */
@@ -188,6 +190,8 @@ declare module "opentype.js" {
     /** Several code points may map to one glyph. */
     unicodes?: number[];
     advanceWidth: number;
+    /** What `hmtx` says; opentype.js writes zero when it is not given. */
+    leftSideBearing?: number;
     path: OtPath;
   }
 
