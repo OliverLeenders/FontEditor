@@ -373,9 +373,12 @@ that will actually draw them.
   and loads only when text is set; until then, or if it cannot load, the in-house shaper
   sets the line. Still left to right: no bidirectional text, and no script or language
   controls yet.
-- **Rendering checked in CI.** Rasterise the exported OTF and TTF with FreeType and compare
-  what comes out with the outlines as drawn, so a font that only looks right in a browser
-  is caught before a Windows preview finds the notch.
+- **Rendering checked in CI — done.** FreeType draws both flavours of a proof font built to
+  break things — overlapping strokes, a counter drawn the wrong way round, a hairline, a
+  composite — unhinted at 16, 48 and 256 pixels, and CI fails where a glyph's pixels differ
+  from the drawing by more than a set share of its ink, or where a drawn glyph renders
+  nothing. The drawing is filled by the editor's rule written again in the check, so
+  nothing the compiler did is taken on trust. See `tools/render-check`.
 - **Hinting.** The TrueType flavour carries no hinting instructions. That is a defensible
   default — most text is drawn unhinted now — but Windows at small sizes is not most text.
   **The `gasp` table — done:** it says to smooth every size, and a `prep` program turns
