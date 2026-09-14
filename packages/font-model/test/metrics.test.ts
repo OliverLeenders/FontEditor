@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { anchor } from "../src/anchor.js";
 import { component } from "../src/component.js";
 import { contour } from "../src/contour.js";
 import { fontDocument } from "../src/document.js";
@@ -92,6 +93,19 @@ describe("the sidebearings of a composite", () => {
     const centred = centreGlyph(lopsided, document)!;
     const sb = sidebearings(centred, document)!;
     expect(sb.left).toBeCloseTo(sb.right, 10);
+  });
+});
+
+describe("anchors when the spacing changes", () => {
+  it("go with the outline when the left side is set, so accents still land centred", () => {
+    const g = { ...boxGlyph(), anchors: [anchor(ids.anchor(), "top", { x: 250, y: 700 })] };
+    const moved = setLeftSidebearing(g, 160)!;
+    expect(moved.anchors[0]?.pt).toEqual({ x: 310, y: 700 });
+  });
+
+  it("stay put when only the right side is set", () => {
+    const g = { ...boxGlyph(), anchors: [anchor(ids.anchor(), "top", { x: 250, y: 700 })] };
+    expect(setRightSidebearing(g, 40)!.anchors).toBe(g.anchors);
   });
 });
 

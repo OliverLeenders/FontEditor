@@ -1,5 +1,6 @@
 import type { Rect, Vec2 } from "@typewright/geometry";
 
+import { movedAnchor } from "./anchor.js";
 import { movedComponent } from "./component.js";
 import { type Contour } from "./contour.js";
 import type { FontDocument, FontInfo } from "./document.js";
@@ -55,11 +56,13 @@ function translateContour(c: Contour, delta: Vec2): Contour {
 }
 
 /**
- * Move every contour and component of a glyph, leaving the advance alone.
+ * Move every contour, component and anchor of a glyph, leaving the advance alone.
  *
  * Components go too, because they are part of the ink: moving a composite's
  * outline means moving the letters it places, together, so an accent stays
- * over the letter it was put on.
+ * over the letter it was put on. Anchors go because they are places on the
+ * ink: an `a` given more space on the left, with its `top` left behind, puts
+ * every accent built on it off-centre.
  */
 export function translateGlyph(g: Glyph, delta: Vec2): Glyph {
   if (delta.x === 0 && delta.y === 0) return g;
@@ -67,6 +70,7 @@ export function translateGlyph(g: Glyph, delta: Vec2): Glyph {
     ...g,
     contours: g.contours.map((c) => translateContour(c, delta)),
     components: g.components.map((c) => movedComponent(c, delta.x, delta.y)),
+    anchors: g.anchors.map((a) => movedAnchor(a, delta.x, delta.y)),
   };
 }
 
