@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Canvas drawing for the glyph editing surface. Pure draw functions plus a thin surface helper.",
+  "license": "GPL-3.0-or-later",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

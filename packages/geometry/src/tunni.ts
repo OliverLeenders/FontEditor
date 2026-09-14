@@ -1,9 +1,16 @@
 /**
  * The Tunni-line kernel.
  *
- * Tunni lines were devised by Eduardo Tunni and FontLab Ltd. The maths here
- * follows the derivation in the Tunni-Lines repository, with three deliberate
- * departures, each marked at the function that makes it:
+ * The Tunni lines concept was devised by Eduardo Tunni and Fontlab Ltd., and is
+ * used in the FontLab font editor.
+ *
+ * That sentence is an attribution this file's licence requires, as an
+ * additional term under section 7(b) of the GNU GPL version 3: any
+ * redistribution of the Tunni-line feature, including the Tunni point, must
+ * keep it, word for word. See the Licence section of the README.
+ *
+ * The maths here follows the derivation in the Tunni-Lines repository, with
+ * three deliberate departures, each marked at the function that makes it:
  *
  *   1. Every operation returns `null` on degenerate input rather than a
  *      plausible-looking point that is not the answer.

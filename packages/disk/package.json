@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "The user's own files: a UFO folder opened, read and written where they can see it.",
+  "license": "GPL-3.0-or-later",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

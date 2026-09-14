@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Pointer and keyboard tools as pure reducers over editor state.",
+  "license": "GPL-3.0-or-later",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

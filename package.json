@@ -5,6 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.24.0",
   "description": "A font editor for the browser and the desktop.",
+  "license": "GPL-3.0-or-later",
   "engines": {
     "node": ">=22.13"
   },

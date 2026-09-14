@@ -3,8 +3,8 @@ name = "typewright"
 version = "0.1.0"
 description = "A font editor for the browser and the desktop"
 authors = ["Oliver Leenders"]
-license = ""
-repository = ""
+license = "GPL-3.0-or-later"
+repository = "https://github.com/OliverLeenders/FontEditor"
 edition = "2021"
 rust-version = "1.77.2"
 

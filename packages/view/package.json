@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Design-to-screen transforms and hit testing. Pure; no canvas, no DOM.",
+  "license": "GPL-3.0-or-later",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
