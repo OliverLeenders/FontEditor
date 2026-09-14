@@ -2,6 +2,7 @@ import { exportFamily, exportFileName, exportUfo, toWoff, toWoff2 } from "@typew
 import { type Location, defaultLocation } from "@typewright/font-model";
 import { useState } from "react";
 
+import { desktop } from "../desktop.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import type { Item } from "./MenuItems.js";
@@ -189,6 +190,28 @@ export function ExportFont(): React.JSX.Element {
     });
 
   /**
+   * The TrueType flavour, hinted by ttfautohint: the desktop application only.
+   *
+   * Hinting is what keeps stems a whole pixel wide at small sizes on Windows,
+   * and ttfautohint is a C program a browser cannot run. So the desktop
+   * application runs the one bundled with it, and this item is not offered
+   * anywhere else.
+   */
+  const hintedTruetype = (): void =>
+    void attemptAsync(async () => {
+      const host = desktop();
+      if (host === null) throw new Error("Hinting needs the desktop application.");
+      const { exportTrueType } = await binary();
+      const document = store.editor.document;
+      const { bytes, warnings } = exportTrueType(document);
+      const hinted = await host.invoke("hint_truetype", new Uint8Array(bytes));
+      if (!(hinted instanceof ArrayBuffer)) throw new Error("ttfautohint gave nothing back.");
+      const file = exportFileName(document).replace(/\.otf$/, "-hinted.ttf");
+      download(hinted, file, "font/ttf");
+      return { file, warnings };
+    });
+
+  /**
    * The same font, wrapped for a web page.
    *
    * Neither of these is another drawing of the font: they are the TrueType
@@ -269,6 +292,18 @@ export function ExportFont(): React.JSX.Element {
       disabled: glyphCount === 0,
       run: truetype,
     },
+    ...(desktop() === null
+      ? []
+      : [
+          {
+            kind: "item" as const,
+            label: "TTF, hinted",
+            note: "ttfautohint, for Windows",
+            icon: DownloadIcon,
+            disabled: glyphCount === 0,
+            run: hintedTruetype,
+          },
+        ]),
     {
       kind: "item",
       label: "WOFF",

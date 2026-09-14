@@ -24,3 +24,7 @@ pnpm-debug.log*
 # of compiled dependencies rebuilt from Cargo.lock on any machine that needs it.
 apps/editor/src-tauri/target/
 apps/editor/src-tauri/gen/
+
+# ttfautohint, fetched for the desktop build by apps/editor/scripts/fetch-ttfautohint.mjs:
+# a program for each platform, checked against the hashes in that script.
+apps/editor/src-tauri/binaries/

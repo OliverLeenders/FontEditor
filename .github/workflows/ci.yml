@@ -103,6 +103,11 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      # The desktop build bundles ttfautohint for its hinted export, and will not
+      # compile without the file there. Fetched and checked against its hash.
+      - name: Fetch ttfautohint for the desktop build
+        run: node apps/editor/scripts/fetch-ttfautohint.mjs
+
       - uses: actions/cache@v6
         with:
           path: |
@@ -225,3 +230,18 @@ jobs:
       # to fail: a check that passes everything would pass the fonts above too.
       - name: Make sure the render check catches a broken font
         run: python tools/render-check/check_render.py --expect-problems "$RUNNER_TEMP/render/broken"
+
+      # The desktop app's hinted export runs ttfautohint on the TrueType flavour.
+      # Here the same program hints the render proof font, and FreeType draws the
+      # result: a font ttfautohint refused, or one it left drawing differently,
+      # fails here rather than in somebody's export.
+      - name: Hint the TrueType flavour with ttfautohint
+        run: |
+          node apps/editor/scripts/fetch-ttfautohint.mjs x86_64-unknown-linux-gnu
+          mkdir -p "$RUNNER_TEMP/hinted"
+          apps/editor/src-tauri/binaries/ttfautohint-x86_64-unknown-linux-gnu \
+            "$RUNNER_TEMP/render/Render.ttf" "$RUNNER_TEMP/hinted/Hinted.ttf"
+          cp "$RUNNER_TEMP/render/drawing.json" "$RUNNER_TEMP/hinted/"
+
+      - name: Render the hinted font with FreeType
+        run: python tools/render-check/check_render.py "$RUNNER_TEMP/hinted"

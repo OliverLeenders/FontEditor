@@ -1,5 +1,9 @@
+use std::path::PathBuf;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
+use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{Manager, WindowEvent};
 
 /// Whether the window has asked the page about closing and not heard back.
@@ -26,10 +30,86 @@ fn keep_window_open() {
   ASKING.store(false, Ordering::SeqCst);
 }
 
+/// Hint a TrueType font with ttfautohint, and hand back the hinted font.
+///
+/// The page compiles the font and sends its bytes as they are; this runs the
+/// ttfautohint bundled beside the application, with its defaults, and answers
+/// with what it wrote. Only the desktop application can do this — a browser has
+/// no program to run — which is why the browser's export has no hinted TrueType.
+///
+/// On the blocking pool, because ttfautohint takes a moment on a large font and
+/// the window should not stop drawing while it does.
+#[tauri::command]
+async fn hint_truetype(request: Request<'_>) -> Result<Response, String> {
+  let InvokeBody::Raw(font) = request.body() else {
+    return Err("the font was not sent as bytes".into());
+  };
+  let font = font.clone();
+  let hinted = tauri::async_runtime::spawn_blocking(move || autohint(&font))
+    .await
+    .map_err(|error| error.to_string())??;
+  Ok(Response::new(hinted))
+}
+
+/// Run ttfautohint on a font, through a pair of temporary files.
+///
+/// Files rather than its standard input and output, which it also reads and
+/// writes: on Windows a program's standard streams are text unless it says
+/// otherwise, and a font is not text.
+fn autohint(font: &[u8]) -> Result<Vec<u8>, String> {
+  let program = bundled("ttfautohint")?;
+
+  let stamp = SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|since| since.as_nanos())
+    .unwrap_or(0);
+  let scratch = std::env::temp_dir();
+  let input = scratch.join(format!("typewright-{}-{stamp}.ttf", std::process::id()));
+  let output = scratch.join(format!("typewright-{}-{stamp}-hinted.ttf", std::process::id()));
+
+  std::fs::write(&input, font).map_err(|error| format!("the font could not be written out: {error}"))?;
+
+  let mut command = Command::new(&program);
+  command.arg(&input).arg(&output);
+  // No console window flashing up behind the application on Windows.
+  #[cfg(windows)]
+  {
+    use std::os::windows::process::CommandExt;
+    command.creation_flags(0x0800_0000);
+  }
+
+  let result = command.output();
+  let hinted = std::fs::read(&output);
+  let _ = std::fs::remove_file(&input);
+  let _ = std::fs::remove_file(&output);
+
+  let ran = result
+    .map_err(|error| format!("ttfautohint could not be started from {}: {error}", program.display()))?;
+  if !ran.status.success() {
+    return Err(format!(
+      "ttfautohint could not hint this font: {}",
+      String::from_utf8_lossy(&ran.stderr).trim()
+    ));
+  }
+  hinted.map_err(|error| format!("ttfautohint wrote nothing readable: {error}"))
+}
+
+/// A program bundled with the application, which Tauri puts beside its executable.
+fn bundled(name: &str) -> Result<PathBuf, String> {
+  let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+  let file = if cfg!(windows) { format!("{name}.exe") } else { name.to_string() };
+  let path = executable.with_file_name(file);
+  if path.exists() {
+    Ok(path)
+  } else {
+    Err(format!("{name} is not installed beside the application at {}", path.display()))
+  }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![close_window, keep_window_open])
+    .invoke_handler(tauri::generate_handler![close_window, keep_window_open, hint_truetype])
     .on_window_event(|window, event| {
       let WindowEvent::CloseRequested { api, .. } = event else {
         return;

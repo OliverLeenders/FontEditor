@@ -116,5 +116,20 @@ export default tseslint.config(
     extends: [tseslint.configs.disableTypeChecked],
   },
 
+  {
+    // Scripts run by Node for the build, such as fetching ttfautohint: plain
+    // JavaScript like the config, and with Node's globals rather than a page's.
+    files: ["**/scripts/**/*.mjs"],
+    extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: {
+        Buffer: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        process: "readonly",
+      },
+    },
+  },
+
   prettier,
 );
