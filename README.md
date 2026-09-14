@@ -371,8 +371,11 @@ that will actually draw them.
   also reachable from a private code point so `/a.001` can be set — which takes about 30 ms
   for 500 glyphs and 130 ms for 2000, after each edit. It lives in `@typewright/shaping`
   and loads only when text is set; until then, or if it cannot load, the in-house shaper
-  sets the line. Still left to right: no bidirectional text, and no script or language
-  controls yet.
+  sets the line.
+- **Right-to-left text, and a script and language for the Proof — later.** The line is still
+  laid out left to right, with HarfBuzz guessing the script from the text. Mixed-direction
+  paragraphs need the Unicode bidirectional algorithm, a dependency or a sizeable module of
+  its own, and the controls are a design question; both are left for after phase 21.
 - **Rendering checked in CI — done.** FreeType draws both flavours of a proof font built to
   break things — overlapping strokes, a counter drawn the wrong way round, a hairline, a
   composite — unhinted at 16, 48 and 256 pixels, and CI fails where a glyph's pixels differ
@@ -382,8 +385,18 @@ that will actually draw them.
 - **Hinting.** The TrueType flavour carries no hinting instructions. That is a defensible
   default — most text is drawn unhinted now — but Windows at small sizes is not most text.
   **The `gasp` table — done:** it says to smooth every size, and a `prep` program turns
-  dropout control on, which is what Google Fonts adds to an unhinted font. Autohinting
-  means ttfautohint, a C program, and another dependency decision.
+  dropout control on, which is what Google Fonts adds to an unhinted font. **Autohinting —
+  done, in the desktop application:** its Export menu has a hinted TrueType, made by running
+  ttfautohint on the TrueType flavour. ttfautohint is a C program a browser cannot run, so it
+  is bundled with the desktop build — fetched from the fontTools project's `ttfautohint-py`
+  wheels, pinned by hash — and the browser's export stays unhinted. CI hints the render proof
+  font with the same program and has FreeType draw the result.
+- **The loose ends — done.** The shaping font keeps the part opentype.js writes and rebuilds
+  only the advances and layout tables after an edit, so a nudge no longer recompiles the
+  whole font. The Features switch is offered for a font with kerning or anchors and no
+  feature file. The TrueType flavour writes its glyph names into `post`, which it had lost
+  with the CFF table. And CI runs the render check on a font broken on purpose, which it has
+  to fail.
 
 #### Phase 18 — Keeping it maintainable
 
@@ -426,10 +439,22 @@ licence where `Cargo.toml` has an empty string, and a content security policy fo
 desktop window, which has none. What separates a program people install from a build
 somebody made.
 
-#### Phase 20 — Two fonts side by side
+#### Phase 20 — A split window
+
+The glyph beside the line it sits in: the canvas on one side and the Spacing line or the
+Proof on the other, or the font's grid beside the glyph open from it, both panes on the
+same document so an edit in one shows in the other as it is made. The tab bar chooses one
+workspace today; each pane would choose its own, and the keyboard would follow the pane
+with focus rather than whichever workspace is showing. Opening a glyph from one pane opens
+it in the other. How the panes are chosen and divided is a design question to settle
+before any of it is built.
+
+#### Phase 21 — Two fonts side by side
 
 With a working copy and a write lock per font, a second window on a second font is most of
-the way there; what is left is the desktop build opening one.
+the way there; what is left is the desktop build opening one. The panes of phase 20 are
+the other way to get there: a second font in the other pane, rather than in a second
+window.
 
 ## Getting started
 
@@ -709,3 +734,10 @@ expensive to reintroduce.
 
 The Tunni lines concept was devised by Eduardo Tunni and FontLab Ltd., and is used in the
 FontLab font editor.
+
+The desktop application's hinted TrueType export runs
+[ttfautohint](https://freetype.org/ttfautohint/) by Werner Lemberg, which it bundles under
+the FreeType License. Portions of this software are copyright © 2011–2022 The FreeType
+Project (www.freetype.org). All rights reserved. The build of it that is bundled comes from
+the [ttfautohint-py](https://github.com/fonttools/ttfautohint-py) wheels published by the
+fontTools project.
