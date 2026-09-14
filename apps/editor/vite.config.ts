@@ -34,6 +34,11 @@ export default defineConfig({
       "@typewright/tools",
       "@typewright/edit-core",
       "@typewright/storage",
+      "@typewright/shaping",
+      // HarfBuzz finds its WebAssembly beside its own script, through
+      // `import.meta.url`. Pre-bundled into Vite's dependency cache, the script
+      // moves and the file it looks for is no longer next to it.
+      "harfbuzzjs",
     ],
   },
 });

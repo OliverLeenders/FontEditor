@@ -27,7 +27,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { KernGroups } from "./KernGroups.js";
 import { palette } from "../scene.js";
 import { SPACING_SPECIMENS, specimenNamed } from "../specimens.js";
-import { positionerFrom, shaperFrom } from "../shaping.js";
+import { positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -112,10 +112,12 @@ export function SpacingView({
     () => positionerFrom(document.features, applyFeatures),
     [document.features, applyFeatures],
   );
+  // HarfBuzz once it has loaded, which then sets the line on its own.
+  const engine = useShapingEngine(document, applyFeatures);
   const hasFeatures = document.features.trim() !== "";
   const run = useMemo(
-    () => layoutRun(document, text, shape, position),
-    [document, text, shape, position],
+    () => layoutRun(document, text, shape, position, engine),
+    [document, text, shape, position, engine],
   );
 
   const selectedName = selected === null ? null : (run.glyphs[selected]?.name ?? null);

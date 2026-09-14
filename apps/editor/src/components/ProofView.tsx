@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
 import { PROOF_SPECIMENS, specimenNamed } from "../specimens.js";
-import { positionerFrom, shaperFrom } from "../shaping.js";
+import { positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -72,6 +72,8 @@ export function ProofView(): React.JSX.Element {
     () => positionerFrom(document.features, applyFeatures),
     [document.features, applyFeatures],
   );
+  // HarfBuzz once it has loaded, which then sets the page on its own.
+  const engine = useShapingEngine(document, applyFeatures);
   const hasFeatures = document.features.trim() !== "";
   const lines = useMemo(() => {
     const scale = size / unitsPerEm;
@@ -83,8 +85,9 @@ export function ProofView(): React.JSX.Element {
       leading * unitsPerEm,
       shape,
       position,
+      engine,
     );
-  }, [document, text, size, leading, unitsPerEm, width, shape, position]);
+  }, [document, text, size, leading, unitsPerEm, width, shape, position, engine]);
 
   /**
    * How tall the set text is, so the page can be scrolled through.
