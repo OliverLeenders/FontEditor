@@ -220,3 +220,8 @@ jobs:
       # the check rather than taken from the compiler.
       - name: Render both flavours with FreeType
         run: python tools/render-check/check_render.py "$RUNNER_TEMP/render"
+
+      # The same check on a font with the compiler's work undone, which it has
+      # to fail: a check that passes everything would pass the fonts above too.
+      - name: Make sure the render check catches a broken font
+        run: python tools/render-check/check_render.py --expect-problems "$RUNNER_TEMP/render/broken"

@@ -181,13 +181,18 @@ def compare(face, glyph, units_per_em, size):
     return float(np.abs(canvas - reference).sum()), float(reference.sum()), float(canvas.sum())
 
 
-def main(directory):
+def main(directory, expect_problems=False):
     folder = Path(directory)
     drawing = json.loads((folder / "drawing.json").read_text())
     units_per_em = drawing["unitsPerEm"]
     problems = []
 
-    for flavour in ("Render.otf", "Render.ttf"):
+    flavours = sorted(path.name for path in folder.iterdir() if path.suffix in (".otf", ".ttf"))
+    if not flavours:
+        print(f"no .otf or .ttf in {folder}")
+        return 2
+
+    for flavour in flavours:
         face = freetype.Face(str(folder / flavour))
         for glyph in drawing["glyphs"]:
             if glyph["codePoint"] is None:
@@ -212,13 +217,24 @@ def main(directory):
         print("\nFreeType does not draw what was drawn:")
         for problem in problems:
             print(f"  {problem}")
+    else:
+        print("\nEvery font renders as drawn at every size.")
+
+    # Run against a font broken on purpose, the check has to find something:
+    # a check that passes everything passes this too, and that is how it would
+    # be noticed.
+    if expect_problems:
+        if problems:
+            print("\nThe broken font was caught, as it should be.")
+            return 0
+        print("\nThe broken font passed. The check is not seeing what it is meant to see.")
         return 1
-    print("\nBoth flavours render as drawn at every size.")
-    return 0
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("usage: check_render.py <directory with Render.otf, Render.ttf, drawing.json>")
+    arguments = [a for a in sys.argv[1:] if a != "--expect-problems"]
+    if len(arguments) != 1:
+        print("usage: check_render.py [--expect-problems] <directory with fonts and drawing.json>")
         sys.exit(2)
-    sys.exit(main(sys.argv[1]))
+    sys.exit(main(arguments[0], "--expect-problems" in sys.argv[1:]))

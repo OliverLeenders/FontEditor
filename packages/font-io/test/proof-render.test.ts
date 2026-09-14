@@ -16,6 +16,9 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";
+import { glyfTable } from "../src/glyf.js";
+import { withLeftSideBearings } from "../src/hmtx.js";
+import { withTable } from "../src/sfnt.js";
 import { exportTrueType } from "../src/truetype.js";
 
 /**
@@ -183,5 +186,32 @@ describe("the render proof font", () => {
     writeFileSync(join(OUT, "Render.otf"), new Uint8Array(exportFont(document).bytes));
     writeFileSync(join(OUT, "Render.ttf"), new Uint8Array(exportTrueType(document).bytes));
     writeFileSync(join(OUT, "drawing.json"), JSON.stringify(drawing(document), null, 2));
+
+    // And a font broken on purpose, beside it, for the check to catch.
+    const broken = join(OUT, "broken");
+    mkdirSync(broken, { recursive: true });
+    writeFileSync(join(broken, "Broken.ttf"), brokenTrueType(document));
+    writeFileSync(join(broken, "drawing.json"), JSON.stringify(drawing(document), null, 2));
   });
 });
+
+/**
+ * The TrueType flavour with the compiler's work undone.
+ *
+ * The outlines written as drawn — no overlaps joined, no counter turned round,
+ * no components placed — and every left sidebearing zero, which is how every
+ * font this editor exported was until FreeType first drew one. A render check
+ * that passes this is a check that is not looking, and CI runs it on this to
+ * make sure it fails.
+ */
+function brokenTrueType(document: FontDocument): Uint8Array {
+  let bytes: Uint8Array = new Uint8Array(exportTrueType(document).bytes);
+  const raw = document.glyphOrder.map((name) => document.glyphs[name]!);
+  const { glyf, loca, xMins } = glyfTable(raw);
+  bytes = withTable(bytes, "glyf", glyf);
+  bytes = withTable(bytes, "loca", loca);
+  return withLeftSideBearings(
+    bytes,
+    xMins.map(() => 0),
+  );
+}
