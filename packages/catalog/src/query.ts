@@ -54,6 +54,13 @@ export function glyphSet(id: string): GlyphSet | null {
  * "Basic Latin" is a range and can be filled in; "Drawn" is a property of the
  * glyphs already present and cannot. That distinction is what decides whether
  * offering to create the missing ones makes any sense.
+ *
+ * Control characters are left out of every block. Basic Latin and Latin-1
+ * Supplement begin with them — U+0000 to U+001F, U+007F, U+0080 to U+009F — and
+ * they are instructions to a terminal, not letters: no font draws them, and a
+ * font that maps U+0000 to anything but `.null` is one opentype.js will not
+ * write. Offered as missing, they were thirty-three empty glyphs nobody asked
+ * for, created by pressing "Add missing" on Basic Latin.
  */
 export function codePointsOfSet(id: string): number[] | null {
   if (id === "ascii") return range(0x20, 0x7e);
@@ -65,7 +72,12 @@ export function codePointsOfSet(id: string): number[] | null {
   // Whole planes are legitimate blocks and nobody wants twenty thousand empty
   // glyphs by accident, so a very large block declines rather than obliges.
   if (block.last - block.first > 512) return null;
-  return range(block.first, block.last);
+  return range(block.first, block.last).filter((codePoint) => !isControl(codePoint));
+}
+
+/** Whether a code point is a control character, general category Cc. */
+function isControl(codePoint: number): boolean {
+  return /\p{Cc}/u.test(String.fromCodePoint(codePoint));
 }
 
 function range(first: number, last: number): number[] {
