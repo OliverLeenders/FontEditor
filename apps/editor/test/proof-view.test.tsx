@@ -9,6 +9,7 @@ installBrowserGlobals();
 
 const { ProofView } = await import("../src/components/ProofView.js");
 const { PROOF_SPECIMENS } = await import("../src/specimens.js");
+const { EMPTY_KERNING, setKern } = await import("@typewright/font-model");
 
 /**
  * The proof: the font set as text, and the controls for how it is set.
@@ -110,7 +111,28 @@ describe("the features switch", () => {
 
     const button = screen.getByRole<HTMLButtonElement>("button", { name: "Features" });
     expect(button.disabled).toBe(true);
-    expect(button.title).toBe("This font defines no features yet");
+    expect(button.title).toBe("This font has no features, kerning or anchors to set yet");
+  });
+
+  it("is offered for a font with kerning and no feature file", () => {
+    // HarfBuzz sets kerning and marks with no feature file at all, and a switch
+    // greyed out for want of one kept those out of the proof.
+    const store = freshStore();
+    act(() => {
+      store.setEditor({
+        ...store.editor,
+        document: {
+          ...store.editor.document,
+          features: "",
+          kerning: setKern(EMPTY_KERNING, "o", "o", -20),
+        },
+      });
+    });
+    render(<ProofView />, store);
+
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Features" }).disabled).toBe(
+      false,
+    );
   });
 
   it("turns the font's features off and on again", () => {

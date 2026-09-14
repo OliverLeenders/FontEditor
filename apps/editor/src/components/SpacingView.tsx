@@ -27,7 +27,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { KernGroups } from "./KernGroups.js";
 import { palette } from "../scene.js";
 import { SPACING_SPECIMENS, specimenNamed } from "../specimens.js";
-import { positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
+import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -114,7 +114,7 @@ export function SpacingView({
   );
   // HarfBuzz once it has loaded, which then sets the line on its own.
   const engine = useShapingEngine(document, applyFeatures);
-  const hasFeatures = document.features.trim() !== "";
+  const hasFeatures = useMemo(() => hasSomethingToShape(document), [document]);
   const run = useMemo(
     () => layoutRun(document, text, shape, position, engine),
     [document, text, shape, position, engine],
@@ -395,7 +395,7 @@ export function SpacingView({
               ? applyFeatures
                 ? "Set with the font's features — click to see the letters behind them"
                 : "Set without the font's features"
-              : "This font defines no features yet"
+              : "This font has no features, kerning or anchors to set yet"
           }
           onClick={() => store.toggleApplyFeatures()}
         >

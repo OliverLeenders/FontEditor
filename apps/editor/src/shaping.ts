@@ -6,6 +6,21 @@ import { useEffect, useMemo, useState } from "react";
 
 type Shaping = typeof ShapingModule;
 
+/**
+ * Whether a font has anything for a shaper to do: a feature file, kerning, or
+ * anchors for marks to attach by.
+ *
+ * What the Features switch is offered for. It used to ask for a feature file
+ * alone, which left a font with kerning and anchors and no `.fea` with the
+ * switch greyed out — and, where it had been left off, HarfBuzz never set the
+ * accents it could have placed.
+ */
+export function hasSomethingToShape(document: FontDocument): boolean {
+  if (document.features.trim() !== "") return true;
+  if (Object.keys(document.kerning.pairs).length > 0) return true;
+  return Object.values(document.glyphs).some((g) => g.anchors.length > 0);
+}
+
 /** The HarfBuzz package, once asked for: one download however many views ask. */
 let loading: Promise<Shaping> | null = null;
 

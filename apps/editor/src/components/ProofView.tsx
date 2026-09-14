@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { palette } from "../scene.js";
 import { PROOF_SPECIMENS, specimenNamed } from "../specimens.js";
-import { positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
+import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -74,7 +74,7 @@ export function ProofView(): React.JSX.Element {
   );
   // HarfBuzz once it has loaded, which then sets the page on its own.
   const engine = useShapingEngine(document, applyFeatures);
-  const hasFeatures = document.features.trim() !== "";
+  const hasFeatures = useMemo(() => hasSomethingToShape(document), [document]);
   const lines = useMemo(() => {
     const scale = size / unitsPerEm;
     const measure = (width - MARGIN * 2) / Math.max(scale, 0.0001);
@@ -254,7 +254,7 @@ export function ProofView(): React.JSX.Element {
               ? applyFeatures
                 ? "Set with the font's features — click to see the letters behind them"
                 : "Set without the font's features"
-              : "This font defines no features yet"
+              : "This font has no features, kerning or anchors to set yet"
           }
           onClick={() => store.toggleApplyFeatures()}
         >
