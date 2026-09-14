@@ -28,6 +28,11 @@ import { done } from "./shared.js";
  * Coalescing is left on: holding an arrow key is one adjustment being made, and
  * a hundred undo entries for it would be useless. Nudging a *different* glyph or
  * a different side starts a new entry, because the label differs.
+ *
+ * Refused for a side that takes its number from a key. The nudge would move the
+ * drawing underneath a key that puts the number straight back when the font is
+ * compiled, so it would look like a step that did nothing; the spacing view says
+ * why instead.
  */
 export function nudgeSidebearing(
   state: EditorState,
@@ -36,6 +41,7 @@ export function nudgeSidebearing(
   delta: number,
 ): ToolResult {
   if (delta === 0) return result(state);
+  if ((state.document.glyphs[glyphName]?.metricKeys[side] ?? "") !== "") return result(state);
 
   // Measured through the font, so a composite is spaced by the letter it draws.
   const document = updateGlyph(state.document, glyphName, (g) => {

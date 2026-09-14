@@ -14,7 +14,12 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { kerningFor, setKernValue } from "../src/commands/kerning.js";
-import { setMetricKey, spaceFromText, unlinkMetricKey } from "../src/commands/spacing.js";
+import {
+  nudgeSidebearing,
+  setMetricKey,
+  spaceFromText,
+  unlinkMetricKey,
+} from "../src/commands/spacing.js";
 import { type EditorState, editorState } from "../src/state.js";
 
 /**
@@ -111,6 +116,19 @@ describe("dropping a key", () => {
     const out = unlinkMetricKey(keyed, "m", "left").state;
     expect(keysOf(out, "m").left).toBe("");
     expect(sidebearings(out.document.glyphs["m"]!)?.left).toBe(10);
+  });
+});
+
+describe("nudging a side that has a key", () => {
+  it("is refused, leaving the key and the drawing as they were", () => {
+    const keyed = spaceFromText(state(), "m", "left", "=n").state;
+    expect(nudgeSidebearing(keyed, "m", "left", 5).state).toBe(keyed);
+  });
+
+  it("still nudges the other side, which has none", () => {
+    const keyed = spaceFromText(state(), "m", "left", "=n").state;
+    const { state: next } = nudgeSidebearing(keyed, "m", "right", 5);
+    expect(sidebearings(next.document.glyphs["m"]!)?.right).toBe(15);
   });
 });
 

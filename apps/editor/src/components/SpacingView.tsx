@@ -239,6 +239,13 @@ export function SpacingView({
     return () => stage.removeEventListener("wheel", onWheel);
   }, [store]);
 
+  // The side an arrow was refused on, because a key supplies it. Forgotten as
+  // soon as the letter or the mode changes, since the note is about that letter.
+  const [refused, setRefused] = useState<"left" | "right" | null>(null);
+  useEffect(() => {
+    setRefused(null);
+  }, [selected, mode]);
+
   // A shorter line must not leave the selection pointing past its end.
   useEffect(() => {
     setSelected((current) => (current === null || current < run.glyphs.length ? current : null));
@@ -265,6 +272,13 @@ export function SpacingView({
 
   const nudge = (side: "left" | "right", delta: number): void => {
     if (selectedName === null) return;
+    // A side taken from a key is not nudged, and says so rather than seeming to
+    // ignore the key press.
+    if ((document.glyphs[selectedName]?.metricKeys[side] ?? "") !== "") {
+      setRefused(side);
+      return;
+    }
+    setRefused(null);
     store.applyTool(nudgeSidebearing(store.editor, selectedName, side, delta));
   };
 
@@ -478,11 +492,13 @@ export function SpacingView({
                   value={pair?.value ?? 0}
                   keyText=""
                   broken={false}
-                  onCommit={(text) =>
+                  onCommit={(text) => {
+                    // An emptied field is a field left alone, not a kern of zero.
+                    if (text.trim() === "") return;
                     store.applyTool(
                       setKernValue(store.editor, previousName, selectedName, Number(text.trim())),
-                    )
-                  }
+                    );
+                  }}
                 />
                 {/* Which rule applied, because adjusting a class moves far more
                     than the two letters in front of you. */}
@@ -562,6 +578,12 @@ export function SpacingView({
             {bands.length > 1 ? (
               <span className={styles.hint}>{bands.length} occurrences, all moving together</span>
             ) : null}
+            {refused === null || keys[refused] === "" ? null : (
+              <span className={styles.hint} role="status">
+                {refused === "left" ? "Left" : "Right"} is taken from {keys[refused]}: drop the key
+                to nudge it
+              </span>
+            )}
           </>
         )}
       </div>
