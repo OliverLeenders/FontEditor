@@ -350,6 +350,13 @@ The gaps phase 16 left, cleared before phase 17:
 - **A binary's line metrics and embedding flag are read** into Font Info's overrides,
   where they differ from what the exporter would derive.
 - **Tests for the glyph browser, Clean up and New glyph.**
+- **And what that turned up.** The TrueType flavour of a font with no `.notdef` of its own
+  could not be opened again, because its outlines sat one place behind its character map.
+  Anchors now move with the outline when a left sidebearing is set. An arrow on a side
+  taken from a key is refused and says why, and an emptied kern field is left alone.
+  Renaming a glyph rewrites the spacing keys that name it. Accented composites are named
+  from their parts — `eacute`, `udieresisacute` — where the marks are named `…comb`, and a
+  capital takes a mark's `.case` form where one is drawn.
 
 #### Phase 17 — Proving it where it will be used
 
