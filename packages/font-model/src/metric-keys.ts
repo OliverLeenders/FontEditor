@@ -1,6 +1,7 @@
 import type { FontDocument, GlyphName } from "./document.js";
 import { glyphNamed, updateGlyph } from "./document.js";
 import { type Glyph, type MetricKeys, hasMetricKeys } from "./glyph.js";
+import { type MetricKeyReference, parseMetricKey } from "./metric-key-text.js";
 import { setLeftSidebearing, setRightSidebearing, sidebearings } from "./metrics.js";
 
 /**
@@ -17,9 +18,9 @@ import { setLeftSidebearing, setRightSidebearing, sidebearings } from "./metrics
  * advance, which is what a tabular figure or a fixed-width family wants.
  *
  * Empty means "this glyph's own", which is what nearly every glyph says. The
- * key is a glyph *name*, so renaming a glyph breaks the keys that pointed at
- * it — the same as everywhere else in a font source, where names are the only
- * thing components and kerning groups have to refer to each other by.
+ * key is a glyph *name*, as a component's base and a kerning group's members
+ * are, and renaming a glyph rewrites the keys that name it as it rewrites
+ * those. What a key can say beyond a name is in `metric-key-text.ts`.
  *
  * The format has no field for these. UFO does not define them and neither does
  * OpenType, so they are written into the font's `lib` under this editor's own
@@ -39,55 +40,6 @@ export type ResolvedMetrics = {
   readonly left: number | null;
   readonly right: number | null;
 };
-
-/**
- * A key, read.
- *
- * What a key field holds is a glyph name, with a little more said about it where
- * that is wanted — the grammar Glyphs uses, so somebody who has spaced a family
- * there types what their hands already know:
- *
- * - `o` — the same side of `o`.
- * - `|b` — the other side of `b`: a `d`'s left side is a `b`'s right, turned round.
- * - `|` — this glyph's own other side, which is how an `o` is kept symmetrical.
- * - `o+10`, `|b-5` — any of those, and a number of units more or less.
- *
- * A leading `=` is allowed and ignored, because that is how the spacing view tells
- * a key from a number, and a key copied out of there should still read. Only whole
- * units are added: a font is written in them, and a fraction would be rounded away
- * when it is compiled.
- *
- * The offset is read off the end, and only where it is a number, so a name with a
- * hyphen in it — `a-cy` — is a name rather than `a` less something.
- */
-export type MetricKeyReference = {
-  /** The glyph named, or `""` for this glyph's own other side. */
-  readonly glyph: GlyphName;
-  /** Take the other side of it: its right side for a left key, and the reverse. */
-  readonly opposite: boolean;
-  readonly offset: number;
-};
-
-/** An optional `=`, an optional bar, a name, and any number of whole `+n` and `-n`. */
-const KEY = /^=?\s*(\|)?\s*([^\s|]*?)\s*((?:[+-]\s*\d+\s*)*)$/;
-
-/** What a key says, or `null` where it cannot be read at all. */
-export function parseMetricKey(text: string): MetricKeyReference | null {
-  const found = KEY.exec(text.trim());
-  if (found === null) return null;
-
-  const opposite = found[1] !== undefined;
-  const glyph = found[2] ?? "";
-  // A bare `=` names nothing. A bare bar names this glyph's other side.
-  if (glyph === "" && !opposite) return null;
-
-  let offset = 0;
-  for (const term of (found[3] ?? "").matchAll(/([+-])\s*(\d+)/g)) {
-    const size = Number(term[2] ?? "0");
-    offset += term[1] === "-" ? -size : size;
-  }
-  return { glyph, opposite, offset };
-}
 
 /** Whether a key points back at the glyph that holds it. */
 function isOwn(key: MetricKeyReference, holder: GlyphName): boolean {

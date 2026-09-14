@@ -20,6 +20,7 @@ import {
   setKern,
   setKernGroup,
 } from "../src/kerning.js";
+import { renamedMetricKey } from "../src/metric-key-text.js";
 import { node } from "../src/node.js";
 
 const ids = counterIds();
@@ -58,6 +59,34 @@ function font() {
   k = setKern(k, "v", "a", -20);
   return setKerning(document, k);
 }
+
+describe("renaming a glyph that others are spaced from", () => {
+  const spaced = () =>
+    fontDocument([
+      glyph("n", { advance: 500 }),
+      glyph("m", { advance: 800, metricKeys: { left: "n", right: "|n+10", width: "" } }),
+      glyph("h", { advance: 500, metricKeys: { left: "nine", right: "", width: "n-5" } }),
+      glyph("o", { advance: 500, metricKeys: { left: "|", right: "", width: "" } }),
+    ]);
+
+  it("rewrites every key that names it, keeping the bar and the offset", () => {
+    const d = renameGlyph(spaced(), "n", "n.alt")!;
+    expect(d.glyphs["m"]?.metricKeys).toEqual({ left: "n.alt", right: "|n.alt+10", width: "" });
+    expect(d.glyphs["h"]?.metricKeys).toEqual({ left: "nine", right: "", width: "n.alt-5" });
+  });
+
+  it("leaves a glyph whose keys name nothing renamed as it was", () => {
+    const before = spaced();
+    const d = renameGlyph(before, "n", "n.alt")!;
+    expect(d.glyphs["o"]).toBe(before.glyphs["o"]);
+  });
+
+  it("reads a key's own words to rewrite it, not the text around a name", () => {
+    expect(renamedMetricKey("= | n + 10", "n", "eng")).toBe("|eng+10");
+    expect(renamedMetricKey("nine", "n", "eng")).toBe("nine");
+    expect(renamedMetricKey("n m", "n", "eng")).toBe("n m");
+  });
+});
 
 describe("renaming a glyph", () => {
   it("moves it in the map and keeps its place in the order", () => {

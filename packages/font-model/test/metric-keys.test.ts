@@ -4,7 +4,8 @@ import { component } from "../src/component.js";
 import { fontDocument } from "../src/document.js";
 import { glyph } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
-import { parseMetricKey, resolvedMetrics, withResolvedMetrics } from "../src/metric-keys.js";
+import { parseMetricKey } from "../src/metric-key-text.js";
+import { resolvedMetrics, withResolvedMetrics } from "../src/metric-keys.js";
 import { sidebearings } from "../src/metrics.js";
 import { rectContour } from "../src/shapes.js";
 

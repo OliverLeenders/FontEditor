@@ -1,6 +1,7 @@
 import type { Glyph } from "./glyph.js";
 import type { Guide } from "./guide.js";
 import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js";
+import { renamedMetricKey } from "./metric-key-text.js";
 import { type TextToken, codePointFromName, textTokens } from "./text.js";
 
 export type GlyphName = string;
@@ -499,12 +500,13 @@ export function renameProblem(
 /**
  * Rename a glyph, and everything that refers to it by that name.
  *
- * A glyph name is not a label, it is a reference, and it is held in four places:
+ * A glyph name is not a label, it is a reference, and it is held in five places:
  * the map it is keyed by, the order it appears in, the `base` of every component
- * that places it, and the kerning — where it appears both as a pair's side and
- * as a member of any group. A rename that fixes only the first two leaves
- * composites pointing at a glyph that no longer exists and kerning that silently
- * stops applying, neither of which shows up until much later.
+ * that places it, the kerning — where it appears both as a pair's side and as a
+ * member of any group — and the spacing keys of every glyph spaced from it. A
+ * rename that fixes only the first two leaves composites pointing at a glyph
+ * that no longer exists, kerning that silently stops applying and spacing that
+ * stops following, none of which shows up until much later.
  *
  * The position in `glyphOrder` is kept. The order is the font's own, someone
  * arranged it, and a rename is not a reordering.
@@ -528,7 +530,11 @@ export function renameGlyph(
     const renamed = name === from ? { ...g, name: to } : g;
     // Every glyph is walked, not just the one moving: any of them may place the
     // renamed glyph as a component, and one that does has to be rewritten too.
-    glyphs[name === from ? to : name] = withComponentBase(renamed, from, to);
+    glyphs[name === from ? to : name] = withKeysRenamed(
+      withComponentBase(renamed, from, to),
+      from,
+      to,
+    );
   }
 
   return {
@@ -537,6 +543,18 @@ export function renameGlyph(
     glyphOrder: document.glyphOrder.map((name) => (name === from ? to : name)),
     kerning: renameGlyphInKerning(document.kerning, from, to),
   };
+}
+
+/** Point a glyph's spacing keys at a renamed glyph, leaving it alone if none name it. */
+function withKeysRenamed(g: Glyph, from: GlyphName, to: GlyphName): Glyph {
+  const { left, right, width } = g.metricKeys;
+  const keys = {
+    left: renamedMetricKey(left, from, to),
+    right: renamedMetricKey(right, from, to),
+    width: renamedMetricKey(width, from, to),
+  };
+  if (keys.left === left && keys.right === right && keys.width === width) return g;
+  return { ...g, metricKeys: keys };
 }
 
 /** Point a glyph's components at a renamed base, leaving it alone if none do. */

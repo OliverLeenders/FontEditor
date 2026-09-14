@@ -105,8 +105,11 @@ export {
 export type { TextToken } from "./text.js";
 export { codePointFromName, textTokens } from "./text.js";
 
-export type { MetricKeyProblem, MetricKeyReference, ResolvedMetrics } from "./metric-keys.js";
-export { parseMetricKey, resolvedMetrics, withResolvedMetrics } from "./metric-keys.js";
+export type { MetricKeyReference } from "./metric-key-text.js";
+export { parseMetricKey, renamedMetricKey } from "./metric-key-text.js";
+
+export type { MetricKeyProblem, ResolvedMetrics } from "./metric-keys.js";
+export { resolvedMetrics, withResolvedMetrics } from "./metric-keys.js";
 
 export type { MetricLine, Sidebearings } from "./metrics.js";
 export {
