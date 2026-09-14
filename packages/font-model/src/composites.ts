@@ -160,10 +160,52 @@ export function compositeParts(document: FontDocument, codePoint: number): strin
     if (replacement !== null && drawn(replacement)) parts[0] = replacement;
   }
 
+  // A capital takes the `.case` form of a mark wherever the font has drawn one:
+  // flatter, so an accented capital keeps inside the line above it.
+  if (isCapital(base)) {
+    for (let i = 1; i < parts.length; i++) {
+      const tall = document.glyphs[`${parts[i]!.name}.case`];
+      if (tall !== undefined && drawn(tall)) parts[i] = tall;
+    }
+  }
+
   return parts.map((p) => p.name);
 }
 
 const drawn = (g: Glyph): boolean => g.contours.length > 0 || g.components.length > 0;
+
+/** Whether a character is an uppercase letter, which is what `.case` marks are drawn for. */
+const isCapital = (codePoint: number): boolean => /\p{Lu}/u.test(String.fromCodePoint(codePoint));
+
+/**
+ * A readable name for a composite, from the names of what it is built from.
+ *
+ * The one the Adobe Glyph List gives nearly every Latin accented letter is its
+ * letter's name and then its marks' names — `eacute`, `Ccedilla`,
+ * `udieresisacute` — and a font that calls its marks `acutecomb` and
+ * `cedillacomb` already holds every word of it. So no table is kept: the letter
+ * is named from its character (an `í` built on a dotless `ı` is still `iacute`),
+ * and each mark is its own name less `comb` and less `.case`.
+ *
+ * `null` where that would not make a name anybody would recognise — a letter
+ * without a plain name, or a mark called something else, `uni0301` say — and
+ * the caller falls back to the `uniXXXX` form.
+ */
+export function compositeName(codePoint: number, parts: readonly string[]): string | null {
+  const base = String.fromCodePoint(codePoint).normalize("NFD").codePointAt(0);
+  if (base === undefined) return null;
+
+  const letter = glyphNameForCodePoint(base);
+  if (!/^[A-Za-z]+$/.test(letter)) return null;
+
+  const marks: string[] = [];
+  for (const part of parts.slice(1)) {
+    const word = /^([a-z]+)comb(?:\.case)?$/.exec(part)?.[1];
+    if (word === undefined) return null;
+    marks.push(word);
+  }
+  return marks.length === 0 ? null : letter + marks.join("");
+}
 
 /** One accented glyph the font can build, and where it would go. */
 export type CompositeBuild = {
@@ -214,7 +256,13 @@ export function compositePlan(
     const parts = compositeParts(document, codePoint);
     if (parts === null) continue;
 
-    const name = existing?.name ?? glyphNameForCodePoint(codePoint);
+    // A readable name where the parts give one and no other glyph has it.
+    const readable = compositeName(codePoint, parts);
+    const name =
+      existing?.name ??
+      (readable !== null && document.glyphs[readable] === undefined
+        ? readable
+        : glyphNameForCodePoint(codePoint));
     // Placed once here with throwaway ids, to know whether it can be.
     const trial = glyph(name, {
       anchors: existing?.anchors ?? [],

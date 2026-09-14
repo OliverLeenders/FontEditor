@@ -61,11 +61,11 @@ describe("building accented glyphs", () => {
     const state = start();
     const out = buildComposites(state, [0xe9, 0xe1], counterIds("b"));
 
-    expect(out.state.document.glyphs["uni00E9"]?.components.map((c) => c.base)).toEqual([
+    expect(out.state.document.glyphs["eacute"]?.components.map((c) => c.base)).toEqual([
       "e",
       "acutecomb",
     ]);
-    expect(out.state.document.glyphs["uni00E1"]).toBeDefined();
+    expect(out.state.document.glyphs["aacute"]).toBeDefined();
     expect(out.effects[0]).toMatchObject({ label: "Build 2 accented glyphs" });
   });
 
@@ -99,11 +99,11 @@ describe("re-attaching accents", () => {
     };
 
     // Left where it was until asked: nothing follows an anchor by itself.
-    expect(moved.document.glyphs["uni00E9"]!.components[1]!.transform.yOffset).toBe(40);
-    expect(detachedComposites(moved)).toEqual(["uni00E9"]);
+    expect(moved.document.glyphs["eacute"]!.components[1]!.transform.yOffset).toBe(40);
+    expect(detachedComposites(moved)).toEqual(["eacute"]);
 
     const out = reattachComposites(moved);
-    expect(out.state.document.glyphs["uni00E9"]!.components[1]!.transform.yOffset).toBe(80);
+    expect(out.state.document.glyphs["eacute"]!.components[1]!.transform.yOffset).toBe(80);
     expect(out.effects[0]).toMatchObject({ label: "Re-attach accents" });
   });
 });

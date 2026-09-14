@@ -187,13 +187,13 @@ describe("planning and building composites", () => {
     const { buildable, problems } = compositePlan(bare, [0xe9]);
 
     expect(buildable).toEqual([]);
-    expect(problems).toEqual([{ codePoint: 0xe9, name: "uni00E9", unplaced: ["acutecomb"] }]);
+    expect(problems).toEqual([{ codePoint: 0xe9, name: "eacute", unplaced: ["acutecomb"] }]);
   });
 
   it("builds a composite placed by its anchors and spaced from its letter", () => {
     const document = font();
     const [build] = compositePlan(document, [0xe9]).buildable;
-    const built = buildComposite(document, build!, counterIds("b")).glyphs["uni00E9"]!;
+    const built = buildComposite(document, build!, counterIds("b")).glyphs["eacute"]!;
 
     expect(built.unicodes).toEqual([0xe9]);
     expect(built.contours).toEqual([]);
@@ -202,5 +202,47 @@ describe("planning and building composites", () => {
     expect(built.advance).toBe(500);
     // A key rather than a copied number, so the e's spacing reaches it.
     expect(built.metricKeys.width).toBe("e");
+  });
+});
+
+describe("naming composites, and capitals' marks", () => {
+  /** A mark with no character of its own, as a `.case` form is. */
+  const unencoded = (name: string): Glyph =>
+    glyph(name, {
+      contours: [mark()],
+      anchors: [anchor(ids.anchor(), "_top", { x: 100, y: 480 })],
+    });
+
+  it("names a composite from its letter and its marks", () => {
+    const names = compositePlan(font(), [0xe9, 0xed, 0x1d8]).buildable.map((b) => b.name);
+    // A dotless i is still an i, and stacked marks are named in the order they stack.
+    expect(names).toEqual(["eacute", "iacute", "udieresisacute"]);
+  });
+
+  it("falls back to the code point where a mark is not named for what it is", () => {
+    const withCircumflex = font(letter("uni0302", 0x302, [["_top", 100, 480]]));
+    expect(compositePlan(withCircumflex, [0xea]).buildable[0]?.name).toBe("uni00EA");
+  });
+
+  it("falls back to the code point where another glyph already has the name", () => {
+    const taken = font(letter("eacute", 0xe000, []));
+    expect(compositePlan(taken, [0xe9]).buildable[0]?.name).toBe("uni00E9");
+  });
+
+  it("puts a capital's accent in its .case form where the font has drawn one", () => {
+    const document = font(letter("E", 0x45, [["top", 250, 720]]), unencoded("acutecomb.case"));
+
+    expect(compositeParts(document, 0xc9)).toEqual(["E", "acutecomb.case"]);
+    expect(compositePlan(document, [0xc9]).buildable[0]?.name).toBe("Eacute");
+    // And a lowercase letter keeps the ordinary one.
+    expect(compositeParts(document, 0xe9)).toEqual(["e", "acutecomb"]);
+  });
+
+  it("keeps the ordinary mark on a capital when the .case form is not drawn yet", () => {
+    const document = font(
+      letter("E", 0x45, [["top", 250, 720]]),
+      glyph("acutecomb.case", { anchors: [anchor(ids.anchor(), "_top", { x: 100, y: 480 })] }),
+    );
+    expect(compositeParts(document, 0xc9)).toEqual(["E", "acutecomb"]);
   });
 });
