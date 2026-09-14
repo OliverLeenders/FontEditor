@@ -24,6 +24,7 @@
     "@typewright/geometry": "workspace:*",
     "@typewright/preflight": "workspace:*",
     "@typewright/render": "workspace:*",
+    "@typewright/shaping": "workspace:*",
     "@typewright/storage": "workspace:*",
     "@typewright/tools": "workspace:*",
     "@typewright/view": "workspace:*",
