@@ -363,12 +363,16 @@ The gaps phase 16 left, cleared before phase 17:
 Both files are checked against fontTools on every push, and neither against the things
 that will actually draw them.
 
-- **Shaping with the engine browsers use.** The Proof and the Spacing line shape with this
-  editor's own subset of `.fea`: no mark attachment, no bidirectional text. HarfBuzz is the
-  shaper nearly every browser and operating system uses, and it builds to WebAssembly.
-  Proofing with it would show a font as it will set — and would test the `GSUB` and `GPOS`
-  written here against something other than the code that wrote them. A dependency
-  decision, as WOFF2 was.
+- **Shaping with the engine browsers use — done.** The Proof and the Spacing line are set by
+  HarfBuzz, the shaper nearly every browser and operating system uses, built to
+  WebAssembly: substitutions, kerning and mark attachment as a font will set them, and the
+  `GSUB` and `GPOS` written here tested against something other than the code that wrote
+  them. It shapes a font compiled without outlines — the same layout tables, every glyph
+  also reachable from a private code point so `/a.001` can be set — which takes about 30 ms
+  for 500 glyphs and 130 ms for 2000, after each edit. It lives in `@typewright/shaping`
+  and loads only when text is set; until then, or if it cannot load, the in-house shaper
+  sets the line. Still left to right: no bidirectional text, and no script or language
+  controls yet.
 - **Rendering checked in CI.** Rasterise the exported OTF and TTF with FreeType and compare
   what comes out with the outlines as drawn, so a font that only looks right in a browser
   is caught before a Windows preview finds the notch.
