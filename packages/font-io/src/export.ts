@@ -133,13 +133,21 @@ export function flattenedGlyphs(document: FontDocument): Glyph[] {
   const ids = counterIds("t");
   const warnings: string[] = [];
 
-  return notdefFirst(document).names.map((name) => {
+  const { names, synthesised } = notdefFirst(document);
+  const glyphs = names.map((name) => {
     const g = document.glyphs[name];
     if (g === undefined) return glyph(name);
 
     const contours = unioned(g, directed(flatten(g, document, ids)), ids, warnings);
     return { ...g, components: [], contours: [...contours] };
   });
+
+  // The blank `.notdef` the export gives a font without one, here too. Left out,
+  // every glyph after it sat one place earlier than the character map and the
+  // metrics said, and the last character pointed past the end of the font.
+  return synthesised
+    ? [glyph(".notdef", { advance: Math.round(document.info.unitsPerEm / 2) }), ...glyphs]
+    : glyphs;
 }
 
 function unioned(
