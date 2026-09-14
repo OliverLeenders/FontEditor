@@ -4,6 +4,7 @@ import { Bytes } from "./bytes.js";
 import { type ExportResult, exportFont, flattenedGlyphs } from "./export.js";
 import { glyfTable } from "./glyf.js";
 import { withLeftSideBearings } from "./hmtx.js";
+import { postWithNames } from "./post.js";
 import { readTablesOf, withSfntVersion, withTable } from "./sfnt.js";
 
 /**
@@ -32,6 +33,18 @@ export function exportTrueType(document: FontDocument): ExportResult {
   bytes = withTable(bytes, "loca", loca);
   // From the points as written, which are what a rasteriser measures against.
   bytes = withLeftSideBearings(bytes, xMins);
+  // The names, which went out with the CFF table that held them.
+  const post = readTablesOf(bytes).find((t) => t.tag === "post")?.data;
+  if (post !== undefined) {
+    bytes = withTable(
+      bytes,
+      "post",
+      postWithNames(
+        post,
+        glyphs.map((g) => g.name),
+      ),
+    );
+  }
   bytes = withTable(bytes, "maxp", maxp(glyphs.length, maxPoints, maxContours));
   bytes = withTable(bytes, "head", headWith(bytes, longLoca));
   bytes = withTable(bytes, "gasp", GASP);
