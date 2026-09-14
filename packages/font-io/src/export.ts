@@ -468,19 +468,45 @@ export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x"
     if (g.name !== undefined) order.set(g.name, i);
   });
 
-  const features = compileFeatures(document.features, (name) => order.get(name));
+  const layout = layoutTables(document, (name) => order.get(name));
+  for (const problem of layout.warnings) warnings.push(problem);
+  return { bytes: withLayoutTables(bytes, layout), warnings };
+}
+
+/** The three layout tables a font is compiled with, each empty where it has nothing to say. */
+export type LayoutTables = {
+  readonly gpos: Uint8Array;
+  readonly gsub: Uint8Array;
+  readonly gdef: Uint8Array;
+  readonly warnings: readonly string[];
+};
+
+/**
+ * `GPOS`, `GSUB` and `GDEF` for a document, given where each glyph sits.
+ *
+ * Apart from the rest of the export because a font set for a preview needs
+ * exactly these and nothing of the outlines, which are the slow part: the same
+ * substitutions, kerning and mark attachment, compiled the same way, so what the
+ * preview shows is what the font will do.
+ */
+export function layoutTables(
+  document: FontDocument,
+  glyphIdOf: (name: string) => number | undefined,
+): LayoutTables {
+  const warnings: string[] = [];
+  const features = compileFeatures(document.features, glyphIdOf);
 
   // One GPOS from two sources: the kerning the editor keeps in its own model,
   // and whatever positioning the feature file asks for. A second table is not a
   // thing a font can have, and a second `kern` feature is one a shaper ignores.
-  const kernSubtables = kerningSubtables(kernIndex(document.kerning), (name) => order.get(name));
+  const kernSubtables = kerningSubtables(kernIndex(document.kerning), glyphIdOf);
   const kernLookups = kerningLookups(kernSubtables);
 
   // The third source: the anchors. A component placed by them puts the accent
   // in the outline; this is the rule that puts it there for a letter and a
   // combining mark typed as two characters, where there is no composite to
   // place anything into.
-  const marks = compileMarks(orderedGlyphs(document), (name) => order.get(name));
+  const marks = compileMarks(orderedGlyphs(document), glyphIdOf);
   for (const problem of marks.warnings) warnings.push(problem);
 
   const markAt = kernLookups.length + features.positioning.lookups.length;
@@ -498,20 +524,30 @@ export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x"
     warnings.push(`features, line ${String(problem.line)}: ${problem.message}`);
   }
 
-  if (gpos.length === 0 && features.table.length === 0 && marks.gdef.length === 0) {
-    return { bytes, warnings };
+  // GDEF only alongside the lookups that need it: a shaper reads it to know
+  // which glyphs are marks, and mark attachment without it is not reliably
+  // applied.
+  return {
+    gpos,
+    gsub: features.table,
+    gdef: gpos.length > 0 ? marks.gdef : new Uint8Array(),
+    warnings,
+  };
+}
+
+/** A compiled font with its layout tables spliced in, or as it was where there are none. */
+export function withLayoutTables(bytes: ArrayBuffer, layout: LayoutTables): ArrayBuffer {
+  if (layout.gpos.length === 0 && layout.gsub.length === 0 && layout.gdef.length === 0) {
+    return bytes;
   }
 
   // Spliced one after the other, each on the bytes the last produced, so the
-  // directory and the checksums are right whichever of the two exists.
+  // directory and the checksums are right whichever of them exists.
   let out: Uint8Array = new Uint8Array(bytes);
-  if (gpos.length > 0) out = withTable(out, "GPOS", gpos);
-  if (features.table.length > 0) out = withTable(out, "GSUB", features.table);
-  // GDEF last, and only alongside the lookups that need it: a shaper reads it to
-  // know which glyphs are marks, and mark attachment without it is not reliably
-  // applied.
-  if (gpos.length > 0 && marks.gdef.length > 0) out = withTable(out, "GDEF", marks.gdef);
-  return { bytes: out.buffer.slice(0) as ArrayBuffer, warnings };
+  if (layout.gpos.length > 0) out = withTable(out, "GPOS", layout.gpos);
+  if (layout.gsub.length > 0) out = withTable(out, "GSUB", layout.gsub);
+  if (layout.gdef.length > 0) out = withTable(out, "GDEF", layout.gdef);
+  return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
 }
 
 export { exportFileName } from "./file-name.js";

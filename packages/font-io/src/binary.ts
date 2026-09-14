@@ -20,6 +20,8 @@ export { FontExportError, exportFont } from "./export.js";
 export type { ImportResult, ImportWarning } from "./import.js";
 export { importFont } from "./import.js";
 export { exportInstances } from "./instances.js";
+export type { ShapingFont } from "./shaping-font.js";
+export { NAMED_GLYPH_BASE, exportShapingFont } from "./shaping-font.js";
 export { exportTrueType } from "./truetype.js";
 export { exportVariableFont } from "./variable.js";
 export { exportVariableTrueType } from "./variable-truetype.js";
