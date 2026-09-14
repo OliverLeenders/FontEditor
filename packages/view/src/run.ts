@@ -68,6 +68,25 @@ export type Adjustment = {
  */
 export type Positioner = (names: readonly string[]) => readonly (Adjustment | null)[];
 
+/** One glyph as a shaping engine set it, in design units. */
+export type EngineGlyph = {
+  readonly name: GlyphName;
+  /** The advance the engine gave it, kerning and positioning rules included. */
+  readonly xAdvance: number;
+  readonly xOffset: number;
+  readonly yOffset: number;
+};
+
+/**
+ * A whole shaping engine, as a function over the text read.
+ *
+ * What HarfBuzz is to this package: it takes the characters and glyph names and
+ * answers with the glyphs to set and where, having applied the substitutions,
+ * the kerning and the mark attachment itself. `null` where it cannot set this
+ * text, and the run is then laid out with the shaper and positioner instead.
+ */
+export type Engine = (tokens: readonly TextToken[]) => readonly EngineGlyph[] | null;
+
 /**
  * The glyphs to set, after the font's own substitutions have had their say.
  *
@@ -114,13 +133,23 @@ function shapedGlyphs(
  *
  * `text` may name glyphs with a slash — see `textTokens` — and may be handed in
  * already read, which is how a paragraph lays out the words it has split.
+ *
+ * `engine`, where there is one, does all of that at once: see {@link Engine}.
+ * The shaper and positioner are then not asked, and neither is the kerning, since
+ * the engine has applied it already.
  */
 export function layoutRun(
   document: FontDocument,
   text: string | readonly TextToken[],
   shape?: Shaper,
   position?: Positioner,
+  engine?: Engine,
 ): GlyphRun {
+  if (engine !== undefined) {
+    const set = engine(typeof text === "string" ? textTokens(text) : text);
+    if (set !== null) return engineRun(document, set);
+  }
+
   const shaped = shapedGlyphs(document, text, shape).filter((g): g is Glyph => g !== null);
   const values = position === undefined ? [] : position(shaped.map((g) => g.name));
 
@@ -156,6 +185,46 @@ export function layoutRun(
   }
 
   return { glyphs, width: x };
+}
+
+/**
+ * A run from what an engine set.
+ *
+ * The engine folds a pair's kerning into the first glyph's advance, which is how
+ * a font file says it. This line keeps the convention the rest of the view is
+ * built on instead: each glyph's band is its own advance, and whatever the
+ * engine added to it — the kerning, most often — goes in before the next glyph
+ * as its `kern`. Where the letters land is the same either way; what changes is
+ * that selecting a letter still marks that letter's own space.
+ *
+ * A glyph the document no longer has is passed over, its advance with it, as a
+ * character with no glyph is.
+ */
+function engineRun(document: FontDocument, set: readonly EngineGlyph[]): GlyphRun {
+  const glyphs: PlacedGlyph[] = [];
+  let x = 0;
+  let carried = 0;
+
+  for (const shaped of set) {
+    const glyph = document.glyphs[shaped.name];
+    if (glyph === undefined) continue;
+
+    x += carried;
+    glyphs.push({
+      glyph,
+      name: glyph.name,
+      index: glyphs.length,
+      x,
+      kern: carried,
+      dx: shaped.xOffset,
+      dy: shaped.yOffset,
+      advance: glyph.advance,
+    });
+    x += glyph.advance;
+    carried = shaped.xAdvance - glyph.advance;
+  }
+
+  return { glyphs, width: x + carried };
 }
 
 /**
@@ -225,6 +294,7 @@ export function layoutParagraph(
   leading: number,
   shape?: Shaper,
   position?: Positioner,
+  engine?: Engine,
 ): ProofLine[] {
   const lines: ProofLine[] = [];
   let y = 0;
@@ -240,15 +310,18 @@ export function layoutParagraph(
     let current: readonly TextToken[] = [];
     for (const word of wordsOf(textTokens(paragraph))) {
       const candidate = current.length === 0 ? word : [...current, SPACE, ...word];
-      if (current.length > 0 && layoutRun(document, candidate, shape, position).width > measure) {
-        lines.push({ run: layoutRun(document, current, shape, position), y });
+      if (
+        current.length > 0 &&
+        layoutRun(document, candidate, shape, position, engine).width > measure
+      ) {
+        lines.push({ run: layoutRun(document, current, shape, position, engine), y });
         y += leading;
         current = word;
       } else {
         current = candidate;
       }
     }
-    lines.push({ run: layoutRun(document, current, shape, position), y });
+    lines.push({ run: layoutRun(document, current, shape, position, engine), y });
     y += leading;
   }
 
