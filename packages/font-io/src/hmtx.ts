@@ -1,6 +1,37 @@
 import { readTablesOf, withTable } from "./sfnt.js";
 
 /**
+ * Advances written into `hmtx`, by glyph id, leaving everything else as it was.
+ *
+ * For the font a preview is shaped with, which is rebuilt after every edit and
+ * after most of them differs from the last only here: a spacing nudge changes
+ * one number, and rebuilding the whole font around it was most of the time a
+ * large font took to follow the arrow keys. Only glyphs with an advance of
+ * their own are written; the fonts this editor compiles give every glyph one.
+ */
+export function withAdvances(font: Uint8Array, advances: readonly number[]): Uint8Array {
+  const tables = readTablesOf(font);
+  const hhea = tables.find((t) => t.tag === "hhea")?.data;
+  const hmtx = tables.find((t) => t.tag === "hmtx")?.data;
+  if (hhea === undefined || hmtx === undefined || hhea.length < 36) return font;
+
+  const metrics = new DataView(hhea.buffer, hhea.byteOffset, hhea.byteLength).getUint16(34);
+  const table = hmtx.slice();
+  const view = new DataView(table.buffer);
+
+  let changed = false;
+  for (const [glyph, advance] of advances.entries()) {
+    if (glyph >= metrics || glyph * 4 + 2 > table.length) break;
+    const wanted = Math.max(0, Math.min(0xffff, Math.round(advance)));
+    if (view.getUint16(glyph * 4) === wanted) continue;
+    view.setUint16(glyph * 4, wanted);
+    changed = true;
+  }
+
+  return changed ? withTable(font, "hmtx", table) : font;
+}
+
+/**
  * Left sidebearings written into `hmtx`, from where each outline actually starts.
  *
  * opentype.js writes the sidebearing it was given and nothing else, and it was

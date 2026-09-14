@@ -1,6 +1,7 @@
 import type { FontDocument } from "@typewright/font-model";
 
 import { layoutTables, withLayoutTables } from "./export.js";
+import { withAdvances } from "./hmtx.js";
 import { opentype } from "./opentype.js";
 import type { OtGlyph } from "opentype.js";
 
@@ -39,18 +40,65 @@ export type ShapingFont = {
  */
 export const NAMED_GLYPH_BASE = 0xf0000;
 
+/**
+ * The last font built, and what it was built for.
+ *
+ * The part opentype.js writes — the character map, the names, the empty
+ * outlines — was nearly all of the time a large font took, and after almost
+ * every edit it is the same as last time: a spacing nudge changes an advance, a
+ * kern changes a pair, and neither touches which glyphs there are or what
+ * characters they stand for. So that part is kept, and rebuilt only when the
+ * glyphs, their characters or the font's vertical measurements change; the
+ * advances and the layout tables are written into it afresh every time.
+ */
+let base: { readonly key: string; readonly bytes: ArrayBuffer } | null = null;
+
 export function exportShapingFont(document: FontDocument): ShapingFont {
   const names = document.glyphOrder.filter((name) => name !== ".notdef");
   const glyphNames = [".notdef", ...names];
   const notdef = document.glyphs[".notdef"];
-
-  const glyphs: OtGlyph[] = glyphNames.map((name, id) => {
+  const advances = glyphNames.map((name) => {
     const g = document.glyphs[name];
-    const advance = g === undefined ? (notdef?.advance ?? document.info.unitsPerEm / 2) : g.advance;
-    const unicodes = [...(g?.unicodes ?? []), NAMED_GLYPH_BASE + id];
+    return g === undefined ? (notdef?.advance ?? document.info.unitsPerEm / 2) : g.advance;
+  });
+
+  const key = structureOf(document, glyphNames);
+  if (base === null || base.key !== key) {
+    base = { key, bytes: compiled(document, glyphNames, advances) };
+  }
+
+  const measured = withAdvances(new Uint8Array(base.bytes), advances);
+  const ids = new Map(glyphNames.map((name, id) => [name, id]));
+  const layout = layoutTables(document, (name) => ids.get(name));
+  const bytes = measured.buffer.slice(
+    measured.byteOffset,
+    measured.byteOffset + measured.byteLength,
+  ) as ArrayBuffer;
+  return { bytes: withLayoutTables(bytes, layout), glyphNames };
+}
+
+/** Everything the kept part of the font depends on, as one string to compare. */
+function structureOf(document: FontDocument, glyphNames: readonly string[]): string {
+  const { info } = document;
+  return [
+    info.unitsPerEm,
+    info.ascender,
+    info.descender,
+    ...glyphNames.map((name) => `${name} ${(document.glyphs[name]?.unicodes ?? []).join(",")}`),
+  ].join("\n");
+}
+
+/** The font opentype.js writes: every glyph, its characters and its advance, no outlines. */
+function compiled(
+  document: FontDocument,
+  glyphNames: readonly string[],
+  advances: readonly number[],
+): ArrayBuffer {
+  const glyphs: OtGlyph[] = glyphNames.map((name, id) => {
+    const unicodes = [...(document.glyphs[name]?.unicodes ?? []), NAMED_GLYPH_BASE + id];
     return new opentype.Glyph({
       name,
-      advanceWidth: Math.max(0, Math.round(advance)),
+      advanceWidth: Math.max(0, Math.round(advances[id] ?? 0)),
       path: new opentype.Path(),
       unicode: unicodes[0]!,
       unicodes,
@@ -58,16 +106,12 @@ export function exportShapingFont(document: FontDocument): ShapingFont {
   });
 
   const { info } = document;
-  const font = new opentype.Font({
+  return new opentype.Font({
     familyName: "Shaping",
     styleName: "Regular",
     unitsPerEm: Math.round(info.unitsPerEm),
     ascender: Math.round(info.ascender),
     descender: -Math.abs(Math.round(info.descender)),
     glyphs,
-  });
-
-  const ids = new Map(glyphNames.map((name, id) => [name, id]));
-  const layout = layoutTables(document, (name) => ids.get(name));
-  return { bytes: withLayoutTables(font.toArrayBuffer(), layout), glyphNames };
+  }).toArrayBuffer();
 }
