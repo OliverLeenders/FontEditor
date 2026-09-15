@@ -25,6 +25,17 @@ export const MAX_SPACING_SIZE = 320;
 export const MIN_PROOF_SIZE = 8;
 export const MAX_PROOF_SIZE = 140;
 
+/**
+ * The size the feature source is set at, in pixels.
+ *
+ * Ctrl and the wheel set it, so a file can be read from across the room or a
+ * long one taken in whole; the limits keep it readable at one end and the
+ * gutter from outgrowing the pane at the other.
+ */
+export const DEFAULT_FEATURE_SIZE = 13.5;
+export const MIN_FEATURE_SIZE = 9;
+export const MAX_FEATURE_SIZE = 32;
+
 /** Line spacing, as a multiple of the em. */
 export const MIN_PROOF_LEADING = 0.8;
 export const MAX_PROOF_LEADING = 2.4;

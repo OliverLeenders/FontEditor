@@ -30,6 +30,13 @@
      painted on the dark ground too. */
   --danger: #c2453d;
   --ok: #3f7d4e;
+  /* Feature source. Hues of their own rather than the accent's, which sat too
+     close to the ink the glyph names are set in: a keyword has to stand apart
+     from the names around it at a glance, and blue beside near-white does not. */
+  --syntax-keyword: #8b3fb0;
+  --syntax-tag: #2f7a45;
+  --syntax-class: #a2601c;
+  --syntax-number: #1f6fa8;
   --shadow: 0 2px 4px rgba(19, 25, 34, 0.06), 0 10px 28px -14px rgba(19, 25, 34, 0.3);
 
   --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -64,6 +71,10 @@
     --warn: #d6a05a;
     --danger: #e2776e;
     --ok: #74c08a;
+    --syntax-keyword: #d49af5;
+    --syntax-tag: #7fd197;
+    --syntax-class: #eab26a;
+    --syntax-number: #6fc3f0;
     --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
     color-scheme: dark;
   }
@@ -85,6 +96,10 @@
   --warn: #d6a05a;
   --danger: #e2776e;
   --ok: #74c08a;
+  --syntax-keyword: #d49af5;
+  --syntax-tag: #7fd197;
+  --syntax-class: #eab26a;
+  --syntax-number: #6fc3f0;
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
   color-scheme: dark;
 }

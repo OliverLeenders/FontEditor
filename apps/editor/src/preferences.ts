@@ -1,5 +1,8 @@
 import {
+  DEFAULT_FEATURE_SIZE,
   DEFAULT_OUTLINE_WIDTH,
+  MAX_FEATURE_SIZE,
+  MIN_FEATURE_SIZE,
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
   MAX_PROOF_SIZE,
@@ -135,6 +138,8 @@ export type Preferences = {
   readonly spacingSize: number;
   readonly proofSize: number;
   readonly proofLeading: number;
+  /** The size the feature source is set at, in pixels. */
+  readonly featureSize: number;
   readonly inspector: InspectorPlacement;
   readonly split: SplitPlacement;
 };
@@ -183,6 +188,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   spacingSize: 128,
   proofSize: 32,
   proofLeading: 1.4,
+  featureSize: DEFAULT_FEATURE_SIZE,
   inspector: DEFAULT_PLACEMENT,
   split: DEFAULT_SPLIT,
 };
@@ -248,6 +254,10 @@ export function loadPreferences(): Preferences {
     proofLeading: number(raw["proofLeading"], DEFAULT_PREFERENCES.proofLeading, {
       min: MIN_PROOF_LEADING,
       max: MAX_PROOF_LEADING,
+    }),
+    featureSize: number(raw["featureSize"], DEFAULT_PREFERENCES.featureSize, {
+      min: MIN_FEATURE_SIZE,
+      max: MAX_FEATURE_SIZE,
     }),
     inspector: {
       x: number(inspector["x"], DEFAULT_PLACEMENT.x, {}),

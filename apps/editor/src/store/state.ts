@@ -148,6 +148,8 @@ export type StoreState = {
    */
   readonly proofText: string;
   readonly proofSize: number;
+  /** The size the feature source is set at, in pixels. */
+  readonly featureSize: number;
   /** Line spacing as a multiple of the em, which is how type is set. */
   readonly proofLeading: number;
   readonly viewport: { readonly width: number; readonly height: number };
@@ -310,6 +312,7 @@ export function initialState(preferences: Preferences): StoreState {
     spacingMode: "space",
     proofText: PROOF_TEXT,
     proofSize: preferences.proofSize,
+    featureSize: preferences.featureSize,
     proofLeading: preferences.proofLeading,
     previewing: false,
     inspector: preferences.inspector,

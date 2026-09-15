@@ -1,7 +1,8 @@
 import { compileFeatures } from "@typewright/font-io";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { FeatureSource, type FeatureSourceHandle } from "./FeatureSource.js";
 import styles from "./FeaturesView.module.css";
 import { CheckIcon, CircleAlertIcon } from "./icons.js";
 
@@ -23,6 +24,8 @@ export function FeaturesView(): React.JSX.Element {
   const store = useEditorStore();
   const source = useStoreValue((s) => s.session.editor.document.features);
   const glyphOrder = useStoreValue((s) => s.session.editor.document.glyphOrder);
+  const editor = useRef<FeatureSourceHandle>(null);
+  const size = useStoreValue((s) => s.featureSize);
 
   // Compiled as you type, which is the whole value of the panel: a rule about a
   // glyph you have not drawn yet should say so now rather than at export.
@@ -32,6 +35,11 @@ export function FeaturesView(): React.JSX.Element {
     const ids = new Map(glyphOrder.map((name, index) => [name, index]));
     return compileFeatures(source, (name) => ids.get(name));
   }, [source, glyphOrder]);
+
+  const problemLines = useMemo(
+    () => new Set(compiled.problems.map((problem) => problem.line)),
+    [compiled],
+  );
 
   const lines = source === "" ? 0 : source.split("\n").length;
 
@@ -60,13 +68,14 @@ export function FeaturesView(): React.JSX.Element {
       </div>
 
       <div className={styles.body}>
-        <textarea
-          className={styles.source}
+        <FeatureSource
+          ref={editor}
           value={source}
-          aria-label="Feature source"
-          spellCheck={false}
+          onChange={(text) => store.setFeatures(text)}
+          problemLines={problemLines}
           placeholder={PLACEHOLDER}
-          onChange={(event) => store.setFeatures(event.target.value)}
+          size={size}
+          onZoom={(factor) => store.setFeatureSize(store.getState().featureSize * factor)}
         />
 
         <aside className={styles.side} aria-label="What the features compile to">
@@ -76,9 +85,16 @@ export function FeaturesView(): React.JSX.Element {
               <ul className={styles.problems}>
                 {compiled.problems.map((problem, index) => (
                   <li key={`${String(problem.line)}-${String(index)}`}>
-                    <CircleAlertIcon />
-                    <span className={styles.line}>{problem.line}</span>
-                    {problem.message}
+                    {/* A problem is somewhere, so pressing it goes there. */}
+                    <button
+                      type="button"
+                      className={styles.problem}
+                      onClick={() => editor.current?.goToLine(problem.line)}
+                    >
+                      <CircleAlertIcon />
+                      <span className={styles.line}>{problem.line}</span>
+                      <span>{problem.message}</span>
+                    </button>
                   </li>
                 ))}
               </ul>

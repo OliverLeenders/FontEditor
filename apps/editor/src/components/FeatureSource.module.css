@@ -1,0 +1,137 @@
+/*
+ * The feature source: a gutter of line numbers, and the text in colour under a
+ * text box whose own letters are transparent.
+ *
+ * The coloured copy and the text box must set every line in exactly the same
+ * place, so everything that decides where a letter goes — font, size, line
+ * height, padding, tab size, wrapping — is set once on `.text` and inherited by
+ * both, rather than written twice and allowed to drift.
+ */
+.editor {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  min-height: 0;
+  border-right: 1px solid var(--rule);
+  background: var(--canvas);
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+}
+
+.gutter {
+  overflow: hidden;
+  padding: 0.8rem 0.5rem 4rem 0.7rem;
+  border-right: 1px solid var(--rule);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  user-select: none;
+}
+
+.number {
+  min-width: 2ch;
+  white-space: pre;
+}
+
+/* A problem on this line, where the eye runs down the numbers looking for one. */
+.number[data-problem] {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.text {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  tab-size: 4;
+  white-space: pre;
+}
+
+.shadow,
+.area {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border: 0;
+  font: inherit;
+  letter-spacing: normal;
+  tab-size: inherit;
+  white-space: pre;
+}
+
+/* Scrolled by the text box, and a little longer than it, so the last line
+   still lines up when the box has a scroll bar along its bottom edge. */
+.shadow {
+  overflow: hidden;
+  padding-bottom: 4rem;
+  color: var(--ink);
+  pointer-events: none;
+}
+
+.row {
+  width: max-content;
+  min-width: 100%;
+}
+
+/* Under the words of the line, and not under its indentation. */
+.row[data-problem] [data-kind]:not([data-kind="space"]) {
+  text-decoration: underline wavy var(--danger);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 0.25em;
+}
+
+.area {
+  overflow: auto;
+  resize: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--ink);
+}
+
+.area::placeholder {
+  color: var(--ink-3);
+}
+
+.area::selection {
+  background: color-mix(in srgb, var(--accent) 32%, transparent);
+  color: transparent;
+}
+
+.area:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* The colours: structure in the accent, names the compiler looks up in the
+   ink, and what it skips in the faintest ink there is. */
+/* A space, as a dot the width of the space, in the faintest ink there is and
+   upright even inside an italic comment. */
+.space {
+  color: var(--ink-3);
+  font-style: normal;
+  font-weight: normal;
+  opacity: 0.55;
+}
+
+[data-kind="keyword"] {
+  color: var(--syntax-keyword);
+  font-weight: 600;
+}
+[data-kind="tag"] {
+  color: var(--syntax-tag);
+}
+[data-kind="class"] {
+  color: var(--syntax-class);
+}
+[data-kind="number"] {
+  color: var(--syntax-number);
+}
+[data-kind="comment"] {
+  color: var(--ink-3);
+  font-style: italic;
+}
+[data-kind="punctuation"],
+[data-kind="mark"] {
+  color: var(--ink-2);
+}

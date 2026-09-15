@@ -34,10 +34,12 @@ import { type DiskFolder, FIRST_PROJECT } from "@typewright/disk";
 import { frameGlyph } from "../framing.js";
 import { type Decoded, ImageCache } from "../images.js";
 import {
+  MAX_FEATURE_SIZE,
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
   MAX_PROOF_SIZE,
   MAX_SPACING_SIZE,
+  MIN_FEATURE_SIZE,
   MIN_OUTLINE_WIDTH,
   MIN_PROOF_LEADING,
   MIN_PROOF_SIZE,
@@ -784,6 +786,12 @@ export class EditorStore {
   setSpacingSize(spacingSize: number): void {
     const held = within(spacingSize, MIN_SPACING_SIZE, MAX_SPACING_SIZE);
     if (held !== null) this.remember({ spacingSize: held });
+  }
+
+  /** The size the feature source is set at, from Ctrl and the wheel. */
+  setFeatureSize(featureSize: number): void {
+    const held = within(featureSize, MIN_FEATURE_SIZE, MAX_FEATURE_SIZE);
+    if (held !== null) this.remember({ featureSize: Math.round(held * 10) / 10 });
   }
 
   /** How a split window is divided: side by side or stacked, and where. */

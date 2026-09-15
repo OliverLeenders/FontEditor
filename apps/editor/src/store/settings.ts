@@ -28,6 +28,7 @@ export function preferencesOf(s: StoreState): Preferences {
     spacingSize: s.spacingSize,
     proofSize: s.proofSize,
     proofLeading: s.proofLeading,
+    featureSize: s.featureSize,
     inspector: s.inspector,
     split: s.split,
   };
@@ -59,6 +60,7 @@ export function defaults(): Partial<StoreState> {
     spacingSize: DEFAULT_PREFERENCES.spacingSize,
     proofSize: DEFAULT_PREFERENCES.proofSize,
     proofLeading: DEFAULT_PREFERENCES.proofLeading,
+    featureSize: DEFAULT_PREFERENCES.featureSize,
   };
 }
 

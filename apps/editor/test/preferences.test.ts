@@ -174,6 +174,15 @@ describe("preferences and the store", () => {
     });
   });
 
+  it("remembers the size the feature source is set at, inside its limits", () => {
+    const first = new EditorStore();
+    first.setFeatureSize(18);
+    expect(new EditorStore().getState().featureSize).toBe(18);
+
+    first.setFeatureSize(400);
+    expect(new EditorStore().getState().featureSize).toBe(32);
+  });
+
   it("ignores a divider position that is not a number", () => {
     // jsdom, or a pane measured before it had a size, reports 0 / 0.
     const store = new EditorStore();
