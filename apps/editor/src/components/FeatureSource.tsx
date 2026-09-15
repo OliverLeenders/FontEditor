@@ -41,6 +41,7 @@ export function FeatureSource({
   placeholder,
   size,
   onZoom,
+  label = "Feature source",
   ref,
 }: {
   value: string;
@@ -51,6 +52,8 @@ export function FeatureSource({
   size: number;
   /** Ctrl and the wheel, as the factor to scale the size by. */
   onZoom: (factor: number) => void;
+  /** What the text box is called, since there is more than one file. */
+  label?: string;
   ref?: React.Ref<FeatureSourceHandle>;
 }): React.JSX.Element {
   const editor = useRef<HTMLDivElement>(null);
@@ -174,7 +177,7 @@ export function FeatureSource({
           className={styles.area}
           value={value}
           wrap="off"
-          aria-label="Feature source"
+          aria-label={label}
           spellCheck={false}
           placeholder={placeholder}
           onChange={(event) => onChange(event.target.value)}

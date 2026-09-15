@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { installBrowserGlobals } from "./browser-globals.js";
@@ -161,5 +161,74 @@ describe("finding a problem", () => {
     expect(document.activeElement).toBe(box);
     expect(box.selectionStart).toBe("feature kern {\n".length);
     expect(box.selectionEnd).toBe("feature kern {\n    pos n o -10;".length);
+  });
+});
+
+describe("the Marks file", () => {
+  // The starter font has no anchors, so the file typed here makes some: `e`
+  // attaches by a `_top`, and `o` offers a `top` for it.
+  const TYPED = [
+    "markClass e <anchor 0 500> @MC_top;",
+    "feature mark {",
+    "    pos base o <anchor 250 480> mark @MC_top;",
+    "} mark;",
+  ].join("\n");
+
+  function openMarks(): { store: Store; box: HTMLTextAreaElement } {
+    const store = freshStore();
+    render(<FeaturesView />, store);
+    fireEvent.click(screen.getByRole("tab", { name: "Marks" }));
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Marks source" });
+    return { store, box };
+  }
+
+  const anchorsOf = (store: Store, name: string): string[] =>
+    (store.editor.document.glyphs[name]?.anchors ?? []).map(
+      (a) => `${a.name} ${String(a.pt.x)} ${String(a.pt.y)}`,
+    );
+
+  it("is written from the anchors of the master being edited", () => {
+    const { box } = openMarks();
+    expect(box.value).toContain("# Marks, from the anchors of Regular.");
+  });
+
+  it("puts what is typed into the anchors, as a step undo takes back", () => {
+    const { store, box } = openMarks();
+
+    fireEvent.change(box, { target: { value: TYPED } });
+
+    expect(anchorsOf(store, "e")).toEqual(["_top 0 500"]);
+    expect(anchorsOf(store, "o")).toEqual(["top 250 480"]);
+    // What was typed stays as it was typed, rather than being rewritten under the caret.
+    expect(box.value).toBe(TYPED);
+
+    act(() => store.undo());
+
+    expect(anchorsOf(store, "o")).toEqual([]);
+    // The anchors changed somewhere other than the file, so it is written from them again.
+    expect(box.value).not.toContain("pos base o");
+  });
+
+  it("changes no anchor while the file has a problem, and says where it is", () => {
+    const { store, box } = openMarks();
+
+    fireEvent.change(box, { target: { value: TYPED.replace("pos base o", "pos base nothing") } });
+
+    expect(anchorsOf(store, "e")).toEqual([]);
+    const side = screen.getByRole("complementary", { name: "What the marks say" });
+    expect(side.textContent).toContain("there is no glyph named nothing");
+    expect(box.value).toContain("pos base nothing");
+  });
+
+  it("is written again from the anchors when it is left and opened again", () => {
+    const { box } = openMarks();
+    fireEvent.change(box, { target: { value: `${TYPED}\n# a note` } });
+
+    fireEvent.click(screen.getByRole("tab", { name: "Features" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Marks" }));
+
+    const again = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Marks source" });
+    expect(again.value).not.toContain("# a note");
+    expect(again.value).toContain("pos base o <anchor 250 480> mark @MC_top;");
   });
 });

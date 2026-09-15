@@ -1,5 +1,5 @@
 import type { CatalogQuery } from "@typewright/catalog";
-import type { ExtraLayer } from "@typewright/font-io";
+import { type ExtraLayer, placeMarks, readMarks } from "@typewright/font-io";
 import {
   canRedoSession,
   canUndoSession,
@@ -13,7 +13,9 @@ import {
   type FontDocument,
   type Glyph,
   type GlyphName,
+  orderedGlyphs,
   putGlyph,
+  randomIds,
   setFeatures,
   setGlyphImage,
 } from "@typewright/font-model";
@@ -289,6 +291,28 @@ export class EditorStore {
     const document = setFeatures(this.editor.document, features);
     if (document === this.editor.document) return;
     this.applyTool(result({ ...this.editor, document }, [begin("Edit features"), commit]));
+  }
+
+  /** Ids for the anchors a Marks file adds. */
+  private readonly markIds = randomIds();
+
+  /**
+   * Put what a Marks file says into the anchors of the master being edited.
+   *
+   * Only when the whole file reads cleanly: a file read in half would take away
+   * the anchors on the lines it could not read. A change is one step, so undo
+   * takes back what was typed, and a reading that moves nothing is no step.
+   */
+  setMarks(text: string): void {
+    const document = this.editor.document;
+    const reading = readMarks(text, (name) => name in document.glyphs);
+    if (reading.problems.length > 0) return;
+    let next = document;
+    for (const g of placeMarks(orderedGlyphs(document), reading, this.markIds)) {
+      next = putGlyph(next, g);
+    }
+    if (next === document) return;
+    this.applyTool(result({ ...this.editor, document: next }, [begin("Edit marks"), commit]));
   }
 
   // ---- snapshots ---------------------------------------------------------

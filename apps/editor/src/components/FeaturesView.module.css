@@ -17,9 +17,60 @@
   color: var(--ink-2);
 }
 
-.summary b {
+/* The two files, as a pair of small tabs at the start of the bar: the files
+   are two views of one workspace, not two workspaces. */
+.files {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.1rem;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.file {
+  appearance: none;
+  padding: 0.15rem 0.6rem;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  cursor: pointer;
+}
+.file:hover {
+  color: var(--ink);
+}
+.file[aria-selected="true"] {
+  background: var(--canvas);
   color: var(--ink);
   font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--rule);
+}
+
+.summary b,
+.note b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* How many glyphs play each part in the Marks file, numbers first. */
+.counts {
+  margin: 0.4rem 0 1.2rem;
+  padding: 0;
+  list-style: none;
+}
+.counts li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.1rem 0;
+}
+.count {
+  flex: none;
+  min-width: 2rem;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 .clean {
   color: var(--ink-2);
