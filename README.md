@@ -433,11 +433,32 @@ that will actually draw them.
 
 #### Phase 19 — Releases
 
-A version number that means something, a signed installer — an unsigned one meets a
-SmartScreen warning on its first run — updates that arrive without a download page, a
-licence where `Cargo.toml` has an empty string, and a content security policy for the
-desktop window, which has none. What separates a program people install from a build
-somebody made.
+What separates a program people install from a build somebody made.
+
+- **A licence — done.** GPL-3.0-or-later, with the third-party notices shipped beside the
+  editor; see [Licence](#licence).
+- **A content security policy for the desktop window — done.** Scripts and styles come only
+  from the application, WebAssembly may compile — HarfBuzz and WOFF2 are both WebAssembly —
+  `eval` is refused, nothing is framed, and requests go only to the application and Tauri's
+  own bridge. Tauri adds the hashes of the scripts it injects. `vite preview` sends the same
+  policy, so the built editor can be tried under it in a browser whose devtools say what it
+  refused. The web build has none until it has a host that can send headers.
+- **One version number — done.** `apps/editor/package.json` holds it and `tauri.conf.json`
+  reads it from there. Cargo needs its own copy in `Cargo.toml` and `Cargo.lock`, which
+  `pnpm version:set` writes, and CI fails when the three disagree. A version is three
+  numbers: a Windows Installer version cannot carry a pre-release name.
+- **Releases — done, untried until the first tag.** A `v` tag builds the Windows installers
+  (NSIS and MSI) and the Linux ones (AppImage and `.deb`) in CI, into a draft GitHub
+  release with the licence, the notices and the updater's manifest. Nothing is public until
+  somebody publishes the draft.
+- **Updates — done, untried until the second release.** The desktop application asks the
+  latest published release whether there is a newer version when it starts, and says so
+  along the top of the window. Nothing is downloaded until somebody presses Install; a
+  folder that is behind is asked about first, as closing the window does; and an update
+  that is not signed with the project's key is refused.
+- **A signed installer — not for now.** An unsigned installer meets a SmartScreen warning
+  the first time it runs. Signing costs a certificate, and can be added to the release
+  workflow whenever there is one.
 
 #### Phase 20 — A split window
 
@@ -505,7 +526,8 @@ worth re-asking on any platform this is built for, because the answer is the pla
 rather than ours.
 
 Nothing in `src-tauri` knows anything about fonts. It opens a window and gets out of the
-way: no plugins beyond a logger, and two commands, both about closing the window. Whether a
+way: a logger in debug builds and the updater, and five commands — two about closing the
+window, one that runs ttfautohint, and two that check for and install an update. Whether a
 close needs a question belongs to the page, the only side that knows whether the folder is
 behind, so the window hands the request over and waits to be told. The page reaches those
 commands through the bridge Tauri injects into every page it hosts rather than through
@@ -517,6 +539,13 @@ The desktop build keeps its working copies in a WebView2 profile of its own, und
 `%LOCALAPPDATA%\dev.typewright.app` on Windows. That is separate from any browser's, so a
 font started in one is not in the other until it has been saved to a folder and opened
 there.
+
+A release is a version and a tag. `pnpm version:set 0.2.0` writes the version everywhere
+it is kept; commit that, tag the commit `v0.2.0` and push the tag, and
+`.github/workflows/release.yml` builds the installers into a draft release to try and then
+publish. The updates it produces are signed with a key held only in the repository's
+secrets, whose public half is in `tauri.conf.json`. A build made anywhere else can install
+the published updates but cannot sign any of its own, and a debug build never looks.
 
 Use PgUp and PgDn to move between glyphs, and press `?` for every key at once. The
 toolbar is icons; every one names its shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
