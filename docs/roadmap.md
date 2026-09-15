@@ -5,39 +5,50 @@ How Typewright got to where it is, phase by phase, and what comes next. The
 
 ## Status
 
-**A font drawn here can be kept on disk, exported and installed.** Five workspaces —
-Font, Glyph, Spacing, Features, Proof — around a canvas with select, pen, knife,
-rectangle, ellipse, measure and section tools, snapping, boolean union, anchors and
-components, kerning, curvature combs and harmonising, a `.fea` subset, and OTF, TTF, WOFF, WOFF2, a variable OTF and UFO in
-both directions. A family is several masters, a `.designspace` and one `.ufo` each; a UFO folder on disk is opened and saved back to; everything autosaves
-to the browser's own store besides, and copies of the whole font are kept as you work.
-Guides and a picture to trace from sit behind the drawing; before it goes out, nineteen checks say what is wrong with it.
-Several fonts are kept at once, each in a working copy of its own, and the program opens on the list of them.
+**A font drawn here can be kept on disk, exported, installed and shipped.** Five
+workspaces — Font, Glyph, Spacing, Features, Proof — around a canvas with select, pen,
+knife, rectangle, ellipse, measure and section tools, snapping, boolean union, anchors and
+components, kerning, curvature combs and harmonising. The Spacing line and the Proof are set
+by HarfBuzz. Most of the `.fea` language compiles, checked against fontTools, and is written
+in a source editor with colour and indentation beside a Marks file that edits the anchors.
+Out come OTF, TTF — hinted, in the desktop application — WOFF, WOFF2, variable fonts and
+UFO, and UFO comes back in. A family is several masters, a `.designspace` and one
+`.ufo` each; a UFO folder on disk is opened and saved back to; everything autosaves to the
+browser's own store besides, and copies of the whole font are kept as you work. Guides and a
+picture to trace from sit behind the drawing; before it goes out, nineteen checks say what
+is wrong with it. Several fonts are kept at once, each in a working copy of its own; the
+window splits into two panes, and a second font opens in a window of its own. The desktop
+application installs from a release and updates itself.
 
-| Phase |                                     | Status                                                                              |
-| ----- | ----------------------------------- | ----------------------------------------------------------------------------------- |
-| 0     | Foundations and the geometry kernel | done                                                                                |
-| 1     | The editing surface                 | done                                                                                |
-| 2     | Undo, redo, persistence             | done                                                                                |
-| 3     | From paths to a glyph               | done, and anchors with it                                                           |
-| 4     | From a glyph to a font              | done                                                                                |
-| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways                     |
-| 6     | Proofing and shaping                | done for this editor's `.fea` subset — see below                                    |
-| 7     | Spacing and kerning                 | done                                                                                |
-| 8     | OpenType features                   | a `.fea` subset compiles to GSUB and GPOS, and anchors to marks                     |
-| 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools |
-| 10    | Production polish                   | lint, format and 2344 tests, run on CI; preferences persist                         |
-| 11    | The drawing hand                    | done                                                                                |
-| 12    | Not losing what was opened          | done                                                                                |
-| 13    | The family, named                   | done                                                                                |
-| 14    | What ships to a browser             | done                                                                                |
-| 15    | Several fonts, and a name           | done                                                                                |
-| 16    | The details a font is judged on     | done                                                                                |
-| 17    | Proving it where it will be used    | done: HarfBuzz sets the proof, FreeType draws the fonts in CI, ttfautohint hints    |
-| 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                     |
-| 19    | Releases                            | done: versions, a release workflow and updates; the installers are unsigned         |
-| 20    | A split window                      | done                                                                                |
-| 21    | Two fonts side by side              | done: a window per font                                                             |
+| Phase |                                     | Status                                                                               |
+| ----- | ----------------------------------- | ------------------------------------------------------------------------------------ |
+| 0     | Foundations and the geometry kernel | done                                                                                 |
+| 1     | The editing surface                 | done                                                                                 |
+| 2     | Undo, redo, persistence             | done                                                                                 |
+| 3     | From paths to a glyph               | done, and anchors with it                                                            |
+| 4     | From a glyph to a font              | done                                                                                 |
+| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways                      |
+| 6     | Proofing and shaping                | done, and set by HarfBuzz since phase 17                                             |
+| 7     | Spacing and kerning                 | done                                                                                 |
+| 8     | OpenType features                   | most of `.fea` compiles to GSUB and GPOS, and anchors to marks                       |
+| 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools  |
+| 10    | Production polish                   | lint, format and about 2,700 tests, run on CI; preferences persist                   |
+| 11    | The drawing hand                    | done                                                                                 |
+| 12    | Not losing what was opened          | done                                                                                 |
+| 13    | The family, named                   | done                                                                                 |
+| 14    | What ships to a browser             | done                                                                                 |
+| 15    | Several fonts, and a name           | done                                                                                 |
+| 16    | The details a font is judged on     | done                                                                                 |
+| 17    | Proving it where it will be used    | done: HarfBuzz sets the proof, FreeType draws the fonts in CI, ttfautohint hints     |
+| 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                      |
+| 19    | Releases                            | done: versions, a release workflow and updates; the installers are unsigned          |
+| 20    | A split window                      | done                                                                                 |
+| 21    | Two fonts side by side              | done: a window per font                                                              |
+| 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools |
+| 23    | Right-to-left text                  | later                                                                                |
+| 24    | The web build, hosted               | later                                                                                |
+| 25    | The feature source, further         | later                                                                                |
+| 26    | The last interface tests            | later                                                                                |
 
 ### What the table missed
 
@@ -77,18 +88,16 @@ The gaps worth naming, in the order they would bite someone using this:
   whose default layer is not in `glyphs/` has its glyphs moved there, and the old
   directory is reported rather than deleted.
 
-- **Positioning in `.fea` is the single adjustment only.** `pos @caps <10 0 20 0>;`
-  compiles and merges into the same GPOS the kerning is written to. A pair adjustment is
-  refused by name and pointed at the Spacing workspace, which is where this editor keeps
-  kerning — two ways to write the same rule would be two answers with no way to say which
-  won. Attachment and positioning in a context are refused too, and kept in the file.
-- **Shaping is this editor's `.fea` subset, not a shaping engine.** Single substitutions,
-  ligatures, and both of those conditioned on their context, are applied to the Spacing
-  line and the Proof in the order the file lists them. There is no mark attachment and no
-  bidi — and the glyph strip under the canvas is deliberately left unshaped, since it is
-  there to show the letter you are drawing beside its neighbours. Positioning rules are
-  applied to both as well — a glyph moves where the rule says and the pen moves by the
-  advance the rule gave it.
+- **Kerning and mark attachment are not written in `.fea`.** The single adjustment and
+  positioning in a context compile into the same GPOS the kerning is written to. A pair
+  adjustment is refused by name and pointed at the Spacing workspace, which is where this
+  editor keeps kerning, and attachment at the glyphs' anchors — two ways to write the same
+  rule would be two answers with no way to say which won. Both are kept in the file.
+- **Shaping is HarfBuzz.** Since phase 17 the Spacing line and the Proof are set by the
+  shaper browsers use, from a font compiled for it after each edit — substitutions, kerning
+  and mark attachment as the exported font will set them. The glyph strip under the canvas
+  is still deliberately left unshaped, since it is there to show the letter you are drawing
+  beside its neighbours, and nothing is set right to left yet (phase 23).
 - **Overlaps are removed where the font is compiled, and the drawing keeps them.** CFF —
   the outline format an OTF written here carries — does not allow overlapping contours:
   its CharStrings are filled by the even-odd rule, under which two shapes subtract where
@@ -135,8 +144,8 @@ The gaps worth naming, in the order they would bite someone using this:
   proof OTF covering mark attachment is exported and its GPOS decompiled by fontTools,
   which is then asked for the anchors back by name — see `tools/otf-check`, and the
   reason it exists: that table is offsets into offsets, and a test written here would be
-  checking our arithmetic against our own arithmetic. What is still unproven is the OTF
-  against a rasteriser, and the UFO against the editors people actually use, which agree
+  checking our arithmetic against our own arithmetic. FreeType has drawn both flavours in
+  CI since phase 17. What is still unproven is the UFO against the editors people actually use, which agree
   with fontTools about the format and not always about what a font should contain.
 
 ### What is still missing
@@ -300,7 +309,7 @@ done — this time with the bundle measured, every component checked for a test 
 it, and the exporter asked what it writes rather than what the model holds. In the order
 they would be reached for.
 
-#### Phase 16 — The details a font is judged on
+#### Phase 16 — The details a font is judged on — done
 
 Small things, each noticed by whoever uses the font rather than whoever draws it.
 
@@ -351,7 +360,7 @@ The gaps phase 16 left, cleared before phase 17:
   from their parts — `eacute`, `udieresisacute` — where the marks are named `…comb`, and a
   capital takes a mark's `.case` form where one is drawn.
 
-#### Phase 17 — Proving it where it will be used
+#### Phase 17 — Proving it where it will be used — done
 
 Both files are checked against fontTools on every push, and neither against the things
 that will actually draw them.
@@ -368,7 +377,7 @@ that will actually draw them.
 - **Right-to-left text, and a script and language for the Proof — later.** The line is still
   laid out left to right, with HarfBuzz guessing the script from the text. Mixed-direction
   paragraphs need the Unicode bidirectional algorithm, a dependency or a sizeable module of
-  its own, and the controls are a design question; both are left for after phase 21.
+  its own, and the controls are a design question; both are phase 23 now.
 - **Rendering checked in CI — done.** FreeType draws both flavours of a proof font built to
   break things — overlapping strokes, a counter drawn the wrong way round, a hairline, a
   composite — unhinted at 16, 48 and 256 pixels, and CI fails where a glyph's pixels differ
@@ -391,7 +400,7 @@ that will actually draw them.
   with the CFF table. And CI runs the render check on a font broken on purpose, which it has
   to fail.
 
-#### Phase 18 — Keeping it maintainable
+#### Phase 18 — Keeping it maintainable — done
 
 - **The interface's missing tests — done for the ones with decisions in them.** The Export
   menu, the kerning groups, the transform panel, the point and curve sections of the
@@ -400,7 +409,8 @@ that will actually draw them.
   a `<label>` gives its name to the first control inside it, so Corner was announced as
   "Type Corner Smooth Tangent" — and Escape in a kerning group's name closed the whole
   panel, because the panel's window listener ran before the field could keep the key.
-  Eighteen components are still untested; what is in them is mostly layout.
+  Eighteen components were still untested then, and eight are now; what is in them is mostly
+  layout, and they are phase 26.
 - **The store's large file — done, as far as it should go.** The snapshots, which carry
   state of their own, and the inspector's placement left `store/index.ts`, which is 917
   lines now. The settings and the view stay, and this list was wrong to name them: the
@@ -424,7 +434,7 @@ that will actually draw them.
   handle fits the type as it is, and the linter noticed the cast had nothing left to do. 7
   is for when the linter can read it.
 
-#### Phase 19 — Releases
+#### Phase 19 — Releases — done
 
 What separates a program people install from a build somebody made.
 
@@ -498,3 +508,84 @@ two windows is read-only in the second, as it always was in two tabs.
 
 A second font in the other pane of a split window is the other way there, and is left for
 when windows have shown whether it is wanted.
+
+#### After phase 21 — Writing feature source — done
+
+The Features workspace was a plain text box. It is a source editor now, with nothing
+installed for it: the file is coloured by a small tokenizer for the language, drawn under a
+text box whose own letters are transparent. Tab indents with four spaces, Shift+Tab takes a
+level off, and Escape then Tab leaves; Enter keeps the indentation, and a closing brace goes
+back a level. Lines are numbered, lines with problems are marked and underlined, a problem in
+the list goes to its line, each space shows as a dot, and Ctrl with the wheel sets the size.
+Released as 0.1.3.
+
+### What comes after
+
+Found by reading this file back after phase 21, and from what using the editor turned up. In
+the order they would be reached for.
+
+#### Phase 22 — More of the feature file — done
+
+The Features workspace compiled classes, single and ligature substitutions, both of those in
+a context, and the single adjustment. Everything else was kept in the file and written to
+the UFO, but refused by name and left out of the exported font — so a font could do less
+than its source said. Now:
+
+- **Alternates and one glyph into several.** `sub a from [a.alt1 a.alt2];` and
+  `sub ffi by f f i;`, in a context too.
+- **Lookups as feaLib groups them.** Rules become a new lookup where the kind of rule
+  changes, at a `lookupflag`, a script or language, or a lookup reference, so a file applies
+  in the order it is written. Named lookups are defined once and shared by every feature
+  that references them, or called from a rule in a context — `sub c a' lookup SMALL;`.
+- **Lookup flags.** `IgnoreMarks`, `IgnoreBaseGlyphs`, `IgnoreLigatures` and `RightToLeft`,
+  by name or number; marks are the glyphs whose anchors say so, as in GDEF.
+- **Scripts and languages.** `languagesystem` declares them, `script` and `language` inside a
+  feature narrow it, and a language takes the script's default lookups unless it says
+  `exclude_dflt`.
+- **Positioning in a context**, a value or a named lookup on each marked glyph.
+- **Proven twice.** Unit tests shape text with HarfBuzz and compare the glyphs and advances
+  with what the file says. In CI a proof file using every construct is compiled here and by
+  fontTools' feaLib, and HarfBuzz has to set every test string identically with both fonts.
+
+- **A Marks file** beside the feature source, written from the current master's anchors as
+  `markClass` and `pos base` / `pos mark` rules, one class per anchor name (`@MC_top`).
+  Anchors stay the source of truth: an edit that reads cleanly moves, adds or removes
+  anchors as an undoable step, and the file is written again from the anchors when you
+  leave it or they change elsewhere. The same proof file in CI ends with it, so fontTools
+  compiles mark attachment from the text while this editor compiles it from the anchors, and
+  the accents have to land in the same place.
+
+Reverse substitution, mark filtering sets and `table` blocks stay refused by name.
+
+#### Phase 23 — Right-to-left text, and a script and language for the Proof
+
+The Spacing line and the Proof are laid out left to right, with HarfBuzz guessing the script
+from the text. Mixed-direction paragraphs need the Unicode bidirectional algorithm — a
+dependency, or a sizeable module of its own — and the controls for choosing a script and a
+language are a design question.
+
+#### Phase 24 — The web build, hosted
+
+The browser build runs anywhere a folder of files can be served, and is served nowhere.
+Choosing a host decides how the content security policy reaches it — a header, or a meta tag
+where the host cannot send one — and gives the README somewhere to link to.
+
+#### Phase 25 — The feature source, further
+
+What a source editor is expected to do beyond colour and indentation: glyph names completed
+from the font as they are typed, search and replace, and a glyph name that opens its glyph.
+
+#### Phase 26 — The last interface tests
+
+Eight components are rendered by no test: the glyph strip, the mark swatch, the menu items,
+the preferences panel, remove overlap, the sheet, the stepper and the toolbar. Mostly layout,
+which is why they come last.
+
+#### Parked
+
+- **A second font in a pane of the split window**, until windows per font have shown whether
+  it is wanted.
+- **TypeScript 7**, until typescript-eslint reads it; its latest release accepts TypeScript
+  below 6.1.
+- **A signed installer**, until there is a certificate.
+- **A macOS build**, which needs Apple's signing and notarisation to open at all.

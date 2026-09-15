@@ -26,6 +26,32 @@ accent that stacks there, and a mark for the class the letter's other anchor nam
 covers a base with a null anchor for a class it does not take, and the difference between
 mark-to-base and mark-to-mark.
 
+## The feature file
+
+`compile_fea.py` checks the feature compiler by comparison rather than by reading bytes
+back. A font's substitutions and positioning are only right if text set with it comes out
+right, and the arithmetic that would check the tables here is the arithmetic that wrote
+them.
+
+So the proof font's feature file — which uses every construct the editor compiles:
+language systems, classes, named lookups and the rules that call them, lookup flags,
+one-into-several and alternates, ligatures, rules in a context and their exceptions,
+scripts and languages, and positioning plain and in a context — is compiled twice. Once by
+the editor, and once by fontTools' feaLib, which this script puts into a copy of the same
+font. HarfBuzz then sets a list of strings with both, and every glyph and position has to
+agree.
+
+The file fontTools is given ends with the Marks file the editor writes from the proof
+font's anchors — `markClass`, `pos base` and `pos mark`. The editor compiles attachment
+from the anchors themselves, so the accents landing in the same place in both fonts proves
+the Marks file says what the anchors do.
+
+```bash
+FEATURES_OUT=/tmp/fea pnpm --filter @typewright/font-io exec vitest run proof-features
+python compile_fea.py /tmp/fea/Features.otf /tmp/fea/features.fea /tmp/fea/FromFeaLib.otf
+FEATURES_REFERENCE=/tmp/fea/FromFeaLib.otf pnpm --filter @typewright/font-io exec vitest run proof-features
+```
+
 ## The variable font
 
 `check_vf.py` is the same idea taken further. A variable font's deltas cannot be

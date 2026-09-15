@@ -225,6 +225,22 @@ jobs:
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"
 
+      # A feature file compiled here and the same file compiled by fontTools'
+      # feaLib have to set text identically: every construct the compiler reads
+      # is in the proof file, and HarfBuzz sets both fonts string by string.
+      # fontTools is also given the Marks file written from the font's anchors,
+      # so its mark attachment has to agree with the one compiled from them.
+      - name: Export the feature proof font
+        run: FEATURES_OUT="$RUNNER_TEMP/fea" pnpm --filter @typewright/font-io exec vitest run proof-features
+
+      - name: Compile the same feature file with fontTools
+        run: >
+          python tools/otf-check/compile_fea.py
+          "$RUNNER_TEMP/fea/Features.otf" "$RUNNER_TEMP/fea/features.fea" "$RUNNER_TEMP/fea/FromFeaLib.otf"
+
+      - name: Set text with both, and compare
+        run: FEATURES_REFERENCE="$RUNNER_TEMP/fea/FromFeaLib.otf" pnpm --filter @typewright/font-io exec vitest run proof-features
+
       - name: Export the render proof font
         run: RENDER_OUT="$RUNNER_TEMP/render" pnpm --filter @typewright/font-io exec vitest run proof-render
 
