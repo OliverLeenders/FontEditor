@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "version:set": "node apps/editor/scripts/set-version.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

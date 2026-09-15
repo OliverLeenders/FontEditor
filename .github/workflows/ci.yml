@@ -32,6 +32,10 @@ jobs:
       - run: pnpm format:check
       - run: pnpm lint
       - run: pnpm typecheck
+      # The app's version is written in three files Cargo and Tauri each read,
+      # and an installer built from files that disagree names itself wrongly.
+      - name: Check the version agrees everywhere
+        run: node apps/editor/scripts/set-version.mjs --check
 
   # The suite, on both ends of what package.json claims to support. The editor
   # runs in a browser, but everything below it is meant to run under plain Node
