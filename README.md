@@ -460,15 +460,28 @@ What separates a program people install from a build somebody made.
   the first time it runs. Signing costs a certificate, and can be added to the release
   workflow whenever there is one.
 
-#### Phase 20 — A split window
+#### Phase 20 — A split window — done
 
-The glyph beside the line it sits in: the canvas on one side and the Spacing line or the
-Proof on the other, or the font's grid beside the glyph open from it, both panes on the
-same document so an edit in one shows in the other as it is made. The tab bar chooses one
-workspace today; each pane would choose its own, and the keyboard would follow the pane
-with focus rather than whichever workspace is showing. Opening a glyph from one pane opens
-it in the other. How the panes are chosen and divided is a design question to settle
-before any of it is built.
+The glyph beside the line it sits in. The button at the end of the tab bar opens a second
+pane with a bar of its own, and each pane shows any workspace; asking for one the other
+pane has swaps the two, because the drawing — its toolbar, inspector and strip — exists
+once. Both panes are on the same document, so an edit in one shows in the other as it is
+made.
+
+- **Side by side or stacked.** The second pane's bar stacks the panes or puts them back
+  side by side, and closes the pane. The divider between them is dragged, moved a step
+  with the arrow keys, or double-clicked back to the middle. The shape of the split is
+  remembered; which workspaces were showing is not, so the window still opens on the font.
+- **The keyboard follows the pane.** Pressing in a pane or tabbing into it makes it the
+  active one, marked along the top of its bar. Undo, save and `?` work from either; the
+  drawing's keys only from the drawing, and the status bar describes the active pane.
+- **A glyph opens where the drawing is.** Chosen from the font's grid or the spacing line,
+  it is drawn in the other pane when that pane is drawing, and the pane it was chosen from
+  stays as it was.
+- **The inspector keeps to its pane.** It docks to the edges of the drawing's pane rather
+  than the window's, and a floating one scrolls within the drawing's height instead of
+  hanging over the pane below. A pane too narrow for the tab labels shows their icons,
+  which still name themselves on hover.
 
 #### Phase 21 — Two fonts side by side
 
