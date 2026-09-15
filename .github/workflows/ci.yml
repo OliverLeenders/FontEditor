@@ -1,4 +1,4 @@
-# Runs the same three commands the README tells a person to run, on every push
+# Runs the same commands docs/development.md tells a person to run, on every push
 # and every pull request. Nothing here is a check the repository does not
 # already hold itself to locally — CI only makes it impossible to forget one.
 
