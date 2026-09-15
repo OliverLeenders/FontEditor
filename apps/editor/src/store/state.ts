@@ -97,6 +97,8 @@ export type StoreState = {
   /** Space held: draw the shape without any controls. */
   readonly previewing: boolean;
   readonly inspector: InspectorPlacement;
+  /** How a split window is divided: side by side or stacked, and where. */
+  readonly split: Preferences["split"];
   /** Which palette to draw with, or "system" to follow the reader's machine. */
   readonly theme: ThemeChoice;
   /** What the glyph browser is filtered to. Not undoable, so it lives out here. */
@@ -311,6 +313,7 @@ export function initialState(preferences: Preferences): StoreState {
     proofLeading: preferences.proofLeading,
     previewing: false,
     inspector: preferences.inspector,
+    split: preferences.split,
     theme: preferences.theme,
     viewport: { width: 0, height: 0 },
   };

@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { applyTheme } from "./scheme.js";
 
 import { ContextMenu, type MenuRequest } from "./components/ContextMenu.js";
+import { Divider } from "./components/Divider.js";
 import { GlyphBrowser } from "./components/GlyphBrowser.js";
 import { GlyphCanvas } from "./components/GlyphCanvas.js";
 import { GlyphStrip } from "./components/GlyphStrip.js";
@@ -27,6 +28,18 @@ import { StatusBar } from "./components/StatusBar.js";
 import { TabBar, type ViewId } from "./components/TabBar.js";
 import { Toolbar } from "./components/Toolbar.js";
 import styles from "./App.module.css";
+import {
+  type PaneIndex,
+  type Panes,
+  SINGLE_PANE,
+  activeView,
+  choosePane,
+  closeSecondPane,
+  focusPane,
+  openGlyphFrom,
+  openSecondPane,
+  viewIn,
+} from "./layout.js";
 import { useEditorStore, useStoreValue } from "./useStore.js";
 
 /** Pasted contours need ids; the application owns the factory. */
@@ -38,13 +51,19 @@ export function App(): React.JSX.Element {
   // want to work on somewhere in it. Opening on the canvas meant opening on
   // whichever letter happened to be first, which is an answer to a question
   // nobody asked yet.
-  const [view, setView] = useState<ViewId>("font");
+  //
+  // One pane or two. Which workspaces they show is where somebody is rather
+  // than a setting, so it is not remembered; the shape of the split is.
+  const [panes, setPanes] = useState<Panes>(SINGLE_PANE);
   const [menu, setMenu] = useState<MenuRequest | null>(null);
   const [keysShown, setKeysShown] = useState(false);
+  // The workspace the keyboard is in: the only one, or the active one of two.
+  const view = activeView(panes);
   // Read by the window key handler, which is installed once and must not be
   // rebuilt every time the workspace changes.
   const viewRef = useRef(view);
   viewRef.current = view;
+  const split = useStoreValue((s) => s.split);
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const inspectorOpen = useStoreValue((s) => s.inspector.open);
   const dock = useStoreValue((s) => s.inspector.dock);
@@ -286,6 +305,122 @@ export function App(): React.JSX.Element {
     };
   }, [store]);
 
+  /** What a workspace shows, in whichever pane it is. */
+  const workspace = (shown: ViewId, index: PaneIndex): React.JSX.Element => {
+    // A glyph chosen here is drawn in the other pane if that one is drawing,
+    // and otherwise this pane turns to the drawing.
+    const open = (name: string): void => {
+      store.setCurrentGlyph(name);
+      setPanes((current) => openGlyphFrom(current, index));
+    };
+
+    switch (shown) {
+      case "features":
+        return (
+          <div className={styles.stage}>
+            <FeaturesView />
+          </div>
+        );
+      case "proof":
+        return (
+          <div className={styles.stage}>
+            <ProofView />
+          </div>
+        );
+      case "spacing":
+        return (
+          <div className={styles.stage}>
+            <SpacingView onOpenGlyph={open} />
+          </div>
+        );
+      case "font":
+        return (
+          <div className={styles.stage}>
+            <GlyphBrowser onOpen={open} />
+          </div>
+        );
+      case "glyph":
+        return (
+          <>
+            <Toolbar />
+            <div
+              className={`${styles.stage} ${styles.editing}`}
+              data-dock={dock === "float" ? undefined : dock}
+            >
+              {/* The canvas in a box of its own, so a docked inspector sits
+                  beside it rather than over it and the drawing gets the rest. */}
+              <div className={styles.drawing}>
+                <GlyphCanvas onContextMenu={setMenu} />
+                {menu !== null ? (
+                  <ContextMenu store={store} request={menu} onClose={() => setMenu(null)} />
+                ) : null}
+                {!inspectorOpen ? (
+                  <button
+                    type="button"
+                    className={styles.reveal}
+                    title="Show the inspector  (I)"
+                    onClick={() => store.toggleInspector()}
+                  >
+                    Inspector
+                  </button>
+                ) : null}
+              </div>
+              <Inspector />
+            </div>
+            <GlyphStrip />
+          </>
+        );
+    }
+  };
+
+  /**
+   * One pane: its bar of workspaces, and the workspace.
+   *
+   * Pressing anywhere in a pane, or tabbing into it, makes it the one the
+   * keyboard follows. Its share of the window is the divider's.
+   */
+  const pane = (index: PaneIndex): React.JSX.Element | null => {
+    const shown = viewIn(panes, index);
+    if (shown === null) return null;
+    const two = panes.second !== null;
+    const focus = (): void => setPanes((current) => focusPane(current, index));
+
+    return (
+      <section
+        key={index}
+        className={styles.pane}
+        data-pane={index}
+        style={two ? { flexGrow: index === 0 ? split.ratio : 1 - split.ratio } : undefined}
+        onPointerDownCapture={focus}
+        onFocusCapture={focus}
+      >
+        <TabBar
+          current={shown}
+          onSelect={(id) => setPanes((current) => choosePane(current, index, id))}
+          glyphName={glyphName}
+          label={
+            !two
+              ? "Workspaces"
+              : index === 0
+                ? "Workspaces in the first pane"
+                : "Workspaces in the second pane"
+          }
+          active={two && panes.active === index}
+          orientation={split.orientation}
+          onSplit={two ? undefined : () => setPanes(openSecondPane)}
+          onFlip={
+            two && index === 1
+              ? () =>
+                  store.placeSplit({ orientation: split.orientation === "row" ? "column" : "row" })
+              : undefined
+          }
+          onClose={two && index === 1 ? () => setPanes(closeSecondPane) : undefined}
+        />
+        {workspace(shown, index)}
+      </section>
+    );
+  };
+
   return (
     <div className={styles.shell}>
       {ownership === "reading" ? (
@@ -307,63 +442,20 @@ export function App(): React.JSX.Element {
         // Blank until there is something true to show: the list, or the font.
         <div className={styles.arriving} aria-busy="true" />
       ) : null}
-      <TabBar current={view} onSelect={setView} glyphName={glyphName} />
-      {view === "features" ? (
-        <main className={styles.stage}>
-          <FeaturesView />
-        </main>
-      ) : view === "proof" ? (
-        <main className={styles.stage}>
-          <ProofView />
-        </main>
-      ) : view === "spacing" ? (
-        <main className={styles.stage}>
-          <SpacingView
-            onOpenGlyph={(name) => {
-              store.setCurrentGlyph(name);
-              setView("glyph");
-            }}
+      <main
+        className={styles.panes}
+        data-orientation={panes.second === null ? undefined : split.orientation}
+      >
+        {pane(0)}
+        {panes.second === null ? null : (
+          <Divider
+            orientation={split.orientation}
+            ratio={split.ratio}
+            onRatio={(ratio) => store.placeSplit({ ratio })}
           />
-        </main>
-      ) : view === "font" ? (
-        <main className={styles.stage}>
-          <GlyphBrowser
-            onOpen={(name) => {
-              store.setCurrentGlyph(name);
-              setView("glyph");
-            }}
-          />
-        </main>
-      ) : (
-        <>
-          <Toolbar />
-          <main
-            className={`${styles.stage} ${styles.editing}`}
-            data-dock={dock === "float" ? undefined : dock}
-          >
-            {/* The canvas in a box of its own, so a docked inspector sits
-                beside it rather than over it and the drawing gets the rest. */}
-            <div className={styles.drawing}>
-              <GlyphCanvas onContextMenu={setMenu} />
-              {menu !== null ? (
-                <ContextMenu store={store} request={menu} onClose={() => setMenu(null)} />
-              ) : null}
-              {!inspectorOpen ? (
-                <button
-                  type="button"
-                  className={styles.reveal}
-                  title="Show the inspector  (I)"
-                  onClick={() => store.toggleInspector()}
-                >
-                  Inspector
-                </button>
-              ) : null}
-            </div>
-            <Inspector />
-          </main>
-          <GlyphStrip />
-        </>
-      )}
+        )}
+        {pane(1)}
+      </main>
       <StatusBar workspace={view} onShortcuts={() => setKeysShown(true)} />
       {keysShown ? <Shortcuts onClose={() => setKeysShown(false)} /> : null}
     </div>

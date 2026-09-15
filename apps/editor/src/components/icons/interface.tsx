@@ -21,6 +21,22 @@ export const XIcon: IconComponent = () => (
   </Glyph>
 );
 
+/** Two panes side by side: splitting the window, or unstacking its panes. */
+export const Columns2Icon: IconComponent = () => (
+  <Glyph>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M12 3v18" />
+  </Glyph>
+);
+
+/** Two panes one above the other. */
+export const Rows2Icon: IconComponent = () => (
+  <Glyph>
+    <rect width="18" height="18" x="3" y="3" rx="2" />
+    <path d="M3 12h18" />
+  </Glyph>
+);
+
 /** The inspector docked to the left edge. */
 export const PanelLeftIcon: IconComponent = () => (
   <Glyph>

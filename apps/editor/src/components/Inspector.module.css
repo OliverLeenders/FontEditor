@@ -151,8 +151,10 @@
   /* The panel floats and is dragged about, so it cannot rely on the window
      being tall enough for everything it holds. Scrolling the contents keeps the
      last field reachable on a short window; dragging the panel off the top to
-     reach it is not a way to use a tool. */
-  max-height: calc(100vh - 7rem);
+     reach it is not a way to use a tool. The drawing below the panel is the
+     measure where it is known — a stacked split gives the drawing a fraction of
+     the window, and the panel would otherwise hang over the pane beneath. */
+  max-height: min(calc(100vh - 7rem), max(8rem, calc(var(--inspector-room, 100vh) - 3.5rem)));
   overflow-y: auto;
 }
 

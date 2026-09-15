@@ -65,6 +65,29 @@ export type InspectorPlacement = {
   readonly sections: Readonly<Record<string, boolean>>;
 };
 
+/** Two panes side by side ("row"), or one above the other ("column"). */
+export type SplitOrientation = "row" | "column";
+
+/**
+ * How the window is divided when it shows two workspaces.
+ *
+ * The shape of the split rather than what is in it: side by side suits a
+ * drawing beside the proof, stacked suits a wide spacing line under the
+ * drawing, and which of those somebody wants is a fact about their screen. The
+ * workspaces in the panes are where somebody is, and are not remembered.
+ */
+export type SplitPlacement = {
+  readonly orientation: SplitOrientation;
+  /** The first pane's share of the space; the second has the rest. */
+  readonly ratio: number;
+};
+
+/** The smallest share a pane can be dragged down to, so neither disappears. */
+export const MIN_SPLIT_RATIO = 0.2;
+export const MAX_SPLIT_RATIO = 0.8;
+
+export const DEFAULT_SPLIT: SplitPlacement = { orientation: "row", ratio: 0.5 };
+
 export type Preferences = {
   readonly theme: ThemeChoice;
   /** How heavy the outline is drawn, in screen pixels. */
@@ -113,6 +136,7 @@ export type Preferences = {
   readonly proofSize: number;
   readonly proofLeading: number;
   readonly inspector: InspectorPlacement;
+  readonly split: SplitPlacement;
 };
 
 const KEY = "typewright.preferences";
@@ -160,6 +184,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   proofSize: 32,
   proofLeading: 1.4,
   inspector: DEFAULT_PLACEMENT,
+  split: DEFAULT_SPLIT,
 };
 
 /**
@@ -192,6 +217,7 @@ export function loadPreferences(): Preferences {
   const raw: Record<string, unknown> = stored ?? {};
 
   const inspector = (raw["inspector"] ?? read(OLD_INSPECTOR_KEY) ?? {}) as Record<string, unknown>;
+  const split = (raw["split"] ?? {}) as Record<string, unknown>;
 
   return {
     theme: isTheme(raw["theme"]) ? raw["theme"] : DEFAULT_PREFERENCES.theme,
@@ -234,11 +260,23 @@ export function loadPreferences(): Preferences {
       }),
       sections: sectionsOf(inspector["sections"]),
     },
+    split: {
+      orientation: isOrientation(split["orientation"])
+        ? split["orientation"]
+        : DEFAULT_SPLIT.orientation,
+      ratio: number(split["ratio"], DEFAULT_SPLIT.ratio, {
+        min: MIN_SPLIT_RATIO,
+        max: MAX_SPLIT_RATIO,
+      }),
+    },
   };
 }
 
 const isDock = (value: unknown): value is InspectorDock =>
   value === "float" || value === "left" || value === "right";
+
+const isOrientation = (value: unknown): value is SplitOrientation =>
+  value === "row" || value === "column";
 
 /** The folded-by-hand choices, keeping only what this can make sense of. */
 function sectionsOf(raw: unknown): Record<string, boolean> {

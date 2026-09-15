@@ -64,6 +64,7 @@ import {
   toggleInspector,
   toggleInspectorSection,
 } from "./inspector.js";
+import { type SplitChanges, placeSplit } from "./split.js";
 import {
   type Arrival,
   arrive,
@@ -779,6 +780,11 @@ export class EditorStore {
   setSpacingSize(spacingSize: number): void {
     const held = within(spacingSize, MIN_SPACING_SIZE, MAX_SPACING_SIZE);
     if (held !== null) this.remember({ spacingSize: held });
+  }
+
+  /** How a split window is divided: side by side or stacked, and where. */
+  placeSplit(changes: SplitChanges): void {
+    placeSplit(this.host, changes);
   }
 
   toggleNeighbours(): void {

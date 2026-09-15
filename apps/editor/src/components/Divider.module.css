@@ -1,0 +1,41 @@
+/*
+ * The line between two panes.
+ *
+ * One pixel to look at and nine to grab: the strip that takes the pointer lies
+ * over the edges of both panes, because a one-pixel target is one nobody hits.
+ */
+.divider {
+  position: relative;
+  flex: none;
+  background: var(--rule-strong);
+  touch-action: none;
+}
+.divider[data-orientation="row"] {
+  width: 1px;
+  cursor: col-resize;
+}
+.divider[data-orientation="column"] {
+  height: 1px;
+  cursor: row-resize;
+}
+
+.divider::before {
+  content: "";
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+}
+.divider[data-orientation="row"]::before {
+  left: -4px;
+  right: -4px;
+}
+.divider[data-orientation="column"]::before {
+  top: -4px;
+  bottom: -4px;
+}
+
+.divider:hover,
+.divider:focus-visible {
+  background: var(--accent);
+  outline: none;
+}

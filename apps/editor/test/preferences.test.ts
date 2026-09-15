@@ -5,8 +5,15 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { MAX_OUTLINE_WIDTH, MIN_PROOF_SIZE } = await import("../src/limits.js");
-const { DEFAULT_PLACEMENT, DEFAULT_PREFERENCES, loadPreferences, savePreferences } =
-  await import("../src/preferences.js");
+const {
+  DEFAULT_PLACEMENT,
+  DEFAULT_PREFERENCES,
+  DEFAULT_SPLIT,
+  MAX_SPLIT_RATIO,
+  MIN_SPLIT_RATIO,
+  loadPreferences,
+  savePreferences,
+} = await import("../src/preferences.js");
 const { EditorStore } = await import("../src/store/index.js");
 
 describe("reading preferences", () => {
@@ -63,6 +70,19 @@ describe("reading preferences", () => {
     const read = loadPreferences();
     expect(read.outlineWidth).toBe(MAX_OUTLINE_WIDTH);
     expect(read.proofSize).toBe(MIN_PROOF_SIZE);
+  });
+
+  it("reads a split it can make sense of, and defaults what it cannot", () => {
+    // A divider dragged past where this version allows would leave a pane too
+    // narrow to find; a shape it has never heard of is no shape at all.
+    localStorage.setItem(
+      "typewright.preferences",
+      JSON.stringify({ split: { orientation: "diagonal", ratio: 0.05 } }),
+    );
+    expect(loadPreferences().split).toEqual({
+      orientation: DEFAULT_SPLIT.orientation,
+      ratio: MIN_SPLIT_RATIO,
+    });
   });
 
   it("adopts what was saved before the editor was named", () => {
@@ -141,5 +161,24 @@ describe("preferences and the store", () => {
     const placed = first.getState().inspector;
 
     expect(new EditorStore().getState().inspector).toEqual(placed);
+  });
+
+  it("remembers how the window is split, inside the divider's limits", () => {
+    const first = new EditorStore();
+    first.placeSplit({ orientation: "column" });
+    first.placeSplit({ ratio: 0.95 });
+
+    expect(new EditorStore().getState().split).toEqual({
+      orientation: "column",
+      ratio: MAX_SPLIT_RATIO,
+    });
+  });
+
+  it("ignores a divider position that is not a number", () => {
+    // jsdom, or a pane measured before it had a size, reports 0 / 0.
+    const store = new EditorStore();
+    store.placeSplit({ ratio: Number.NaN });
+
+    expect(store.getState().split).toEqual(DEFAULT_SPLIT);
   });
 });

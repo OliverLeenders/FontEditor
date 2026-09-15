@@ -36,6 +36,16 @@ export function Inspector(): React.JSX.Element | null {
   const y = useStoreValue((s) => s.inspector.y);
   const dock = useStoreValue((s) => s.inspector.dock);
   const width = useStoreValue((s) => s.inspector.width);
+  // The size of the drawing the panel floats over: the window less its bars in
+  // a window of one, and much less in a stacked split.
+  const roomWidth = useStoreValue((s) => s.viewport.width);
+  const room = useStoreValue((s) => s.viewport.height);
+  // Where it is drawn: where it was put, as far as the drawing allows — enough
+  // of it across to grab, and its header and the least of its body down. The
+  // remembered place is left alone, so a pane made larger again puts the panel
+  // back where it was.
+  const shownX = roomWidth > 1 ? Math.max(0, Math.min(x, roomWidth - 80)) : x;
+  const shownY = room > 1 ? Math.max(0, Math.min(y, room - 168)) : y;
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
 
@@ -77,7 +87,13 @@ export function Inspector(): React.JSX.Element | null {
       data-dock={dock === "float" ? undefined : dock}
       style={
         dock === "float"
-          ? { left: `${x}px`, top: `${y}px` }
+          ? {
+              left: `${shownX}px`,
+              top: `${shownY}px`,
+              // How much of the drawing lies below the panel's top, for its
+              // body to scroll within. Unset until the canvas has been measured.
+              ...(room > 1 ? { "--inspector-room": `${room - shownY}px` } : {}),
+            }
           : { width: `${width}px`, flex: `0 0 ${width}px` }
       }
       aria-label="Glyph inspector"
@@ -89,10 +105,15 @@ export function Inspector(): React.JSX.Element | null {
           // A docked panel is not where the pointer went down relative to its
           // own left edge, so dragging one out starts from under the cursor
           // rather than from a position it does not have.
+          // Floating, it is placed within the workspace it lies over, which in
+          // a split window does not start at the window's corner.
+          const origin = event.currentTarget
+            .closest("aside")
+            ?.parentElement?.getBoundingClientRect() ?? { left: 0, top: 0 };
           drag.current =
             dock === "float"
-              ? { dx: event.clientX - x, dy: event.clientY - y }
-              : { dx: width / 2, dy: 8 };
+              ? { dx: event.clientX - shownX, dy: event.clientY - shownY }
+              : { dx: width / 2 + origin.left, dy: 8 + origin.top };
         }}
         onPointerMove={(event) => {
           const from = drag.current;
@@ -101,7 +122,7 @@ export function Inspector(): React.JSX.Element | null {
           // Dragging to an edge docks, dragging away from one undocks. The
           // panel goes where it is put, which is the gesture anybody would try
           // first — the button in the header is for the people who would not.
-          const edge = edgeAt(event.clientX);
+          const edge = edgeAt(event.clientX, event.currentTarget);
           if (edge !== null) {
             store.dockInspector(edge);
             return;
@@ -195,8 +216,9 @@ export function Inspector(): React.JSX.Element | null {
           }}
           onPointerMove={(event) => {
             if (!resizing.current) return;
+            const pane = paneEdges(event.currentTarget);
             store.resizeInspector(
-              dock === "right" ? window.innerWidth - event.clientX : event.clientX,
+              dock === "right" ? pane.right - event.clientX : event.clientX - pane.left,
             );
           }}
           onPointerUp={(event) => {
@@ -242,9 +264,22 @@ export function Inspector(): React.JSX.Element | null {
  */
 const EDGE = 48;
 
-/** Which side of the window a drag is at, if it is at one. */
-function edgeAt(clientX: number): "left" | "right" | null {
-  if (clientX <= EDGE) return "left";
-  if (clientX >= window.innerWidth - EDGE) return "right";
+/** Which side of its pane a drag is at, if it is at one. */
+function edgeAt(clientX: number, inside: Element): "left" | "right" | null {
+  const pane = paneEdges(inside);
+  if (clientX <= pane.left + EDGE) return "left";
+  if (clientX >= pane.right - EDGE) return "right";
   return null;
+}
+
+/**
+ * The left and right edges of the pane the inspector is in.
+ *
+ * The window's, in a window of one. In a split window the drawing may be the
+ * right-hand pane, and docking to the window's left edge would put the panel in
+ * the other pane's workspace.
+ */
+function paneEdges(inside: Element): { left: number; right: number } {
+  const pane = inside.closest("[data-pane]");
+  return pane === null ? { left: 0, right: window.innerWidth } : pane.getBoundingClientRect();
 }

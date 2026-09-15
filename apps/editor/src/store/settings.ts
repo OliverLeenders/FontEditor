@@ -29,6 +29,7 @@ export function preferencesOf(s: StoreState): Preferences {
     proofSize: s.proofSize,
     proofLeading: s.proofLeading,
     inspector: s.inspector,
+    split: s.split,
   };
 }
 
