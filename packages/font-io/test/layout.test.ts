@@ -124,4 +124,108 @@ describe("putting two sets of features together", () => {
       { tag: "liga", lookups: [3, 5] },
     ]);
   });
+
+  it("keeps a feature's language apart from the same tag everywhere", () => {
+    const turkish = { script: "latn", language: "TRK" };
+    expect(
+      mergeFeatures(
+        [{ tag: "locl", lookups: [0] }],
+        [{ tag: "locl", lookups: [1], system: turkish }],
+      ),
+    ).toEqual([
+      { tag: "locl", lookups: [0] },
+      { tag: "locl", lookups: [1], system: turkish },
+    ]);
+  });
+});
+
+/** The script list: each script's default language and named languages, as feature indices. */
+function scripts(table: Uint8Array) {
+  const listAt = read16(table, 4);
+  const count = read16(table, listAt);
+  const out: {
+    tag: string;
+    fallback: number[] | null;
+    languages: { tag: string; features: number[] }[];
+  }[] = [];
+  const langSys = (at: number) => {
+    const n = read16(table, at + 4);
+    return Array.from({ length: n }, (_, i) => read16(table, at + 6 + i * 2));
+  };
+  for (let i = 0; i < count; i++) {
+    const record = listAt + 2 + i * 6;
+    const tag = String.fromCharCode(...table.slice(record, record + 4));
+    const scriptAt = listAt + read16(table, record + 4);
+    const defaultAt = read16(table, scriptAt);
+    const languageCount = read16(table, scriptAt + 2);
+    const languages = Array.from({ length: languageCount }, (_, j) => {
+      const at = scriptAt + 4 + j * 6;
+      return {
+        tag: String.fromCharCode(...table.slice(at, at + 4)),
+        features: langSys(scriptAt + read16(table, at + 4)),
+      };
+    });
+    out.push({ tag, fallback: defaultAt === 0 ? null : langSys(scriptAt + defaultAt), languages });
+  }
+  return out;
+}
+
+describe("scripts and languages", () => {
+  const lookups = [
+    { type: 1, subtables: [subtable(1)] },
+    { type: 1, subtables: [subtable(2)] },
+  ];
+  const DFLT = { script: "DFLT", language: "dflt" };
+  const latn = { script: "latn", language: "dflt" };
+  const turkish = { script: "latn", language: "TRK" };
+
+  it("declares the default script alone when nothing says otherwise", () => {
+    const table = layoutTable([{ tag: "liga", lookups: [0] }], lookups);
+    expect(scripts(table)).toEqual([{ tag: "DFLT", fallback: [0], languages: [] }]);
+  });
+
+  it("offers a feature with no language of its own in every language declared", () => {
+    const table = layoutTable([{ tag: "liga", lookups: [0] }], lookups, [DFLT, latn, turkish]);
+    expect(scripts(table)).toEqual([
+      { tag: "DFLT", fallback: [0], languages: [] },
+      { tag: "latn", fallback: [0], languages: [{ tag: "TRK ", features: [0] }] },
+    ]);
+  });
+
+  it("offers a feature written for one language only there", () => {
+    const table = layoutTable(
+      [
+        { tag: "liga", lookups: [0] },
+        { tag: "locl", lookups: [1], system: turkish },
+      ],
+      lookups,
+      [DFLT, latn, turkish],
+    );
+    expect(featureTags(table)).toEqual(["liga", "locl"]);
+    expect(scripts(table)).toEqual([
+      { tag: "DFLT", fallback: [0], languages: [] },
+      { tag: "latn", fallback: [0], languages: [{ tag: "TRK ", features: [0, 1] }] },
+    ]);
+  });
+
+  it("lists a tag once for each set of lookups it has in different languages", () => {
+    const table = layoutTable(
+      [
+        { tag: "smcp", lookups: [0] },
+        { tag: "smcp", lookups: [1], system: turkish },
+      ],
+      lookups,
+      [latn, turkish],
+    );
+    expect(featureTags(table)).toEqual(["smcp", "smcp"]);
+    const [, latin] = [null, scripts(table)[0]!];
+    expect(lookupsOfFeature(table, latin.fallback![0]!)).toEqual([0]);
+    expect(lookupsOfFeature(table, latin.languages[0]!.features[0]!)).toEqual([0, 1]);
+  });
+
+  it("includes a language only a feature names", () => {
+    const table = layoutTable([{ tag: "locl", lookups: [1], system: latn }], lookups);
+    expect(scripts(table).map((s) => s.tag)).toEqual(["DFLT", "latn"]);
+    expect(scripts(table)[0]!.fallback).toEqual([]);
+  });
 });

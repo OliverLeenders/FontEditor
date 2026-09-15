@@ -7,9 +7,9 @@ import { Writer, coverage } from "./gpos.js";
  * script list, feature list, lookup list — is in `layout.ts`, written once for
  * both.
  *
- * Three lookup types, and they are the ones a font being drawn actually uses:
- * one glyph for another, a run of glyphs for one, and either of those again
- * conditioned on what surrounds it.
+ * The lookup types a font being drawn actually uses: one glyph for another, one
+ * for several, one of a set of alternates, a run of glyphs for one, and any of
+ * those again conditioned on what surrounds it.
  */
 
 export type SingleSub = {
@@ -131,6 +131,58 @@ export function ligatureSubst(ligatures: readonly LigatureSub[]): Uint8Array {
  * the subtables of a lookup are tried in order and the first to match wins, so
  * an ignore rule placed before another stops it.
  */
+/** One glyph into several: `sub f_i by f i;`. */
+export type MultipleSub = { readonly from: number; readonly to: readonly number[] };
+
+/** One glyph, and the alternates an application may offer for it. */
+export type AlternateSub = { readonly from: number; readonly alternates: readonly number[] };
+
+/**
+ * A lookup of one glyph to a list: a multiple substitution or an alternate set.
+ *
+ * The two formats are laid out alike — a coverage of the glyphs, and for each
+ * one a count and a list — and differ only in what the list means: glyphs that
+ * all replace the one, or glyphs of which one is chosen.
+ */
+function sequences(entries: readonly { from: number; list: readonly number[] }[]): Uint8Array {
+  const sorted = [...entries].sort((l, r) => l.from - r.from);
+  const cover = coverage(sorted.map((e) => e.from));
+
+  const lists = sorted.map((entry) => {
+    const w = new Writer();
+    w.u16(entry.list.length);
+    for (const id of entry.list) w.u16(id);
+    return w.finish();
+  });
+
+  const header = 6 + lists.length * 2;
+  let at = header + cover.length;
+  const offsets = lists.map((list) => {
+    const here = at;
+    at += list.length;
+    return here;
+  });
+
+  const w = new Writer();
+  w.u16(1); // format 1, the only one
+  w.u16(header); // the coverage sits between the offsets and the lists
+  w.u16(lists.length);
+  for (const off of offsets) w.u16(off);
+  w.bytesOf(cover);
+  for (const list of lists) w.bytesOf(list);
+  return w.finish();
+}
+
+/** A multiple substitution: each covered glyph becomes a run of glyphs. */
+export function multipleSubst(subs: readonly MultipleSub[]): Uint8Array {
+  return sequences(subs.map((s) => ({ from: s.from, list: s.to })));
+}
+
+/** An alternate substitution: each covered glyph offers a set to choose from. */
+export function alternateSubst(subs: readonly AlternateSub[]): Uint8Array {
+  return sequences(subs.map((s) => ({ from: s.from, list: s.alternates })));
+}
+
 export type ChainRule = {
   readonly backtrack: readonly (readonly number[])[];
   readonly input: readonly (readonly number[])[];
@@ -173,3 +225,13 @@ export function chainContextSubst(rule: ChainRule): Uint8Array {
   for (const cover of covers) w.bytesOf(cover);
   return w.finish();
 }
+
+/**
+ * A chaining contextual adjustment: GPOS type 8, format 3.
+ *
+ * Byte for byte the same layout as the substitution — the coverages of the
+ * backtrack, the input and the lookahead, then which lookup runs where — with
+ * the lookups it points at being positioning ones. Kept as a name of its own so
+ * that the table each one belongs in is said where it is used.
+ */
+export const chainContextPos: (rule: ChainRule) => Uint8Array = chainContextSubst;

@@ -552,6 +552,9 @@ export function layoutTables(
       marks.features.map((tag, i) => ({ tag, lookups: [markAt + i] })),
     ),
     [...kernLookups, ...features.positioning.lookups, ...marks.lookups],
+    // Kerning and marks apply in every language system the feature file
+    // declares, as they would had they been written in it.
+    features.systems,
   );
   for (const problem of features.problems) {
     warnings.push(`features, line ${String(problem.line)}: ${problem.message}`);

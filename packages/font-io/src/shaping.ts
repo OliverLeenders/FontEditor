@@ -101,13 +101,19 @@ function applyRules(names: readonly string[], rules: readonly FeaRule[]): string
     // Positioning moves a glyph without changing which glyph it is, and this
     // returns names. Such a rule reaches the exported font and not the preview,
     // which is a gap worth knowing about rather than one worth pretending away.
-    if (rule.kind === "position") {
+    // Alternates are chosen by an application rather than applied; positioning
+    // in a context moves glyphs, like any positioning.
+    if (rule.kind === "position" || rule.kind === "contextPosition" || rule.kind === "alternate") {
       at += 1;
       continue;
     }
 
     run =
-      rule.kind === "ligature" ? applyLigature(run, rule.from, rule.to) : applySingle(run, rule);
+      rule.kind === "ligature"
+        ? applyLigature(run, rule.from, rule.to)
+        : rule.kind === "multiple"
+          ? run.flatMap((name) => (name === rule.from ? [...rule.to] : [name]))
+          : applySingle(run, rule);
     at += 1;
   }
   return run;
@@ -179,6 +185,7 @@ function chainMatches(
 function replacement(first: string, rule: Chain): string[] {
   const to = rule.to ?? [];
   if (to.length === 0) return [first];
+  if (rule.multiple) return [...to];
   if (rule.input.length > 1 || to.length === 1) return [to[0]!];
 
   // A class paired off with another: each glyph of the marked position becomes

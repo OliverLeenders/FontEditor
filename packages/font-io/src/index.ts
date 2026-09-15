@@ -59,10 +59,21 @@ export {
 export type { ZipFile } from "./unzip.js";
 export { fileText, unzip } from "./unzip.js";
 
-export type { FeaFeature, FeaProblem, FeaRule, FeaSource } from "./fea.js";
+export type {
+  FeaBlock,
+  FeaFeature,
+  FeaLookup,
+  FeaProblem,
+  FeaRule,
+  FeaSource,
+  FeaStatement,
+} from "./fea.js";
+export type { LanguageSystem } from "./layout.js";
 export { parseFea } from "./fea.js";
 export type { CompiledFeatures } from "./features.js";
 export { NO_FEATURES, compileFeatures } from "./features.js";
+export type { MarkPlace, MarksSource } from "./marks-source.js";
+export { MARK_CLASS_PREFIX, placeMarks, readMarks, writeMarks } from "./marks-source.js";
 
 export type { Positioner, Shaper } from "./shaping.js";
 export {

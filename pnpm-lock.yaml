@@ -156,6 +156,10 @@ importers:
       woff2-encoder:
         specifier: ^2.0.0
         version: 2.0.0
+    devDependencies:
+      harfbuzzjs:
+        specifier: ^1.6.1
+        version: 1.6.1
 
   packages/font-model:
     dependencies:

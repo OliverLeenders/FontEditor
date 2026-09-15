@@ -206,14 +206,28 @@ describe("reading a rule with a context", () => {
     expect(parsed.problems.some((p) => p.message.includes("replaces nothing"))).toBe(true);
   });
 
-  it("refuses a rule that calls a lookup by name", () => {
-    const parsed = parseFea("feature calt { sub a b' lookup SOMETHING; } calt;");
-    expect(parsed.problems.some((p) => p.message.includes("named lookup"))).toBe(true);
+  it("reads a rule that calls a named lookup at a marked glyph", () => {
+    const parsed = parseFea(
+      "lookup SC { sub b by b.sc; } SC;\nfeature calt { sub a b' lookup SC; } calt;",
+    );
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.features[0]?.rules[0]).toMatchObject({
+      kind: "chain",
+      backtrack: [["a"]],
+      input: [["b"]],
+      to: null,
+      calls: ["SC"],
+      ignore: false,
+    });
   });
 
-  it("refuses ignore of anything but a substitution", () => {
-    const parsed = parseFea("feature calt { ignore pos a b'; } calt;");
-    expect(parsed.problems.some((p) => p.message.includes("ignore sub"))).toBe(true);
+  it("reads an ignore rule for positioning too", () => {
+    expect(rule("feature kern { ignore pos a b'; } kern;")).toMatchObject({
+      kind: "contextPosition",
+      backtrack: [["a"]],
+      input: [["b"]],
+      ignore: true,
+    });
   });
 
   it("still reads a plain rule the same way", () => {
@@ -327,9 +341,20 @@ describe("reading a positioning rule", () => {
     expect(parsed.problems.some((p) => p.message.includes("needs a value"))).toBe(true);
   });
 
-  it("refuses positioning in a context", () => {
-    const parsed = parseFea("feature test { pos a b' 20; } test;");
-    expect(parsed.problems.some((p) => p.message.includes("in a context"))).toBe(true);
+  it("reads positioning in a context, with the value after the marked glyph", () => {
+    expect(rule("feature test { pos a b' 20 c; } test;")).toMatchObject({
+      kind: "contextPosition",
+      backtrack: [["a"]],
+      input: [["b"]],
+      lookahead: [["c"]],
+      values: [{ x: 0, y: 0, xAdvance: 20, yAdvance: 0 }],
+      ignore: false,
+    });
+  });
+
+  it("refuses a value on a glyph that is only context", () => {
+    const parsed = parseFea("feature test { pos a 20 b' 10; } test;");
+    expect(parsed.problems.some((p) => p.message.includes("marked glyph"))).toBe(true);
   });
 
   it("refuses every kind of attachment by its own name", () => {
@@ -507,5 +532,226 @@ describe("the exported font positions", () => {
     const f = reread("feature liga { sub f i by fi; } liga; feature cpsp { pos a 20; } cpsp;");
     expect(f.tables.gsub!.features.map((x) => x.tag)).toEqual(["liga"]);
     expect(f.tables.gpos!.features.map((x) => x.tag)).toEqual(["cpsp"]);
+  });
+});
+
+describe("reading the rest of the language", () => {
+  const rule = (source: string) => parseFea(source).features[0]?.rules[0];
+
+  it("reads one glyph replaced by several", () => {
+    expect(rule("feature ccmp { sub fi by f i; } ccmp;")).toMatchObject({
+      kind: "multiple",
+      from: "fi",
+      to: ["f", "i"],
+    });
+  });
+
+  it("reads a glyph and its alternates", () => {
+    expect(rule("feature salt { sub a from [a.sc b]; } salt;")).toMatchObject({
+      kind: "alternate",
+      from: "a",
+      alternates: ["a.sc", "b"],
+    });
+  });
+
+  it("gives alternates for one glyph at a time", () => {
+    const parsed = parseFea("@A = [a b]; feature salt { sub @A from [a.sc b.sc]; } salt;");
+    expect(parsed.problems.some((p) => p.message.includes("one glyph at a time"))).toBe(true);
+  });
+
+  it("reads one glyph replaced by several in a context", () => {
+    expect(rule("feature calt { sub b a' by f i; } calt;")).toMatchObject({
+      kind: "chain",
+      backtrack: [["b"]],
+      input: [["a"]],
+      to: ["f", "i"],
+      multiple: true,
+    });
+  });
+
+  it("reads a named lookup, and a feature that uses it", () => {
+    const parsed = parseFea(`
+      lookup SC { sub a by a.sc; } SC;
+      feature smcp { lookup SC; } smcp;
+    `);
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.lookups.map((l) => l.name)).toEqual(["SC"]);
+    expect(parsed.features[0]?.statements).toEqual([{ kind: "lookup", name: "SC", line: 3 }]);
+    // The feature's rules include the lookup's, for a reader that only wants rules.
+    expect(parsed.features[0]?.rules[0]).toMatchObject({ kind: "single", from: ["a"] });
+    expect(parsed.blocks.map((b) => b.kind)).toEqual(["lookup", "feature"]);
+  });
+
+  it("reads a lookup defined inside the feature that uses it", () => {
+    const parsed = parseFea("feature liga { lookup LIGA { sub f i by fi; } LIGA; } liga;");
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.features[0]?.statements[0]).toMatchObject({
+      kind: "block",
+      lookup: { name: "LIGA" },
+    });
+  });
+
+  it("reads lookup flags by name and as a number", () => {
+    const flagsOf = (source: string) =>
+      parseFea(source).features[0]?.statements.find((s) => s.kind === "flags");
+    expect(flagsOf("feature liga { lookupflag IgnoreMarks RightToLeft; } liga;")).toMatchObject({
+      flags: 9,
+    });
+    expect(flagsOf("feature liga { lookupflag 8; } liga;")).toMatchObject({ flags: 8 });
+  });
+
+  it("refuses mark filtering in a lookup flag, by name", () => {
+    const parsed = parseFea("@M = [a]; feature liga { lookupflag UseMarkFilteringSet @M; } liga;");
+    expect(parsed.problems.some((p) => p.message.includes("UseMarkFilteringSet"))).toBe(true);
+  });
+
+  it("reads language systems, scripts and languages", () => {
+    const parsed = parseFea(`
+      languagesystem DFLT dflt;
+      languagesystem latn TRK;
+      feature locl { script latn; language TRK exclude_dflt; sub i by l; } locl;
+    `);
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.languageSystems).toEqual([
+      { script: "DFLT", language: "dflt" },
+      { script: "latn", language: "TRK" },
+    ]);
+    expect(parsed.features[0]?.statements.slice(0, 2)).toMatchObject([
+      { kind: "script", script: "latn" },
+      { kind: "language", language: "TRK", includeDefault: false },
+    ]);
+  });
+
+  it("sends mark classes to the anchors", () => {
+    const parsed = parseFea("markClass a <anchor 0 500> @TOP;");
+    expect(parsed.problems[0]?.message).toContain("anchors");
+  });
+
+  it("steps over a table it refuses, whole, and reads on", () => {
+    const parsed = parseFea(`
+      table GDEF { GlyphClassDef [a], , , ; } GDEF;
+      feature liga { sub f i by fi; } liga;
+    `);
+    expect(parsed.problems).toHaveLength(1);
+    expect(parsed.problems[0]?.message).toContain("tables");
+    expect(parsed.features.map((f) => f.tag)).toEqual(["liga"]);
+  });
+});
+
+/** The parts of a GSUB table as opentype.js reads them, for the tests below. */
+type ReadGsub = {
+  scripts: {
+    tag: string;
+    script: {
+      defaultLangSys?: { featureIndexes: number[] };
+      langSysRecords: { tag: string; langSys: { featureIndexes: number[] } }[];
+    };
+  }[];
+  features: { tag: string; feature: { lookupListIndexes: number[] } }[];
+  lookups: { lookupType: number; lookupFlag: number; subtables: unknown[] }[];
+};
+
+const gsubOf = (features: string): ReadGsub => reread(features).tables.gsub as unknown as ReadGsub;
+
+describe("compiling the rest of the language", () => {
+  const compile = (source: string) =>
+    compileFeatures(source, (n) => (NAMES.includes(n) ? NAMES.indexOf(n) : undefined));
+
+  it("writes one glyph into several as a multiple substitution", () => {
+    expect(compile("feature ccmp { sub fi by f i; } ccmp;").problems).toEqual([]);
+    expect(
+      gsubOf("feature ccmp { sub fi by f i; } ccmp;").lookups.map((l) => l.lookupType),
+    ).toEqual([2]);
+  });
+
+  it("writes alternates as an alternate substitution", () => {
+    expect(
+      gsubOf("feature salt { sub a from [a.sc b]; } salt;").lookups.map((l) => l.lookupType),
+    ).toEqual([3]);
+  });
+
+  it("starts a new lookup where the kind of rule changes, as fontTools does", () => {
+    // Which lookup a rule is in is the order a shaper applies it in.
+    const gsub = gsubOf("feature test { sub a by a.sc; sub f i by fi; sub b by b.sc; } test;");
+    expect(gsub.lookups.map((l) => l.lookupType)).toEqual([1, 4, 1]);
+    expect(gsub.features[0]?.feature.lookupListIndexes).toEqual([0, 1, 2]);
+  });
+
+  it("writes the flags a lookup was given", () => {
+    const gsub = gsubOf("feature liga { lookupflag IgnoreMarks; sub f i by fi; } liga;");
+    expect(gsub.lookups[0]?.lookupFlag).toBe(8);
+  });
+
+  it("writes a named lookup once, however many features use it", () => {
+    const gsub = gsubOf(`
+      lookup SC { sub a by a.sc; } SC;
+      feature smcp { lookup SC; } smcp;
+      feature c2sc { lookup SC; } c2sc;
+    `);
+    expect(gsub.lookups).toHaveLength(1);
+    expect(gsub.features.map((f) => f.feature.lookupListIndexes)).toEqual([[0], [0]]);
+  });
+
+  it("points a contextual rule at the named lookup it calls", () => {
+    const gsub = gsubOf(
+      "lookup SC { sub b by b.sc; } SC;\nfeature calt { sub a b' lookup SC; } calt;",
+    );
+    const chain = gsub.lookups.find((l) => l.lookupType === 6)!;
+    const records = (chain.subtables[0] as { lookupRecords: { lookupListIndex: number }[] })
+      .lookupRecords;
+    expect(records.map((r) => r.lookupListIndex)).toEqual([0]);
+  });
+
+  it("reports a lookup used before it is defined", () => {
+    const compiled = compile("feature smcp { lookup NOPE; } smcp;");
+    expect(compiled.problems.some((p) => p.message.includes("before it is defined"))).toBe(true);
+  });
+
+  it("refuses a substitution that calls a positioning lookup", () => {
+    const compiled = compile(
+      "lookup MOVE { pos a 20; } MOVE;\nfeature calt { sub a' lookup MOVE; } calt;",
+    );
+    expect(compiled.problems.some((p) => p.message.includes("positions glyphs"))).toBe(true);
+  });
+
+  it("refuses a named lookup holding two kinds of rule", () => {
+    const compiled = compile("lookup MIXED { sub a by a.sc; sub f i by fi; } MIXED;");
+    expect(compiled.problems.some((p) => p.message.includes("one kind of rule"))).toBe(true);
+  });
+
+  it("puts positioning in a context in GPOS, with the adjustment it points at", () => {
+    const compiled = compile("feature kern { pos a b' -20; } kern;");
+    expect(compiled.problems).toEqual([]);
+    expect(compiled.positioning.lookups.map((l) => l.type)).toEqual([8, 1]);
+    expect(compiled.positioning.entries).toEqual([{ tag: "kern", lookups: [0] }]);
+  });
+
+  it("gives a language the lookups written for it, and the script's default ones", () => {
+    const gsub = gsubOf(`
+      languagesystem DFLT dflt;
+      languagesystem latn dflt;
+      languagesystem latn TRK;
+      feature smcp { script latn; sub a by a.sc; language TRK; sub b by b.sc; } smcp;
+    `);
+    const lookupsFor = (indexes: number[] | undefined) =>
+      (indexes ?? []).map((i) => gsub.features[i]!.feature.lookupListIndexes);
+    const latn = gsub.scripts.find((s) => s.tag === "latn")!.script;
+    const dflt = gsub.scripts.find((s) => s.tag === "DFLT")!.script;
+
+    expect(lookupsFor(latn.defaultLangSys?.featureIndexes)).toEqual([[0]]);
+    expect(lookupsFor(latn.langSysRecords[0]?.langSys.featureIndexes)).toEqual([[0, 1]]);
+    // Written under a script, so not for text in no script in particular.
+    expect(lookupsFor(dflt.defaultLangSys?.featureIndexes)).toEqual([]);
+  });
+
+  it("keeps the script's default lookups out of a language that says exclude_dflt", () => {
+    const gsub = gsubOf(`
+      languagesystem latn dflt;
+      languagesystem latn TRK;
+      feature smcp { script latn; sub a by a.sc; language TRK exclude_dflt; sub b by b.sc; } smcp;
+    `);
+    const latn = gsub.scripts.find((s) => s.tag === "latn")!.script;
+    const turkish = latn.langSysRecords[0]!.langSys.featureIndexes;
+    expect(turkish.map((i) => gsub.features[i]!.feature.lookupListIndexes)).toEqual([[1]]);
   });
 });
