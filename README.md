@@ -511,8 +511,11 @@ the operating system's own webview at the editor. Building it needs a Rust toolc
 which ships with Windows 11.
 
 Tauri rather than Electron for one reason that matters here and one that does not. The one
-that does not is size: the installer is 2.4 MB against something like 150, because the
-browser is the one already on the machine rather than a second copy of Chromium. The one
+that does not is size: the Windows installer is 16.5 MB against something like 150, because
+the browser is the one already on the machine rather than a second copy of Chromium. Most of
+those megabytes are ttfautohint, 73 MB unpacked; before it was bundled the installer was
+2.4 MB. The Linux AppImage is 95 MB, because it brings the webview's libraries with it
+rather than relying on the system's. The one
 that does is the risk that buys: a system webview is _a_ browser rather than a pinned one,
 and this editor is unusually dependent on browser APIs — the File System Access API for a
 folder on disk, the private filesystem for autosave, Web Locks so two windows cannot write
