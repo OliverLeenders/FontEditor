@@ -1,0 +1,176 @@
+# Builds the desktop installers when a version is tagged, and puts them in a
+# draft GitHub release for a person to try and then publish.
+#
+#   pnpm version:set 0.2.0, commit it, then
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# Nothing here is public until the draft is published by hand. Installed copies
+# look for updates in the newest *published* release, so they only see this one
+# from then on.
+#
+# Run by hand from the Actions tab, it builds the installers and keeps them as
+# workflow artifacts, with no release: a way to try the workflow, or a build,
+# without tagging anything.
+#
+# The installers are not code-signed, so Windows SmartScreen warns the first
+# time one runs. The updates are signed — with the key in the
+# TAURI_SIGNING_PRIVATE_KEY secret — and the application refuses one that is not.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Two pushes of the same tag must not race each other into one release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    name: Open a draft release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      # A tag that disagrees with the version the files hold would build an
+      # installer calling itself one thing, attached to a release called another.
+      - name: Check the tag names the version the app says it is
+        run: node apps/editor/scripts/set-version.mjs --check "$GITHUB_REF_NAME"
+
+      - name: Open the draft, with the licence and the notices
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          --draft --verify-tag
+          --title "Typewright ${GITHUB_REF_NAME#v}"
+          --notes "Installers for Windows and Linux. They are not code-signed, so Windows SmartScreen warns the first time the installer runs."
+          LICENSE THIRD_PARTY_NOTICES.txt
+
+  build:
+    name: Installers for ${{ matrix.name }}
+    needs: draft
+    # A run by hand has no draft, and the build should not wait for one.
+    if: ${{ !cancelled() && (needs.draft.result == 'success' || needs.draft.result == 'skipped') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            bundles: nsis,msi
+          # Not the newest Ubuntu: an AppImage runs on systems at least as new as
+          # the one it was built on, so the oldest supported runner reaches the
+          # most people.
+          - name: Linux
+            os: ubuntu-22.04
+            bundles: appimage,deb
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: The libraries the webview binds to
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev \
+            librsvg2-dev patchelf
+
+      - run: pnpm install --frozen-lockfile
+
+      # The bundles are left out: a cached installer from the last release would
+      # otherwise be found beside this one's and attached to it.
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/editor/src-tauri/target
+            !apps/editor/src-tauri/target/release/bundle
+          key: release-${{ runner.os }}-${{ hashFiles('apps/editor/src-tauri/Cargo.lock') }}
+          restore-keys: release-${{ runner.os }}-
+
+      # The updater's artifacts are asked for here and not in tauri.conf.json:
+      # they need the private key, which a build on somebody's own machine does
+      # not have and should not need.
+      - name: Build the installers
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: >
+          pnpm --filter @typewright/editor tauri build --ci
+          --bundles ${{ matrix.bundles }}
+          --config '{"bundle":{"createUpdaterArtifacts":true}}'
+
+      - name: Gather this version's installers and signatures
+        run: |
+          version=$(node -p "require('./apps/editor/package.json').version")
+          mkdir -p out
+          find apps/editor/src-tauri/target/release/bundle -type f -name "*_${version}_*" \
+            \( -name "*-setup.exe" -o -name "*.msi" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.sig" \) \
+            -exec cp {} out/ \;
+          ls -l out
+          test -n "$(ls out)"
+
+      - name: Attach them to the draft
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" out/* --clobber
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installers-${{ matrix.name }}
+          path: out/
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: signatures-${{ matrix.name }}
+          path: out/*.sig
+          if-no-files-found: error
+
+  manifest:
+    name: The updater's manifest
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: signatures-*
+          path: signatures
+          merge-multiple: true
+
+      - name: Write latest.json
+        run: >
+          node apps/editor/scripts/updater-manifest.mjs
+          signatures "$GITHUB_REF_NAME" "$GITHUB_REPOSITORY" latest.json
+
+      - name: Attach it to the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" latest.json --clobber
