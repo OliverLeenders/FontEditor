@@ -5,6 +5,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use tauri::ipc::{InvokeBody, Request, Response};
 use tauri::{Manager, WindowEvent};
+use tauri_plugin_updater::UpdaterExt;
 
 /// Whether the window has asked the page about closing and not heard back.
 ///
@@ -28,6 +29,49 @@ fn close_window(window: tauri::WebviewWindow) -> Result<(), String> {
 #[tauri::command]
 fn keep_window_open() {
   ASKING.store(false, Ordering::SeqCst);
+}
+
+/// The version of a newer release, if one has been published.
+///
+/// Asked once, when the page starts, of the manifest the release workflow
+/// attaches to the latest published GitHub release. Always `None` in a debug
+/// build, which is somebody's work in progress rather than an installed copy,
+/// and would otherwise offer to replace itself with the last release.
+#[tauri::command]
+async fn check_for_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
+  if cfg!(debug_assertions) {
+    return Ok(None);
+  }
+  let update = app
+    .updater()
+    .map_err(|error| error.to_string())?
+    .check()
+    .await
+    .map_err(|error| error.to_string())?;
+  Ok(update.map(|update| update.version))
+}
+
+/// Download the newer release, install it, and start it.
+///
+/// It checks again rather than keeping what `check_for_update` found, so there
+/// is no state here to go stale while the offer sits unanswered. The download
+/// is refused unless its signature matches the public key in the configuration.
+/// On Windows the installer takes over and ends this process itself; elsewhere
+/// the application restarts once the new one is in place.
+#[tauri::command]
+async fn install_update(app: tauri::AppHandle) -> Result<(), String> {
+  let update = app
+    .updater()
+    .map_err(|error| error.to_string())?
+    .check()
+    .await
+    .map_err(|error| error.to_string())?
+    .ok_or_else(|| "there is no newer version to install".to_string())?;
+  update
+    .download_and_install(|_, _| {}, || {})
+    .await
+    .map_err(|error| error.to_string())?;
+  app.restart();
 }
 
 /// Hint a TrueType font with ttfautohint, and hand back the hinted font.
@@ -109,7 +153,14 @@ fn bundled(name: &str) -> Result<PathBuf, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
-    .invoke_handler(tauri::generate_handler![close_window, keep_window_open, hint_truetype])
+    .plugin(tauri_plugin_updater::Builder::new().build())
+    .invoke_handler(tauri::generate_handler![
+      close_window,
+      keep_window_open,
+      check_for_update,
+      install_update,
+      hint_truetype
+    ])
     .on_window_event(|window, event| {
       let WindowEvent::CloseRequested { api, .. } = event else {
         return;

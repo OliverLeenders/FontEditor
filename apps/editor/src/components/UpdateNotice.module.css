@@ -1,0 +1,41 @@
+/*
+ * A newer version, offered along the top of the desktop window.
+ *
+ * Laid out like the notice that a font is open in another tab, in the accent's
+ * colours rather than a warning's: nothing is wrong.
+ */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.8rem;
+  padding: 0.45rem 0.8rem;
+  border-bottom: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+
+.notice button {
+  flex: none;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+}
+.notice button:hover {
+  background: var(--surface-2);
+}
+
+/* The answer most people mean. */
+.notice .primary {
+  border-color: var(--accent-ink);
+}
+
+.failed {
+  color: var(--danger);
+}

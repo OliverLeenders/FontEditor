@@ -19,6 +19,7 @@ import { FeaturesView } from "./components/FeaturesView.js";
 import { ProofView } from "./components/ProofView.js";
 import { Projects } from "./components/Projects.js";
 import { CloseWarning } from "./components/CloseWarning.js";
+import { UpdateNotice } from "./components/UpdateNotice.js";
 import { desktop } from "./desktop.js";
 import { SpacingView } from "./components/SpacingView.js";
 import { Shortcuts } from "./components/Shortcuts.js";
@@ -298,6 +299,7 @@ export function App(): React.JSX.Element {
           </button>
         </div>
       ) : null}
+      <UpdateNotice />
       <CloseWarning />
       {showChooser ? (
         <Projects />

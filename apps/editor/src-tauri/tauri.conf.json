@@ -52,5 +52,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYzNzhEMDE5NTlFMzcxOUYKUldTZmNlTlpHZEI0WTRsNVpCZzNDQXdxMndqMDRoWGozT0kzVkNVVTJrWFEwNWl0SjBPYXhIZXQK",
+      "endpoints": [
+        "https://github.com/OliverLeenders/FontEditor/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }
