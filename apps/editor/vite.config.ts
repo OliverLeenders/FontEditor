@@ -29,8 +29,34 @@ function legalFiles(): Plugin {
   };
 }
 
+/**
+ * The desktop window's content security policy, as a header.
+ *
+ * `tauri.conf.json` holds it, and Tauri sends it with every page of the built
+ * application. `vite preview` sends the same header, so the built editor can be
+ * tried under the policy in an ordinary browser, whose devtools say what it
+ * refused and why. The development server sends none, as the desktop app's
+ * development window gets none: Tauri only attaches the policy to files it
+ * serves itself.
+ */
+function desktopPolicy(): string {
+  const config = JSON.parse(
+    readFileSync(new URL("./src-tauri/tauri.conf.json", import.meta.url), "utf8"),
+  ) as { app: { security: { csp: Record<string, string> } } };
+  return Object.entries(config.app.security.csp)
+    .map(([directive, sources]) => `${directive} ${sources}`)
+    .join("; ");
+}
+
 export default defineConfig({
   plugins: [react(), legalFiles()],
+  preview: {
+    // Not 5174: a preview is the built editor, and should never be mistaken for
+    // — or take the storage of — the development server's.
+    port: 4173,
+    strictPort: true,
+    headers: { "Content-Security-Policy": desktopPolicy() },
+  },
   server: {
     port: 5174,
     // Fail rather than pick another port. The desktop shell is told to load

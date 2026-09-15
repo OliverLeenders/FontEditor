@@ -6,6 +6,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@typewright/editor", "dev"],
       "port": 5174
+    },
+    {
+      "name": "editor-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@typewright/editor", "preview"],
+      "port": 4173
     }
   ]
 }
