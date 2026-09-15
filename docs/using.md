@@ -15,6 +15,14 @@ in that list opens the font straight away. Each window is on one font and names 
 title. The same font in a second window is read-only there, with a button to edit it there
 instead.
 
+**Feature source.** The Features workspace colours the file as it is typed, numbers its
+lines and marks the ones the compiler has a problem with; pressing a problem in the list
+puts the cursor on its line. Tab indents with four spaces, or a level onto every selected
+line, and Shift+Tab takes one off; to leave the source by keyboard, press Escape and then
+Tab. Enter keeps the indentation, a level deeper after `{`, and a `}` typed on an indented
+line goes back a level. Each space shows as a faint dot, so indentation can be counted, and
+Ctrl with the wheel sets the text larger or smaller.
+
 Use PgUp and PgDn to move between glyphs, and press `?` for every key at once. The
 toolbar is icons; every one names its shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
 `L` ruler. Measuring one stem is **held** rather than switched to: `M` borrows the tool
