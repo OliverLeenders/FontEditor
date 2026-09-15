@@ -12,13 +12,16 @@ import styles from "./UpdateNotice.module.css";
  * another tab — with an answer to give or not. Nothing is downloaded until
  * somebody presses Install; Later lasts until the next start. When the check
  * cannot be made, offline or before anything is published, there is nothing to
- * say and nothing is said.
+ * say and nothing is said. Only the window the application started with asks;
+ * the desktop side answers nothing to the others, so the offer is made once.
  *
- * Installing restarts the application, so first it asks about the one thing a
- * restart leaves behind, as closing the window does: a UFO folder that does not
- * have the latest changes. The working copy has them either way.
+ * Installing restarts the application, so first it asks about what a restart
+ * leaves behind. Every other window is on a font of its own, so those are
+ * closed first, each asking about its own folder as it goes. Then this window's
+ * folder, as closing the window does: a UFO folder that does not have the
+ * latest changes. The working copy has them either way.
  */
-type Stage = "offer" | "behind" | "installing";
+type Stage = "offer" | "others" | "behind" | "installing";
 
 export function UpdateNotice(): React.JSX.Element | null {
   const store = useEditorStore();
@@ -26,6 +29,7 @@ export function UpdateNotice(): React.JSX.Element | null {
 
   const [version, setVersion] = useState<string | null>(null);
   const [stage, setStage] = useState<Stage>("offer");
+  const [others, setOthers] = useState(0);
   const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
@@ -61,6 +65,15 @@ export function UpdateNotice(): React.JSX.Element | null {
   };
 
   const begin = async (): Promise<void> => {
+    setFailed(null);
+    const open = await desktop()
+      ?.invoke("other_windows")
+      .catch(() => 0);
+    if (typeof open === "number" && open > 0) {
+      setOthers(open);
+      setStage("others");
+      return;
+    }
     // The working copy first, whatever happens next.
     await store.flushNow();
     if (store.unsavedOnDisk) setStage("behind");
@@ -84,14 +97,18 @@ export function UpdateNotice(): React.JSX.Element | null {
     setVersion(null);
   };
 
+  const windows = others === 1 ? "the other window" : `the other ${String(others)} windows`;
+
   return (
     <div className={styles.notice} role="status">
       <span>
         {stage === "behind"
           ? `${folder} has changes that are not in it yet. They are kept in Typewright either way — this is about the folder other tools read.`
-          : stage === "installing"
-            ? `Installing Typewright ${version}. It will start again when it is done.`
-            : `Typewright ${version} is available.`}
+          : stage === "others"
+            ? `Close ${windows} first. Installing restarts Typewright, and each window asks about its own folder as it closes.`
+            : stage === "installing"
+              ? `Installing Typewright ${version}. It will start again when it is done.`
+              : `Typewright ${version} is available.`}
       </span>
       {failed === null ? null : (
         <span className={styles.failed} role="alert">
@@ -102,6 +119,15 @@ export function UpdateNotice(): React.JSX.Element | null {
         <>
           <button type="button" className={styles.primary} onClick={() => void begin()}>
             Install and restart
+          </button>
+          <button type="button" onClick={later}>
+            Later
+          </button>
+        </>
+      ) : stage === "others" ? (
+        <>
+          <button type="button" className={styles.primary} onClick={() => void begin()}>
+            Try again
           </button>
           <button type="button" onClick={later}>
             Later

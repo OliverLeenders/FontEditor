@@ -114,6 +114,26 @@
   color: var(--danger);
 }
 
+/* Open in a new window: as quiet as Forget, and no colour of its own. */
+.window {
+  display: grid;
+  place-items: center;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.window svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.window:hover {
+  border-color: var(--rule);
+  color: var(--ink);
+}
+
 .actions,
 .naming {
   display: flex;

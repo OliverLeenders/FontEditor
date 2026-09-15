@@ -41,6 +41,7 @@ import {
   viewIn,
 } from "./layout.js";
 import { useEditorStore, useStoreValue } from "./useStore.js";
+import { openWindow } from "./windows.js";
 
 /** Pasted contours need ids; the application owns the factory. */
 const pasteIds = randomIds();
@@ -85,6 +86,22 @@ export function App(): React.JSX.Element {
     applyTheme(theme);
   }, [theme]);
 
+  // The window says which font it is on, so two windows can be told apart in
+  // the taskbar and two tabs in the tab strip. The desktop window's title is
+  // its own rather than the page's, so it is told as well.
+  const family = useStoreValue((s) => s.session.editor.document.info.familyName);
+  const style = useStoreValue((s) => s.session.editor.document.info.styleName);
+  useEffect(() => {
+    const name = `${family} ${style}`.trim();
+    const title = showChooser || arriving || name === "" ? "Typewright" : `${name} — Typewright`;
+    document.title = title;
+    void desktop()
+      ?.invoke("set_title", { title })
+      .catch(() => {
+        // A window that cannot be renamed still works; nothing depends on it.
+      });
+  }, [family, style, showChooser, arriving]);
+
   // Application shortcuts live on the window; the tools' own keys are handled by
   // the canvas, which only receives them while it has focus.
   useEffect(() => {
@@ -125,6 +142,14 @@ export function App(): React.JSX.Element {
       // happens, including the one for drawing. What the save has to say for
       // itself is on the status bar, which is on screen wherever the shortcut
       // now is.
+      // Another window, on the list of fonts: the way to a second font beside
+      // this one. Only the desktop application ever sees the key.
+      if (modified && event.shiftKey && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        openWindow("fonts");
+        return;
+      }
+
       if (modified && event.key.toLowerCase() === "s") {
         // Saving the page is never what somebody wants from a font editor.
         event.preventDefault();

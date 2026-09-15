@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { openWindow } from "../windows.js";
 import styles from "./Projects.module.css";
+import { AppWindowIcon } from "./icons.js";
 
 /**
  * Which font to work on.
@@ -72,6 +74,21 @@ export function Projects(): React.JSX.Element {
                   <span className={styles.where}>
                     {project.folder ?? "not saved to a folder"} · {since(project.openedAt)}
                   </span>
+                </button>
+                {/* A second font beside this one is a second window. Once it
+                    is open elsewhere, a list shown over a font goes away and
+                    leaves this window on the font it had. */}
+                <button
+                  type="button"
+                  className={styles.window}
+                  title="Open in a new window"
+                  aria-label={`Open ${project.name} in a new window`}
+                  onClick={() => {
+                    openWindow({ font: project.id });
+                    if (current !== null) store.showProjects(false);
+                  }}
+                >
+                  <AppWindowIcon />
                 </button>
                 {confirming === project.id ? (
                   <div

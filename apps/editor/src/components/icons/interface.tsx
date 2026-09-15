@@ -29,6 +29,16 @@ export const Columns2Icon: IconComponent = () => (
   </Glyph>
 );
 
+/** Another window: for a second font beside this one. */
+export const AppWindowIcon: IconComponent = () => (
+  <Glyph>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="M10 4v4" />
+    <path d="M2 8h20" />
+    <path d="M6 4v4" />
+  </Glyph>
+);
+
 /** Two panes one above the other. */
 export const Rows2Icon: IconComponent = () => (
   <Glyph>

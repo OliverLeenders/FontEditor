@@ -72,6 +72,7 @@ import {
   forgetProject,
   sweepForgotten,
   noteProjects,
+  requestedArrival,
   showChooser,
   startProject,
   switchTo,
@@ -579,7 +580,8 @@ export class EditorStore {
    * What to do with the editor's first moment: open a font, or offer the list.
    *
    * A reload asking for a particular font wins over both. That is how the
-   * chooser opens anything at all — see `switchTo`.
+   * chooser opens anything at all — see `switchTo`. After that, a window opened
+   * for a font or for the list of fonts gets what it was opened for.
    */
   decideArrival(skipChooser: boolean): Promise<Arrival> {
     // Decided once per page, however many times it is asked. Reading which font
@@ -590,6 +592,8 @@ export class EditorStore {
     this.arrival ??= (async (): Promise<Arrival> => {
       const chosen = await chosenOnReload();
       if (chosen !== null) return { kind: "open", id: chosen };
+      const requested = await requestedArrival();
+      if (requested !== null) return requested;
       return await arrive(skipChooser);
     })();
     return this.arrival;

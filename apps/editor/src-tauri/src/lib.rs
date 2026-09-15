@@ -1,20 +1,34 @@
+use std::collections::HashSet;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tauri::ipc::{InvokeBody, Request, Response};
-use tauri::{Manager, WindowEvent};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_updater::UpdaterExt;
 
-/// Whether the window has asked the page about closing and not heard back.
+/// The windows that have asked their page about closing and not heard back, by label.
 ///
 /// The page decides whether closing needs a question — only it knows whether
 /// the font has changes its folder does not — so a close request is held here
 /// and handed over. If the page never answers, because it failed to load or is
 /// stuck, a second press of the close button closes the window: a question the
-/// program cannot ask must not become a window that cannot be shut.
-static ASKING: AtomicBool = AtomicBool::new(false);
+/// program cannot ask must not become a window that cannot be shut. Kept per
+/// window, because each window is on a font of its own and asks about its own
+/// folder.
+fn asking() -> &'static Mutex<HashSet<String>> {
+  static ASKING: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+  ASKING.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// Forget that a window was asking, whether it closed or stayed.
+fn stop_asking(label: &str) {
+  if let Ok(mut asking) = asking().lock() {
+    asking.remove(label);
+  }
+}
 
 /// Close the window for real, without asking again.
 ///
@@ -22,24 +36,83 @@ static ASKING: AtomicBool = AtomicBool::new(false);
 /// would come straight back here.
 #[tauri::command]
 fn close_window(window: tauri::WebviewWindow) -> Result<(), String> {
+  stop_asking(window.label());
   window.destroy().map_err(|error| error.to_string())
 }
 
 /// The page asked, and the answer was to stay open.
 #[tauri::command]
-fn keep_window_open() {
-  ASKING.store(false, Ordering::SeqCst);
+fn keep_window_open(window: tauri::WebviewWindow) {
+  stop_asking(window.label());
+}
+
+/// How many windows have been opened after the first, for naming the next one.
+static OPENED: AtomicUsize = AtomicUsize::new(0);
+
+/// Open another window, on a font or on the list of fonts.
+///
+/// The request travels in the address, as it does when a browser opens a tab —
+/// `?font=<id>` or `?fonts` — so the page reads it the same way in both. An id is
+/// refused unless it is the kind of name the editor gives a font, which is all
+/// this needs to know about it to put it in an address.
+///
+/// Async, because on Windows a window made from a command that holds the main
+/// thread waits for that thread, and never appears.
+#[tauri::command]
+async fn open_window(app: tauri::AppHandle, font: Option<String>) -> Result<(), String> {
+  let search = match font {
+    Some(id)
+      if !id.is_empty()
+        && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') =>
+    {
+      format!("font={id}")
+    }
+    Some(_) => return Err("that is not the name of a font".into()),
+    None => "fonts".into(),
+  };
+  let label = format!("font-{}", OPENED.fetch_add(1, Ordering::SeqCst) + 1);
+  WebviewWindowBuilder::new(&app, label, WebviewUrl::App(format!("index.html?{search}").into()))
+    .title("Typewright")
+    .inner_size(1400.0, 900.0)
+    .min_inner_size(900.0, 600.0)
+    .build()
+    .map(|_| ())
+    .map_err(|error| error.to_string())
+}
+
+/// Name the window after the font it is on, so windows can be told apart.
+#[tauri::command]
+fn set_title(window: tauri::WebviewWindow, title: String) -> Result<(), String> {
+  window.set_title(&title).map_err(|error| error.to_string())
+}
+
+/// How many windows are open besides this one.
+///
+/// Installing an update ends the whole program, so the window offering one asks
+/// first: every other window is on a font, and perhaps a folder, of its own.
+#[tauri::command]
+fn other_windows(app: tauri::AppHandle, window: tauri::WebviewWindow) -> usize {
+  app
+    .webview_windows()
+    .keys()
+    .filter(|label| label.as_str() != window.label())
+    .count()
 }
 
 /// The version of a newer release, if one has been published.
 ///
-/// Asked once, when the page starts, of the manifest the release workflow
-/// attaches to the latest published GitHub release. Always `None` in a debug
-/// build, which is somebody's work in progress rather than an installed copy,
-/// and would otherwise offer to replace itself with the last release.
+/// Asked once, by the window the application started with, of the manifest the
+/// release workflow attaches to the latest published GitHub release. Windows
+/// opened later are told there is nothing, so the offer is made once rather than
+/// in every window. Always `None` in a debug build, which is somebody's work in
+/// progress rather than an installed copy, and would otherwise offer to replace
+/// itself with the last release.
 #[tauri::command]
-async fn check_for_update(app: tauri::AppHandle) -> Result<Option<String>, String> {
-  if cfg!(debug_assertions) {
+async fn check_for_update(
+  app: tauri::AppHandle,
+  window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
+  if cfg!(debug_assertions) || window.label() != "main" {
     return Ok(None);
   }
   let update = app
@@ -157,35 +230,45 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       close_window,
       keep_window_open,
+      open_window,
+      set_title,
+      other_windows,
       check_for_update,
       install_update,
       hint_truetype
     ])
-    .on_window_event(|window, event| {
-      let WindowEvent::CloseRequested { api, .. } = event else {
-        return;
-      };
+    .on_window_event(|window, event| match event {
+      WindowEvent::CloseRequested { api, .. } => {
+        let label = window.label().to_string();
 
-      // Already asked and no answer: this is the second press, so let it close.
-      if ASKING.swap(true, Ordering::SeqCst) {
-        return;
+        // Already asked and no answer: this is the second press, so let it close.
+        let first = asking()
+          .lock()
+          .map(|mut asking| asking.insert(label.clone()))
+          .unwrap_or(false);
+        if !first {
+          stop_asking(&label);
+          return;
+        }
+
+        let asked = window
+          .get_webview_window(&label)
+          .map(|webview| {
+            webview
+              .eval("window.dispatchEvent(new Event('typewright:close-requested'))")
+              .is_ok()
+          })
+          .unwrap_or(false);
+
+        if asked {
+          api.prevent_close();
+        } else {
+          // Nothing to ask; close as the button said.
+          stop_asking(&label);
+        }
       }
-
-      let asked = window
-        .get_webview_window(window.label())
-        .map(|webview| {
-          webview
-            .eval("window.dispatchEvent(new Event('typewright:close-requested'))")
-            .is_ok()
-        })
-        .unwrap_or(false);
-
-      if asked {
-        api.prevent_close();
-      } else {
-        // Nothing to ask; close as the button said.
-        ASKING.store(false, Ordering::SeqCst);
-      }
+      WindowEvent::Destroyed => stop_asking(window.label()),
+      _ => {}
     })
     .setup(|app| {
       if cfg!(debug_assertions) {

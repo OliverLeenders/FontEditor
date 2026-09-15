@@ -1,13 +1,16 @@
 import { canOpenFolders } from "@typewright/disk";
 import { useRef, useState } from "react";
 
+import { desktop } from "../desktop.js";
 import { unsaved } from "../store/index.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { openWindow } from "../windows.js";
 import { BarMenu } from "./BarMenu.js";
 import menu from "./BarMenu.module.css";
 import type { Item } from "./MenuItems.js";
 import styles from "./OpenFont.module.css";
 import {
+  AppWindowIcon,
   CircleDotIcon,
   FilePlusIcon,
   FolderClockIcon,
@@ -112,6 +115,18 @@ export function FileMenu(): React.JSX.Element {
     disabled: working,
     run: () => {
       store.showProjects(true);
+    },
+  });
+  items.push({
+    kind: "item",
+    label: "New window",
+    icon: AppWindowIcon,
+    // A browser keeps Ctrl-Shift-N for a private window and never passes it on,
+    // so only the desktop application has the key to offer.
+    ...(desktop() === null ? {} : { note: "Ctrl-Shift-N" }),
+    hint: "Another window, on the list of fonts: for a second font beside this one",
+    run: () => {
+      openWindow("fonts");
     },
   });
 

@@ -12,6 +12,7 @@ import {
 
 import { deleteWorkingCopy, forgottenCopies, workingCopies } from "@typewright/storage";
 
+import { takeWindowRequest } from "../windows.js";
 import { confirmSaved, noteFolder } from "./folder.js";
 import type { FontHost } from "./fonts.js";
 import type { ProjectSummary } from "./state.js";
@@ -171,6 +172,23 @@ export async function chosenOnReload(): Promise<string | null> {
   if (id === null) return null;
 
   return (await projectById(id)) === null ? null : id;
+}
+
+/**
+ * What the window was opened to show, when it was opened for something.
+ *
+ * A window opened on a font goes straight into it, and one opened on the list
+ * shows the list whatever the reader has said about skipping it — the list is
+ * what it was asked for. A font forgotten in another window between the asking
+ * and the opening gives the list rather than an empty editor.
+ */
+export async function requestedArrival(): Promise<Arrival | null> {
+  const request = takeWindowRequest();
+  if (request === null) return null;
+  if (request !== "fonts" && (await projectById(request.font)) !== null) {
+    return { kind: "open", id: request.font };
+  }
+  return await arrive(false);
 }
 
 /** Read the instruction and clear it, or nothing if storage will not play. */
