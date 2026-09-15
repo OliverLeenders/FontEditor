@@ -37,7 +37,7 @@ Several fonts are kept at once, each in a working copy of its own, and the progr
 | 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                     |
 | 19    | Releases                            | done: versions, a release workflow and updates; the installers are unsigned         |
 | 20    | A split window                      | done                                                                                |
-| 21    | Two fonts side by side              | next                                                                                |
+| 21    | Two fonts side by side              | done: a window per font                                                             |
 
 ### What the table missed
 
@@ -440,15 +440,16 @@ What separates a program people install from a build somebody made.
   reads it from there. Cargo needs its own copy in `Cargo.toml` and `Cargo.lock`, which
   `pnpm version:set` writes, and CI fails when the three disagree. A version is three
   numbers: a Windows Installer version cannot carry a pre-release name.
-- **Releases — done, untried until the first tag.** A `v` tag builds the Windows installers
+- **Releases — done.** A `v` tag builds the Windows installers
   (NSIS and MSI) and the Linux ones (AppImage and `.deb`) in CI, into a draft GitHub
   release with the licence, the notices and the updater's manifest. Nothing is public until
   somebody publishes the draft.
-- **Updates — done, untried until the second release.** The desktop application asks the
+- **Updates — done.** The desktop application asks the
   latest published release whether there is a newer version when it starts, and says so
   along the top of the window. Nothing is downloaded until somebody presses Install; a
   folder that is behind is asked about first, as closing the window does; and an update
-  that is not signed with the project's key is refused.
+  that is not signed with the project's key is refused. 0.1.0, installed, updated itself
+  to 0.1.1 this way.
 - **A signed installer — not for now.** An unsigned installer meets a SmartScreen warning
   the first time it runs. Signing costs a certificate, and can be added to the release
   workflow whenever there is one.
@@ -476,9 +477,24 @@ made.
   hanging over the pane below. A pane too narrow for the tab labels shows their icons,
   which still name themselves on hover.
 
-#### Phase 21 — Two fonts side by side
+#### Phase 21 — Two fonts side by side — done
 
-With a working copy and a write lock per font, a second window on a second font is most of
-the way there; what is left is the desktop build opening one. The panes of phase 20 are
-the other way to get there: a second font in the other pane, rather than in a second
-window.
+A window per font. Each window is the whole editor on one font — its own working copy,
+write lock, undo and panes — so two fonts sit side by side the way any two windows do,
+arranged by the operating system. File → New window opens one on the list of fonts, with
+Ctrl-Shift-N in the desktop application (a browser keeps that key for itself), and each
+other font in the list has a button that opens it in a window of its own. The same font in
+two windows is read-only in the second, as it always was in two tabs.
+
+- **What a window is for travels in its address.** `?font=<id>` or `?fonts`, read once on
+  the way in and taken out again, so a reload starts as any start does. A browser opens the
+  address in a tab; the desktop application opens it in a window of its own.
+- **Each window names its font** in its title, so two can be told apart in the taskbar and
+  two tabs in the tab strip.
+- **Closing asks per window**, each about its own folder.
+- **An update is offered once**, by the window the application started with, and asks for
+  the other windows to be closed before it installs, because installing restarts the whole
+  program.
+
+A second font in the other pane of a split window is the other way there, and is left for
+when windows have shown whether it is wanted.

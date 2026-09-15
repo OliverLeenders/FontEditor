@@ -9,6 +9,12 @@ the spacing line or the proof, and the second pane's bar stacks the panes or clo
 The keyboard follows the pane you last pressed in; a glyph opened from the font's grid or
 the spacing line is drawn in the other pane when that pane is drawing.
 
+**Windows.** A second font goes in a window of its own. File → New window opens one on the
+list of fonts — Ctrl-Shift-N in the desktop application — and the button beside each font
+in that list opens the font straight away. Each window is on one font and names it in its
+title. The same font in a second window is read-only there, with a button to edit it there
+instead.
+
 Use PgUp and PgDn to move between glyphs, and press `?` for every key at once. The
 toolbar is icons; every one names its shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
 `L` ruler. Measuring one stem is **held** rather than switched to: `M` borrows the tool

@@ -54,9 +54,12 @@ API is there: the File menu offers _Open folder…_, which it only does when
 worth re-asking on any platform this is built for, because the answer is the platform's
 rather than ours.
 
-Nothing in `src-tauri` knows anything about fonts. It opens a window and gets out of the
-way: a logger in debug builds and the updater, and five commands — two about closing the
-window, one that runs ttfautohint, and two that check for and install an update. Whether a
+Nothing in `src-tauri` knows anything about fonts. It opens windows and gets out of the
+way: a logger in debug builds and the updater, and eight commands — two about closing a
+window, one that opens another, one that names a window after its font, one that counts
+the other windows, one that runs ttfautohint, and two that check for and install an
+update. The first window is labelled `main` and later ones `font-1`, `font-2` and on; the
+capability in `capabilities/default.json` covers both, and only `main` offers updates. Whether a
 close needs a question belongs to the page, the only side that knows whether the folder is
 behind, so the window hands the request over and waits to be told. The page reaches those
 commands through the bridge Tauri injects into every page it hosts rather than through

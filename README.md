@@ -32,7 +32,8 @@ starts.
 - **Checks before export.** Nineteen of them, reported and never repaired.
 - **Nothing lost.** Every font autosaves to a working copy of its own, with snapshots kept
   as you work.
-- **Two panes.** The drawing beside the spacing line or the proof, side by side or stacked.
+- **Panes and windows.** The drawing beside the spacing line or the proof, side by side or
+  stacked, and a second font in a window of its own.
 
 ## Run it from source
 
