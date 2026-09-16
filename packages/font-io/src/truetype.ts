@@ -1,7 +1,7 @@
 import type { FontDocument } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
-import { type ExportResult, exportFont, flattenedGlyphs } from "./export.js";
+import { type ExportOptions, type ExportResult, exportFont, flattenedGlyphs } from "./export.js";
 import { glyfTable } from "./glyf.js";
 import { withLeftSideBearings } from "./hmtx.js";
 import { postWithNames } from "./post.js";
@@ -22,8 +22,8 @@ import { readTablesOf, withSfntVersion, withTable } from "./sfnt.js";
  * much of a rasteriser's memory the outlines will need.
  */
 
-export function exportTrueType(document: FontDocument): ExportResult {
-  const base = exportFont(document);
+export function exportTrueType(document: FontDocument, options: ExportOptions = {}): ExportResult {
+  const base = exportFont(document, undefined, options);
   let bytes: Uint8Array = new Uint8Array(base.bytes);
 
   const glyphs = flattenedGlyphs(document);

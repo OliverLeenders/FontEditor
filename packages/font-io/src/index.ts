@@ -93,10 +93,13 @@ export { designspaceFileName, designspaceXml, parseDesignspace } from "./designs
 
 export type {
   FamilyExport,
+  FamilyExtras,
   FamilyImport,
+  FamilyImportMaster,
   FamilyInstance,
   FamilyMaster,
   FamilyProblem,
+  FamilySparse,
 } from "./family.js";
 export { exportFamily, familyFiles, looksLikeFamily, readFamily } from "./family.js";
 
@@ -104,14 +107,20 @@ export type { InstanceFont, InstanceMaster, InstancesExport, NamedPlace } from "
 export { exportInstances, instanceFonts } from "./instances.js";
 
 export { Bytes } from "./bytes.js";
-export type { Cff2Font, Cff2Result } from "./cff2.js";
+export type { Cff2Font } from "./cff2.js";
 export { cff2Table } from "./cff2.js";
 export type { NamedInstance } from "./fvar.js";
-export { fvarTable, statTable } from "./fvar.js";
+export { avarTable, fvarTable, statTable } from "./fvar.js";
+export type { SwapRegion, SwapVariations } from "./feature-variations.js";
+export { gsubWithSwaps, overlay, swapVariationsFor } from "./feature-variations.js";
+export type { FeatureVariation } from "./layout.js";
+export type { GlyphVariationPlan, VariationPlan } from "./variation-plan.js";
+export { deltasOf, planVariations } from "./variation-plan.js";
 export type { NameRecord } from "./names.js";
 export { nameTable, readNames, withNames } from "./names.js";
-export { deltaMasters, hvarTable, itemVariationStore, regionsOf } from "./varstore.js";
-export type { VariableMaster, VariableResult } from "./variable.js";
+export type { VariationData } from "./varstore.js";
+export { hvarTable, itemVariationStore } from "./varstore.js";
+export type { VariableMaster, VariableOptions, VariableResult } from "./variable.js";
 export { exportVariableFont } from "./variable.js";
 
 export type { GlyfResult } from "./glyf.js";

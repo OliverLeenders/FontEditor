@@ -1,4 +1,5 @@
 import type { Axis, Location } from "@typewright/font-model";
+import { avarSegments, toUser } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
 
@@ -13,6 +14,11 @@ import { Bytes } from "./bytes.js";
  * Names are not in here. An axis and an instance each carry a `nameID` into the
  * `name` table, so writing this means adding records there too — see
  * `withNames`.
+ *
+ * Everything in it is on the user scale: the numbers somebody asking for a
+ * weight types. The model keeps axes and locations where the drawings are, so
+ * they go through each axis's map on the way in — and `avar` is what takes them
+ * back to the drawings when the font is used.
  */
 
 export type NamedInstance = {
@@ -41,9 +47,9 @@ export function fvarTable(
 
   for (const { it, nameId } of axes) {
     out.ascii(tag(it.tag));
-    out.fixed(it.min);
-    out.fixed(it.default);
-    out.fixed(it.max);
+    out.fixed(toUser(it, it.min));
+    out.fixed(toUser(it, it.default));
+    out.fixed(toUser(it, it.max));
     // No flags. The one that exists hides an axis from a user interface, and an
     // axis this editor was told about is one somebody meant.
     out.u16(0);
@@ -53,9 +59,43 @@ export function fvarTable(
   for (const { it, nameId } of instances) {
     out.u16(nameId);
     out.u16(0); // flags, of which there are none
-    for (const { it: axis } of axes) out.fixed(it.location[axis.tag] ?? axis.default);
+    for (const { it: axis } of axes) {
+      out.fixed(toUser(axis, it.location[axis.tag] ?? axis.default));
+    }
   }
 
+  return out.done();
+}
+
+/**
+ * `avar`: the user scale against the design scale, on each axis.
+ *
+ * A font without one moves along its axes in a straight line from what is asked
+ * for to what is drawn. A designspace whose map bends — weight 700 drawn much
+ * nearer the black than the regular — needs this table or every weight between
+ * the masters comes out at the wrong stem.
+ *
+ * `null` where no axis has anything to say, and then no table is written. Where
+ * one axis does, every axis is listed, the rest with the three points that say
+ * a straight line.
+ */
+export function avarTable(axes: readonly Axis[]): Uint8Array | null {
+  const maps = axes.map(avarSegments);
+  if (maps.every((m) => m === null)) return null;
+
+  const out = new Bytes();
+  out.u16(1).u16(0); // version 1.0
+  out.u16(0); // reserved
+  out.u16(axes.length);
+  for (const map of maps) {
+    const pairs = map ?? [
+      [-1, -1],
+      [0, 0],
+      [1, 1],
+    ];
+    out.u16(pairs.length);
+    for (const [from, to] of pairs) out.f2dot14(from).f2dot14(to);
+  }
   return out.done();
 }
 

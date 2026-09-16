@@ -1,9 +1,10 @@
 import type { Vec2 } from "@typewright/geometry";
-import type { Axis, Glyph, Location } from "@typewright/font-model";
+import type { Axis, Glyph } from "@typewright/font-model";
 import { segmentCubic, segments } from "@typewright/font-model";
 
 import { Bytes } from "./bytes.js";
-import { itemVariationStore, regionsOf } from "./varstore.js";
+import { type GlyphVariationPlan, type VariationPlan, deltasOf } from "./variation-plan.js";
+import { itemVariationStore } from "./varstore.js";
 
 /**
  * `CFF2`: cubic outlines that vary.
@@ -27,27 +28,21 @@ import { itemVariationStore, regionsOf } from "./varstore.js";
  * `gvar`, where the deltas are gathered per glyph and the regions inline.
  */
 
-/** What a font needs to be written as CFF2: the masters, and where they sit. */
+/** What a font needs to be written as CFF2: the masters, and how each glyph varies. */
 export type Cff2Font = {
   readonly axes: readonly Axis[];
-  /** Where each master sits. The first is the default and everything varies from it. */
-  readonly locations: readonly Location[];
   /**
-   * The glyphs of each master, in one order: `masters[m][g]`.
+   * The glyphs of each master, in one order: `masters[m][g]`. The first master
+   * is the default and everything varies from it.
    *
-   * Every master must have every glyph, in the same order and compatible —
-   * which is what the compatibility check is for. A glyph that is not is
-   * written from the default master alone and does not vary.
+   * A master that takes no part in a glyph — one the plan gives no say — may
+   * hold anything there; its coefficients are zero. One that does take part
+   * must be compatible with the default, which the caller has made sure of.
    */
   readonly masters: readonly (readonly Glyph[])[];
+  readonly plan: VariationPlan;
   /** How wide the em is, for the font matrix. */
   readonly unitsPerEm: number;
-};
-
-export type Cff2Result = {
-  readonly table: Uint8Array;
-  /** Glyphs written from the default master alone, because the masters disagree. */
-  readonly notVarying: readonly string[];
 };
 
 // Charstring operators. Only the four a drawing needs.
@@ -55,6 +50,7 @@ const RMOVETO = 21;
 const RLINETO = 5;
 const RRCURVETO = 8;
 const BLEND = 16;
+const VSINDEX = 15;
 
 // Top dictionary operators.
 const OP_CHARSTRINGS = 17;
@@ -73,26 +69,27 @@ const OP_PRIVATE = 18;
  * five-byte integer whatever its value — a fixed size is worth four wasted
  * bytes against a layout that has to converge.
  */
-export function cff2Table(font: Cff2Font): Cff2Result {
+export function cff2Table(font: Cff2Font): Uint8Array {
   const base = font.masters[0];
-  if (base === undefined || base.length === 0) {
-    return { table: new Uint8Array(), notVarying: [] };
-  }
+  if (base === undefined || base.length === 0) return new Uint8Array();
 
-  const regions = regionsOf(font.axes, font.locations);
   // The store as CFF2 holds it: a two-byte length, then the item variation
   // store itself. Every other table that carries one puts it in on its own, and
-  // this is the format that wraps it.
-  const bare = itemVariationStore(font.axes, regions);
+  // this is the format that wraps it. One set of regions for each distinct way
+  // a glyph varies, which a charstring picks with `vsindex`.
+  const bare = itemVariationStore(
+    font.axes,
+    font.plan.regions,
+    font.plan.sets.map((regions) => ({ regions, rows: [] })),
+  );
   const store = new Bytes().u16(bare.length).bytes(bare).done();
 
-  const notVarying: string[] = [];
   const charstrings = base.map((glyph, i) => {
-    const others = font.masters.slice(1).map((m) => m[i] ?? null);
-    const varying = others.every((g) => g !== null && sameShape(glyph, g));
-    if (!varying && others.length > 0) notVarying.push(glyph.name);
-
-    return charstring(glyph, varying ? (others as Glyph[]) : [], regions.length);
+    const plan = font.plan.glyphs[i] ?? { regions: [], coefficients: [], set: 0 };
+    return charstring(
+      font.masters.map((m) => m[i] ?? glyph),
+      plan,
+    );
   });
 
   const charStringsIndex = index(charstrings);
@@ -138,7 +135,7 @@ export function cff2Table(font: Cff2Font): Cff2Result {
   out.bytes(privateDict);
   out.bytes(charStringsIndex);
 
-  return { table: out.done(), notVarying };
+  return out.done();
 }
 
 /**
@@ -173,14 +170,25 @@ function topDict(
 /**
  * One glyph, as a charstring, with its deltas beside its values.
  *
- * The default master draws the outline; every other master contributes one
- * delta per coordinate per region. Where there is nothing varying — a font with
- * one master, or a glyph the masters disagree about — no `blend` is written at
- * all and the charstring is an ordinary one.
+ * The default master draws the outline; each region the glyph varies over
+ * contributes one delta per coordinate, worked out from every master's value by
+ * the glyph's plan. Where there is nothing varying — a font with one master, or
+ * a glyph the masters disagree about — no `blend` is written at all and the
+ * charstring is an ordinary one.
  */
-function charstring(glyph: Glyph, others: readonly Glyph[], regions: number): Uint8Array {
+function charstring(drawings: readonly Glyph[], plan: GlyphVariationPlan): Uint8Array {
   const out = new Bytes();
-  const varying = others.length > 0 && regions > 0;
+  const glyph = drawings[0]!;
+  const others = drawings.slice(1);
+  const varying = plan.regions.length > 0;
+
+  // A glyph that varies over other regions than the full set says which, once,
+  // before anything is blended.
+  if (varying && plan.set !== 0) out.bytes(charstringNumber(plan.set)).u8(VSINDEX);
+  const blend = (values: readonly number[], perMaster: readonly (readonly number[])[]) =>
+    values.map((_, i) =>
+      deltasOf(plan, [values[i] ?? 0, ...perMaster.map((v) => v[i] ?? values[i] ?? 0)]),
+    );
 
   // The pen runs on across the whole charstring, not per contour: every
   // coordinate is relative to the last one written, and the second contour's
@@ -206,10 +214,14 @@ function charstring(glyph: Glyph, others: readonly Glyph[], regions: number): Ui
       others_at[i] = there;
       return step;
     });
+    const move = [start.x - at.x, start.y - at.y];
     emit(
       out,
-      [start.x - at.x, start.y - at.y],
-      moves.map((m) => [m.x, m.y]),
+      move,
+      blend(
+        move,
+        moves.map((m) => [m.x, m.y]),
+      ),
       RMOVETO,
       varying,
     );
@@ -250,7 +262,7 @@ function charstring(glyph: Glyph, others: readonly Glyph[], regions: number): Ui
         return made;
       });
 
-      emit(out, step, steps, line ? RLINETO : RRCURVETO, varying);
+      emit(out, step, blend(step, steps), line ? RLINETO : RRCURVETO, varying);
       at = cubic.b;
     }
   }
@@ -269,7 +281,7 @@ function charstring(glyph: Glyph, others: readonly Glyph[], regions: number): Ui
 function emit(
   out: Bytes,
   values: readonly number[],
-  others: readonly (readonly number[])[],
+  deltas: readonly (readonly number[])[],
   operator: number,
   varying: boolean,
 ): void {
@@ -280,8 +292,8 @@ function emit(
   }
 
   for (const value of values) out.bytes(charstringNumber(value));
-  for (const [i, value] of values.entries()) {
-    for (const other of others) out.bytes(charstringNumber((other[i] ?? value) - value));
+  for (const [i] of values.entries()) {
+    for (const delta of deltas[i] ?? []) out.bytes(charstringNumber(tidy(delta)));
   }
   out.bytes(charstringNumber(values.length)).u8(BLEND);
   out.u8(operator);
@@ -296,7 +308,7 @@ function emit(
  * is to write the default master's drawing and let it be the same at every
  * weight.
  */
-function sameShape(one: Glyph, two: Glyph): boolean {
+export function sameShape(one: Glyph, two: Glyph): boolean {
   if (one.contours.length !== two.contours.length) return false;
 
   for (const [i, a] of one.contours.entries()) {
@@ -378,6 +390,18 @@ function dictReal(value: number): Uint8Array {
  * fractional — which a delta between two masters very often is — takes the
  * 16.16 fixed form, which is the only way a charstring can say one.
  */
+/**
+ * A delta as the charstring will hold it.
+ *
+ * A sum of whole numbers times coefficients that are not always whole comes
+ * back as 3.0000000000000004 as readily as 3, and the fixed form costs four
+ * bytes to say a sixty-five-thousandth nobody drew.
+ */
+function tidy(value: number): number {
+  const whole = Math.round(value);
+  return Math.abs(value - whole) < 1e-6 ? whole : Math.round(value * 65536) / 65536;
+}
+
 function charstringNumber(value: number): Uint8Array {
   const out = new Bytes();
 

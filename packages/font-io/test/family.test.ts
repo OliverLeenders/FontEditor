@@ -153,7 +153,10 @@ describe("the designspace file", () => {
 
     const after = parseDesignspace(designspaceXml(before));
     expect(after?.axes).toEqual(before.axes);
-    expect(after?.sources).toEqual(before.sources);
+    // The first source is marked as the one the family's information comes
+    // from, which is read back as the file's own words rather than the model's.
+    expect(after?.sources.map(({ kept: _, ...s }) => s)).toEqual(before.sources);
+    expect(after?.sources[0]?.kept?.children).toEqual(['<info copy="1"/>', '<lib copy="1"/>']);
     expect(after?.instances).toEqual(before.instances);
   });
 

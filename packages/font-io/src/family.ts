@@ -1,4 +1,13 @@
-import type { Axis, FontDocument, IdFactory, Location } from "@typewright/font-model";
+import type {
+  Axis,
+  FontDocument,
+  IdFactory,
+  KeptXml,
+  Location,
+  Rule,
+  RulesProcessing,
+} from "@typewright/font-model";
+import { fontDocument, orderedGlyphs } from "@typewright/font-model";
 
 import {
   type Designspace,
@@ -7,8 +16,9 @@ import {
   designspaceXml,
   parseDesignspace,
 } from "./designspace.js";
-import { type UfoWarning, readUfo } from "./ufo-import.js";
-import { ufoFiles } from "./ufo.js";
+import { type UfoWarning, readLayerGlyphs, readUfo } from "./ufo-import.js";
+import type { ExtraLayer } from "./ufo-layers.js";
+import { layerDirectoryFor, layerOf, ufoFiles } from "./ufo.js";
 import type { ZipFile } from "./unzip.js";
 import { type ZipEntry, zip } from "./zip.js";
 
@@ -22,6 +32,7 @@ import { type ZipEntry, zip } from "./zip.js";
  *
  *     Family.designspace
  *     Family-Regular.ufo/
+ *     Family-Regular.ufo/glyphs.Mid/     a master that draws only some glyphs
  *     Family-Bold.ufo/
  *
  * Delivered as a zip for the same reason a single UFO is: a browser cannot hand
@@ -39,6 +50,19 @@ export type FamilyInstance = {
   readonly name: string;
   readonly location: Location;
   readonly familyName: string;
+  readonly kept?: KeptXml;
+};
+
+/**
+ * Where a master that draws only some glyphs is kept: a layer of another
+ * master's UFO. `of` is that master's place in the list the family is given
+ * or read as.
+ */
+export type FamilySparse = {
+  readonly of: number;
+  readonly layer: string;
+  readonly directory?: string;
+  readonly layerInfo?: string;
 };
 
 /** One master on the way out: what it is called, where it sits, what it holds. */
@@ -48,6 +72,18 @@ export type FamilyMaster = {
   readonly document: FontDocument;
   /** Its own pictures, by name. Each master's are written into its own UFO. */
   readonly images?: ReadonlyMap<string, Uint8Array>;
+  /** The layers of its UFO nothing here edits, carried whole. */
+  readonly layers?: readonly ExtraLayer[];
+  readonly sparse?: FamilySparse;
+  /** What the designspace said about this source that the model does not read. */
+  readonly kept?: KeptXml;
+};
+
+/** What a family is besides its masters and instances. */
+export type FamilyExtras = {
+  readonly rules?: readonly Rule[];
+  readonly rulesProcessing?: RulesProcessing;
+  readonly kept?: KeptXml | null;
 };
 
 export type FamilyExport = {
@@ -67,15 +103,24 @@ export function familyFiles(
   axes: readonly Axis[],
   masters: readonly FamilyMaster[],
   instances: readonly FamilyInstance[] = [],
+  extras: FamilyExtras = {},
 ): ZipEntry[] {
   const family = familyName(masters);
-  const sources: Source[] = masters.map((m) => ({
-    filename: ufoFolderName(family, m.name),
-    name: `${family} ${m.name}`.trim(),
-    familyName: family,
-    styleName: m.name,
-    location: m.location,
-  }));
+  const folders = masters.map((m) => ufoFolderName(family, m.name));
+
+  const sources: Source[] = masters.map((m, i) => {
+    const parent = m.sparse === undefined ? undefined : masters[m.sparse.of];
+    const whole = parent === undefined || parent.sparse !== undefined;
+    return {
+      filename: whole ? (folders[i] ?? "") : (folders[m.sparse!.of] ?? ""),
+      name: `${family} ${m.name}`.trim(),
+      familyName: family,
+      styleName: m.name,
+      location: m.location,
+      ...(whole ? {} : { layer: m.sparse!.layer }),
+      ...(m.kept === undefined ? {} : { kept: m.kept }),
+    };
+  });
 
   const designspace: Designspace = {
     axes,
@@ -90,20 +135,43 @@ export function familyFiles(
         styleName: it.name,
         location: it.location,
         filename: `instance_ufo/${ufoFolderName(under, it.name)}`,
+        ...(it.kept === undefined ? {} : { kept: it.kept }),
       };
     }),
+    rules: extras.rules ?? [],
+    rulesProcessing: extras.rulesProcessing ?? "first",
+    ...(extras.kept === null || extras.kept === undefined ? {} : { kept: extras.kept }),
   };
   const entries: ZipEntry[] = [
     { path: designspaceFileName(family), text: designspaceXml(designspace) },
   ];
 
   for (const [i, m] of masters.entries()) {
+    if (sources[i]?.layer !== undefined) continue;
     const root = sources[i]?.filename ?? ufoFolderName(family, m.name);
+
+    // The masters drawn as layers of this one's file, written into it beside
+    // the layers it was read with — and in place of a carried layer of the same
+    // name, which is the one they were read from.
+    const children = masters.filter(
+      (c, j) => c.sparse?.of === i && sources[j]?.layer !== undefined,
+    );
+    const named = new Set(children.map((c) => c.sparse!.layer));
+    const carried = (m.layers ?? []).filter((layer) => !named.has(layer.name));
+    const taken = new Set(["glyphs", ...carried.map((layer) => layer.directory.toLowerCase())]);
+
+    const drawn = children.map((c) => {
+      const sparse = c.sparse!;
+      const directory = sparse.directory ?? layerDirectoryFor(sparse.layer, taken);
+      taken.add(directory.toLowerCase());
+      return layerOf(sparse.layer, directory, orderedGlyphs(c.document), sparse.layerInfo);
+    });
+
     // Each UFO says which style it is. A master called Bold whose own file
     // calls itself Regular is a file that lies about itself the moment anybody
     // opens it on its own — and the designspace saying otherwise does not help,
     // because a UFO is opened without one all the time.
-    for (const entry of ufoFiles(styled(m), m.images ?? new Map())) {
+    for (const entry of ufoFiles(styled(m), m.images ?? new Map(), [...carried, ...drawn])) {
       entries.push({ ...entry, path: `${root}/${entry.path}` });
     }
   }
@@ -115,34 +183,44 @@ export function exportFamily(
   axes: readonly Axis[],
   masters: readonly FamilyMaster[],
   instances: readonly FamilyInstance[] = [],
+  extras: FamilyExtras = {},
 ): FamilyExport {
-  const files = familyFiles(axes, masters, instances);
+  const files = familyFiles(axes, masters, instances, extras);
   return { bytes: zip(files), fileName: `${familyName(masters)}.zip`, files: files.length };
 }
+
+/** One master as it was read. */
+export type FamilyImportMaster = {
+  readonly name: string;
+  readonly location: Location;
+  readonly document: FontDocument;
+  readonly images: ReadonlyMap<string, Uint8Array>;
+  readonly layers: readonly ExtraLayer[];
+  readonly sparse?: FamilySparse;
+  readonly kept?: KeptXml;
+};
 
 /** What came back from reading a family. */
 export type FamilyImport = {
   readonly axes: readonly Axis[];
   /** The styles the file asked for between its sources. */
   readonly instances: readonly FamilyInstance[];
-  readonly masters: readonly {
-    readonly name: string;
-    readonly location: Location;
-    readonly document: FontDocument;
-    readonly images: ReadonlyMap<string, Uint8Array>;
-  }[];
+  readonly masters: readonly FamilyImportMaster[];
+  readonly rules: readonly Rule[];
+  readonly rulesProcessing: RulesProcessing;
+  readonly kept: KeptXml | null;
   readonly warnings: readonly UfoWarning[];
 };
 
 export type FamilyProblem = { readonly reason: string };
 
-/** A readonly array's element type, as something a reader can build up. */
-type Mutable<T extends readonly unknown[]> = T[number][];
-
 /** Whether a list of files holds a designspace, and therefore a family. */
 export function looksLikeFamily(files: readonly ZipFile[]): boolean {
   return files.some((f) => f.path.endsWith(".designspace"));
 }
+
+/** The name a UFO gives the layer it is drawn in. */
+const DEFAULT_LAYER = "public.default";
 
 /**
  * Read a family: the designspace, and the UFO each of its sources names.
@@ -166,9 +244,15 @@ export function readFamily(
   // the archive is the root everything else hangs from.
   const root = found.path.slice(0, found.path.lastIndexOf("/") + 1);
   const warnings: UfoWarning[] = [];
-  const masters: Mutable<FamilyImport["masters"]> = [];
+  const masters: FamilyImportMaster[] = [];
+  // Where each whole source's UFO was read into the list, by file name, so a
+  // layer of it can find it.
+  const wholeAt = new Map<string, number>();
+
+  const isLayer = (s: Source): boolean => s.layer !== undefined && s.layer !== DEFAULT_LAYER;
 
   for (const source of designspace.sources) {
+    if (isLayer(source)) continue;
     const prefix = `${root}${source.filename}/`;
     const inside = files
       .filter((f) => f.path.startsWith(prefix))
@@ -191,13 +275,65 @@ export function readFamily(
         message: `${source.styleName || source.filename}: ${w.message}`,
       })),
     );
+    wholeAt.set(source.filename, masters.length);
     masters.push({
       // The style name is what a master is called; the source name is the
       // family and the style together and reads oddly in a list of masters.
-      name: source.styleName === "" ? source.name : source.styleName,
+      name: masterName(source),
       location: source.location,
       document: read.document,
       images: read.images,
+      layers: read.layers,
+      ...(source.kept === undefined ? {} : { kept: source.kept }),
+    });
+  }
+
+  // The masters drawn as layers, once the files they live in have been read.
+  for (const source of designspace.sources) {
+    if (!isLayer(source)) continue;
+    const layerName = source.layer!;
+    const at = wholeAt.get(source.filename);
+    const parent = at === undefined ? undefined : masters[at];
+    if (at === undefined || parent === undefined) {
+      warnings.push({
+        glyph: null,
+        message: `${masterName(source)} is a layer of ${source.filename}, which is not a master here; left out`,
+      });
+      continue;
+    }
+
+    const layer = parent.layers.find((l) => l.name === layerName);
+    if (layer === undefined) {
+      warnings.push({
+        glyph: null,
+        message: `${masterName(source)}: ${source.filename} has no layer called ${layerName}; left out`,
+      });
+      continue;
+    }
+
+    const glyphs = readLayerGlyphs(layer, ids, (glyph, message) =>
+      warnings.push({ glyph, message: `${masterName(source)}: ${message}` }),
+    );
+    const layerInfo = layer.files.find((f) => f.path === "layerinfo.plist")?.text;
+
+    // The layer is this master now, and no longer something its file carries:
+    // it is written back from the master, and writing it twice would be two
+    // directories claiming one name.
+    masters[at] = { ...parent, layers: parent.layers.filter((l) => l !== layer) };
+    masters.push({
+      name: masterName(source),
+      location: source.location,
+      // The file's information is the master's it lives in: a layer has none.
+      document: fontDocument(glyphs, parent.document.info),
+      images: new Map(),
+      layers: [],
+      sparse: {
+        of: at,
+        layer: layerName,
+        directory: layer.directory,
+        ...(layerInfo === undefined ? {} : { layerInfo }),
+      },
+      ...(source.kept === undefined ? {} : { kept: source.kept }),
     });
   }
 
@@ -215,9 +351,17 @@ export function readFamily(
       name: it.styleName,
       location: it.location,
       familyName: it.familyName === familyOf(designspace.sources) ? "" : it.familyName,
+      ...(it.kept === undefined ? {} : { kept: it.kept }),
     })),
+    rules: (designspace.rules ?? []).map((r, i) => ({ ...r, id: `rule-${String(i + 1)}` })),
+    rulesProcessing: designspace.rulesProcessing ?? "first",
+    kept: designspace.kept ?? null,
     warnings,
   };
+}
+
+function masterName(source: Source): string {
+  return source.styleName === "" ? source.name : source.styleName;
 }
 
 /** The family the sources agree they belong to, or the first one's answer. */

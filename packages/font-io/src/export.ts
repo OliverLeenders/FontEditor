@@ -22,6 +22,7 @@ import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
 import { compileFeatures } from "./features.js";
 import { gdefTable } from "./gdef.js";
+import { type SwapVariations, gsubWithSwaps } from "./feature-variations.js";
 import { compileMarks } from "./marks.js";
 import { readTablesOf, withTable } from "./sfnt.js";
 import type { OtGlyph, OtOS2Init, OtPath } from "opentype.js";
@@ -365,7 +366,20 @@ function platformsOf(font: { names: Record<string, unknown> }): Record<string, {
   return out;
 }
 
-export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x")): ExportResult {
+/** What a font is compiled with besides its document. */
+export type ExportOptions = {
+  /**
+   * The designspace's rules, for the default master of a variable font: GSUB
+   * is written with them in it, switched on where they apply.
+   */
+  readonly swaps?: SwapVariations | null;
+};
+
+export function exportFont(
+  source: FontDocument,
+  ids: IdFactory = counterIds("x"),
+  options: ExportOptions = {},
+): ExportResult {
   // Checked before the synthesised .notdef is added, or a document holding
   // nothing at all would quietly export as a font holding nothing at all.
   if (source.glyphOrder.length === 0) {
@@ -502,7 +516,7 @@ export function exportFont(source: FontDocument, ids: IdFactory = counterIds("x"
     if (g.name !== undefined) order.set(g.name, i);
   });
 
-  const layout = layoutTables(document, (name) => order.get(name));
+  const layout = layoutTables(document, (name) => order.get(name), options);
   for (const problem of layout.warnings) warnings.push(problem);
   return { bytes: withLayoutTables(bytes, layout), warnings };
 }
@@ -526,6 +540,7 @@ export type LayoutTables = {
 export function layoutTables(
   document: FontDocument,
   glyphIdOf: (name: string) => number | undefined,
+  options: ExportOptions = {},
 ): LayoutTables {
   const warnings: string[] = [];
   const features = compileFeatures(document.features, glyphIdOf);
@@ -577,7 +592,18 @@ export function layoutTables(
     carets: features.gdef.carets,
   });
 
-  return { gpos, gsub: features.table, gdef, warnings };
+  const gsub =
+    options.swaps === undefined || options.swaps === null
+      ? features.table
+      : gsubWithSwaps(
+          features.substitution,
+          features.systems,
+          options.swaps,
+          glyphIdOf,
+          (message) => warnings.push(message),
+        );
+
+  return { gpos, gsub, gdef, warnings };
 }
 
 /** A compiled font with its layout tables spliced in, or as it was where there are none. */

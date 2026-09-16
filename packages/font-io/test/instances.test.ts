@@ -10,8 +10,76 @@ import {
 import { vec } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
-import { exportInstances, instanceFonts } from "../src/instances.js";
+import { exportInstances, instanceFonts, withSwaps } from "../src/instances.js";
 import { unzip } from "../src/unzip.js";
+
+describe("the rules, in a static style", () => {
+  const document = () =>
+    fontDocument([
+      glyph("dollar", { advance: 500, unicodes: [0x24] }),
+      glyph("dollar.heavy", { advance: 560 }),
+    ]);
+
+  it("trades the drawings and keeps the names and characters", () => {
+    const swapped = withSwaps(document(), [["dollar", "dollar.heavy"]]);
+    expect(swapped.glyphs["dollar"]).toMatchObject({ advance: 560, unicodes: [0x24] });
+    expect(swapped.glyphs["dollar.heavy"]).toMatchObject({ advance: 500, unicodes: [] });
+  });
+
+  it("changes nothing for a glyph the font has not got", () => {
+    const before = document();
+    expect(withSwaps(before, [["dollar", "nothing"]]).glyphs).toEqual(before.glyphs);
+  });
+
+  it("applies where the style sits and not elsewhere", () => {
+    const masters = [
+      { location: { wght: 400 }, document: withAlt(master(60)) },
+      { location: { wght: 900 }, document: withAlt(master(200)) },
+    ];
+    const rules = [
+      {
+        id: "r",
+        name: "heavy",
+        conditionSets: [[{ tag: "wght", min: 600, max: null }]],
+        swaps: [["n", "n.alt"] as const],
+      },
+    ];
+    const fonts = instanceFonts(
+      [WEIGHT],
+      masters,
+      [
+        { name: "Light", location: { wght: 400 }, familyName: "" },
+        { name: "Bold", location: { wght: 700 }, familyName: "" },
+      ],
+      rules,
+    );
+    expect(fonts.every((f) => f.warnings.length === 0)).toBe(true);
+    // Each drawn and compiled; that the swap happened is the model's to show.
+    expect(fonts.map((f) => f.name)).toEqual(["Light", "Bold"]);
+  });
+});
+
+const withAlt = (document: ReturnType<typeof master>) => ({
+  ...document,
+  glyphOrder: [...document.glyphOrder, "n.alt"],
+  glyphs: {
+    ...document.glyphs,
+    "n.alt": { ...document.glyphs["n"]!, name: "n.alt", unicodes: [] },
+  },
+});
+
+describe("a master that draws only some glyphs", () => {
+  it("counts for its own glyphs, and leaves the rest to the others", () => {
+    const middle = fontDocument([stem(170)], { ...DEFAULT_FONT_INFO, familyName: "Chalk" });
+    const fonts = instanceFonts(
+      [WEIGHT],
+      [...family(), { location: { wght: 650 }, document: middle, sparse: true }],
+      [{ name: "Medium", location: { wght: 650 }, familyName: "" }],
+    );
+    // Nothing refused: the sparse master is not missing the .notdef, it does not draw it.
+    expect(fonts[0]?.warnings).toEqual([]);
+  });
+});
 
 /**
  * The styles of a family, each as an ordinary static font.

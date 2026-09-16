@@ -63,6 +63,25 @@ export type FeatureEntry = {
 };
 
 /**
+ * Lookups a feature gains in part of a variable font's designspace.
+ *
+ * A region is a range on each of some axes, on the −1 to 1 scale the font's
+ * variations work in; where every range holds, the feature named by `tag`
+ * uses `lookups` as well as its own. Records are tried in the order given and
+ * the first that holds is the one applied, so the caller puts the narrower
+ * regions — where two rules overlap — before the wider ones.
+ */
+export type FeatureVariation = {
+  readonly conditions: readonly {
+    readonly axis: number;
+    readonly min: number;
+    readonly max: number;
+  }[];
+  readonly tag: string;
+  readonly lookups: readonly number[];
+};
+
+/**
  * Wrap lookups in the scaffolding a layout table needs.
  *
  * `systems` are the language systems the font declares, and every feature
@@ -83,8 +102,18 @@ export function layoutTable(
   features: readonly FeatureEntry[],
   lookups: readonly Lookup[],
   systems: readonly LanguageSystem[] = DEFAULT_SYSTEMS,
+  variations: readonly FeatureVariation[] = [],
 ): Uint8Array {
-  const usable = features.filter((f) => f.lookups.length > 0);
+  // A feature that only does something in part of the designspace is still in
+  // the list everywhere, with no lookups of its own: a variation can only
+  // substitute a feature the font already has.
+  const varied = new Set(variations.map((v) => v.tag));
+  const usable: FeatureEntry[] = [
+    ...features.filter((f) => f.lookups.length > 0),
+    ...[...varied]
+      .filter((tag) => !features.some((f) => f.tag === tag && f.lookups.length > 0))
+      .map((tag) => ({ tag, lookups: [] })),
+  ];
   if (lookups.length === 0 || usable.length === 0) return new Uint8Array(0);
   if (lookups.some((l) => l.subtables.length === 0)) return new Uint8Array(0);
 
@@ -244,16 +273,111 @@ export function layoutTable(
   for (const table of scriptTables) scriptList.bytesOf(table);
   const scriptListBytes = scriptList.finish();
 
-  const headerSize = 10;
+  // Version 1.1 only where there is something only it can say: the offset to
+  // the feature variations is four bytes more of header, and a reader that
+  // knows only 1.0 reads the rest of the table the same either way.
+  const variationBytes = variations.length === 0 ? null : featureVariations(variations, sorted);
+  const headerSize = variationBytes === null ? 10 : 14;
   const w = new Writer();
-  w.u32(0x00010000); // version 1.0
+  w.u32(variationBytes === null ? 0x00010000 : 0x00010001);
   w.u16(headerSize);
   w.u16(headerSize + scriptListBytes.length);
   w.u16(headerSize + scriptListBytes.length + featureListBytes.length);
+  if (variationBytes !== null) {
+    w.u32(headerSize + scriptListBytes.length + featureListBytes.length + lookupBytes.length);
+  }
   w.bytesOf(scriptListBytes);
   w.bytesOf(featureListBytes);
   w.bytesOf(lookupBytes);
+  if (variationBytes !== null) w.bytesOf(variationBytes);
   return w.finish();
+}
+
+/**
+ * The `FeatureVariations` table: for each region, which features are replaced
+ * by which.
+ *
+ * Every feature record with a varied tag is substituted — one per language that
+ * has its own set of lookups — by the same feature with the variation's lookups
+ * added, in lookup-list order.
+ */
+function featureVariations(
+  variations: readonly FeatureVariation[],
+  records: readonly { readonly tag: string; readonly lookups: readonly number[] }[],
+): Uint8Array {
+  const conditionSets = variations.map((v) => {
+    const conditions = v.conditions.map((c) => {
+      const cw = new Writer();
+      cw.u16(1); // format 1: a range on one axis
+      cw.u16(c.axis);
+      f2dot14(cw, c.min);
+      f2dot14(cw, c.max);
+      return cw.finish();
+    });
+    const w = new Writer();
+    w.u16(conditions.length);
+    let at = 2 + conditions.length * 4;
+    for (const c of conditions) {
+      w.u32(at);
+      at += c.length;
+    }
+    for (const c of conditions) w.bytesOf(c);
+    return w.finish();
+  });
+
+  const substitutions = variations.map((v) => {
+    const replaced = records.flatMap((record, index) =>
+      record.tag === v.tag
+        ? [
+            {
+              index,
+              lookups: [...new Set([...record.lookups, ...v.lookups])].sort((a, b) => a - b),
+            },
+          ]
+        : [],
+    );
+    const tables = replaced.map(({ lookups }) => {
+      const fw = new Writer();
+      fw.u16(0); // no feature params
+      fw.u16(lookups.length);
+      for (const index of lookups) fw.u16(index);
+      return fw.finish();
+    });
+    const w = new Writer();
+    w.u16(1);
+    w.u16(0);
+    w.u16(replaced.length);
+    let at = 6 + replaced.length * 6;
+    for (const [i, { index }] of replaced.entries()) {
+      w.u16(index);
+      w.u32(at);
+      at += tables[i]!.length;
+    }
+    for (const table of tables) w.bytesOf(table);
+    return w.finish();
+  });
+
+  const w = new Writer();
+  w.u16(1);
+  w.u16(0);
+  w.u32(variations.length);
+  let at = 8 + variations.length * 8;
+  for (const [i, set] of conditionSets.entries()) {
+    w.u32(at);
+    at += set.length;
+    w.u32(at);
+    at += substitutions[i]!.length;
+  }
+  for (const [i, set] of conditionSets.entries()) {
+    w.bytesOf(set);
+    w.bytesOf(substitutions[i]!);
+  }
+  return w.finish();
+}
+
+function f2dot14(w: Writer, value: number): void {
+  const clamped = Math.max(-2, Math.min(1.99993896484375, value));
+  w.i16(Math.round(clamped * 16384));
 }
 
 function compareLists(l: readonly number[], r: readonly number[]): number {

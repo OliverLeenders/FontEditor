@@ -201,6 +201,35 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
 }
 
 /**
+ * The glyphs of one layer the reader carried rather than read.
+ *
+ * For a master that is drawn as a layer of another's UFO: the designspace names
+ * the layer, and its glyphs are that master's drawing. Read the way the default
+ * layer is, from `contents.plist` and the `.glif` files it names.
+ */
+export function readLayerGlyphs(
+  layer: ExtraLayer,
+  ids: IdFactory,
+  warn: (glyph: string | null, message: string) => void,
+): Glyph[] {
+  const text = (path: string): string | null =>
+    layer.files.find((f) => f.path === path)?.text ?? null;
+
+  const glyphs: Glyph[] = [];
+  for (const [name, file] of stringEntries(parsePlistDict(text("contents.plist") ?? ""))) {
+    const source = text(file);
+    if (source === null) {
+      warn(name, `listed in ${layer.directory}/contents.plist but ${file} is not there`);
+      continue;
+    }
+    const parsed = parseGlif(source, ids, (message) => warn(name, message));
+    if (parsed === null) warn(name, `${layer.directory}/${file} is not a glif`);
+    else glyphs.push({ ...parsed, name });
+  }
+  return glyphs;
+}
+
+/**
  * Put the glyphs in the order the font asks for.
  *
  * `contents.plist` is a dictionary and a dictionary has no order, so the order

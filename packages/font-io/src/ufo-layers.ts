@@ -32,6 +32,11 @@ export type ExtraLayer = {
   /** The directory it lives in, relative to the UFO's root. */
   readonly directory: string;
   readonly files: readonly LayerFile[];
+  /**
+   * Which master of a family the layer's UFO is, for whoever keeps layers for
+   * several masters at once. Nothing here sets or reads it.
+   */
+  readonly master?: string;
 };
 
 /** Where the default layer lives when the file does not say. */

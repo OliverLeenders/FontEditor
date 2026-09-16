@@ -38,15 +38,19 @@ import type { Drawn } from "./glyf.js";
  * here.
  */
 
-/** Every master's points for one glyph, in the order the regions are in. */
+/**
+ * How one glyph varies: for each region it varies over, how far every point
+ * moves there.
+ *
+ * The deltas are worked out by the caller from every master's points — see
+ * `variation-plan.ts` — and are given for the outline's points and then the
+ * four phantom points, in that order.
+ */
 export type GlyphVariation = {
-  /** The default master's outline, which is what `glyf` holds. */
-  readonly base: Drawn;
-  /** One per region, in region order, each the outline at that region's peak. */
-  readonly at: readonly Drawn[];
-  /** The default master's advance, and the same at each region's peak. */
-  readonly advance: number;
-  readonly advanceAt: readonly number[];
+  readonly tuples: readonly {
+    readonly region: Support;
+    readonly deltas: readonly (readonly [number, number])[];
+  }[];
 };
 
 /** Deltas smaller than this are not worth a byte; the format's own threshold. */
@@ -54,7 +58,6 @@ const NOTHING = 0.5;
 
 export function gvarTable(
   axes: readonly Axis[],
-  regions: readonly Support[],
   glyphs: readonly (GlyphVariation | null)[],
 ): Uint8Array {
   const out = new Bytes();
@@ -91,7 +94,7 @@ export function gvarTable(
     out.patchU32(offsetsAt + index * 4, out.length - dataFrom);
     if (glyph === null) continue;
 
-    const data = variationData(axes, regions, glyph);
+    const data = variationData(axes, glyph);
     if (data !== null) out.bytes(data);
   }
   out.patchU32(offsetsAt + glyphs.length * 4, out.length - dataFrom);
@@ -106,38 +109,10 @@ export function gvarTable(
  * space, a glyph drawn identically in every master — and is said by giving it
  * no data at all rather than by writing an empty table for it.
  */
-function variationData(
-  axes: readonly Axis[],
-  regions: readonly Support[],
-  glyph: GlyphVariation,
-): Uint8Array | null {
-  const base = flat(glyph.base);
-  const runs: { readonly region: Support; readonly deltas: readonly [number, number][] }[] = [];
-
-  for (const [i, region] of regions.entries()) {
-    const there = glyph.at[i];
-    if (there === undefined) continue;
-
-    const moved = flat(there);
-    // A master the conversion could not match point for point. Nothing honest
-    // can be said about it, and saying nothing leaves the glyph at its default
-    // shape rather than at a wrong one.
-    if (moved.length !== base.length) return null;
-
-    const deltas = base.map((p, k) => [moved[k]!.x - p.x, moved[k]!.y - p.y] as [number, number]);
-
-    // The four phantom points. The second is the horizontal advance, and how
-    // far it moves is how much wider this master's letter is — which is the
-    // whole of how spacing varies in this flavour. The other three do not move:
-    // the origin travels with the outline, and there is no vertical metric
-    // here to vary.
-    const advance = (glyph.advanceAt[i] ?? glyph.advance) - glyph.advance;
-    deltas.push([0, 0], [advance, 0], [0, 0], [0, 0]);
-
-    if (deltas.some(([x, y]) => Math.abs(x) >= NOTHING || Math.abs(y) >= NOTHING)) {
-      runs.push({ region, deltas });
-    }
-  }
+function variationData(axes: readonly Axis[], glyph: GlyphVariation): Uint8Array | null {
+  const runs = glyph.tuples.filter((tuple) =>
+    tuple.deltas.some(([x, y]) => Math.abs(x) >= NOTHING || Math.abs(y) >= NOTHING),
+  );
 
   if (runs.length === 0) return null;
 
@@ -181,24 +156,29 @@ function variationData(
 /**
  * Whether a region needs its start and end written out.
  *
- * A tuple whose peak alone is given is read as spanning from zero to the peak
- * to zero, which is what a region between two masters on one axis looks like.
- * Anything else — a region that does not reach zero, or one bounded short of
- * the axis end — has to say so, and the interpolation model here produces those
- * as soon as there are three masters on an axis.
+ * A tuple whose peak alone is given is read as running from zero to the peak
+ * and no further: the specification takes the start as the lesser of the peak
+ * and zero and the end as the greater. That is a master at the end of an axis.
+ * Anything else — a region that does not reach zero, or one that carries on
+ * past its peak towards a master further out — has to say so, and the
+ * interpolation model here produces those as soon as there is a master between
+ * the default and the end of an axis.
+ *
+ * Reading the implied end as the end of the axis was a mistake this made once,
+ * and no master in the proofs sat anywhere but at an end or with nothing beyond
+ * it, so nothing noticed until a master drawn halfway along did.
  */
-function intermediate(axes: readonly Axis[], region: Support): boolean {
+export function intermediate(axes: readonly Axis[], region: Support): boolean {
   return axes.some((a) => {
     const at = region[a.tag];
     if (at === undefined) return false;
-    const implied = at.peak < 0 ? { min: -1, max: 0 } : { min: 0, max: 1 };
     if (at.peak === 0) return at.min !== 0 || at.max !== 0;
-    return at.min !== implied.min || at.max !== implied.max;
+    return at.min !== Math.min(at.peak, 0) || at.max !== Math.max(at.peak, 0);
   });
 }
 
-/** Every point of every contour, in the order the file writes them. */
-function flat(drawn: Drawn): { x: number; y: number }[] {
+/** Every point of every contour, in the order the file writes them, as `glyf` rounds them. */
+export function flatPoints(drawn: Drawn): { x: number; y: number }[] {
   return drawn.contours.flat().map((p) => ({ x: Math.round(p.pt.x), y: Math.round(p.pt.y) }));
 }
 

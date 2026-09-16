@@ -50,6 +50,14 @@ export type CompiledFeatures = {
   /** GSUB. Empty when nothing compiled, so a caller writes no table rather than an empty one. */
   readonly table: Uint8Array;
   /**
+   * The substitution half as well, unwrapped, for a variable font that adds
+   * lookups of its own — the designspace's rules — before GSUB is written.
+   */
+  readonly substitution: {
+    readonly entries: readonly FeatureEntry[];
+    readonly lookups: readonly Lookup[];
+  };
+  /**
    * The positioning half, unwrapped.
    *
    * Not a table of its own, because the font's kerning and its mark attachment
@@ -97,6 +105,7 @@ const NO_GDEF: GdefFromFeatures = {
 
 export const NO_FEATURES: CompiledFeatures = {
   table: new Uint8Array(0),
+  substitution: { entries: [], lookups: [] },
   positioning: { entries: [], lookups: [] },
   systems: DEFAULT_SYSTEMS,
   tags: [],
@@ -202,6 +211,7 @@ class Compilation {
       this.slots[table].map((slot) => ("singles" in slot ? written(slot) : slot));
     return {
       table: layoutTable(mergeFeatures(this.entries.sub, []), lookups("sub"), this.systems),
+      substitution: { entries: mergeFeatures(this.entries.sub, []), lookups: lookups("sub") },
       positioning: { entries: mergeFeatures(this.entries.pos, []), lookups: lookups("pos") },
       systems: this.systems,
       tags: this.tags,

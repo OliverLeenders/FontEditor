@@ -598,6 +598,61 @@ export function ufoFiles(
   return entries;
 }
 
+/**
+ * A layer of a UFO, written from glyphs: one `.glif` each and the
+ * `contents.plist` naming them.
+ *
+ * What a master that draws only some glyphs becomes when its family is written
+ * out — a directory beside `glyphs/` in the UFO of the master it belongs to.
+ * `layerInfo` is the layer's own `layerinfo.plist`, carried from the file it was
+ * read from where there was one.
+ */
+export function layerOf(
+  name: string,
+  directory: string,
+  glyphs: readonly Glyph[],
+  layerInfo?: string,
+): ExtraLayer {
+  const taken = new Set<string>();
+  const contents: Array<readonly [string, string]> = [];
+  const files: { path: string; text: string }[] = [];
+
+  for (const g of glyphs) {
+    let file = glyphFileName(g.name, ".glif");
+    let n = 2;
+    while (taken.has(file.toLowerCase())) {
+      file = glyphFileName(`${g.name}.${String(n)}`, ".glif");
+      n++;
+    }
+    taken.add(file.toLowerCase());
+    contents.push([g.name, file]);
+    files.push({ path: file, text: glif(g) });
+  }
+
+  files.push({
+    path: "contents.plist",
+    text: plist(dict(contents.map(([glyphName, file]) => [glyphName, str(file)] as const))),
+  });
+  if (layerInfo !== undefined) files.push({ path: "layerinfo.plist", text: layerInfo });
+
+  return { name, directory, files };
+}
+
+/**
+ * A directory name for a new layer, in the form UFO's own writers use:
+ * `glyphs.` and the name escaped the way a glyph's file name is.
+ */
+export function layerDirectoryFor(name: string, taken: ReadonlySet<string>): string {
+  const base = `glyphs.${glyphFileName(name, "")}`;
+  let directory = base;
+  let n = 2;
+  while (taken.has(directory.toLowerCase())) {
+    directory = `${base}${String(n)}`;
+    n++;
+  }
+  return directory;
+}
+
 export type UfoExport = {
   readonly bytes: Uint8Array;
   readonly fileName: string;

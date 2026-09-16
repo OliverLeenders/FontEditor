@@ -1,5 +1,5 @@
-import type { Axis, FontDocument, Location } from "@typewright/font-model";
-import { interpolateFont } from "@typewright/font-model";
+import type { Axis, FontDocument, Glyph, Location, Rule } from "@typewright/font-model";
+import { interpolateFont, swapsAt } from "@typewright/font-model";
 
 import { exportFont } from "./export.js";
 import { type ZipEntry, zip } from "./zip.js";
@@ -23,6 +23,8 @@ import { type ZipEntry, zip } from "./zip.js";
 export type InstanceMaster = {
   readonly location: Location;
   readonly document: FontDocument;
+  /** Whether it draws only some glyphs, and counts only for those. */
+  readonly sparse?: boolean;
 };
 
 /** A style to write out: what it is called, and where on the axes it is. */
@@ -59,13 +61,20 @@ export function instanceFonts(
   axes: readonly Axis[],
   masters: readonly InstanceMaster[],
   instances: readonly NamedPlace[],
+  rules: readonly Rule[] = [],
 ): InstanceFont[] {
   const locations = masters.map((m) => m.location);
   const sources = masters.map((m) => m.document);
+  const sparse = masters.map((m) => m.sparse === true);
   const out: InstanceFont[] = [];
 
   for (const it of instances) {
-    const { document, refused } = interpolateFont(axes, locations, sources, it.location);
+    const worked = interpolateFont(axes, locations, sources, it.location, sparse);
+    const { refused } = worked;
+    // The rules in effect here, applied the way a build applies them to a
+    // static instance: the glyphs trade drawings, and keep their names and
+    // characters, so a `$` typed at this weight is the heavy one.
+    const document = withSwaps(worked.document, swapsAt(axes, rules, it.location));
     const family = it.familyName === "" ? document.info.familyName : it.familyName;
 
     const named: FontDocument = {
@@ -94,13 +103,38 @@ export function instanceFonts(
   return out;
 }
 
+/**
+ * A font with some glyphs' drawings traded for others'.
+ *
+ * Each pair in turn, so a later rule sees what an earlier one did — which is
+ * the order a variable font applies them in. A pair naming a glyph the font
+ * has not got changes nothing.
+ */
+export function withSwaps(
+  document: FontDocument,
+  swaps: readonly (readonly [string, string])[],
+): FontDocument {
+  if (swaps.length === 0) return document;
+
+  const glyphs: Record<string, Glyph> = { ...document.glyphs };
+  for (const [a, b] of swaps) {
+    const one = glyphs[a];
+    const two = glyphs[b];
+    if (one === undefined || two === undefined) continue;
+    glyphs[a] = { ...two, name: a, unicodes: one.unicodes };
+    glyphs[b] = { ...one, name: b, unicodes: two.unicodes };
+  }
+  return { ...document, glyphs };
+}
+
 /** Every instance, zipped, because a browser hands over one file at a time. */
 export function exportInstances(
   axes: readonly Axis[],
   masters: readonly InstanceMaster[],
   instances: readonly NamedPlace[],
+  rules: readonly Rule[] = [],
 ): InstancesExport {
-  const fonts = instanceFonts(axes, masters, instances);
+  const fonts = instanceFonts(axes, masters, instances, rules);
   const entries: ZipEntry[] = fonts.map((f) => ({
     path: f.fileName,
     bytes: new Uint8Array(f.bytes),
