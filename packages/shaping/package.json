@@ -20,6 +20,7 @@
     "@typewright/font-io": "workspace:*",
     "@typewright/font-model": "workspace:*",
     "@typewright/view": "workspace:*",
+    "bidi-js": "^1.1.0",
     "harfbuzzjs": "^1.6.1"
   }
 }

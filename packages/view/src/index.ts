@@ -27,6 +27,8 @@ export {
 } from "./transform.js";
 
 export type { Adjustment, Engine, EngineGlyph, Positioner, Shaper } from "./run.js";
+export type { TextDirection, TextSettings } from "./text.js";
+export { READ_FROM_TEXT, sameTextSettings } from "./text.js";
 export type { WheelIntent, WheelLike } from "./wheel.js";
 export { wheelIntent } from "./wheel.js";
 
