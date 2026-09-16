@@ -677,6 +677,47 @@ describe("locking one handle at a time", () => {
 
     expect(unlocked.nodes[0]!.out).toEqual(locked.nodes[0]!.out);
   });
+
+  it("makes a smooth node a corner when one side is freed and the other stays locked", () => {
+    // Otherwise the far side's lock goes on holding this handle, and the switch
+    // would be a switch that changed nothing.
+    const c = smooth();
+    const both = setHvLock(c, c.nodes[0]!.id, "both", true)!;
+    const freed = setHvLock(both, c.nodes[0]!.id, "in", false)!;
+    const n = freed.nodes[0]!;
+
+    expect(n.hvLock).toEqual({ in: false, out: true });
+    expect(n.type).toBe("corner");
+
+    // Which is what makes the handle free in fact, and not only on paper.
+    const dragged = setHandle(freed, c.nodes[0]!.id, "in", vec(-70, -55))!;
+    expect(dragged.nodes[0]!.in).toEqual({ x: -70, y: -55 });
+  });
+
+  it("leaves a smooth node smooth when the side freed was the only one locked", () => {
+    const c = smooth();
+    const locked = setHvLock(c, c.nodes[0]!.id, "out", true)!;
+    const freed = setHvLock(locked, c.nodes[0]!.id, "out", false)!;
+
+    expect(freed.nodes[0]!.type).toBe("smooth");
+    expect(freed.nodes[0]!.hvLock).toEqual({ in: false, out: false });
+  });
+
+  it("leaves a smooth node smooth when both sides are freed at once", () => {
+    const c = smooth();
+    const both = setHvLock(c, c.nodes[0]!.id, "both", true)!;
+    const freed = setHvLock(both, c.nodes[0]!.id, "both", false)!;
+
+    expect(freed.nodes[0]!.type).toBe("smooth");
+  });
+
+  it("leaves a corner node a corner, since it was never holding anything", () => {
+    const c = corner();
+    const both = setHvLock(c, c.nodes[0]!.id, "both", true)!;
+    const freed = setHvLock(both, c.nodes[0]!.id, "in", false)!;
+
+    expect(freed.nodes[0]!.type).toBe("corner");
+  });
 });
 
 describe("tangent nodes", () => {

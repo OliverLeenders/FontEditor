@@ -420,6 +420,12 @@ export function setNodeType(c: Contour, id: NodeId, type: Node["type"]): Contour
  * both are, the longer handle leads, since it carries more of the curve's shape
  * and is the less destructive to keep. A corner node has no such obligation, so
  * each handle snaps on its own.
+ *
+ * Switching one side of a smooth node off while the other stays locked makes it
+ * a corner. The two handles are one line, so the far side's lock goes on holding
+ * this one — see `setHandle` — and the switch would be a switch that changes
+ * nothing. Freeing the handle is what unlocking it means, and a node whose
+ * handles are free to point in different directions is a corner.
  */
 export function setHvLock(
   c: Contour,
@@ -435,7 +441,11 @@ export function setHvLock(
     which === "both" ? { in: locked, out: locked } : { ...base.hvLock, [which]: locked };
 
   const next: Node = { ...base, hvLock };
-  if (!locked) return settled(replaceNode(c, i, next));
+  if (!locked) {
+    const other = which === "in" ? "out" : "in";
+    const stillHeld = which !== "both" && base.type === "smooth" && hvLock[other];
+    return settled(replaceNode(c, i, stillHeld ? { ...next, type: "corner" } : next));
+  }
 
   const smooth = base.type === "smooth" && base.in !== null && base.out !== null;
   if (smooth) {
