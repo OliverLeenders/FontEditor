@@ -222,6 +222,20 @@ jobs:
           python tools/otf-check/check_vf_ttf.py
           "$RUNNER_TEMP/vf/Three.ttf" "$RUNNER_TEMP/vf/three.json" "$RUNNER_TEMP/vf"
 
+      # A family that uses what a designspace can say: a master at every corner
+      # of two axes, a weight map that needs avar, a master drawn as a layer for
+      # one glyph, and two rules whose regions overlap. None of it shows at the
+      # masters, so fontTools works out what both fonts should be between them
+      # from the masters' own points and compares.
+      - name: Export the designspace proof family
+        run: DESIGNSPACE_OUT="$RUNNER_TEMP/designspace" pnpm --filter @typewright/font-io exec vitest run proof-designspace
+
+      - name: Read the designspace proof family with fontTools
+        run: python tools/ufo-check/check_family.py "$RUNNER_TEMP/designspace/Proof.designspace"
+
+      - name: Check both variable fonts between the masters
+        run: python tools/otf-check/check_designspace_vf.py "$RUNNER_TEMP/designspace"
+
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"
 

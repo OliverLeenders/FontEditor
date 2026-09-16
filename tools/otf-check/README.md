@@ -67,6 +67,22 @@ say — and getting any one of those wrong gives a font that is perfect at the
 default and wrong everywhere else, which is the failure that would otherwise
 reach somebody's screen.
 
+## Between the masters
+
+`check_designspace_vf.py` asks what `check_vf.py` cannot see, because it only shows
+between the masters: a delta at the corner of two axes, a master drawn as a layer for a
+few glyphs, a weight map carried in `avar`, and rules carried as feature variations. The
+proof family is read with `designspaceLib`, and fontTools' own `VariationModel` works
+out from the masters' points what every glyph should be at eight places; both flavours of
+the variable font are pinned there and compared — the CFF2 font point for point, the
+TrueType one against it as a shape — and what `rvrn` substitutes is compared with what
+`processRules` says. `outline.py` holds the shape comparison both TrueType checks use.
+
+```sh
+DESIGNSPACE_OUT=/tmp/ds pnpm --filter @typewright/font-io exec vitest run proof-designspace
+python check_designspace_vf.py /tmp/ds
+```
+
 ## The TrueType flavour
 
 `check_ttf.py` asks the one question the conversion raises. A cubic cannot be

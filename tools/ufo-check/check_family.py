@@ -77,6 +77,23 @@ for source in document.sources:
     seen.add(at)
 
     reader = UFOReader(ufo, validate=True)
+
+    # A master drawn as a layer of another's UFO: the layer has to be there, and
+    # has to hold glyphs the font has. Its names are its master's, so there is
+    # no style of its own to compare.
+    if source.layerName:
+        if source.layerName not in reader.getLayerNames():
+            problem(where, f"has no layer {source.layerName!r}")
+            continue
+        drawn = set(reader.getGlyphSet(source.layerName).keys())
+        extra = sorted(drawn - set(reader.getGlyphSet().keys()))
+        note(f"  layer {source.layerName!r}, {len(drawn)} glyphs")
+        if not drawn:
+            problem(where, f"the layer {source.layerName!r} draws nothing")
+        if extra:
+            problem(where, f"the layer {source.layerName!r} draws glyphs the font has not got: {extra[:8]}")
+        continue
+
     info = SimpleNamespace()
     try:
         reader.readInfo(info)
@@ -107,7 +124,8 @@ for source in document.sources:
 sets = {}
 for source in document.sources:
     ufo = here / source.filename
-    if not ufo.is_dir():
+    # A master drawn as a layer draws only some glyphs, which is the point of it.
+    if not ufo.is_dir() or source.layerName:
         continue
     sets[source.filename] = set(UFOReader(ufo, validate=True).getGlyphSet().keys())
 

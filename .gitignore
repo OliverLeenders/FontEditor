@@ -14,6 +14,8 @@ Thumbs.db
 # The font checks in tools/ run under Python, and a virtual environment for them
 # is the one thing in this repository that is neither JavaScript nor a font.
 .venv*/
+# And the checks import a module of their own, which Python compiles beside it.
+__pycache__/
 
 *.log
 npm-debug.log*
