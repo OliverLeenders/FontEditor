@@ -32,6 +32,15 @@ cleanly, and Ctrl-Z takes it back; while it has a problem, no anchor changes. It
 again from the anchors when you switch files or an anchor moves elsewhere, so comments typed
 there are not kept.
 
+**Which way the text runs.** The Spacing bar and the Proof bar each end with three pickers:
+direction, script and language. All three start at Auto, which reads them from the text —
+type Arabic and it is set right to left, with any Latin or numbers inside it in their own
+order. Choose a direction to say so outright, which is what a line of Latin proofed as part
+of an Arabic setting needs; a right-to-left proof is set from the right margin. The script
+list is the scripts your font has letters for, and the language list is what your feature
+file names in its `languagesystem` lines — so a `locl` rule for Turkish can be seen by
+choosing Turkish. Each line remembers its own three.
+
 **Names, finding and opening.** In both files, a list of names offers itself under the caret
 after two characters: glyph names and keywords, classes after `@`, named lookups after
 `lookup`, and feature tags after `feature`. Ctrl+Space opens it at once; the arrows choose,

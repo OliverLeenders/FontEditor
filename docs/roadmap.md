@@ -45,7 +45,7 @@ application installs from a release and updates itself.
 | 20    | A split window                      | done                                                                                 |
 | 21    | Two fonts side by side              | done: a window per font                                                              |
 | 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools |
-| 23    | Right-to-left text                  | later                                                                                |
+| 23    | Right-to-left text                  | done: bidi runs, and direction, script and language chosen in each bar               |
 | 24    | The web build, hosted               | later                                                                                |
 | 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                  |
 | 26    | The last interface tests            | done: every panel and control is rendered by a test                                  |
@@ -97,7 +97,9 @@ The gaps worth naming, in the order they would bite someone using this:
   shaper browsers use, from a font compiled for it after each edit — substitutions, kerning
   and mark attachment as the exported font will set them. The glyph strip under the canvas
   is still deliberately left unshaped, since it is there to show the letter you are drawing
-  beside its neighbours, and nothing is set right to left yet (phase 23).
+  beside its neighbours. The Spacing line and the Proof are ordered by the Unicode
+  bidirectional algorithm since phase 23, and each has its own direction, script and
+  language.
 - **Overlaps are removed where the font is compiled, and the drawing keeps them.** CFF —
   the outline format an OTF written here carries — does not allow overlapping contours:
   its CharStrings are filled by the even-odd rule, under which two shapes subtract where
@@ -557,12 +559,29 @@ than its source said. Now:
 
 Reverse substitution, mark filtering sets and `table` blocks stay refused by name.
 
-#### Phase 23 — Right-to-left text, and a script and language for the Proof
+#### Phase 23 — Right-to-left text, and a script and language for the Proof — done
 
-The Spacing line and the Proof are laid out left to right, with HarfBuzz guessing the script
-from the text. Mixed-direction paragraphs need the Unicode bidirectional algorithm — a
-dependency, or a sizeable module of its own — and the controls for choosing a script and a
-language are a design question.
+The Spacing line and the Proof were laid out left to right, with HarfBuzz guessing the
+script from the text. Now:
+
+- **Mixed-direction text is ordered by the algorithm.** `bidi-js` (MIT, no dependencies of
+  its own) resolves the embedding levels; the line is cut into runs where the level changes,
+  each run is shaped with its own direction, and the runs are put in drawing order by rule
+  L2. So an Arabic line with an English phrase in it comes back with the phrase in the
+  middle, each part reading its own way. The glyphs still arrive at the view left to right,
+  which is what every caller already expected, so `packages/view` needed nothing.
+- **Direction, script and language are chosen in the bar**, in the Spacing line and the
+  Proof each, and remembered. All three start at Auto, which is what a shaper does with text
+  it is told nothing about.
+- **The pickers are about the font in hand.** The scripts are the ones its characters belong
+  to, plus any its feature file declares; the languages are the ones that file names in its
+  `languagesystem` lines, which are exactly the ones its rules can differ for.
+- **A right-to-left proof is set from the right margin**, so its ragged edge is on the left,
+  where a line ends in that reading.
+
+Mirroring — the brackets that face the other way — is HarfBuzz's own doing for a run it is
+told runs right to left, and doing it here as well turned every bracket back as it went in.
+That is a test now.
 
 #### Phase 24 — The web build, hosted
 
