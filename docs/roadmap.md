@@ -47,7 +47,7 @@ application installs from a release and updates itself.
 | 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools |
 | 23    | Right-to-left text                  | later                                                                                |
 | 24    | The web build, hosted               | later                                                                                |
-| 25    | The feature source, further         | later                                                                                |
+| 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                  |
 | 26    | The last interface tests            | later                                                                                |
 
 ### What the table missed
@@ -570,10 +570,22 @@ The browser build runs anywhere a folder of files can be served, and is served n
 Choosing a host decides how the content security policy reaches it — a header, or a meta tag
 where the host cannot send one — and gives the README somewhere to link to.
 
-#### Phase 25 — The feature source, further
+#### Phase 25 — The feature source, further — done
 
-What a source editor is expected to do beyond colour and indentation: glyph names completed
-from the font as they are typed, search and replace, and a glyph name that opens its glyph.
+What a source editor is expected to do beyond colour and indentation, in both the Features
+and the Marks file, still with nothing installed for it:
+
+- **Completion as you type.** After two characters a list under the caret offers the font's
+  glyph names and the language's keywords; after `@` the classes the file defines, after
+  `lookup` its named lookups, after `feature` the registered feature tags. Ctrl+Space opens
+  it at once, the arrows choose, Enter takes, Escape closes, and Tab still indents.
+- **Find and replace.** Ctrl+F and Ctrl+H open a bar over the source, with the count, the
+  next and previous match, match case and whole word, where a whole word is a whole name as
+  the language splits them. The matches are marked in a third copy of the text under the
+  colours, and each replacement is an undo step of its own.
+- **A name opens its glyph.** Ctrl+click or F12 on a glyph name the font has opens it in the
+  Glyph workspace — in the other pane when the window is split, so the file stays in sight
+  — and the name is underlined while Ctrl is held over it.
 
 #### Phase 26 — The last interface tests
 

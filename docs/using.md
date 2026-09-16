@@ -32,6 +32,14 @@ cleanly, and Ctrl-Z takes it back; while it has a problem, no anchor changes. It
 again from the anchors when you switch files or an anchor moves elsewhere, so comments typed
 there are not kept.
 
+**Names, finding and opening.** In both files, a list of names offers itself under the caret
+after two characters: glyph names and keywords, classes after `@`, named lookups after
+`lookup`, and feature tags after `feature`. Ctrl+Space opens it at once; the arrows choose,
+Enter takes one, and Escape closes it. Ctrl+F finds and Ctrl+H replaces, from a bar over the
+source — Enter and Shift+Enter move between matches, and each replacement is one undo step.
+Ctrl+click or F12 on a glyph name opens that glyph, in the other pane when the window is
+split; holding Ctrl underlines the names that can be opened.
+
 Use PgUp and PgDn to move between glyphs, and press `?` for every key at once. The
 toolbar is icons; every one names its shortcut in its tooltip — `V` select, `P` pen, `K` knife, `R` rectangle, `E` ellipse,
 `L` ruler. Measuring one stem is **held** rather than switched to: `M` borrows the tool
