@@ -9,6 +9,7 @@ import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingEngine } fro
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { TextSettingsControls } from "./TextSettingsControls.js";
 import styles from "./ProofView.module.css";
 
 /** Space around the text block, in screen pixels. */
@@ -64,6 +65,7 @@ export function ProofView(): React.JSX.Element {
    */
   const { unitsPerEm } = document.info;
   const applyFeatures = useStoreValue((s) => s.applyFeatures);
+  const settings = useStoreValue((s) => s.proofTextSettings);
   const shape = useMemo(
     () => shaperFrom(document.features, applyFeatures),
     [document.features, applyFeatures],
@@ -73,21 +75,20 @@ export function ProofView(): React.JSX.Element {
     [document.features, applyFeatures],
   );
   // HarfBuzz once it has loaded, which then sets the page on its own.
-  const engine = useShapingEngine(document, applyFeatures);
+  const engine = useShapingEngine(document, applyFeatures, settings);
   const hasFeatures = useMemo(() => hasSomethingToShape(document), [document]);
-  const lines = useMemo(() => {
+  /** How wide a line may be, in design units: the window, less the margins. */
+  const measure = useMemo(() => {
     const scale = size / unitsPerEm;
-    const measure = (width - MARGIN * 2) / Math.max(scale, 0.0001);
-    return layoutParagraph(
-      document,
-      text,
-      Math.max(measure, unitsPerEm),
-      leading * unitsPerEm,
-      shape,
-      position,
-      engine,
-    );
-  }, [document, text, size, leading, unitsPerEm, width, shape, position, engine]);
+    return Math.max((width - MARGIN * 2) / Math.max(scale, 0.0001), unitsPerEm);
+  }, [size, unitsPerEm, width]);
+  const lines = useMemo(
+    () => layoutParagraph(document, text, measure, leading * unitsPerEm, shape, position, engine),
+    [document, text, measure, leading, unitsPerEm, shape, position, engine],
+  );
+  // A page that runs right to left is set from the right margin, so its ragged
+  // edge is on the left — where, in that reading, a line ends.
+  const rtl = settings.direction === "rtl";
 
   /**
    * How tall the set text is, so the page can be scrolled through.
@@ -109,8 +110,8 @@ export function ProofView(): React.JSX.Element {
   const wantedScroll = useRef<number | null>(null);
 
   // The document too, for the components each glyph is drawn with.
-  const frame = useRef({ lines, size, unitsPerEm, document });
-  frame.current = { lines, size, unitsPerEm, document };
+  const frame = useRef({ lines, size, unitsPerEm, document, measure, rtl });
+  frame.current = { lines, size, unitsPerEm, document, measure, rtl };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -124,17 +125,20 @@ export function ProofView(): React.JSX.Element {
       const scrollTop = scrollRef.current?.scrollTop ?? 0;
 
       const scene: ProofScene = {
-        lines: state.lines.map((line) => ({
-          glyphs: line.run.glyphs.map((p) => ({
-            // Components drawn in, or a composite is a gap in the proof.
-            glyph: drawableGlyph(state.document, p.glyph),
-            x: p.x,
-            advance: p.advance,
-            dx: p.dx,
-            dy: p.dy,
-          })),
-          y: line.y,
-        })),
+        lines: state.lines.map((line) => {
+          const shift = state.rtl ? state.measure - line.run.width : 0;
+          return {
+            glyphs: line.run.glyphs.map((p) => ({
+              // Components drawn in, or a composite is a gap in the proof.
+              glyph: drawableGlyph(state.document, p.glyph),
+              x: p.x + shift,
+              advance: p.advance,
+              dx: p.dx,
+              dy: p.dy,
+            })),
+            y: line.y,
+          };
+        }),
         // The first baseline sits a line below the top margin, so the ascenders
         // of the first line have somewhere to be.
         view: { scale, tx: MARGIN, ty: MARGIN + state.size - scrollTop },
@@ -159,7 +163,7 @@ export function ProofView(): React.JSX.Element {
 
   useEffect(() => {
     surfaceRef.current?.invalidate();
-  }, [lines, size, contentHeight]);
+  }, [lines, size, contentHeight, measure, rtl]);
 
   // After the page has grown or shrunk, and not before.
   useEffect(() => {
@@ -280,6 +284,12 @@ export function ProofView(): React.JSX.Element {
             </option>
           ))}
         </select>
+
+        <TextSettingsControls
+          value={settings}
+          document={document}
+          onChange={(next) => store.setProofTextSettings(next)}
+        />
 
         <span className={styles.count}>
           {lines.length === 1 ? "1 line" : `${String(lines.length)} lines`}

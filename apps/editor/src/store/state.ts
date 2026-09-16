@@ -147,6 +147,9 @@ export type StoreState = {
    * other would make comparing them a chore rather than a glance.
    */
   readonly proofText: string;
+  /** How each line is set: which way it runs, and whose rules it chooses. */
+  readonly spacingTextSettings: Preferences["spacingTextSettings"];
+  readonly proofTextSettings: Preferences["proofTextSettings"];
   readonly proofSize: number;
   /** The size the feature source is set at, in pixels. */
   readonly featureSize: number;
@@ -311,6 +314,8 @@ export function initialState(preferences: Preferences): StoreState {
     spacingSize: preferences.spacingSize,
     spacingMode: "space",
     proofText: PROOF_TEXT,
+    spacingTextSettings: preferences.spacingTextSettings,
+    proofTextSettings: preferences.proofTextSettings,
     proofSize: preferences.proofSize,
     featureSize: preferences.featureSize,
     proofLeading: preferences.proofLeading,

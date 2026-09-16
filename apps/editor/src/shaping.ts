@@ -1,7 +1,13 @@
 import { NO_POSITIONING, NO_SHAPING, positionerFor, shaperFor } from "@typewright/font-io";
 import type { FontDocument } from "@typewright/font-model";
 import type * as ShapingModule from "@typewright/shaping";
-import type { Engine, Positioner, Shaper } from "@typewright/view";
+import {
+  type Engine,
+  type Positioner,
+  type Shaper,
+  type TextSettings,
+  READ_FROM_TEXT,
+} from "@typewright/view";
 import { useEffect, useMemo, useState } from "react";
 
 type Shaping = typeof ShapingModule;
@@ -39,6 +45,7 @@ let loading: Promise<Shaping> | null = null;
 export function useShapingEngine(
   document: FontDocument,
   applyFeatures: boolean,
+  settings: TextSettings = READ_FROM_TEXT,
 ): Engine | undefined {
   const [shaping, setShaping] = useState<Shaping | null>(null);
 
@@ -60,8 +67,9 @@ export function useShapingEngine(
   }, [applyFeatures, shaping]);
 
   return useMemo(
-    () => (applyFeatures && shaping !== null ? shaping.harfBuzzEngine(document) : undefined),
-    [applyFeatures, shaping, document],
+    () =>
+      applyFeatures && shaping !== null ? shaping.harfBuzzEngine(document, settings) : undefined,
+    [applyFeatures, shaping, document, settings],
   );
 }
 

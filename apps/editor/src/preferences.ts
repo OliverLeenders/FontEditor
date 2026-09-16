@@ -1,3 +1,5 @@
+import { type TextSettings, READ_FROM_TEXT } from "@typewright/view";
+
 import {
   DEFAULT_FEATURE_SIZE,
   DEFAULT_OUTLINE_WIDTH,
@@ -140,6 +142,16 @@ export type Preferences = {
   readonly proofLeading: number;
   /** The size the feature source is set at, in pixels. */
   readonly featureSize: number;
+  /**
+   * How each of the two lines is set: which way the text runs, and which
+   * script's and language's rules the font should choose.
+   *
+   * Remembered, and per line rather than shared: somebody spacing an Arabic
+   * font still sets a Latin proof beside it often enough for one setting to be
+   * the wrong setting half the time.
+   */
+  readonly spacingTextSettings: TextSettings;
+  readonly proofTextSettings: TextSettings;
   readonly inspector: InspectorPlacement;
   readonly split: SplitPlacement;
 };
@@ -189,6 +201,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   proofSize: 32,
   proofLeading: 1.4,
   featureSize: DEFAULT_FEATURE_SIZE,
+  spacingTextSettings: READ_FROM_TEXT,
+  proofTextSettings: READ_FROM_TEXT,
   inspector: DEFAULT_PLACEMENT,
   split: DEFAULT_SPLIT,
 };
@@ -259,6 +273,8 @@ export function loadPreferences(): Preferences {
       min: MIN_FEATURE_SIZE,
       max: MAX_FEATURE_SIZE,
     }),
+    spacingTextSettings: textSettingsOf(raw["spacingTextSettings"]),
+    proofTextSettings: textSettingsOf(raw["proofTextSettings"]),
     inspector: {
       x: number(inspector["x"], DEFAULT_PLACEMENT.x, {}),
       y: number(inspector["y"], DEFAULT_PLACEMENT.y, {}),
@@ -287,6 +303,22 @@ const isDock = (value: unknown): value is InspectorDock =>
 
 const isOrientation = (value: unknown): value is SplitOrientation =>
   value === "row" || value === "column";
+
+/** How a line was last set, keeping only what this can make sense of. */
+function textSettingsOf(raw: unknown): TextSettings {
+  if (typeof raw !== "object" || raw === null) return READ_FROM_TEXT;
+  const held = raw as Record<string, unknown>;
+  const direction = held["direction"];
+  return {
+    direction: direction === "ltr" || direction === "rtl" ? direction : "auto",
+    script: tagOf(held["script"]),
+    language: tagOf(held["language"]),
+  };
+}
+
+/** An OpenType tag is four characters at most; anything else is not one. */
+const tagOf = (raw: unknown): string | null =>
+  typeof raw === "string" && raw.length > 0 && raw.length <= 4 ? raw : null;
 
 /** The folded-by-hand choices, keeping only what this can make sense of. */
 function sectionsOf(raw: unknown): Record<string, boolean> {

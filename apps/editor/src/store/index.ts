@@ -793,12 +793,22 @@ export class EditorStore {
     this.patch({ spacingText });
   }
 
+  /** How the spacing line is set: which way it runs, and whose rules it chooses. */
+  setSpacingTextSettings(spacingTextSettings: StoreState["spacingTextSettings"]): void {
+    this.remember({ spacingTextSettings });
+  }
+
   setSpacingMode(spacingMode: "space" | "kern"): void {
     if (spacingMode !== this.state.spacingMode) this.patch({ spacingMode });
   }
 
   setProofText(proofText: string): void {
     this.patch({ proofText });
+  }
+
+  /** The same three choices for the proof, remembered apart from the line's. */
+  setProofTextSettings(proofTextSettings: StoreState["proofTextSettings"]): void {
+    this.remember({ proofTextSettings });
   }
 
   setProofSize(proofSize: number): void {

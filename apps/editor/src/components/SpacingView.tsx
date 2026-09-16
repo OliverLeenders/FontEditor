@@ -31,6 +31,7 @@ import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingEngine } fro
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { TextSettingsControls } from "./TextSettingsControls.js";
 import styles from "./SpacingView.module.css";
 
 /** Design units per arrow press, and with shift held. */
@@ -104,6 +105,7 @@ export function SpacingView({
   // the way the font would set it — a ligature in the source shows as one letter
   // rather than as the two it replaces.
   const applyFeatures = useStoreValue((s) => s.applyFeatures);
+  const settings = useStoreValue((s) => s.spacingTextSettings);
   const shape = useMemo(
     () => shaperFrom(document.features, applyFeatures),
     [document.features, applyFeatures],
@@ -113,7 +115,7 @@ export function SpacingView({
     [document.features, applyFeatures],
   );
   // HarfBuzz once it has loaded, which then sets the line on its own.
-  const engine = useShapingEngine(document, applyFeatures);
+  const engine = useShapingEngine(document, applyFeatures, settings);
   const hasFeatures = useMemo(() => hasSomethingToShape(document), [document]);
   const run = useMemo(
     () => layoutRun(document, text, shape, position, engine),
@@ -363,6 +365,12 @@ export function SpacingView({
             </option>
           ))}
         </select>
+        <TextSettingsControls
+          value={settings}
+          document={document}
+          onChange={(next) => store.setSpacingTextSettings(next)}
+        />
+
         {/* Two exclusive modes rather than a modifier key: adjusting a letter's
             own space and adjusting the gap before it are different jobs, and
             which one the arrows are doing should be visible, not remembered. */}
