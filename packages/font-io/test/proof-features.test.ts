@@ -126,11 +126,24 @@ feature ccmp {
     sub ae by a e;
 } ccmp;
 
+table GDEF {
+    GlyphClassDef [A B T a b c e f i n o ae], [f_i f_f_i], [acutecomb gravecomb cedillacomb], ;
+    LigatureCaretByPos f_i 250;
+    LigatureCaretByPos f_f_i 200 400;
+} GDEF;
+
+@ABOVE = [acutecomb gravecomb];
+
 feature liga {
     lookupflag IgnoreMarks;
     sub f f i by f_f_i;
     sub f i by f_i;
 } liga;
+
+feature rlig {
+    lookupflag UseMarkFilteringSet @ABOVE;
+    sub B by b.sc;
+} rlig;
 
 feature salt {
     sub a from [a.alt1 a.alt2];
@@ -141,6 +154,11 @@ feature calt {
     sub [n o] a' lookup SMALL;
     sub c b' by b.sc;
 } calt;
+
+feature rclt {
+    rsub a' b by a.alt1;
+    rsub [c e] f' by f_i;
+} rclt;
 
 feature locl {
     script latn;
@@ -184,6 +202,10 @@ const STRINGS: readonly Setting[] = [
   { text: "no" },
   { text: "naTo" },
   { text: "AB" },
+  { text: "ab" },
+  { text: "cf" },
+  { text: "ef" },
+  { text: "af" },
   { text: "a", features: ["salt=1"] },
   { text: "a", features: ["salt=2"] },
   { text: "Tofi", features: ["-kern"] },

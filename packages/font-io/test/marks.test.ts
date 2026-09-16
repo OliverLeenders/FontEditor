@@ -67,7 +67,7 @@ describe("compiling anchors into GPOS", () => {
     // the editor's business and not a rule a shaper can use.
     const out = compileMarks([letter()], idOf);
     expect(out.lookups).toEqual([]);
-    expect(out.gdef).toHaveLength(0);
+    expect(out.classes.size).toBe(0);
   });
 
   it("writes a mark-to-base lookup, and the anchors it was given", () => {
@@ -136,33 +136,16 @@ describe("compiling anchors into GPOS", () => {
     ]);
   });
 
-  it("declares the glyph classes, because a shaper needs them to apply this", () => {
+  it("says which glyphs are marks, because a shaper needs that to apply this", () => {
     const out = compileMarks([letter(), accent()], idOf);
 
-    expect(u16(out.gdef, 0)).toBe(1); // version 1.0
-    expect(u16(out.gdef, 4)).toBe(12); // class definitions follow the header
-
-    const classes = out.gdef.subarray(12);
-    const format = u16(classes, 0);
-    // Whichever format it took, the accent is a mark (3) and the letter is a
-    // base (1).
-    const classOf = (id: number): number => {
-      if (format === 1) {
-        const start = u16(classes, 2);
-        const count = u16(classes, 4);
-        return id < start || id >= start + count ? 0 : u16(classes, 6 + (id - start) * 2);
-      }
-      const count = u16(classes, 2);
-      for (let i = 0; i < count; i++) {
-        const first = u16(classes, 4 + i * 6);
-        const last = u16(classes, 6 + i * 6);
-        if (id >= first && id <= last) return u16(classes, 8 + i * 6);
-      }
-      return 0;
-    };
-
-    expect(classOf(1)).toBe(1);
-    expect(classOf(2)).toBe(3);
+    // The letter is a base (1) and the accent a mark (3). The table itself is
+    // written in `gdef.ts`, from these and from what the feature file says —
+    // a font has one GDEF and these are only half of what goes in it.
+    expect([...out.classes]).toEqual([
+      [1, 1],
+      [2, 3],
+    ]);
   });
 
   it("uses one anchor of a mark that has several, and says which", () => {

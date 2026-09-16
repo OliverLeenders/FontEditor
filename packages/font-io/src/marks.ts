@@ -1,6 +1,6 @@
 import { type Anchor, type Glyph, type GlyphName, isMarkAnchor } from "@typewright/font-model";
 
-import { Writer, classDef, coverage } from "./gpos.js";
+import { Writer, coverage } from "./gpos.js";
 import type { Lookup } from "./layout.js";
 
 /**
@@ -145,15 +145,21 @@ export type MarkCompilation = {
   readonly lookups: readonly Lookup[];
   /** The feature tags to register, aligned with `lookups`. */
   readonly features: readonly string[];
-  /** The GDEF table, or empty when there are no marks to declare. */
-  readonly gdef: Uint8Array;
+  /**
+   * Which glyphs are marks and which are bases, for GDEF.
+   *
+   * The map rather than the table: GDEF also carries what the feature file
+   * says — attachment classes, mark sets, ligature carets — and a font has one
+   * of it, so it is written where those meet. See `gdef.ts`.
+   */
+  readonly classes: ReadonlyMap<number, number>;
   readonly warnings: readonly string[];
 };
 
 const NOTHING: MarkCompilation = {
   lookups: [],
   features: [],
-  gdef: new Uint8Array(0),
+  classes: new Map(),
   warnings: [],
 };
 
@@ -245,21 +251,21 @@ export function compileMarks(
   }
   if (lookups.length === 0) return NOTHING;
 
-  return { lookups, features, gdef: gdefTable(glyphs, marksOf, glyphIdOf), warnings };
+  return { lookups, features, classes: glyphClasses(glyphs, marksOf, glyphIdOf), warnings };
 }
 
 /**
- * The GDEF glyph class table: which glyphs are marks, and which are ordinary.
+ * Which glyphs are marks, and which are ordinary, for GDEF.
  *
  * Everything that attaches is a mark; everything else that takes part in the
  * attachment is a base. Glyphs mentioned by neither are left out, which class
  * zero already means.
  */
-function gdefTable(
+function glyphClasses(
   glyphs: readonly Glyph[],
   marks: ReadonlyMap<GlyphName, Anchor>,
   glyphIdOf: (name: GlyphName) => number | undefined,
-): Uint8Array {
+): Map<number, number> {
   const classes = new Map<number, number>();
   for (const g of glyphs) {
     const id = glyphIdOf(g.name);
@@ -267,16 +273,5 @@ function gdefTable(
     if (marks.has(g.name)) classes.set(id, GDEF_MARK);
     else if (g.anchors.length > 0) classes.set(id, GDEF_BASE);
   }
-  if (classes.size === 0) return new Uint8Array(0);
-
-  const table = classDef(classes);
-  const w = new Writer();
-  w.u16(1); // major version
-  w.u16(0); // minor version
-  w.u16(12); // glyph class definitions follow the header
-  w.u16(0); // no attachment list
-  w.u16(0); // no ligature caret list
-  w.u16(0); // no mark attachment class definitions
-  w.bytesOf(table);
-  return w.finish();
+  return classes;
 }

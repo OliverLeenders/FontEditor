@@ -62,6 +62,7 @@ export { fileText, unzip } from "./unzip.js";
 export type {
   FeaBlock,
   FeaFeature,
+  FeaGdef,
   FeaLookup,
   FeaProblem,
   FeaRule,

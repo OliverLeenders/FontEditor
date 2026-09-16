@@ -163,6 +163,14 @@ describe("text set with a compiled feature file", () => {
     expect(set(font, "i", { script: "Latn", language: "en" }).names).toEqual(["i"]);
   });
 
+  it("replaces a glyph by what follows it, reading the line backwards", () => {
+    // What `rsub` is for: a form chosen by what comes after it. Here the a
+    // becomes a small capital only where a b follows.
+    const font = fontWith("feature calt { rsub a' b by a.sc; } calt;");
+    expect(set(font, "ab").names).toEqual(["a.sc", "b"]);
+    expect(set(font, "ac").names).toEqual(["a", "c"]);
+  });
+
   it("adjusts a glyph only in the context it was written for", () => {
     const font = fontWith("feature kern { pos T o' <0 0 -50 0>; } kern;");
     expect(set(font, "To").advances).toEqual([500, 450]);

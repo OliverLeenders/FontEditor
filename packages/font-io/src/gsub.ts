@@ -183,6 +183,63 @@ export function alternateSubst(subs: readonly AlternateSub[]): Uint8Array {
   return sequences(subs.map((s) => ({ from: s.from, list: s.alternates })));
 }
 
+/**
+ * A reverse chaining substitution: one glyph swapped, chosen by its context,
+ * with the line read from the end.
+ *
+ * The one rule in the language that runs backwards, and what it is for: a form
+ * chosen by what *follows* it, when what follows has already been decided.
+ * Arabic final forms are the reason it exists.
+ *
+ * One glyph becomes one glyph — there is no ligature or one-into-several form
+ * of this — and the context is never replaced.
+ */
+export type ReverseSub = {
+  readonly backtrack: readonly (readonly number[])[];
+  readonly lookahead: readonly (readonly number[])[];
+  /** What is replaced, and by what. Written in coverage order, as the format wants. */
+  readonly pairs: readonly { readonly from: number; readonly to: number }[];
+};
+
+/** A reverse chaining single substitution, format 1 — the only format there is. */
+export function reverseChainSubst(rule: ReverseSub): Uint8Array {
+  const sorted = [...rule.pairs].sort((l, r) => l.from - r.from);
+  const cover = coverage(sorted.map((pair) => pair.from));
+  // Backwards, as a chaining context stores it: the position nearest the match
+  // first, which is the order a shaper steps away from the match in.
+  const back = [...rule.backtrack].reverse().map((ids) => coverage(ids));
+  const ahead = rule.lookahead.map((ids) => coverage(ids));
+
+  const header =
+    2 + // format
+    2 + // the coverage of what is replaced
+    2 +
+    back.length * 2 +
+    2 +
+    ahead.length * 2 +
+    2 +
+    sorted.length * 2;
+
+  let at = header;
+  const offsets = [cover, ...back, ...ahead].map((table) => {
+    const here = at;
+    at += table.length;
+    return here;
+  });
+
+  const w = new Writer();
+  w.u16(1);
+  w.u16(offsets[0]!);
+  w.u16(back.length);
+  for (let i = 0; i < back.length; i++) w.u16(offsets[1 + i]!);
+  w.u16(ahead.length);
+  for (let i = 0; i < ahead.length; i++) w.u16(offsets[1 + back.length + i]!);
+  w.u16(sorted.length);
+  for (const pair of sorted) w.u16(pair.to);
+  for (const table of [cover, ...back, ...ahead]) w.bytesOf(table);
+  return w.finish();
+}
+
 export type ChainRule = {
   readonly backtrack: readonly (readonly number[])[];
   readonly input: readonly (readonly number[])[];

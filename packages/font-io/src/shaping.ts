@@ -103,7 +103,12 @@ function applyRules(names: readonly string[], rules: readonly FeaRule[]): string
     // which is a gap worth knowing about rather than one worth pretending away.
     // Alternates are chosen by an application rather than applied; positioning
     // in a context moves glyphs, like any positioning.
-    if (rule.kind === "position" || rule.kind === "contextPosition" || rule.kind === "alternate") {
+    if (
+      rule.kind === "position" ||
+      rule.kind === "contextPosition" ||
+      rule.kind === "alternate" ||
+      rule.kind === "reverse"
+    ) {
       at += 1;
       continue;
     }

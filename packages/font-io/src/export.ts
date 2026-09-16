@@ -21,6 +21,7 @@ import { kerningLookups, kerningSubtables } from "./gpos.js";
 import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
 import { compileFeatures } from "./features.js";
+import { gdefTable } from "./gdef.js";
 import { compileMarks } from "./marks.js";
 import { readTablesOf, withTable } from "./sfnt.js";
 import type { OtGlyph, OtOS2Init, OtPath } from "opentype.js";
@@ -560,15 +561,23 @@ export function layoutTables(
     warnings.push(`features, line ${String(problem.line)}: ${problem.message}`);
   }
 
-  // GDEF only alongside the lookups that need it: a shaper reads it to know
-  // which glyphs are marks, and mark attachment without it is not reliably
-  // applied.
-  return {
-    gpos,
-    gsub: features.table,
-    gdef: gpos.length > 0 ? marks.gdef : new Uint8Array(),
-    warnings,
-  };
+  /*
+   * One GDEF from both sources.
+   *
+   * The anchors say which glyphs are marks — a shaper reads that to apply mark
+   * attachment at all — and the feature file says what its lookup flags refer
+   * to: attachment classes, mark glyph sets, and where a caret may sit in a
+   * ligature. A font has one GDEF, so they are written together, and a class
+   * the feature file states outright wins over the one the anchors imply.
+   */
+  const gdef = gdefTable({
+    classes: new Map([...marks.classes, ...features.gdef.classes]),
+    attach: features.gdef.attach,
+    markSets: features.gdef.markSets,
+    carets: features.gdef.carets,
+  });
+
+  return { gpos, gsub: features.table, gdef, warnings };
 }
 
 /** A compiled font with its layout tables spliced in, or as it was where there are none. */

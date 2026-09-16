@@ -24,6 +24,13 @@ export type Lookup = {
    * an accent between two letters from breaking a kern pair or a ligature.
    */
   readonly flags?: number;
+  /**
+   * Which mark glyph set the filtering flag means, as an index into GDEF's.
+   *
+   * Written only where that flag is set, since the field is not there otherwise
+   * — the lookup's own header grows by two bytes to hold it.
+   */
+  readonly markFilteringSet?: number;
   readonly subtables: readonly Uint8Array[];
 };
 
@@ -120,7 +127,10 @@ export function layoutTable(
     // Subtables are tried in the order they are written, first match winning —
     // which is what makes an exception rule work, and why the caller's order is
     // kept rather than sorted.
-    const head = 6 + lookup.subtables.length * 2;
+    // Two more bytes where the filtering flag is set: the set's index sits
+    // after the subtable offsets, and everything after it moves along.
+    const filtering = ((lookup.flags ?? 0) & 0x0010) !== 0;
+    const head = 6 + lookup.subtables.length * 2 + (filtering ? 2 : 0);
     let at = head;
     const offsets = lookup.subtables.map((sub) => {
       const here = at;
@@ -133,6 +143,7 @@ export function layoutTable(
     w.u16(lookup.flags ?? 0);
     w.u16(lookup.subtables.length);
     for (const off of offsets) w.u16(off);
+    if (filtering) w.u16(lookup.markFilteringSet ?? 0);
     for (const sub of lookup.subtables) w.bytesOf(sub);
     return w.finish();
   });

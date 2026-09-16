@@ -1,4 +1,5 @@
 import {
+  type FeaGdef,
   type FeaLookup,
   type FeaProblem,
   type FeaRule,
@@ -16,6 +17,7 @@ import {
   chainContextSubst,
   ligatureSubst,
   multipleSubst,
+  reverseChainSubst,
   singleSubst,
 } from "./gsub.js";
 import {
@@ -63,7 +65,34 @@ export type CompiledFeatures = {
   /** Tags that produced at least one working rule, in the order they appeared. */
   readonly tags: readonly string[];
   readonly rules: number;
+  /**
+   * What the feature file puts into GDEF.
+   *
+   * A font has one GDEF and two sources for it — the anchors say which glyphs
+   * are marks, the file says what its lookup flags mean — so what is collected
+   * here is handed back for the export to write together with the anchors'.
+   */
+  readonly gdef: GdefFromFeatures;
   readonly problems: readonly FeaProblem[];
+};
+
+/** The parts of GDEF a feature file can state. */
+export type GdefFromFeatures = {
+  /** Glyph classes stated outright, which win over the ones anchors imply. */
+  readonly classes: ReadonlyMap<number, number>;
+  /** Mark attachment classes, as `lookupflag MarkAttachmentType` names them. */
+  readonly attach: ReadonlyMap<number, number>;
+  /** Mark glyph sets, in the order the lookups refer to them by. */
+  readonly markSets: readonly (readonly number[])[];
+  /** Where a caret may sit inside a ligature, in design units. */
+  readonly carets: ReadonlyMap<number, readonly number[]>;
+};
+
+const NO_GDEF: GdefFromFeatures = {
+  classes: new Map(),
+  attach: new Map(),
+  markSets: [],
+  carets: new Map(),
 };
 
 export const NO_FEATURES: CompiledFeatures = {
@@ -72,6 +101,7 @@ export const NO_FEATURES: CompiledFeatures = {
   systems: DEFAULT_SYSTEMS,
   tags: [],
   rules: 0,
+  gdef: NO_GDEF,
   problems: [],
 };
 
@@ -94,10 +124,20 @@ export function compileFeatures(
 type Table = "sub" | "pos";
 
 /** A lookup being filled, rule by rule, until it is written. */
+/**
+ * A lookup's flags, and which mark glyph set the filtering bit points at.
+ *
+ * Together because they are one decision: the bit says "only these marks" and
+ * the index says which, and neither means anything without the other.
+ */
+type Flags = { readonly bits: number; readonly set: number | null };
+
+const NO_FLAGS: Flags = { bits: 0, set: null };
+
 type Builder = {
   readonly table: Table;
   readonly type: number;
-  readonly flags: number;
+  readonly flags: Flags;
   readonly index: number;
   readonly singles: Map<number, number>;
   readonly multiples: MultipleSub[];
@@ -135,6 +175,14 @@ class Compilation {
   private readonly entries: Record<Table, FeatureEntry[]> = { sub: [], pos: [] };
   private readonly tags: string[] = [];
   private readonly systems: readonly LanguageSystem[];
+  /** What the file says GDEF should hold; see {@link GdefFromFeatures}. */
+  private readonly gdefClasses = new Map<number, number>();
+  private readonly attachClasses = new Map<number, number>();
+  private readonly markSets: number[][] = [];
+  /** The classes and sets already made, so that naming the same marks twice makes one. */
+  private readonly attachNamed = new Map<string, number>();
+  private readonly markSetNamed = new Map<string, number>();
+  private readonly carets = new Map<number, number[]>();
 
   constructor(
     parsed: FeaSource,
@@ -146,6 +194,7 @@ class Compilation {
       if (block.kind === "lookup") this.lookupBlock(block.lookup);
       else this.feature(block.feature.tag, block.feature.statements);
     }
+    if (parsed.gdef !== null) this.gdefBlock(parsed.gdef);
   }
 
   result(): CompiledFeatures {
@@ -157,6 +206,12 @@ class Compilation {
       systems: this.systems,
       tags: this.tags,
       rules: this.rules,
+      gdef: {
+        classes: this.gdefClasses,
+        attach: this.attachClasses,
+        markSets: this.markSets,
+        carets: this.carets,
+      },
       problems: this.problems,
     };
   }
@@ -171,7 +226,7 @@ class Compilation {
    * default had until then, unless the statement says `exclude_dflt`.
    */
   private feature(tag: string, statements: readonly FeaStatement[]): void {
-    let flags = 0;
+    let flags = NO_FLAGS;
     let current: Builder | null = null;
     let script: string | null = null;
     let target: LanguageSystem | null = null;
@@ -202,7 +257,7 @@ class Compilation {
           break;
         }
         case "flags":
-          flags = statement.flags;
+          flags = this.flagsOf(statement);
           current = null;
           break;
         case "script":
@@ -260,7 +315,7 @@ class Compilation {
       return;
     }
 
-    let flags = 0;
+    let flags = NO_FLAGS;
     let builder: Builder | null = null;
     let ruled = false;
     for (const statement of lookup.statements) {
@@ -270,7 +325,7 @@ class Compilation {
             line: statement.line,
             message: `lookupflag comes before the rules of lookup ${lookup.name}`,
           });
-        } else flags = statement.flags;
+        } else flags = this.flagsOf(statement);
         continue;
       }
       if (statement.kind !== "rule") continue;
@@ -295,7 +350,84 @@ class Compilation {
     );
   }
 
-  private builder(table: Table, type: number, flags: number): Builder {
+  /**
+   * What `table GDEF` stated: glyph classes, and ligature carets.
+   *
+   * The classes here win over the ones the anchors imply, since a file that
+   * says a glyph is a ligature is saying something the anchors cannot. A glyph
+   * the font has not got is passed over, as it is in a rule.
+   */
+  private gdefBlock(gdef: FeaGdef): void {
+    const kinds = [
+      [gdef.base, 1],
+      [gdef.ligature, 2],
+      [gdef.mark, 3],
+      [gdef.component, 4],
+    ] as const;
+    for (const [names, value] of kinds) {
+      for (const name of names) {
+        const id = this.glyphId(name);
+        if (id !== undefined) this.gdefClasses.set(id, value);
+      }
+    }
+
+    for (const [name, positions] of gdef.carets) {
+      const id = this.glyphId(name);
+      if (id !== undefined) this.carets.set(id, [...positions]);
+    }
+  }
+
+  /**
+   * A lookupflag statement, with the marks it names resolved into GDEF.
+   *
+   * An attachment class is a number the flag carries in its high byte, and a
+   * font has 255 of them; a filtering set is an index into a list GDEF holds,
+   * and there may be as many as the file asks for. Naming the same marks twice
+   * gives the same class or set back, since two identical ones would be two
+   * answers to one question.
+   */
+  private flagsOf(statement: Extract<FeaStatement, { kind: "flags" }>): Flags {
+    let bits = statement.flags;
+    let set: number | null = null;
+
+    if (statement.attach !== null) {
+      const ids = this.idsOf(statement.attach, statement.line);
+      if (ids !== null) {
+        const key = [...ids].sort((a, b) => a - b).join(",");
+        let index = this.attachNamed.get(key);
+        if (index === undefined && this.attachNamed.size >= 255) {
+          this.problems.push({
+            line: statement.line,
+            message: "a font has 255 mark attachment classes, and this is one more",
+          });
+        } else if (index === undefined) {
+          index = this.attachNamed.size + 1;
+          this.attachNamed.set(key, index);
+          for (const id of ids) this.attachClasses.set(id, index);
+        }
+        if (index !== undefined) bits |= index << 8;
+      }
+    }
+
+    if (statement.filtering !== null) {
+      const ids = this.idsOf(statement.filtering, statement.line);
+      if (ids !== null) {
+        const key = [...ids].sort((a, b) => a - b).join(",");
+        let index = this.markSetNamed.get(key);
+        if (index === undefined) {
+          index = this.markSets.length;
+          this.markSetNamed.set(key, index);
+          this.markSets.push([...ids]);
+        }
+        bits |= 0x0010;
+        set = index;
+      }
+    }
+
+    return { bits, set };
+  }
+
+  private builder(table: Table, type: number, flags: Flags): Builder {
     const builder: Builder = {
       table,
       type,
@@ -397,7 +529,7 @@ class Compilation {
     return out;
   }
 
-  private prepare(rule: FeaRule, flags: number): Prepared | null {
+  private prepare(rule: FeaRule, flags: Flags): Prepared | null {
     switch (rule.kind) {
       case "single": {
         const pairs: { from: number; to: number; name: string }[] = [];
@@ -501,6 +633,31 @@ class Compilation {
         };
       }
 
+      case "reverse": {
+        // The context is read as any other is, with the one replaced glyph as
+        // the whole of the input.
+        const context = this.contextOf({ ...rule, input: [rule.from] });
+        const to = this.idsOf(rule.to, rule.line);
+        if (context === null || to === null) return null;
+        const from = context.input[0] ?? [];
+        return {
+          table: "sub",
+          type: 8,
+          // One subtable per rule, as a contextual rule has: each carries its
+          // own context, and a shaper tries them in the order they were written.
+          add: (into) => {
+            into.subtables.push(
+              reverseChainSubst({
+                backtrack: context.backtrack,
+                lookahead: context.lookahead,
+                pairs: from.map((id, index) => ({ from: id, to: to[index]! })),
+              }),
+            );
+            return 1;
+          },
+        };
+      }
+
       case "chain": {
         const context = this.contextOf(rule);
         if (context === null) return null;
@@ -559,7 +716,7 @@ class Compilation {
               };
               actions.push({
                 at,
-                lookup: this.append("pos", flags === 0 ? adjustment : { ...adjustment, flags }),
+                lookup: this.append("pos", under(adjustment, flags)),
               });
             });
             calls.forEach((lookup, at) => {
@@ -577,7 +734,7 @@ class Compilation {
 /** A lookup as the table stores it. */
 function written(builder: Builder): Lookup {
   const subtables =
-    builder.table === "pos" || builder.type === 6
+    builder.table === "pos" || builder.type === 6 || builder.type === 8
       ? builder.subtables
       : builder.type === 1
         ? [singleSubst({ from: [...builder.singles.keys()], to: [...builder.singles.values()] })]
@@ -586,9 +743,15 @@ function written(builder: Builder): Lookup {
           : builder.type === 3
             ? [alternateSubst(builder.alternates)]
             : [ligatureSubst(builder.ligatures)];
-  return builder.flags === 0
-    ? { type: builder.type, subtables }
-    : { type: builder.type, flags: builder.flags, subtables };
+  return under({ type: builder.type, subtables }, builder.flags);
+}
+
+/** A lookup under a set of flags, and under the mark set they may point at. */
+function under(lookup: Lookup, flags: Flags): Lookup {
+  if (flags.bits === 0) return lookup;
+  return flags.set === null
+    ? { ...lookup, flags: flags.bits }
+    : { ...lookup, flags: flags.bits, markFilteringSet: flags.set };
 }
 
 /**
@@ -603,10 +766,10 @@ function nestedSubstitution(
   input: readonly (readonly number[])[],
   to: readonly number[],
   multiple: boolean,
-  flags: number,
+  flags: Flags,
 ): Lookup | null {
   if (input.length === 0 || to.length === 0) return null;
-  const withFlags = (lookup: Lookup): Lookup => (flags === 0 ? lookup : { ...lookup, flags });
+  const withFlags = (lookup: Lookup): Lookup => under(lookup, flags);
 
   if (multiple) {
     const from = input[0]?.[0];

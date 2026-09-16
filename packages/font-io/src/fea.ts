@@ -109,6 +109,23 @@ export type FeaRule =
       readonly calls: readonly (string | null)[];
       readonly ignore: boolean;
       readonly line: number;
+    }
+  | {
+      /**
+       * A substitution read from the end of the line: `rsub a' b by a.fina;`.
+       *
+       * One glyph replaced, chosen by what surrounds it, with the line walked
+       * backwards — which is what lets a form depend on what *follows* it after
+       * that has already been decided. Arabic final forms are the reason it is
+       * in the language.
+       */
+      readonly kind: "reverse";
+      readonly backtrack: readonly (readonly string[])[];
+      /** Equal-length lists, as a single substitution has. */
+      readonly from: readonly string[];
+      readonly to: readonly string[];
+      readonly lookahead: readonly (readonly string[])[];
+      readonly line: number;
     };
 
 /** Where a glyph is drawn and how far the pen moves after it, in design units. */
@@ -128,7 +145,15 @@ export type ValueRecord = {
  */
 export type FeaStatement =
   | { readonly kind: "rule"; readonly rule: FeaRule }
-  | { readonly kind: "flags"; readonly flags: number; readonly line: number }
+  | {
+      readonly kind: "flags";
+      readonly flags: number;
+      /** The marks `MarkAttachmentType` names — the only ones the lookup sees. */
+      readonly attach: readonly string[] | null;
+      /** The marks `UseMarkFilteringSet` names, which may overlap another set's. */
+      readonly filtering: readonly string[] | null;
+      readonly line: number;
+    }
   | { readonly kind: "script"; readonly script: string; readonly line: number }
   | {
       readonly kind: "language";
@@ -175,6 +200,23 @@ export type FeaProblem = {
   readonly message: string;
 };
 
+/**
+ * What a `table GDEF` block says.
+ *
+ * The two parts of that table a feature file is the right place for: which
+ * glyphs are of which kind, where the anchors cannot say — a ligature is a
+ * ligature whether or not anything attaches to it — and where a text cursor
+ * may sit inside a ligature.
+ */
+export type FeaGdef = {
+  readonly base: readonly string[];
+  readonly ligature: readonly string[];
+  readonly mark: readonly string[];
+  readonly component: readonly string[];
+  /** Ligature glyph to the caret positions in it, in design units. */
+  readonly carets: ReadonlyMap<string, readonly number[]>;
+};
+
 export type FeaSource = {
   readonly features: readonly FeaFeature[];
   /** Named lookups defined at the top of the file, outside any feature. */
@@ -184,6 +226,8 @@ export type FeaSource = {
   /** The `languagesystem` statements, in order; empty where there are none. */
   readonly languageSystems: readonly LanguageSystem[];
   readonly classes: ReadonlyMap<string, readonly string[]>;
+  /** What `table GDEF` said, or `null` where the file has no such block. */
+  readonly gdef: FeaGdef | null;
   readonly problems: readonly FeaProblem[];
 };
 
@@ -249,7 +293,6 @@ const REFUSED_AT_TOP: ReadonlyMap<string, string> = new Map([
     "markClass",
     "mark attachment is where the glyphs' anchors say, and is not compiled from the feature file",
   ],
-  ["table", "tables written in the feature file are not compiled by this editor"],
   ["include", "including another feature file is not compiled by this editor"],
   ["anchorDef", "named anchors are not compiled by this editor"],
   ["valueRecordDef", "named value records are not compiled by this editor"],
@@ -297,6 +340,7 @@ export function parseFea(source: string): FeaSource {
   const lookups: FeaLookup[] = [];
   const blocks: FeaBlock[] = [];
   const languageSystems: LanguageSystem[] = [];
+  let gdef: FeaGdef | null = null;
 
   const r = readerOver(tokens, problems);
 
@@ -348,15 +392,138 @@ export function parseFea(source: string): FeaSource {
       continue;
     }
 
+    if (token.text === "table") {
+      const read = readGdefTable(token, r);
+      if (read !== null) gdef = read;
+      continue;
+    }
+
     const refused = REFUSED_AT_TOP.get(token.text);
     r.complain(token.line, refused ?? `"${token.text}" is not something this editor understands`);
     skipStatementOrBlock(r);
   }
 
-  return { features, lookups, blocks, languageSystems, classes: r.classes, problems };
+  return { features, lookups, blocks, languageSystems, classes: r.classes, gdef, problems };
 }
 
 export const isTag = (token: Token): boolean => /^[A-Za-z0-9 _]{1,4}$/.test(token.text);
+
+/** The tables this editor writes from what it knows, rather than from the file. */
+const OUR_TABLES: ReadonlyMap<string, string> = new Map([
+  ["head", "the font's own settings, which are edited in the Font workspace"],
+  ["hhea", "the font's own line metrics, which are edited in the Font workspace"],
+  ["OS/2", "the font's own settings, which are edited in the Font workspace"],
+  ["name", "the font's own names, which are edited in the Font workspace"],
+  ["vhea", "vertical metrics, which this editor does not write"],
+  ["vmtx", "vertical metrics, which this editor does not write"],
+  ["BASE", "baselines, which this editor does not write"],
+  ["STAT", "the axis table, which this editor writes from the masters"],
+]);
+
+/**
+ * `table GDEF { … } GDEF;`
+ *
+ * The one table worth writing from a feature file, and only two of its parts:
+ * the glyph classes, where a font wants to state outright what the anchors only
+ * imply, and the ligature carets. Attachment points are hinting rather than
+ * shaping, and carets by contour point tie a caret to an outline that moves
+ * when the glyph is redrawn, so both are refused by name.
+ */
+function readGdefTable(keyword: Token, r: Reader): FeaGdef | null {
+  const tag = r.take();
+  if (tag === undefined) {
+    r.complain(keyword.line, "a table block names the table it writes");
+    return null;
+  }
+  if (tag.text !== "GDEF") {
+    const ours = OUR_TABLES.get(tag.text);
+    r.complain(
+      tag.line,
+      ours === undefined
+        ? `the table ${tag.text} is not written from the feature file by this editor`
+        : `${tag.text} is ${ours}`,
+    );
+    skipStatementOrBlock(r);
+    return null;
+  }
+
+  if (r.take()?.text !== "{") {
+    r.complain(keyword.line, 'expected "{" after table GDEF');
+    skipStatementOrBlock(r);
+    return null;
+  }
+
+  const classes: Record<"base" | "ligature" | "mark" | "component", string[]> = {
+    base: [],
+    ligature: [],
+    mark: [],
+    component: [],
+  };
+  const carets = new Map<string, readonly number[]>();
+
+  for (;;) {
+    const token = r.take();
+    if (token === undefined) {
+      r.complain(keyword.line, "table GDEF is never closed");
+      break;
+    }
+    if (token.text === "}") {
+      closeBlock(r, "table", "GDEF");
+      break;
+    }
+    if (token.text === ";") continue;
+
+    if (token.text === "GlyphClassDef") {
+      for (const kind of ["base", "ligature", "mark", "component"] as const) {
+        const next = r.peek();
+        if (next === undefined || next.text === ";" || next.text === "}") break;
+        if (next.text === ",") {
+          r.take();
+          continue;
+        }
+        const list = readGlyphList(token.line, r);
+        if (list === null) break;
+        classes[kind] = list.glyphs;
+        if (r.peek()?.text === ",") r.take();
+      }
+      if (r.peek()?.text === ";") r.take();
+      continue;
+    }
+
+    if (token.text === "LigatureCaretByPos") {
+      const list = readGlyphList(token.line, r);
+      if (list === null) {
+        skipInside(r);
+        continue;
+      }
+      const positions: number[] = [];
+      while (r.peek() !== undefined && r.peek()!.text !== ";" && r.peek()!.text !== "}") {
+        const value = r.take()!;
+        if (!/^-?[0-9]+$/.test(value.text)) {
+          r.complain(value.line, "a caret is a position in design units");
+          skipInside(r);
+          break;
+        }
+        positions.push(Number(value.text));
+      }
+      if (r.peek()?.text === ";") r.take();
+      for (const glyph of list.glyphs) carets.set(glyph, positions);
+      continue;
+    }
+
+    r.complain(
+      token.line,
+      token.text === "LigatureCaretByIndex"
+        ? "a caret at a contour point moves when the glyph is redrawn; give it as a position"
+        : token.text === "Attach"
+          ? "attachment points are hinting rather than shaping, and are not written by this editor"
+          : `"${token.text}" is not something table GDEF holds in this editor`,
+    );
+    skipInside(r);
+  }
+
+  return { ...classes, carets };
+}
 
 /** Skip to just past the next `;`, which is how a bad statement is escaped. */
 function skipStatement(r: Reader): void {
@@ -481,8 +648,6 @@ export function readGlyphList(line: number, r: Reader): GlyphList | null {
 
 /** Refused inside a feature, each by what it is. */
 const REFUSED_IN_FEATURE: ReadonlyMap<string, string> = new Map([
-  ["rsub", "reverse chaining substitution is not compiled by this editor"],
-  ["reversesub", "reverse chaining substitution is not compiled by this editor"],
   [
     "enum",
     "a pair adjustment is kerning, which is edited in the Spacing workspace rather than here",
@@ -611,7 +776,7 @@ function readFeature(keyword: Token, r: Reader): FeaFeature | null {
 /**
  * The `}` that closes a feature or a lookup, and the name repeated after it.
  */
-export function closeBlock(r: Reader, what: "feature" | "lookup", name: string): void {
+export function closeBlock(r: Reader, what: string, name: string): void {
   const closing = r.peek();
   if (closing !== undefined && closing.text !== ";") {
     r.take();
@@ -692,6 +857,10 @@ function readRuleOrFlags(token: Token, r: Reader): FeaStatement | null | "unknow
     const rule = readSubstitution(token, r, false);
     return rule === null ? null : { kind: "rule", rule };
   }
+  if (token.text === "rsub" || token.text === "reversesub") {
+    const rule = readSubstitution(token, r, false, true);
+    return rule === null ? null : { kind: "rule", rule };
+  }
   if (token.text === "pos" || token.text === "position") {
     const rule = readPosition(token, r, false);
     return rule === null ? null : { kind: "rule", rule };
@@ -720,16 +889,31 @@ function readRuleOrFlags(token: Token, r: Reader): FeaStatement | null | "unknow
   return "unknown";
 }
 
-/** `lookupflag IgnoreMarks RightToLeft;`, or the same as a number. */
+/**
+ * `lookupflag IgnoreMarks RightToLeft;`, or the same as a number.
+ *
+ * Two of the flags name glyphs rather than switching something on.
+ * `MarkAttachmentType` says which marks the lookup sees and ignores every
+ * other; `UseMarkFilteringSet` says the same, and its sets may overlap where
+ * attachment classes may not. Both are kept as the glyphs they name and turned
+ * into what GDEF holds when the file is compiled.
+ */
 function readFlags(keyword: Token, r: Reader): FeaStatement | null {
   let flags = 0;
   let ok = true;
+  let attach: string[] | null = null;
+  let filtering: string[] | null = null;
   while (r.peek() !== undefined && r.peek()!.text !== ";" && r.peek()!.text !== "}") {
     const word = r.take()!;
     if (/^[0-9]+$/.test(word.text)) {
       flags |= Number(word.text) & 0x000f;
       if ((Number(word.text) & ~0x000f) !== 0) {
-        r.complain(word.line, "mark filtering in a lookupflag is not compiled by this editor");
+        // The bits above the low four say *which* marks, by an index into GDEF
+        // that a number in a feature file cannot name.
+        r.complain(
+          word.line,
+          "a lookupflag written as a number cannot say which marks it means; name them with MarkAttachmentType or UseMarkFilteringSet",
+        );
         ok = false;
       }
       continue;
@@ -740,17 +924,20 @@ function readFlags(keyword: Token, r: Reader): FeaStatement | null {
       continue;
     }
     if (word.text === "MarkAttachmentType" || word.text === "UseMarkFilteringSet") {
-      r.complain(word.line, `${word.text} is not compiled by this editor`);
-      // Its class argument.
-      if (r.peek() !== undefined && r.peek()!.text !== ";") readGlyphList(word.line, r);
-      ok = false;
+      const list = readGlyphList(word.line, r);
+      if (list === null) {
+        ok = false;
+        continue;
+      }
+      if (word.text === "MarkAttachmentType") attach = list.glyphs;
+      else filtering = list.glyphs;
       continue;
     }
     r.complain(word.line, `"${word.text}" is not a lookup flag`);
     ok = false;
   }
   if (r.peek()?.text === ";") r.take();
-  return ok ? { kind: "flags", flags, line: keyword.line } : null;
+  return ok ? { kind: "flags", flags, attach, filtering, line: keyword.line } : null;
 }
 
 /** The attachment rules, each refused by its own name rather than as "not a sub". */
@@ -965,6 +1152,65 @@ type Position = {
 };
 
 /**
+ * A reverse substitution, once its positions have been read.
+ *
+ * Stricter than the rule it looks like: one marked glyph rather than a run, one
+ * list on each side of `by`, and no lookup called — the format has one glyph
+ * for one glyph and nothing else to offer.
+ */
+function readReverse(
+  keyword: Token,
+  positions: readonly Position[],
+  targets: readonly GlyphList[],
+  joiner: "by" | "from" | null,
+  r: Reader,
+): FeaRule | null {
+  if (joiner !== "by") {
+    r.complain(keyword.line, 'a reverse substitution replaces one glyph, so it needs "by"');
+    return null;
+  }
+  if (positions.some((p) => p.call !== null)) {
+    r.complain(keyword.line, "a reverse substitution calls no lookup");
+    return null;
+  }
+
+  const marks = positions.map((p) => p.marked);
+  const first = marks.indexOf(true);
+  if (first !== marks.lastIndexOf(true)) {
+    r.complain(keyword.line, "a reverse substitution replaces one glyph, so it marks one");
+    return null;
+  }
+  // With nothing marked the rule is the glyph itself, which is how a reverse
+  // rule with no context is written.
+  const at = first < 0 ? (positions.length === 1 ? 0 : -1) : first;
+  if (at < 0) {
+    r.complain(keyword.line, "a reverse substitution needs a marked glyph, written with a '");
+    return null;
+  }
+
+  const from = positions[at]!.list.glyphs;
+  const target = targets[0];
+  if (targets.length !== 1 || target === undefined) {
+    r.complain(keyword.line, "a reverse substitution replaces one glyph with one glyph");
+    return null;
+  }
+  const to = target.plural ? target.glyphs : from.map(() => target.glyphs[0]!);
+  if (to.length !== from.length) {
+    r.complain(keyword.line, "the two sides of this rule have different numbers of glyphs");
+    return null;
+  }
+
+  return {
+    kind: "reverse",
+    backtrack: positions.slice(0, at).map((p) => p.list.glyphs),
+    from,
+    to,
+    lookahead: positions.slice(at + 1).map((p) => p.list.glyphs),
+    line: keyword.line,
+  };
+}
+
+/**
  * A substitution, contextual or not.
  *
  * Every kind is written the same way up to `by` or `from`, and only a `'` tells
@@ -972,7 +1218,12 @@ type Position = {
  * first and what kind of rule they make is decided afterwards, because until the
  * whole left side has been read there is no way to know.
  */
-function readSubstitution(keyword: Token, r: Reader, ignoring: boolean): FeaRule | null {
+function readSubstitution(
+  keyword: Token,
+  r: Reader,
+  ignoring: boolean,
+  reverse = false,
+): FeaRule | null {
   const positions: Position[] = [];
   let joiner: "by" | "from" | null = null;
 
@@ -1039,6 +1290,8 @@ function readSubstitution(keyword: Token, r: Reader, ignoring: boolean): FeaRule
     r.complain(keyword.line, "a substitution replaces nothing");
     return null;
   }
+
+  if (reverse) return readReverse(keyword, positions, targets, joiner, r);
 
   const marks = positions.map((p) => p.marked);
   const firstMark = marks.indexOf(true);

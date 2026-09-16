@@ -32,3 +32,27 @@ font.save(target)
 
 lookups = {tag: len(font[tag].table.LookupList.Lookup) for tag in ("GSUB", "GPOS") if tag in font}
 print(f"fontTools compiled {features} into {target}: {lookups}")
+
+# What the shaping comparison cannot see.
+#
+# Both fonts are given the editor's own GDEF, so setting text with them says
+# nothing about whether that table holds what the feature file asked for. So it
+# is read here, by something that did not write it: the mark glyph sets a
+# lookupflag named, the ligature carets, and the glyph classes.
+gdef = TTFont(source)["GDEF"].table
+assert gdef.GlyphClassDef is not None, "GDEF says nothing about which glyphs are marks"
+
+sets = gdef.MarkGlyphSetsDef
+assert sets is not None and sets.MarkSetCount > 0, "GDEF has no mark glyph set for the lookupflag"
+named = {glyph for coverage in sets.Coverage for glyph in coverage.glyphs}
+assert "acutecomb" in named, f"the mark set does not hold the marks it named: {named}"
+
+carets = gdef.LigCaretList
+assert carets is not None and carets.LigGlyphCount > 0, "GDEF has no ligature carets"
+positions = {
+    glyph: [caret.Coordinate for caret in lig.CaretValue]
+    for glyph, lig in zip(carets.Coverage.glyphs, carets.LigGlyph)
+}
+assert positions.get("f_f_i") == [200, 400], f"the carets are not where the file put them: {positions}"
+
+print(f"GDEF holds {sets.MarkSetCount} mark set(s) and carets for {sorted(positions)}")

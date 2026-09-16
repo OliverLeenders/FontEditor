@@ -600,9 +600,22 @@ describe("reading the rest of the language", () => {
     expect(flagsOf("feature liga { lookupflag 8; } liga;")).toMatchObject({ flags: 8 });
   });
 
-  it("refuses mark filtering in a lookup flag, by name", () => {
-    const parsed = parseFea("@M = [a]; feature liga { lookupflag UseMarkFilteringSet @M; } liga;");
-    expect(parsed.problems.some((p) => p.message.includes("UseMarkFilteringSet"))).toBe(true);
+  it("reads the marks a lookup flag names", () => {
+    const parsed = parseFea(
+      "@M = [a b]; feature liga { lookupflag UseMarkFilteringSet @M; sub a by b; } liga;",
+    );
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.features[0]?.statements.find((s) => s.kind === "flags")).toMatchObject({
+      filtering: ["a", "b"],
+      attach: null,
+    });
+  });
+
+  it("refuses a lookup flag written as a number that would name marks", () => {
+    // The bits above the low four are an index into GDEF, and a number in a
+    // feature file cannot say which set or class it means.
+    const parsed = parseFea("feature liga { lookupflag 16; } liga;");
+    expect(parsed.problems.some((p) => p.message.includes("cannot say which marks"))).toBe(true);
   });
 
   it("reads language systems, scripts and languages", () => {
@@ -627,13 +640,40 @@ describe("reading the rest of the language", () => {
     expect(parsed.problems[0]?.message).toContain("anchors");
   });
 
-  it("steps over a table it refuses, whole, and reads on", () => {
+  it("reads the glyph classes a GDEF table states outright", () => {
     const parsed = parseFea(`
-      table GDEF { GlyphClassDef [a], , , ; } GDEF;
+      table GDEF { GlyphClassDef [a], [fi], [b], ; } GDEF;
+      feature liga { sub f i by fi; } liga;
+    `);
+    expect(parsed.problems).toEqual([]);
+    expect(parsed.gdef).toMatchObject({
+      base: ["a"],
+      ligature: ["fi"],
+      mark: ["b"],
+      component: [],
+    });
+    expect(parsed.features.map((f) => f.tag)).toEqual(["liga"]);
+  });
+
+  it("reads where a caret may sit in a ligature", () => {
+    const parsed = parseFea("table GDEF { LigatureCaretByPos fi 400 700; } GDEF;");
+    expect(parsed.problems).toEqual([]);
+    expect([...(parsed.gdef?.carets ?? [])]).toEqual([["fi", [400, 700]]]);
+  });
+
+  it("refuses a caret tied to a contour point", () => {
+    // The point moves when the glyph is redrawn, and the caret goes with it.
+    const parsed = parseFea("table GDEF { LigatureCaretByIndex fi 2; } GDEF;");
+    expect(parsed.problems[0]?.message).toContain("redrawn");
+  });
+
+  it("steps over a table this editor writes itself, and reads on", () => {
+    const parsed = parseFea(`
+      table head { FontRevision 1.1; } head;
       feature liga { sub f i by fi; } liga;
     `);
     expect(parsed.problems).toHaveLength(1);
-    expect(parsed.problems[0]?.message).toContain("tables");
+    expect(parsed.problems[0]?.message).toContain("Font workspace");
     expect(parsed.features.map((f) => f.tag)).toEqual(["liga"]);
   });
 });
@@ -668,6 +708,64 @@ describe("compiling the rest of the language", () => {
     expect(
       gsubOf("feature salt { sub a from [a.sc b]; } salt;").lookups.map((l) => l.lookupType),
     ).toEqual([3]);
+  });
+
+  it("writes a reverse substitution as its own lookup type", () => {
+    expect(compile("feature rclt { rsub a' b by a.sc; } rclt;").problems).toEqual([]);
+    expect(
+      gsubOf("feature rclt { rsub a' b by a.sc; } rclt;").lookups.map((l) => l.lookupType),
+    ).toEqual([8]);
+  });
+
+  it("puts the marks a filtering set names into GDEF, and its index on the lookup", () => {
+    const out = compile(
+      "@M = [a b]; feature liga { lookupflag UseMarkFilteringSet @M; sub f i by fi; } liga;",
+    );
+
+    expect(out.problems).toEqual([]);
+    // The flag's bit is set, and the set it points at is the first one.
+    expect(out.gdef.markSets).toEqual([[NAMES.indexOf("a"), NAMES.indexOf("b")]]);
+    const gsub = gsubOf(
+      "@M = [a b]; feature liga { lookupflag UseMarkFilteringSet @M; sub f i by fi; } liga;",
+    );
+    expect(gsub.lookups[0]?.lookupFlag).toBe(0x10);
+  });
+
+  it("puts a mark attachment class into GDEF, and its number in the flag", () => {
+    const source =
+      "@M = [a]; feature liga { lookupflag MarkAttachmentType @M; sub f i by fi; } liga;";
+    const out = compile(source);
+
+    expect(out.problems).toEqual([]);
+    // The first class is 1, and the flag carries it in its high byte.
+    expect([...out.gdef.attach]).toEqual([[NAMES.indexOf("a"), 1]]);
+    expect(gsubOf(source).lookups[0]?.lookupFlag).toBe(1 << 8);
+  });
+
+  it("puts the classes and carets a GDEF table states into GDEF", () => {
+    const out = compile(`
+      table GDEF { GlyphClassDef [a], [fi], [b], ; LigatureCaretByPos fi 400; } GDEF;
+      feature liga { sub f i by fi; } liga;
+    `);
+
+    expect(out.problems).toEqual([]);
+    expect([...out.gdef.classes]).toEqual([
+      [NAMES.indexOf("a"), 1],
+      [NAMES.indexOf("fi"), 2],
+      [NAMES.indexOf("b"), 3],
+    ]);
+    expect([...out.gdef.carets]).toEqual([[NAMES.indexOf("fi"), [400]]]);
+  });
+
+  it("gives the same marks the same set, however many lookups name them", () => {
+    const out = compile(`
+      @M = [a b];
+      feature liga { lookupflag UseMarkFilteringSet @M; sub f i by fi; } liga;
+      feature calt { lookupflag UseMarkFilteringSet @M; sub f l by fl; } calt;
+    `);
+
+    expect(out.problems).toEqual([]);
+    expect(out.gdef.markSets).toHaveLength(1);
   });
 
   it("starts a new lookup where the kind of rule changes, as fontTools does", () => {
