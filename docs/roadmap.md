@@ -49,8 +49,8 @@ application installs from a release and updates itself.
 | 24    | The web build, hosted               | later                                                                                |
 | 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                  |
 | 26    | The last interface tests            | done: every panel and control is rendered by a test                                  |
-| 27    | A designspace that survives         | next                                                                                 |
-| 28    | Binary import keeps its layout      | planned                                                                              |
+| 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried     |
+| 28    | Binary import keeps its layout      | next                                                                                 |
 | 29    | Layers to draw on                   | planned                                                                              |
 | 30    | Making masters compatible           | planned                                                                              |
 | 31    | A proof for judging features        | planned                                                                              |
@@ -665,10 +665,10 @@ Found by reading the code back once phases 22 to 26 and the loose ends were done
 two lose something without saying so, which is why they come first; the rest are the daily
 work of drawing a family.
 
-#### Phase 27 — A designspace that survives being opened
+#### Phase 27 — A designspace that survives being opened — done
 
-The designspace reader keeps axes, sources and instances and drops everything else, so a
-real family opened and written back out loses part of itself:
+The designspace reader kept axes, sources and instances and dropped everything else, so a
+real family opened and written back out lost part of itself:
 
 - **Axis maps** (`<map>`), the curve between the value a user picks and the one the design
   is drawn at. The variable font has no `avar` either, so its axes move in a straight line
@@ -683,6 +683,42 @@ real family opened and written back out loses part of itself:
 The rule the UFO reader already keeps is the one to keep here: what is not understood is
 carried. Then the maps and rules are understood — `avar` written from the maps, and rules
 compiled into the variable font where the format allows.
+
+Now:
+
+- **Axes keep their maps**, and the model keeps an axis where the drawings are, so a map
+  changes what the font tells the world and nothing about how a letter is worked out.
+  `fvar` is written on the user scale, `avar` from the map, and a map can be made and
+  edited in a Designspace panel beside the font info — with a warning, rather than a
+  quiet move, when a master ends up outside the range or no master is left at the default.
+  Axes with stops are read; a variable font is the designspace at the default stop.
+- **Sparse masters are masters.** A source that is a layer of another's UFO is read from
+  that layer, draws only its glyphs, and is written back into the same file. Interpolation
+  — the preview, static instances and both variable flavours — works a glyph out from the
+  masters that draw it, which means a variable font varies each glyph over its own regions:
+  CFF2 selects them with `vsindex`, `gvar` gives each tuple its own. The glyph grid of a
+  sparse master is the whole font with what it does not draw shown faint, and opening one
+  offers to draw it there, starting from the shape the rest of the family has at that place.
+- **Rules are compiled and edited.** Each rule is a lookup of single substitutions, switched
+  on by GSUB 1.1 feature variations in `rvrn` (or `rclt` when processed last), with a
+  record for every overlap of two rules' regions ahead of the records it came from. Static
+  instances trade the glyphs' drawings where a rule applies. Rules are added, given ranges
+  and swaps (with the font's glyph names offered as they are typed) in the Designspace panel.
+- **Everything else is carried**: the file's version, a `lib`, labels, variable-font
+  definitions, an instance's PostScript and style-map names, a source's `<features copy>`
+  — as the XML they were written as, back where they were. Each master's other UFO layers
+  now go back into that master's file too, where a family used to drop them.
+
+Found on the way, and fixed with it: a variable font's deltas were each master's plain
+difference from the default, which counts a corner master's two edges twice — right at every
+master, wrong between them. They are now worked out the way the preview is. A `gvar` region
+that ends past its peak was written as if it ended there, and the CFF2 flavour had no glyph
+names, CFF2 having nowhere to keep them; `post` carries them now.
+
+Proved the way the rest is: HarfBuzz sets both flavours at places on the user scale and
+finds the rules and the map honoured, and on CI fontTools reads the proof family and pins
+both fonts at eight places between the masters, where its own `VariationModel`, given the
+masters' points, has to agree with them — see `tools/otf-check/check_designspace_vf.py`.
 
 #### Phase 28 — Importing an OTF or TTF keeps its layout
 

@@ -164,6 +164,14 @@ source, and — once a font has more than one master — a family as a designspa
 UFO each, one variable font, and every named style as an ordinary static font. The web
 formats are written from the TrueType flavour, which is what WOFF2's transform is for.
 
+**A family's designspace.** The Designspace button beside the font info edits what a
+`.designspace` says besides its masters: each axis's range as a menu offers it and its map
+to where the drawings are, and the rules — a glyph put in place of another where a range
+holds, like a dollar sign whose stroke closes up past a weight. Both go into the variable
+font and the static styles. A master drawn as a layer of another's UFO opens as a master of
+its own; its glyph grid shows the whole font with what it does not draw faint, and opening
+one of those offers to draw it there. Whatever else the file said is kept and written back.
+
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,
 reverse contour and delete. A handle offers the axis lock, its node's type, retract,
 and reverse. A segment offers insert-point-here, line/curve conversion, balance and
