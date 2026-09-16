@@ -24,9 +24,32 @@ export function GlyphStrip(): React.JSX.Element {
   const text = useStoreValue((s) => s.stripText);
   const document = useStoreValue((s) => s.session.editor.document);
   const current = useStoreValue((s) => s.session.editor.currentGlyph);
+  // The Spacing line's direction, since "the letters either side" has to mean
+  // the same thing in both places. Only where it was chosen outright: the strip
+  // is a list of what was typed rather than a setting of it, and guessing at a
+  // direction per keystroke would move the cells about as somebody types.
+  const rtl = useStoreValue((s) => s.spacingTextSettings.direction === "rtl");
 
   const tokens = textTokens(text);
   const found = glyphsForString(document, tokens);
+
+  const cells = found.map((glyph, index) =>
+    glyph === null ? (
+      <span
+        key={`gap-${String(index)}`}
+        className={styles.missing}
+        title={`No glyph for “${tokens[index]?.text.trim() ?? "?"}”`}
+      />
+    ) : (
+      <GlyphCell
+        key={`${glyph.name}-${String(index)}`}
+        glyph={glyph}
+        active={glyph.name === current}
+        metrics={document.info}
+        onSelect={() => store.setCurrentGlyph(glyph.name)}
+      />
+    ),
+  );
 
   return (
     <div className={styles.strip}>
@@ -38,25 +61,7 @@ export function GlyphStrip(): React.JSX.Element {
         title="Letters, or a glyph by name after a slash: /a.001, /uni0301"
         onChange={(event) => store.setStripText(event.target.value)}
       />
-      <div className={styles.cells}>
-        {found.map((glyph, index) =>
-          glyph === null ? (
-            <span
-              key={`gap-${String(index)}`}
-              className={styles.missing}
-              title={`No glyph for “${tokens[index]?.text.trim() ?? "?"}”`}
-            />
-          ) : (
-            <GlyphCell
-              key={`${glyph.name}-${String(index)}`}
-              glyph={glyph}
-              active={glyph.name === current}
-              metrics={document.info}
-              onSelect={() => store.setCurrentGlyph(glyph.name)}
-            />
-          ),
-        )}
-      </div>
+      <div className={styles.cells}>{rtl ? [...cells].reverse() : cells}</div>
     </div>
   );
 }

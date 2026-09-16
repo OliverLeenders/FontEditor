@@ -25,10 +25,11 @@ type Draft = { readonly text: string; readonly written: string };
  * exchanges. Modelling it would mean choosing which of the language's constructs
  * the model can hold and quietly discarding the rest of somebody's file.
  *
- * Most of the language is compiled — substitutions of every kind but the
- * reverse one, named lookups and their flags, scripts and languages, and
- * positioning plain and in a context. What is not is reported by name and line
- * rather than skipped, and the panel says so plainly. A workspace that accepted
+ * Most of the language is compiled — substitutions of every kind, including the
+ * one read backwards, named lookups and their flags, scripts and languages,
+ * positioning plain and in a context, and the parts of GDEF a file is the right
+ * place for. What is not is reported by name and line rather than skipped, and
+ * the panel says so plainly. A workspace that accepted
  * a file and shipped a font doing less than the file says would be worse than
  * one that admits its limits.
  *
@@ -326,13 +327,31 @@ function WhatIsCompiled(): React.JSX.Element {
           <CheckIcon />
           adjustment in context — <code>pos T o&apos; &lt;0 0 -40 0&gt;;</code>
         </li>
+        <li>
+          <CheckIcon />
+          read backwards — <code>rsub a&apos; b by a.fina;</code>
+        </li>
+        <li>
+          <CheckIcon />
+          flags that name marks — <code>lookupflag UseMarkFilteringSet @ABOVE;</code>
+        </li>
+        <li>
+          <CheckIcon />
+          glyph classes and carets —{" "}
+          <code>
+            table GDEF {"{"} … {"}"} GDEF;
+          </code>
+        </li>
       </ul>
       <p className={styles.note}>
         A pair adjustment is kerning, which is written in the Spacing workspace, and mark attachment
         is where the glyphs&apos; anchors say, which the Marks file writes out; two ways to write
-        the same rule would be two answers with no way to say which won. Reverse substitution, mark
-        filtering sets and <code>table</code> blocks are kept in the file and written to the UFO,
-        but are not compiled into the exported OTF.
+        the same rule would be two answers with no way to say which won. The tables this editor
+        writes itself — <code>head</code>, <code>name</code>, <code>OS/2</code> — are refused and
+        pointed at the Font workspace, as are attachment points, which are hinting rather than
+        shaping, and a caret given as a contour point, which moves when the glyph is redrawn.
+        Anything else refused is kept in the file and written to the UFO, but is not compiled into
+        the exported OTF.
       </p>
     </>
   );

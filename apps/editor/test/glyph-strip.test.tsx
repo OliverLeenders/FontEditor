@@ -90,3 +90,37 @@ describe("moving about with the strip", () => {
     expect(store.editor.currentGlyph).toBe("o");
   });
 });
+
+describe("a strip for text that runs the other way", () => {
+  it("lays the cells right to left when the spacing line does", () => {
+    // Not shaped — the strip is one cell per glyph, which is what makes it a
+    // way to move about — but laid out the way the line beside it reads.
+    const store = freshStore();
+    store.setStripText("hello");
+    store.setSpacingTextSettings({ direction: "rtl", script: null, language: null });
+    render(<GlyphStrip />, store);
+
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "o",
+      "l",
+      "l",
+      "e",
+      "h",
+    ]);
+  });
+
+  it("is left to right for a line whose direction was never chosen", () => {
+    const store = freshStore();
+    store.setStripText("hello");
+    store.setSpacingTextSettings({ direction: "auto", script: null, language: null });
+    render(<GlyphStrip />, store);
+
+    expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
+      "h",
+      "e",
+      "l",
+      "l",
+      "o",
+    ]);
+  });
+});
