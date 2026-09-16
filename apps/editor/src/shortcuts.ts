@@ -114,4 +114,18 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "Escape", what: "Let go of the letter" },
     ],
   },
+  {
+    title: "Feature source",
+    note: "In the Features and Marks files.",
+    items: [
+      { keys: "Tab · Shift-Tab", what: "Indent and outdent" },
+      { keys: "Escape then Tab", what: "Leave the source" },
+      { keys: "Ctrl-Space", what: "Complete the name at the caret" },
+      { keys: "↑ ↓ · Enter", what: "Choose a completion and take it" },
+      { keys: "Ctrl-F · Ctrl-H", what: "Find, and find and replace" },
+      { keys: "Enter · Shift-Enter", what: "The next and previous match, in the find field" },
+      { keys: "Ctrl-click · F12", what: "Open the glyph a name is for" },
+      { keys: "Ctrl-wheel", what: "Text size" },
+    ],
+  },
 ];

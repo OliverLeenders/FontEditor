@@ -36,6 +36,7 @@ import {
   choosePane,
   closeSecondPane,
   focusPane,
+  openGlyphBeside,
   openGlyphFrom,
   openSecondPane,
   viewIn,
@@ -343,7 +344,14 @@ export function App(): React.JSX.Element {
       case "features":
         return (
           <div className={styles.stage}>
-            <FeaturesView />
+            <FeaturesView
+              onOpenGlyph={(name) => {
+                // Drawn beside the source when the window is split, so the
+                // file stays in sight while the glyph is looked at.
+                store.setCurrentGlyph(name);
+                setPanes((current) => openGlyphBeside(current, index));
+              }}
+            />
           </div>
         );
       case "proof":

@@ -287,10 +287,12 @@ export class EditorStore {
    * An edit to the document like any other, so it is undoable and saved — the
    * feature file is part of the font rather than a setting about it.
    */
-  setFeatures(features: string): void {
+  setFeatures(features: string, apart = false): void {
     const document = setFeatures(this.editor.document, features);
     if (document === this.editor.document) return;
-    this.applyTool(result({ ...this.editor, document }, [begin("Edit features"), commit]));
+    // Typing merges into one step; a replacement stands apart, so that undo
+    // takes back exactly the replacement.
+    this.applyTool(result({ ...this.editor, document }, [begin("Edit features", !apart), commit]));
   }
 
   /** Ids for the anchors a Marks file adds. */
@@ -303,7 +305,7 @@ export class EditorStore {
    * the anchors on the lines it could not read. A change is one step, so undo
    * takes back what was typed, and a reading that moves nothing is no step.
    */
-  setMarks(text: string): void {
+  setMarks(text: string, apart = false): void {
     const document = this.editor.document;
     const reading = readMarks(text, (name) => name in document.glyphs);
     if (reading.problems.length > 0) return;
@@ -312,7 +314,9 @@ export class EditorStore {
       next = putGlyph(next, g);
     }
     if (next === document) return;
-    this.applyTool(result({ ...this.editor, document: next }, [begin("Edit marks"), commit]));
+    this.applyTool(
+      result({ ...this.editor, document: next }, [begin("Edit marks", !apart), commit]),
+    );
   }
 
   // ---- snapshots ---------------------------------------------------------

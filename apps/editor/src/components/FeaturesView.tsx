@@ -38,7 +38,12 @@ type Draft = { readonly text: string; readonly written: string };
  * anchors are what it made them — leaving the file, or changing an anchor
  * anywhere else, writes it again from the anchors.
  */
-export function FeaturesView(): React.JSX.Element {
+export function FeaturesView({
+  onOpenGlyph,
+}: {
+  /** Open a glyph by name, from a name in either file. */
+  onOpenGlyph?: ((name: string) => void) | undefined;
+} = {}): React.JSX.Element {
   const store = useEditorStore();
   const source = useStoreValue((s) => s.session.editor.document.features);
   const glyphOrder = useStoreValue((s) => s.session.editor.document.glyphOrder);
@@ -81,8 +86,8 @@ export function FeaturesView(): React.JSX.Element {
     setDraft(null);
   };
 
-  const editMarks = (typed: string): void => {
-    store.setMarks(typed);
+  const editMarks = (typed: string, apart = false): void => {
+    store.setMarks(typed, apart);
     const document = store.editor.document;
     setDraft({
       text: typed,
@@ -134,12 +139,17 @@ export function FeaturesView(): React.JSX.Element {
           key={file}
           ref={editor}
           value={text}
-          onChange={file === "marks" ? editMarks : (typed) => store.setFeatures(typed)}
+          onChange={
+            file === "marks" ? editMarks : (typed, apart) => store.setFeatures(typed, apart)
+          }
           problemLines={problemLines}
           placeholder={file === "marks" ? "" : PLACEHOLDER}
           size={size}
           onZoom={(factor) => store.setFeatureSize(store.getState().featureSize * factor)}
           label={file === "marks" ? "Marks source" : "Feature source"}
+          names={glyphOrder}
+          isGlyph={(name) => name in glyphs}
+          onOpenGlyph={onOpenGlyph}
         />
 
         <aside

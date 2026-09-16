@@ -7,9 +7,23 @@ import {
   choosePane,
   closeSecondPane,
   focusPane,
+  openGlyphBeside,
   openGlyphFrom,
   openSecondPane,
 } from "../src/layout.js";
+
+describe("a glyph opened from feature source", () => {
+  it("is drawn in the other pane of a split window, whatever it showed", () => {
+    expect(openGlyphBeside(split("features", "proof"), 0)).toEqual(split("features", "glyph", 1));
+    expect(openGlyphBeside(split("spacing", "features", 1), 1)).toEqual(
+      split("glyph", "features", 0),
+    );
+  });
+
+  it("turns a window of one to the drawing", () => {
+    expect(openGlyphBeside(split("features", null), 0)).toEqual(split("glyph", null));
+  });
+});
 
 /**
  * Which workspaces a split window shows, and which one the keyboard is in.

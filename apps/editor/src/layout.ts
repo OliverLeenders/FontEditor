@@ -90,3 +90,17 @@ export function openGlyphFrom(panes: Panes, index: PaneIndex): Panes {
   if (viewIn(panes, other(index)) === "glyph") return panes;
   return choosePane(panes, index, "glyph");
 }
+
+/**
+ * Where a glyph opened from feature source is drawn.
+ *
+ * In the other pane whenever the window is split, whatever it was showing: the
+ * name was chosen in a file, and the file is worth keeping in sight while the
+ * glyph is looked at. A window of one turns to the drawing, as it does from
+ * anywhere else.
+ */
+export function openGlyphBeside(panes: Panes, index: PaneIndex): Panes {
+  return panes.second === null
+    ? choosePane(panes, index, "glyph")
+    : choosePane(panes, other(index), "glyph");
+}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { installBrowserGlobals } from "./browser-globals.js";
 import { freshStore, installDomStubs, render } from "./render.js";
@@ -230,5 +230,124 @@ describe("the Marks file", () => {
     const again = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Marks source" });
     expect(again.value).not.toContain("# a note");
     expect(again.value).toContain("pos base o <anchor 250 480> mark @MC_top;");
+  });
+});
+
+describe("completing names", () => {
+  it("offers glyph names as a word is typed, and Enter takes one", () => {
+    const { store, box } = open("sub s", 5);
+
+    fireEvent.change(box, { target: { value: "sub sp" } });
+
+    const list = screen.getByRole("listbox", { name: "Completions" });
+    expect(within(list).getAllByRole("option")[0]?.textContent).toContain("space");
+
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(features(store)).toBe("sub space");
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("opens on Ctrl+Space, moves with the arrows, and closes on Escape", () => {
+    const { store, box } = open("sub ", 4);
+
+    fireEvent.keyDown(box, { key: " ", ctrlKey: true });
+    const options = screen.getAllByRole("option");
+    expect(options.length).toBeGreaterThan(1);
+    expect(options[0]?.getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.keyDown(box, { key: "ArrowDown" });
+    expect(screen.getAllByRole("option")[1]?.getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(features(store)).toBe("sub ");
+  });
+});
+
+describe("opening a glyph from its name", () => {
+  function openWith(text: string, at: number) {
+    const opened = vi.fn<(name: string) => void>();
+    const store = freshStore();
+    store.setFeatures(text);
+    render(<FeaturesView onOpenGlyph={opened} />, store);
+    const box = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Feature source" });
+    box.focus();
+    box.setSelectionRange(at, at);
+    return { opened, box };
+  }
+
+  it("opens the glyph at the caret on F12", () => {
+    const { opened, box } = openWith("sub o by e;", 5);
+    fireEvent.keyDown(box, { key: "F12" });
+    expect(opened).toHaveBeenCalledWith("o");
+  });
+
+  it("opens the glyph clicked with Ctrl held, and not on a plain click", () => {
+    const { opened, box } = openWith("sub o by e;", 9);
+    fireEvent.click(box);
+    expect(opened).not.toHaveBeenCalled();
+    fireEvent.click(box, { ctrlKey: true });
+    expect(opened).toHaveBeenCalledWith("e");
+  });
+
+  it("leaves alone a name the font has no glyph for", () => {
+    const { opened, box } = openWith("sub zz by e;", 5);
+    fireEvent.keyDown(box, { key: "F12" });
+    expect(opened).not.toHaveBeenCalled();
+  });
+});
+
+describe("finding and replacing", () => {
+  const TWO = "sub o by e;\nsub o by c;";
+
+  it("finds on Ctrl+F, counts the matches, and steps through them with Enter", () => {
+    const { box } = open(TWO, 0);
+
+    fireEvent.keyDown(box, { key: "f", ctrlKey: true });
+    const field = screen.getByRole<HTMLInputElement>("textbox", { name: "Find" });
+    expect(document.activeElement).toBe(field);
+
+    fireEvent.change(field, { target: { value: "o" } });
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+    expect(box.selectionStart).toBe(4);
+    expect(document.querySelectorAll("mark")).toHaveLength(2);
+
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(screen.getByText("2 of 2")).toBeTruthy();
+    expect(box.selectionStart).toBe(16);
+
+    fireEvent.keyDown(field, { key: "Escape" });
+    expect(screen.queryByRole("search")).toBeNull();
+    expect(document.activeElement).toBe(box);
+  });
+
+  it("finds whole names only when asked", () => {
+    const { box } = open("sub o by o.alt;", 0);
+    fireEvent.keyDown(box, { key: "f", ctrlKey: true });
+    fireEvent.change(screen.getByRole("textbox", { name: "Find" }), { target: { value: "o" } });
+    expect(screen.getByText("1 of 2")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Whole word" }));
+    expect(screen.getByText("1 of 1")).toBeTruthy();
+  });
+
+  it("replaces one match and then every match, each a step undo takes back", () => {
+    const { store, box } = open(TWO, 0);
+
+    fireEvent.keyDown(box, { key: "h", ctrlKey: true });
+    fireEvent.change(screen.getByRole("textbox", { name: "Find" }), { target: { value: "o" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Replace with" }), {
+      target: { value: "n" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace" }));
+    expect(features(store)).toBe("sub n by e;\nsub o by c;");
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace all" }));
+    expect(features(store)).toBe("sub n by e;\nsub n by c;");
+
+    act(() => store.undo());
+    expect(features(store)).toBe("sub n by e;\nsub o by c;");
   });
 });
