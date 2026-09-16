@@ -25,7 +25,7 @@ export type TokenKind =
 export type Token = { readonly kind: TokenKind; readonly text: string };
 
 /** The language's reserved words, from the feature file specification. */
-const KEYWORDS = new Set([
+export const KEYWORDS: ReadonlySet<string> = new Set([
   "anchor",
   "anchorDef",
   "anon",
