@@ -48,7 +48,7 @@ application installs from a release and updates itself.
 | 23    | Right-to-left text                  | later                                                                                |
 | 24    | The web build, hosted               | later                                                                                |
 | 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                  |
-| 26    | The last interface tests            | later                                                                                |
+| 26    | The last interface tests            | done: every panel and control is rendered by a test                                  |
 
 ### What the table missed
 
@@ -587,11 +587,28 @@ and the Marks file, still with nothing installed for it:
   Glyph workspace — in the other pane when the window is split, so the file stays in sight
   — and the name is underlined while Ctrl is held over it.
 
-#### Phase 26 — The last interface tests
+#### Phase 26 — The last interface tests — done
 
-Eight components are rendered by no test: the glyph strip, the mark swatch, the menu items,
+Eight components were rendered by no test: the glyph strip, the mark swatch, the menu items,
 the preferences panel, remove overlap, the sheet, the stepper and the toolbar. Mostly layout,
-which is why they come last.
+which is why they came last — but each one had something worth asking of it, and the asking
+is what the tests are about rather than the markup:
+
+- **The strip** shows what was typed, a gap and not a silent omission for a character the
+  font has nothing for, and a glyph reached by name after a slash.
+- **The stepper** steps once and at once on a press, repeats only when held, stops at a
+  bound rather than against it, and is dead where there is nothing to step.
+- **The toolbar** says which tool is in hand, what the next undo would take back, and how far
+  the view is zoomed.
+- **Remove overlap** says what it did — "nothing was overlapping" and a refusal both look
+  exactly like a button that does nothing.
+- **The preferences** change what the reader sees and leave the document untouched, which is
+  checked by reference: the same document object before and after.
+- **The menu rows** run the item and then close the menu, and a disabled one does neither.
+- **The sheet** exists only where the glyph is traced from a picture, and says it is reading
+  rather than showing an empty frame.
+- **The mark swatch** gives the same colour the same component, so a menu does not remount
+  its icons as it draws.
 
 #### Parked
 
