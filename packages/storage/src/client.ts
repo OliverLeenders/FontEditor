@@ -201,6 +201,9 @@ export class StorageClient {
     masters: unknown;
     current: string;
     instances: unknown;
+    rules: unknown;
+    rulesProcessing: string;
+    kept: unknown;
   }): Promise<void> {
     await this.send({ kind: "putDesignspace", designspace });
   }

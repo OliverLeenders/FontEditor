@@ -61,6 +61,7 @@ export {
   breakOutKern,
   deleteKernGroup,
   createGlyphs,
+  drawGlyphHere,
   deleteGlyph,
   deleteGlyphs,
   deleteRefusal,

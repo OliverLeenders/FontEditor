@@ -335,6 +335,9 @@ export class Persistence {
     masters: unknown;
     current: string;
     instances: unknown;
+    rules: unknown;
+    rulesProcessing: string;
+    kept: unknown;
   }): Promise<void> {
     if (this.client === null || !this.owner) return;
     await this.client.putDesignspace(designspace);

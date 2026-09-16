@@ -1,0 +1,256 @@
+/*
+ * The axes and the rules, hanging under their button.
+ *
+ * Shaped like the font info beside it: sections with small capitals over them,
+ * scrolling when there is more than fits. An axis and a rule are each a block
+ * with a rule above it, because each is several rows that belong together.
+ */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  gap: 0.7rem;
+  width: 26rem;
+  max-width: calc(100vw - 2rem);
+  max-height: min(38rem, 75vh);
+  overflow-y: auto;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.section {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.heading {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.headRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.processing {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+.processing select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.axis,
+.rule {
+  display: grid;
+  gap: 0.4rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.axisHead {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.axisName {
+  flex: 1;
+  min-width: 0;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.axisName:hover:not(:disabled),
+.axisName:focus {
+  border-color: var(--rule-strong);
+  background: var(--ground);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.range {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.label {
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.input,
+.number {
+  width: 100%;
+  min-width: 0;
+  padding: 0.2rem 0.35rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.map {
+  width: 100%;
+  border-collapse: collapse;
+}
+.map th {
+  padding: 0 0.2rem 0.15rem 0;
+  text-align: left;
+  font-size: 0.64rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.map td {
+  padding: 0.1rem 0.2rem 0.1rem 0;
+}
+.map td:last-child,
+.map th:last-child {
+  width: 1.6rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.where,
+.swaps {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.condition,
+.swap {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto 1fr 1.6rem;
+  align-items: center;
+  gap: 0.3rem;
+}
+.swap {
+  grid-template-columns: 1fr auto 1fr 1.6rem;
+}
+.condition select {
+  min-width: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--ink);
+  background: var(--ground);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+}
+
+.to {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.add,
+.small {
+  justify-self: start;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.small {
+  border-style: dashed;
+  font-size: 0.7rem;
+}
+.add:hover:not(:disabled),
+.small:hover:not(:disabled) {
+  color: var(--ink);
+}
+.add:disabled,
+.small:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.drop {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.drop:hover:not(:disabled) {
+  color: var(--warn);
+}
+.drop svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--ink-3);
+}
+
+.problem {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--warn);
+}
+
+.hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

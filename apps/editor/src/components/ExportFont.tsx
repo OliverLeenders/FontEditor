@@ -90,8 +90,12 @@ export function ExportFont(): React.JSX.Element {
   const family = (): void =>
     void attemptAsync(async () => {
       const project = store.getState().project;
-      const masters = await store.allMasters();
-      const { bytes, fileName, files } = exportFamily(project.axes, masters, project.instances);
+      const masters = await store.familyMasters();
+      const { bytes, fileName, files } = exportFamily(project.axes, masters, project.instances, {
+        rules: project.rules,
+        rulesProcessing: project.rulesProcessing,
+        kept: project.kept,
+      });
       download(bytes.slice().buffer, fileName, "application/zip");
       return { file: `${fileName} · ${String(files)} files`, warnings: [] };
     });
@@ -112,9 +116,12 @@ export function ExportFont(): React.JSX.Element {
   const instances = (): void =>
     void attemptAsync(async () => {
       const project = store.getState().project;
-      const masters = await store.allMasters();
+      const masters = (await store.allMasters()).map((m) => ({
+        ...m,
+        sparse: m.sparse !== undefined,
+      }));
       const { exportInstances } = await binary();
-      const out = exportInstances(project.axes, masters, project.instances);
+      const out = exportInstances(project.axes, masters, project.instances, project.rules);
       download(out.bytes.slice().buffer, out.fileName, "application/zip");
       return { file: `${out.fileName} · ${String(out.files)} fonts`, warnings: out.warnings };
     });
@@ -127,18 +134,32 @@ export function ExportFont(): React.JSX.Element {
    * a font whose default is its Black is a font that is Black until something
    * asks otherwise.
    */
+  /**
+   * The masters a variable font is built from, the default first and whole:
+   * everything in the file is a delta from it.
+   */
+  const variableMasters = async () => {
+    const project = store.getState().project;
+    const all = await store.allMasters();
+    const home = defaultLocation(project.axes);
+    const whole = (m: (typeof all)[number]) =>
+      m.sparse === undefined && atHome(m.location, home, project.axes);
+    return [...all.filter(whole), ...all.filter((m) => !whole(m))].map((m) => ({
+      ...m,
+      sparse: m.sparse !== undefined,
+    }));
+  };
+
   const variable = (): void =>
     void attemptAsync(async () => {
       const project = store.getState().project;
-      const all = await store.allMasters();
-      const home = defaultLocation(project.axes);
-      const ordered = [
-        ...all.filter((m) => atHome(m.location, home, project.axes)),
-        ...all.filter((m) => !atHome(m.location, home, project.axes)),
-      ];
+      const ordered = await variableMasters();
 
       const { exportVariableFont } = await binary();
-      const out = exportVariableFont(project.axes, ordered, project.instances);
+      const out = exportVariableFont(project.axes, ordered, project.instances, {
+        rules: project.rules,
+        rulesProcessing: project.rulesProcessing,
+      });
       const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.otf");
       download(out.bytes, file, "font/otf");
       return { file, warnings: out.warnings };
@@ -157,15 +178,13 @@ export function ExportFont(): React.JSX.Element {
   const variableTrueType = (): void =>
     void attemptAsync(async () => {
       const project = store.getState().project;
-      const all = await store.allMasters();
-      const home = defaultLocation(project.axes);
-      const ordered = [
-        ...all.filter((m) => atHome(m.location, home, project.axes)),
-        ...all.filter((m) => !atHome(m.location, home, project.axes)),
-      ];
+      const ordered = await variableMasters();
 
       const { exportVariableTrueType } = await binary();
-      const out = exportVariableTrueType(project.axes, ordered, project.instances);
+      const out = exportVariableTrueType(project.axes, ordered, project.instances, {
+        rules: project.rules,
+        rulesProcessing: project.rulesProcessing,
+      });
       const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.ttf");
       download(out.bytes, file, "font/ttf");
       return { file, warnings: out.warnings };

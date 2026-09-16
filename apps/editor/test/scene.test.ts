@@ -232,6 +232,9 @@ describe("an instance between the masters", () => {
         sources: { m1: light, m2: black },
         current: "m1",
         instances: [],
+        rules: [],
+        rulesProcessing: "first",
+        kept: null,
       },
     });
     store.setCurrentGlyph("o");

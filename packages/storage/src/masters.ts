@@ -1,4 +1,13 @@
-import type { Axis, FontDocument, Instance, Master, MasterId } from "@typewright/font-model";
+import type {
+  Axis,
+  FontDocument,
+  Instance,
+  KeptXml,
+  Master,
+  MasterId,
+  Rule,
+  RulesProcessing,
+} from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
 import { type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";
@@ -40,6 +49,11 @@ export type StoredDesignspace = {
    * reader takes a missing list as an empty one rather than as a damaged file.
    */
   readonly instances: readonly Instance[];
+  /** The glyphs swapped in parts of the designspace. Absent before rules existed. */
+  readonly rules: readonly Rule[];
+  readonly rulesProcessing: RulesProcessing;
+  /** What the designspace file said that the model does not read, or `null`. */
+  readonly kept: KeptXml | null;
 };
 
 export const DESIGNSPACE_SCHEMA = 1;
@@ -73,9 +87,23 @@ export async function readDesignspace(store: FileStore): Promise<StoredDesignspa
     const masters = Array.isArray(parsed["masters"]) ? (parsed["masters"] as Master[]) : [];
     const current = typeof parsed["current"] === "string" ? parsed["current"] : "";
     const instances = Array.isArray(parsed["instances"]) ? (parsed["instances"] as Instance[]) : [];
+    // Absent in every project written before rules were kept, which is read as
+    // a family with none rather than as a damaged file.
+    const rules = Array.isArray(parsed["rules"]) ? (parsed["rules"] as Rule[]) : [];
+    const rulesProcessing = parsed["rulesProcessing"] === "last" ? "last" : "first";
+    const kept = isRecord(parsed["kept"]) ? (parsed["kept"] as KeptXml) : null;
     if (masters.length === 0) return null;
 
-    return { schema: DESIGNSPACE_SCHEMA, axes, masters, current, instances };
+    return {
+      schema: DESIGNSPACE_SCHEMA,
+      axes,
+      masters,
+      current,
+      instances,
+      rules,
+      rulesProcessing,
+      kept,
+    };
   } catch {
     // A file that will not parse is a project whose designspace has been lost,
     // and the font itself is still there: better one master than no font.

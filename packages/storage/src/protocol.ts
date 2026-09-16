@@ -111,6 +111,9 @@ export type StorageRequest =
         masters: unknown;
         current: string;
         instances: unknown;
+        rules: unknown;
+        rulesProcessing: string;
+        kept: unknown;
       };
     }
   | { readonly id: number; readonly kind: "getDesignspace" }

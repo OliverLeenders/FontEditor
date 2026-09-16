@@ -29,6 +29,7 @@ export function BarMenu({
   panelClassName,
   items,
   onOpen,
+  openOn,
   closeOnOutside = true,
   children,
 }: {
@@ -45,6 +46,12 @@ export function BarMenu({
   readonly items?: readonly Item[] | undefined;
   /** Called when it opens, for a panel that reads something first. */
   readonly onOpen?: (() => void) | undefined;
+  /**
+   * Opens it whenever this changes: for somewhere else in the interface that
+   * links here. A count rather than a flag, so the button keeps owning whether
+   * it is open and a second request after it was closed still opens it.
+   */
+  readonly openOn?: number | undefined;
   /**
    * Whether a press outside closes it.
    *
@@ -65,6 +72,15 @@ export function BarMenu({
   // re-read the disk as fast as the bar re-rendered.
   const opener = useRef(onOpen);
   opener.current = onOpen;
+
+  // Not on the first render: a count that was already there when the bar was
+  // drawn is not a request.
+  const requested = useRef(openOn);
+  useEffect(() => {
+    if (openOn === undefined || openOn === requested.current) return;
+    requested.current = openOn;
+    setShown(true);
+  }, [openOn]);
 
   useEffect(() => {
     if (!shown) return;

@@ -87,6 +87,7 @@ export { infoProblem, setInfo } from "./font.js";
 export type { NewGlyph } from "./glyphs.js";
 export {
   createGlyphs,
+  drawGlyphHere,
   deleteGlyph,
   deleteGlyphs,
   deleteRefusal,

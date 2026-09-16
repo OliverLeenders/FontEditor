@@ -1,15 +1,29 @@
+import type { ExtraLayer } from "@typewright/font-io";
 import {
   type Axis,
   type FontDocument,
+  type FontProject,
+  type Glyph,
   type Instance,
   type InstanceId,
+  type KeptXml,
   type Location,
   type Master,
   type MasterId,
+  type Rule,
+  type RuleId,
+  type RulesProcessing,
+  type SparseSource,
   addInstance as addToInstances,
+  addRule as addToRules,
+  removeRule as removeFromRules,
+  replaceRule as replaceInRules,
+  setRulesProcessing as setProcessing,
   addMaster as addToProject,
   instanceProblemSays,
+  glyphPresence,
   incompatibilities,
+  interpolateGlyph,
   isProject,
   masterProblemSays,
   moveInstance as moveInInstances,
@@ -22,6 +36,7 @@ import {
   project as makeProject,
   setAxes as setProjectAxes,
   switchTo as switchProjectTo,
+  weightsAmong,
 } from "@typewright/font-model";
 
 import type { FontHost } from "./fonts.js";
@@ -74,6 +89,9 @@ export async function switchMaster(host: FontHost, id: MasterId): Promise<Master
   showDocument(host, found.document, false);
   await host.disk.replaceAll(found.document);
   await rememberDesignspace(host, next);
+  // A master that draws only some glyphs is shown against the one it is a
+  // layer of, so that one is read in as well.
+  await loadWhole(host);
 
   return { name: master.name, glyphs: found.document.glyphOrder.length, problems: found.problems };
 }
@@ -179,24 +197,42 @@ export async function adoptFamily(
       readonly location: Location;
       readonly document: FontDocument;
       readonly images: ReadonlyMap<string, Uint8Array>;
+      readonly layers?: readonly ExtraLayer[];
+      readonly sparse?: Omit<SparseSource, "of"> & { readonly of: number };
+      readonly kept?: KeptXml;
     }[];
-    readonly instances: readonly { name: string; location: Location; familyName: string }[];
+    readonly instances: readonly {
+      name: string;
+      location: Location;
+      familyName: string;
+      kept?: KeptXml;
+    }[];
+    readonly rules?: readonly Rule[];
+    readonly rulesProcessing?: RulesProcessing;
+    readonly kept?: KeptXml | null;
   },
 ): Promise<void> {
   for (const m of host.state().project.masters) await host.disk.dropMaster(m.id);
 
   const stamp = Date.now();
-  const masters = family.masters.map((m, i) => ({
-    id: `master-${String(stamp)}-${String(i)}`,
+  const ids = family.masters.map((_, i) => `master-${String(stamp)}-${String(i)}`);
+  const masters: Master[] = family.masters.map((m, i) => ({
+    id: ids[i]!,
     name: m.name,
     location: m.location,
+    // The master a layer lives in, by its id now rather than by where it was
+    // in the file's list.
+    ...(m.sparse === undefined || ids[m.sparse.of] === undefined
+      ? {}
+      : { sparse: { ...m.sparse, of: ids[m.sparse.of]! } }),
+    ...(m.kept === undefined ? {} : { kept: m.kept }),
   }));
 
   const first = masters[0];
   const opened = family.masters[0];
   if (first === undefined || opened === undefined) return;
 
-  const next = {
+  const next: FontProject = {
     axes: family.axes,
     masters,
     sources: { [first.id]: opened.document },
@@ -208,6 +244,9 @@ export async function adoptFamily(
       ...it,
       id: `instance-${String(stamp)}-${String(i)}`,
     })),
+    rules: family.rules ?? [],
+    rulesProcessing: family.rulesProcessing ?? "first",
+    kept: family.kept ?? null,
   };
   host.patch({ project: next });
 
@@ -215,6 +254,74 @@ export async function adoptFamily(
     const source = family.masters[i];
     if (source !== undefined) await host.disk.putMaster(m.id, source.document);
   }
+
+  // Every master's other layers, each marked with the master whose file it is
+  // in, so that writing the family back puts each into its own UFO.
+  const layers = family.masters.flatMap((m, i) =>
+    (m.layers ?? []).map((layer) => ({ ...layer, master: ids[i]! })),
+  );
+  host.patch({ layers });
+  await host.disk.putLayers(layers);
+
+  await rememberDesignspace(host, next);
+}
+
+/**
+ * The carried layers of one master's file.
+ *
+ * A layer marked with no master came with a font of one master, and belongs to
+ * the master that font became: the first.
+ */
+export function layersOf(
+  project: FontProject,
+  layers: readonly ExtraLayer[],
+  id: MasterId,
+): ExtraLayer[] {
+  const first = project.masters[0]?.id;
+  return layers.filter((layer) => (layer.master ?? first) === id);
+}
+
+/**
+ * Change one axis: its name, its range, its map or its stops.
+ *
+ * Found by tag, which is what every location refers to it by — so a new tag is
+ * a new axis, and changing one is not done here.
+ *
+ * The masters stay where they are drawn. Moving a map's end moves where the
+ * axis's range is on the design scale, and a master left outside it is a
+ * mistake to be shown rather than a location to quietly change: it is where
+ * somebody drew that font.
+ */
+export async function updateAxis(host: FontHost, tag: string, axis: Axis): Promise<void> {
+  const project = host.state().project;
+  if (!project.axes.some((a) => a.tag === tag)) return;
+  const next = { ...project, axes: project.axes.map((a) => (a.tag === tag ? axis : a)) };
+  host.patch({ project: next });
+  await rememberDesignspace(host, next);
+}
+
+export async function addRule(host: FontHost, rule: Rule): Promise<void> {
+  await rememberRules(host, addToRules(host.state().project, rule));
+}
+
+export async function replaceRule(host: FontHost, rule: Rule): Promise<void> {
+  await rememberRules(host, replaceInRules(host.state().project, rule));
+}
+
+export async function removeRule(host: FontHost, id: RuleId): Promise<void> {
+  await rememberRules(host, removeFromRules(host.state().project, id));
+}
+
+export async function setRulesProcessing(
+  host: FontHost,
+  processing: RulesProcessing,
+): Promise<void> {
+  await rememberRules(host, setProcessing(host.state().project, processing));
+}
+
+async function rememberRules(host: FontHost, next: FontProject): Promise<void> {
+  if (next === host.state().project) return;
+  host.patch({ project: next });
   await rememberDesignspace(host, next);
 }
 
@@ -232,6 +339,9 @@ export function projectFrom(
     masters: readonly Master[];
     current: MasterId;
     instances?: readonly Instance[];
+    rules?: readonly Rule[];
+    rulesProcessing?: RulesProcessing;
+    kept?: KeptXml | null;
   } | null,
   document: FontDocument,
 ): ReturnType<typeof makeProject> {
@@ -246,7 +356,74 @@ export function projectFrom(
     current,
     // Absent in every project written before instances existed.
     instances: stored.instances ?? [],
+    // And these before rules were kept.
+    rules: stored.rules ?? [],
+    rulesProcessing: stored.rulesProcessing ?? "first",
+    kept: stored.kept ?? null,
   };
+}
+
+/**
+ * The master a sparse one is a layer of, read in if it is not already.
+ *
+ * Nothing for a whole master. The glyph grid of a sparse master is the whole
+ * font with the glyphs it does not draw shown faint, and the whole font is in
+ * the other file.
+ */
+export async function loadWhole(host: FontHost): Promise<void> {
+  const project = host.state().project;
+  const of = project.masters.find((m) => m.id === project.current)?.sparse?.of;
+  if (of === undefined || project.sources[of] !== undefined) return;
+
+  const found = await host.disk.getMaster(of);
+  if (found === null) return;
+  const now = host.state().project;
+  host.patch({ project: { ...now, sources: { ...now.sources, [of]: found.document } } });
+}
+
+/** The whole master the open one is a layer of, where it is one and it has been read. */
+export function wholeOf(project: FontProject): FontDocument | null {
+  const of = project.masters.find((m) => m.id === project.current)?.sparse?.of;
+  return of === undefined ? null : (project.sources[of] ?? null);
+}
+
+/**
+ * A glyph the open master does not draw, as the rest of the family has it at
+ * this master's place.
+ *
+ * Worked out from every other master, which is what the font would draw there
+ * if this master did not exist; where they cannot be worked out, the whole
+ * master's own drawing, so there is always something to start from.
+ */
+export async function glyphFromFamily(host: FontHost, name: string): Promise<Glyph | null> {
+  await loadSources(host);
+  const { project, session } = host.state();
+  const here = project.masters.find((m) => m.id === project.current);
+  if (here === undefined) return null;
+
+  const sources = project.masters.map((m) =>
+    m.id === project.current ? session.editor.document : (project.sources[m.id] ?? null),
+  );
+  const present = glyphPresence(
+    sources,
+    project.masters.map((m) => m.sparse !== undefined),
+    name,
+  ).map((p, i) => p && project.masters[i]?.id !== project.current);
+
+  const weights = weightsAmong(
+    project.axes,
+    project.masters.map((m) => m.location),
+    present,
+    here.location,
+  );
+  const worked = interpolateGlyph(
+    sources.map((s, i) => (present[i] === true ? (s?.glyphs[name] ?? null) : null)),
+    weights,
+  );
+  if (worked !== null) return worked;
+
+  const whole = here.sparse === undefined ? null : project.sources[here.sparse.of];
+  return whole?.glyphs[name] ?? null;
 }
 
 /**
@@ -298,6 +475,9 @@ export async function rememberDesignspace(
     masters: project.masters,
     current: project.current,
     instances: project.instances,
+    rules: project.rules,
+    rulesProcessing: project.rulesProcessing,
+    kept: project.kept,
   });
 }
 

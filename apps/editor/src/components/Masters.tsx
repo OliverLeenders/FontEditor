@@ -191,6 +191,17 @@ export function Masters(): React.JSX.Element {
 
       {project.axes.length > 0 ? <Instances onFailed={setFailed} onSaid={setSaid} /> : null}
 
+      {project.axes.length > 0 ? (
+        <p className={styles.link}>
+          <button type="button" className={styles.add} onClick={() => store.requestDesignspace()}>
+            Axes, maps and rules…
+          </button>
+          {project.rules.length === 0
+            ? null
+            : ` ${String(project.rules.length)} rule${project.rules.length === 1 ? "" : "s"}`}
+        </p>
+      ) : null}
+
       {checked === null ? null : <Report name={checked.name} found={checked.found} store={store} />}
 
       {failed !== null ? (

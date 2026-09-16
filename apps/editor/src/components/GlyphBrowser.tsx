@@ -8,7 +8,13 @@ import {
   roundGlyphsAt,
   setMarkColors,
 } from "@typewright/tools";
-import { MARK_COLORS, NOTDEF, drawableGlyph, sameMarkColor } from "@typewright/font-model";
+import {
+  type FontDocument,
+  MARK_COLORS,
+  NOTDEF,
+  drawableGlyph,
+  sameMarkColor,
+} from "@typewright/font-model";
 import {
   type GridLayout,
   cellBox,
@@ -20,6 +26,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { isDarkNow, watchScheme } from "../scheme.js";
+import { wholeOf } from "../store/masters.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import { CopyPlusIcon, GridIcon, PenToolIcon, TrashIcon, TypeIcon } from "./icons.js";
@@ -30,6 +37,7 @@ import { FileMenu } from "./FileMenu.js";
 import { Masters } from "./Masters.js";
 import { Preflight } from "./Preflight.js";
 import { FontInfoPanel } from "./FontInfoPanel.js";
+import { Designspace } from "./Designspace.js";
 import { Sheet } from "./Sheet.js";
 import { Snapshots } from "./Snapshots.js";
 import { Tracing } from "./Tracing.js";
@@ -57,6 +65,19 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   const document = useStoreValue((s) => s.session.editor.document);
   const query = useStoreValue((s) => s.catalogQuery);
   const currentGlyph = useStoreValue((s) => s.session.editor.currentGlyph);
+  // A master that draws only some glyphs is shown as the whole font, with what
+  // it does not draw faint: the whole master it is a layer of supplies the rest.
+  const sparseName = useStoreValue(
+    (s) => s.project.masters.find((m) => m.id === s.project.current && m.sparse)?.name ?? null,
+  );
+  const whole = useStoreValue((s) => wholeOf(s.project));
+  useEffect(() => {
+    if (sparseName !== null && whole === null) void store.loadWhole();
+  }, [sparseName, whole, store]);
+  const grid = useMemo(() => withWhole(document, whole), [document, whole]);
+  const absent = (name: string): boolean => whole !== null && document.glyphs[name] === undefined;
+  /** A glyph this master does not draw, which somebody has asked to open. */
+  const [offer, setOffer] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -89,7 +110,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
     return () => observer.disconnect();
   }, []);
 
-  const entries = useMemo(() => catalog(document), [document]);
+  const entries = useMemo(() => catalog(grid), [grid]);
   const counts = useMemo(() => setCounts(entries), [entries]);
   const shown = useMemo(() => filterCatalog(entries, query), [entries, query]);
 
@@ -118,8 +139,24 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   // What the frame callback reads. Held in a ref so that installing the surface
   // does not depend on it — otherwise the canvas would be torn down and rebuilt
   // on every keystroke.
-  const frame = useRef({ shown, document, focused, currentGlyph, layout, selectionSet });
-  frame.current = { shown, document, focused, currentGlyph, layout, selectionSet };
+  const frame = useRef({
+    shown,
+    document: grid,
+    own: document,
+    focused,
+    currentGlyph,
+    layout,
+    selectionSet,
+  });
+  frame.current = {
+    shown,
+    document: grid,
+    own: document,
+    focused,
+    currentGlyph,
+    layout,
+    selectionSet,
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -167,6 +204,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
             current: entry.name === state.currentGlyph,
             selected: state.selectionSet.size > 1 && state.selectionSet.has(entry.name),
             markColor: state.document.glyphs[entry.name]?.markColor ?? null,
+            absent: state.document !== state.own && state.own.glyphs[entry.name] === undefined,
           },
         );
       }
@@ -190,7 +228,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   // Redraw when what is shown changes. The canvas itself never re-renders.
   useEffect(() => {
     surfaceRef.current?.invalidate();
-  }, [shown, focused, currentGlyph, document, layout, selectionSet]);
+  }, [shown, focused, currentGlyph, grid, layout, selectionSet]);
 
   // A filter that shortens the list must not strand focus past its end.
   useEffect(() => {
@@ -342,7 +380,11 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
 
   const openAt = (index: number): void => {
     const entry = shown[index];
-    if (entry !== undefined) onOpen(entry.name);
+    if (entry === undefined) return;
+    // Not drawn in this master: asked rather than done, because opening it
+    // means adding a glyph to a master that was deliberately drawn without it.
+    if (absent(entry.name)) setOffer(entry.name);
+    else onOpen(entry.name);
   };
 
   /**
@@ -429,6 +471,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               disclosure. */}
           <div className={styles.group}>
             <FontInfoPanel />
+            <Designspace />
             <Masters />
             <Tracing />
             <Sheet />
@@ -595,6 +638,32 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           <Menu x={menu.x} y={menu.y} items={cellItems(menu.index)} onClose={() => setMenu(null)} />
         )}
 
+        {offer === null || !absent(offer) ? null : (
+          <div className={styles.offer} role="alertdialog" aria-label={`Draw ${offer} here`}>
+            <span>
+              {sparseName ?? "This master"} does not draw <b>{offer}</b>. Draw it here, starting
+              from the shape the rest of the family has at this place?
+            </span>
+            <button
+              type="button"
+              className={styles.offerGo}
+              autoFocus
+              onClick={() => {
+                const name = offer;
+                setOffer(null);
+                void store.drawHere(name).then(() => {
+                  if (store.editor.document.glyphs[name] !== undefined) onOpen(name);
+                });
+              }}
+            >
+              Draw it here
+            </button>
+            <button type="button" className={styles.offerNo} onClick={() => setOffer(null)}>
+              Not now
+            </button>
+          </div>
+        )}
+
         {shown.length === 0 ? (
           <p className={styles.empty}>
             No glyphs match. Try {query.search === "" ? "another set" : "a different search"}.
@@ -603,6 +672,19 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
       </div>
     </div>
   );
+}
+
+/**
+ * The font as the grid shows it: the open master's own glyphs over the whole
+ * master's, in the whole master's order. Just the open master where it is whole.
+ */
+function withWhole(own: FontDocument, whole: FontDocument | null): FontDocument {
+  if (whole === null) return own;
+  return {
+    ...own,
+    glyphOrder: [...whole.glyphOrder, ...own.glyphOrder.filter((n) => !(n in whole.glyphs))],
+    glyphs: { ...whole.glyphs, ...own.glyphs },
+  };
 }
 
 /** Which cell a mouse event landed on, in the grid's content coordinates. */

@@ -21,6 +21,7 @@ import { crc32, entryBytes, readUfo, ufoFiles } from "@typewright/font-io";
 import { type FontDocument, randomIds } from "@typewright/font-model";
 
 import { type FontHost, adoptDocument, adoptImages, adoptLayers } from "./fonts.js";
+import { layersOf } from "./masters.js";
 import { type FolderState, NO_FOLDER } from "./state.js";
 
 /**
@@ -198,7 +199,7 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
     // thrown away the designer's sketch as far as anything reading it can tell.
     const written = await writeFolder(
       folder,
-      ufoFiles(document, await host.disk.allImages(), host.state().layers),
+      ufoFiles(document, await host.disk.allImages(), ownLayers(host)),
       {
         // Only the files that differ from what the last save left. A UFO is one
         // file per glyph, so moving one point changes one of several hundred,
@@ -400,12 +401,21 @@ export function unsaved(folder: FolderState, now: FontDocument): boolean {
  * Costs one serialisation of the font, once, after it has loaded. That is the
  * price of the question, and it is the same work a save does before it writes.
  */
+/**
+ * The layers of the master being written: a folder is one UFO, and a family's
+ * other masters keep layers of their own in files of their own.
+ */
+function ownLayers(host: FontHost) {
+  const { project, layers } = host.state();
+  return layersOf(project, layers, project.current);
+}
+
 export async function confirmSaved(host: FontHost, savedHash: string | null): Promise<void> {
   if (savedHash === null) return;
 
   const before = host.state().folder;
   const document = host.state().session.editor.document;
-  const entries = ufoFiles(document, await host.disk.allImages(), host.state().layers);
+  const entries = ufoFiles(document, await host.disk.allImages(), ownLayers(host));
   const now = hashOfWritten(
     entries.map((entry): [string, WrittenFile] => [
       entry.path,

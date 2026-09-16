@@ -859,6 +859,12 @@ export type GlyphCellState = {
   readonly selected?: boolean;
   /** The glyph's colour mark, as the UFO writes it, or nothing. */
   readonly markColor?: string | null;
+  /**
+   * Not drawn in the master being edited, which draws only some glyphs: the
+   * letter shown is the one the rest of the family has, faint, so the grid is
+   * still the whole font and it is plain which glyphs this master has.
+   */
+  readonly absent?: boolean;
 };
 
 /**
@@ -867,6 +873,9 @@ export type GlyphCellState = {
  * two do not read as one line.
  */
 const CELL_LABEL_HEIGHT = 30;
+
+/** How faintly a glyph the open master does not draw is shown. */
+const ABSENT_ALPHA = 0.28;
 
 /** How strongly a mark's colour washes the letter's ground: a tint, not a fill. */
 const MARK_WASH = 0.15;
@@ -924,7 +933,9 @@ export function drawGlyphCell(
     ctx.fill();
   }
 
+  const faint = state.absent === true;
   if (glyph !== null) {
+    if (faint) ctx.globalAlpha = ABSENT_ALPHA;
     drawGlyphThumbnail(
       ctx,
       glyph,
@@ -933,6 +944,7 @@ export function drawGlyphCell(
       metrics,
       6,
     );
+    if (faint) ctx.globalAlpha = 1;
   }
 
   ctx.fillStyle = palette.cellLabel;

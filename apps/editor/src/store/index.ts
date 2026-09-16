@@ -1,5 +1,5 @@
 import type { CatalogQuery } from "@typewright/catalog";
-import { type ExtraLayer, placeMarks, readMarks } from "@typewright/font-io";
+import { type ExtraLayer, type FamilyMaster, placeMarks, readMarks } from "@typewright/font-io";
 import {
   canRedoSession,
   canUndoSession,
@@ -26,10 +26,19 @@ import {
   begin,
   commit,
   currentGlyph,
+  drawGlyphHere,
   result,
   setActiveTool,
 } from "@typewright/tools";
-import { type Axis, orderedMasters } from "@typewright/font-model";
+import {
+  type Axis,
+  type KeptXml,
+  type Rule,
+  type RuleId,
+  type RulesProcessing,
+  type SparseSource,
+  orderedMasters,
+} from "@typewright/font-model";
 import type { ViewTransform } from "@typewright/view";
 import { type DiskFolder, FIRST_PROJECT } from "@typewright/disk";
 
@@ -86,7 +95,11 @@ import {
   type MasterReport,
   addInstance,
   addMaster,
+  addRule,
   compareWith,
+  glyphFromFamily,
+  layersOf,
+  loadWhole,
   moveInstance,
   moveMaster,
   loadSources,
@@ -94,11 +107,15 @@ import {
   projectFrom,
   removeInstance,
   removeMaster,
+  removeRule,
   renameInstance,
   renameMaster,
+  replaceRule,
   setInstanceFamily,
   setAxes,
+  setRulesProcessing,
   switchMaster,
+  updateAxis,
 } from "./masters.js";
 import { defaults, remember, within } from "./settings.js";
 import { Snapshots } from "./snapshots.js";
@@ -487,6 +504,29 @@ export class EditorStore {
     await setAxes(this.host, axes);
   }
 
+  /** Change one axis — its name, range, map or stops — found by its tag. */
+  async updateAxis(tag: string, axis: Axis): Promise<void> {
+    await updateAxis(this.host, tag, axis);
+  }
+
+  // ---- the glyphs swapped in parts of the designspace ----------------------
+
+  async addRule(rule: Rule): Promise<void> {
+    await addRule(this.host, rule);
+  }
+
+  async replaceRule(rule: Rule): Promise<void> {
+    await replaceRule(this.host, rule);
+  }
+
+  async removeRule(id: RuleId): Promise<void> {
+    await removeRule(this.host, id);
+  }
+
+  async setRulesProcessing(processing: RulesProcessing): Promise<void> {
+    await setRulesProcessing(this.host, processing);
+  }
+
   // ---- the styles named between the masters -------------------------------
 
   async addInstance(id: string, name: string, location: Record<string, number>): Promise<void> {
@@ -533,20 +573,68 @@ export class EditorStore {
    * screen rather than what was last parked.
    */
   async allMasters(): Promise<
-    { name: string; location: Record<string, number>; document: FontDocument }[]
+    {
+      id: string;
+      name: string;
+      location: Record<string, number>;
+      document: FontDocument;
+      sparse?: SparseSource;
+      kept?: KeptXml;
+    }[]
   > {
     await loadSources(this.host);
     const project = this.state.project;
 
     return orderedMasters(project).flatMap((m) => {
       const document = m.id === project.current ? this.editor.document : project.sources[m.id];
-      return document === undefined ? [] : [{ name: m.name, location: m.location, document }];
+      return document === undefined ? [] : [{ ...m, document }];
+    });
+  }
+
+  /**
+   * Every master as a family is written: each with the layers of its own file,
+   * and a sparse one pointing at the master it is a layer of by its place in
+   * the list.
+   */
+  async familyMasters(): Promise<FamilyMaster[]> {
+    const all = await this.allMasters();
+    const { project, layers } = this.state;
+    return all.map((m) => {
+      const of = m.sparse === undefined ? -1 : all.findIndex((it) => it.id === m.sparse?.of);
+      return {
+        name: m.name,
+        location: m.location,
+        document: m.document,
+        layers: layersOf(project, layers, m.id),
+        ...(m.sparse === undefined || of < 0 ? {} : { sparse: { ...m.sparse, of } }),
+        ...(m.kept === undefined ? {} : { kept: m.kept }),
+      };
     });
   }
 
   /** What cannot be interpolated between this master and another. */
   async compareWith(id: string): Promise<Awaited<ReturnType<typeof compareWith>>> {
     return await compareWith(this.host, id);
+  }
+
+  /** Read in the master the open one is a layer of, where it is one. */
+  async loadWhole(): Promise<void> {
+    await loadWhole(this.host);
+  }
+
+  /**
+   * Begin a glyph the open master does not draw, from the shape the rest of the
+   * family has at its place, and open it.
+   */
+  async drawHere(name: string): Promise<void> {
+    const drawn = await glyphFromFamily(this.host, name);
+    if (drawn === null) return;
+    this.applyTool(drawGlyphHere(this.editor, drawn));
+  }
+
+  /** Open the Designspace panel, from wherever something links to it. */
+  requestDesignspace(): void {
+    this.patch({ designspaceRequest: this.state.designspaceRequest + 1 });
   }
 
   // ---- the font's folder on disk -----------------------------------------

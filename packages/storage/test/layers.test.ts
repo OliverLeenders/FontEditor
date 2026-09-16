@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryFileStore } from "../src/file-store.js";
 import { LAYERS_PATH, type StoredLayer, readLayers, writeLayers } from "../src/layers.js";
+import { DESIGNSPACE_PATH, readDesignspace, writeDesignspace } from "../src/masters.js";
 
 /**
  * The layers of the source this editor does not edit.
@@ -76,5 +77,55 @@ describe("keeping the layers", () => {
     );
 
     expect(await readLayers(store)).toEqual([good]);
+  });
+
+  it("keeps which master of a family each layer's file is", async () => {
+    const store = new MemoryFileStore();
+    const ours = { ...layer("sketch", "glyphs.sketch"), master: "m1" };
+    await writeLayers(store, [ours, layer("old", "glyphs.old")]);
+    expect((await readLayers(store)).map((l) => l.master)).toEqual(["m1", undefined]);
+
+    // A master that is not a name is not believed.
+    await store.write(LAYERS_PATH, JSON.stringify({ schema: 1, layers: [{ ...ours, master: 7 }] }));
+    expect(await readLayers(store)).toEqual([]);
+  });
+});
+
+describe("keeping the designspace", () => {
+  const base = {
+    axes: [{ tag: "wght", name: "Weight", min: 20, default: 80, max: 220, map: [[100, 20]] }],
+    masters: [{ id: "m1", name: "Regular", location: { wght: 80 } }],
+    current: "m1",
+    instances: [],
+  } as const;
+
+  it("keeps the rules, their order of application, and what the file said besides", async () => {
+    const store = new MemoryFileStore();
+    const rules = [
+      {
+        id: "r",
+        name: "heavy",
+        conditionSets: [[{ tag: "wght", min: 150, max: null }]],
+        swaps: [["dollar", "dollar.heavy"] as const],
+      },
+    ];
+    const kept = { attributes: { format: "5.0" }, children: ["<lib/>"] };
+    await writeDesignspace(store, { ...base, rules, rulesProcessing: "last", kept });
+
+    const read = await readDesignspace(store);
+    expect(read?.axes[0]?.map).toEqual([[100, 20]]);
+    expect(read?.rules).toEqual(rules);
+    expect(read?.rulesProcessing).toBe("last");
+    expect(read?.kept).toEqual(kept);
+  });
+
+  it("reads a project written before rules were kept as one with none", async () => {
+    const store = new MemoryFileStore();
+    await store.write(DESIGNSPACE_PATH, JSON.stringify({ schema: 1, ...base }));
+
+    const read = await readDesignspace(store);
+    expect(read?.rules).toEqual([]);
+    expect(read?.rulesProcessing).toBe("first");
+    expect(read?.kept).toBeNull();
   });
 });

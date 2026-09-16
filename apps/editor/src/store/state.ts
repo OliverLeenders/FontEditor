@@ -87,6 +87,12 @@ export type StoreState = {
    * file is the bug this whole arrangement exists to stop.
    */
   readonly layers: readonly ExtraLayer[];
+  /**
+   * Counted up whenever something asks for the Designspace panel to open — the
+   * masters panel's link to it — so the panel opens on a change rather than
+   * holding an open flag the bar button also owns.
+   */
+  readonly designspaceRequest: number;
   /** Draw the picture behind the glyph at all, and how strongly. */
   readonly showImage: boolean;
   readonly imageOpacity: number;
@@ -297,6 +303,7 @@ export function initialState(preferences: Preferences): StoreState {
     projects: NO_PROJECTS,
     images: [],
     layers: [],
+    designspaceRequest: 0,
     showImage: preferences.showImage,
     imageOpacity: preferences.imageOpacity,
     ownership: "owner",

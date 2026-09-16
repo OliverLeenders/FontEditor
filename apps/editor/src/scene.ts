@@ -1,7 +1,8 @@
 import type { Vec2 } from "@typewright/geometry";
 import {
   interpolateGlyph,
-  masterWeights,
+  glyphPresence,
+  weightsAmong,
   type ComponentSource,
   type Contour,
   type FontDocument,
@@ -302,9 +303,16 @@ function instanceFor(state: StoreState): readonly Contour[] {
   // Until every master has been read in there is nothing honest to draw.
   if (sources.some((s) => s === null)) return [];
 
-  const weights = masterWeights(
+  // A master drawn as a layer counts only for the glyphs it draws; everything
+  // else is worked out as the font will work it out, as if it were not there.
+  const weights = weightsAmong(
     project.axes,
     masters.map((m) => m.location),
+    glyphPresence(
+      sources,
+      masters.map((m) => m.sparse !== undefined),
+      editor.currentGlyph,
+    ),
     at,
   );
   const worked = interpolateGlyph(

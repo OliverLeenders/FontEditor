@@ -34,6 +34,11 @@ export type StoredLayer = {
   readonly name: string;
   readonly directory: string;
   readonly files: readonly { readonly path: string; readonly text: string }[];
+  /**
+   * The master whose UFO the layer is in, for a family. Absent for a font of
+   * one master, and in every project written before families kept layers.
+   */
+  readonly master?: string;
 };
 
 export const LAYERS_PATH = "layers.json";
@@ -84,6 +89,7 @@ function isLayer(value: unknown): value is StoredLayer {
   if (typeof value !== "object" || value === null) return false;
   const layer = value as Partial<StoredLayer>;
   if (typeof layer.name !== "string" || typeof layer.directory !== "string") return false;
+  if (layer.master !== undefined && typeof layer.master !== "string") return false;
   if (!Array.isArray(layer.files)) return false;
 
   return layer.files.every(

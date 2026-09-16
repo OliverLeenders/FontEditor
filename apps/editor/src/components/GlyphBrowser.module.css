@@ -196,6 +196,48 @@
   pointer-events: none;
 }
 
+/* Asked when a glyph the open master does not draw is opened. Pinned to the
+   foot of the grid, over the cells, where the question is next to the answer. */
+.offer {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  left: 0.75rem;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 0.8rem;
+  color: var(--ink-2);
+}
+.offer span {
+  flex: 1 1 16rem;
+}
+.offer b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.offerGo,
+.offerNo {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.offerGo {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .empty {
   position: absolute;
   inset: auto 0 50% 0;

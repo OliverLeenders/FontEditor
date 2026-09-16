@@ -329,3 +329,10 @@
   font-size: 0.74rem;
   color: var(--ink-3);
 }
+
+/* Where the axes themselves are edited, which is the Designspace panel. */
+.link {
+  margin: 0.5rem 0 0;
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}

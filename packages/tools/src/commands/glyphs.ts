@@ -1,4 +1,5 @@
 import {
+  type Glyph,
   type GlyphName,
   type RenameProblem,
   deleteProblem,
@@ -48,6 +49,22 @@ export function createGlyphs(
   const first = fresh[0]!.name;
   return result({ ...state, document, currentGlyph: first, selection: [] }, [
     begin(label, false),
+    commit,
+  ]);
+}
+
+/**
+ * Put a drawing into the font as a glyph of its own, and open it.
+ *
+ * For a master that draws only some glyphs: a glyph it does not draw yet is
+ * begun from the shape the rest of the family has at its place, so drawing it
+ * here starts from what it would otherwise have been. One undoable step.
+ */
+export function drawGlyphHere(state: EditorState, drawn: Glyph): ToolResult {
+  if (state.document.glyphs[drawn.name] !== undefined) return result(state);
+  const document = putGlyph(state.document, drawn);
+  return result({ ...state, document, currentGlyph: drawn.name, selection: [] }, [
+    begin(`Draw ${drawn.name} here`, false),
     commit,
   ]);
 }

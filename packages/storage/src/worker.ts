@@ -252,6 +252,9 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
         masters: request.designspace.masters as never,
         current: request.designspace.current,
         instances: request.designspace.instances as never,
+        rules: request.designspace.rules as never,
+        rulesProcessing: request.designspace.rulesProcessing === "last" ? "last" : "first",
+        kept: request.designspace.kept as never,
       });
       return null;
     }
