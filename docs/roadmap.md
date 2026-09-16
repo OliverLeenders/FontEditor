@@ -49,6 +49,12 @@ application installs from a release and updates itself.
 | 24    | The web build, hosted               | later                                                                                |
 | 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                  |
 | 26    | The last interface tests            | done: every panel and control is rendered by a test                                  |
+| 27    | A designspace that survives         | next                                                                                 |
+| 28    | Binary import keeps its layout      | planned                                                                              |
+| 29    | Layers to draw on                   | planned                                                                              |
+| 30    | Making masters compatible           | planned                                                                              |
+| 31    | A proof for judging features        | planned                                                                              |
+| 32    | More outline operations             | planned                                                                              |
 
 ### What the table missed
 
@@ -653,6 +659,63 @@ finished.
   side" means the same thing in both places. It is still unshaped and one cell per glyph,
   which is what makes it a way to move about.
 
+### What comes next
+
+Found by reading the code back once phases 22 to 26 and the loose ends were done. The first
+two lose something without saying so, which is why they come first; the rest are the daily
+work of drawing a family.
+
+#### Phase 27 — A designspace that survives being opened
+
+The designspace reader keeps axes, sources and instances and drops everything else, so a
+real family opened and written back out loses part of itself:
+
+- **Axis maps** (`<map>`), the curve between the value a user picks and the one the design
+  is drawn at. The variable font has no `avar` either, so its axes move in a straight line
+  where the designer said otherwise.
+- **Rules** (`<rules>`), the glyph swaps at a location — the dollar sign that loses its
+  stroke when it gets heavy.
+- **Sparse masters** (`<source layer="…">`). The layer is ignored, so a master that only
+  draws a few glyphs is read from the UFO's main layer, which is a different drawing.
+- **Version 5 and the details of an instance**: discrete axes, PostScript and style-map
+  names, and `lib`.
+
+The rule the UFO reader already keeps is the one to keep here: what is not understood is
+carried. Then the maps and rules are understood — `avar` written from the maps, and rules
+compiled into the variable font where the format allows.
+
+#### Phase 28 — Importing an OTF or TTF keeps its layout
+
+A binary font comes in with its outlines and its kerning. Its GSUB, its mark positioning and
+its GDEF are dropped, and the import warnings do not mention it. Lookups can be written back
+out as feature source, mark positioning as anchors on the glyphs, and what still cannot come
+back is named in the warnings rather than lost quietly.
+
+#### Phase 29 — Layers to draw on
+
+A UFO's other layers are read, carried and written back, but cannot be seen or edited. A
+background layer is where an outline is copied before it is reworked, and where a sketch is
+traced from; a layer is shown behind the drawing, and outlines move between it and the glyph.
+
+#### Phase 30 — Making masters compatible
+
+The compatibility check in Masters says what disagrees and offers no way to put it right.
+Setting a contour's start point, reordering contours, and point numbers on the canvas that can
+be compared across masters are what fix it; a location slider in the Spacing line and the Proof
+shows the family between its masters.
+
+#### Phase 31 — A proof for judging features
+
+The Proof turns every feature on or off together, and sets text at one size. A designer
+judging a stylistic set or small caps wants that one feature on and the rest as they are, and a
+waterfall of sizes to see where the text stops reading.
+
+#### Phase 32 — More outline operations
+
+Union is the only boolean. Subtract, intersect and exclude, adding points at the extremes,
+simplifying a contour, and offsetting a path are the operations reached for when drawing, and
+each is a menu item in every other editor.
+
 #### Parked
 
 - **A second font in a pane of the split window**, until windows per font have shown whether
@@ -661,3 +724,7 @@ finished.
   below 6.1.
 - **A signed installer**, until there is a certificate.
 - **A macOS build**, which needs Apple's signing and notarisation to open at all.
+- **Colour fonts** (`COLR` and `CPAL`), a drawing model of their own, and nothing else waits
+  on them.
+- **Vertical metrics** (`vhea` and `vmtx`), which vertical CJK setting needs, and which
+  wait for a font that is set vertically.
