@@ -50,6 +50,33 @@ function desktopPolicy(): string {
 
 export default defineConfig({
   plugins: [react(), legalFiles()],
+  build: {
+    /*
+     * React in a chunk of its own.
+     *
+     * Not to make the download smaller — it is the same bytes either way — but
+     * to keep them cached. React changes when React is upgraded, which is
+     * rarely; the editor changes every release, and a reader who has the one
+     * should not fetch the other again to get it.
+     */
+    rolldownOptions: {
+      output: {
+        advancedChunks: {
+          groups: [{ name: "react", test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/ }],
+        },
+      },
+    },
+    /*
+     * Above the largest chunk anybody meant to ship.
+     *
+     * That is HarfBuzz's own build at about a megabyte, which is downloaded
+     * only when text is first set — see `@typewright/shaping` — and the editor's
+     * own startup chunk is a third of it. The default of 500 kB warns about
+     * both on every build, and a warning nobody can act on is a warning nobody
+     * reads; this one goes off when something unexpected arrives instead.
+     */
+    chunkSizeWarningLimit: 1100,
+  },
   preview: {
     // Not 5174: a preview is the built editor, and should never be mistaken for
     // — or take the storage of — the development server's.
