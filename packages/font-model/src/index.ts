@@ -250,25 +250,46 @@ export {
 export type { ImageRef } from "./image.js";
 export { imagePoint, imageRef, invertAffine, placeCrop, shownCrop } from "./image.js";
 
-export type { Axis, Instance, InstanceId, Location, Master, MasterId } from "./designspace.js";
+export type {
+  Axis,
+  AxisMap,
+  Instance,
+  InstanceId,
+  KeptXml,
+  Location,
+  Master,
+  MasterId,
+  SparseSource,
+} from "./designspace.js";
 export {
   WEIGHT,
   axis,
   defaultLocation,
   describeLocation,
   inAxisOrder,
+  avarSegments,
   instance,
+  isDiscrete,
+  isSparse,
   master,
   normalised,
   sameLocation,
   settledLocation,
+  toDesign,
+  toUser,
+  userLocation,
+  userRange,
 } from "./designspace.js";
+
+export type { Rule, RuleCondition, RuleId, RulesProcessing } from "./rules.js";
+export { conditionHolds, rule, ruleApplies, swapsAt } from "./rules.js";
 
 export type { FontProject, InstanceProblem, MasterProblem } from "./project.js";
 export {
   FIRST_MASTER,
   addInstance,
   addMaster,
+  addRule,
   currentMaster,
   currentSource,
   hasMasters,
@@ -284,12 +305,16 @@ export {
   project,
   removeInstance,
   removeMaster,
+  removeRule,
   renameInstance,
   renameMaster,
+  replaceRule,
   setAxes,
   setInstanceFamily,
   setInstances,
+  setRulesProcessing,
   sourceOf,
+  sparseFlags,
   switchTo,
   withCurrentSource,
   withSource,
@@ -299,9 +324,15 @@ export type { Incompatibility } from "./compatible.js";
 export { glyphCompatible, glyphIncompatibilities, incompatibilities } from "./compatible.js";
 
 export type { Region, Support } from "./variation.js";
-export { masterWeights, supportScalar, supportsFor } from "./variation.js";
+export {
+  masterWeights,
+  supportScalar,
+  supportsFor,
+  variationModel,
+  weightsAmong,
+} from "./variation.js";
 
-export { interpolateFont, interpolateGlyph } from "./interpolate.js";
+export { glyphPresence, interpolateFont, interpolateGlyph } from "./interpolate.js";
 
 export type { VerticalMetrics } from "./vertical-metrics.js";
 export {

@@ -1,5 +1,5 @@
 import type { Axis, Location } from "./designspace.js";
-import { normalised } from "./designspace.js";
+import { isDiscrete, normalised } from "./designspace.js";
 
 /**
  * How much each master counts, anywhere in the designspace.
@@ -126,8 +126,41 @@ export function masterWeights(
   if (count === 0) return [];
   if (count === 1) return [1];
 
-  const supports = supportsFor(axes, locations);
+  const { supports, deltas } = variationModel(axes, locations);
   const here = normalised(axes, at);
+
+  // And the instance: every delta, as far as it reaches here.
+  const weights = new Array<number>(count).fill(0);
+  for (const [i, support] of supports.entries()) {
+    const scalar = supportScalar(support, here);
+    if (scalar === 0) continue;
+
+    const delta = deltas[i];
+    if (delta === undefined) continue;
+    for (let k = 0; k < count; k++) weights[k] = (weights[k] ?? 0) + (delta[k] ?? 0) * scalar;
+  }
+
+  return weights;
+}
+
+/**
+ * The regions, and what each master's delta is made of.
+ *
+ * `deltas[i]` is master *i*'s delta written as a sum over the masters: the
+ * value it adds where its region is fully in effect is `Σ deltas[i][k] × value
+ * of master k`. The default master's is itself alone; a master at the end of an
+ * axis is itself less the default; a master at a corner is itself less
+ * everything that already reaches it. That last is the one a plain difference
+ * from the default gets wrong, by counting the corner's two edges twice.
+ *
+ * What a variable font writes is exactly this, applied to each coordinate.
+ */
+export function variationModel(
+  axes: readonly Axis[],
+  locations: readonly Location[],
+): { supports: Support[]; deltas: number[][] } {
+  const count = locations.length;
+  const supports = supportsFor(axes, locations);
   const there = locations.map((location) => normalised(axes, location));
 
   // Masters nearest the default first: a master's delta is what is left after
@@ -159,17 +192,44 @@ export function masterWeights(
     }
   }
 
-  // And the instance: every delta, as far as it reaches here.
-  const weights = new Array<number>(count).fill(0);
-  for (const [i, support] of supports.entries()) {
-    const scalar = supportScalar(support, here);
-    if (scalar === 0) continue;
+  return { supports, deltas };
+}
 
-    const delta = deltas[i];
-    if (delta === undefined) continue;
-    for (let k = 0; k < count; k++) weights[k] = (weights[k] ?? 0) + (delta[k] ?? 0) * scalar;
+/**
+ * How much each master counts at a location, when not every master is there.
+ *
+ * Two reasons one might not be. A sparse master draws a few glyphs, and for
+ * every other glyph the family is worked out as if it did not exist — `present`
+ * says which masters have the glyph in hand. And an axis with stops rather than
+ * a range, an italic drawn upright and slanted and never between: nothing is
+ * worked out across it, so only the masters at the same stop as the location
+ * count, and the model is built along the other axes.
+ *
+ * A weight for every master, in the order given; the ones left out get zero.
+ */
+export function weightsAmong(
+  axes: readonly Axis[],
+  locations: readonly Location[],
+  present: readonly boolean[],
+  at: Location,
+): number[] {
+  const along = axes.filter((a) => !isDiscrete(a));
+  const stops = axes.filter(isDiscrete);
+
+  const chosen: number[] = [];
+  for (const [i, location] of locations.entries()) {
+    if (present[i] === false) continue;
+    if (stops.some((a) => (location[a.tag] ?? a.default) !== (at[a.tag] ?? a.default))) continue;
+    chosen.push(i);
   }
 
+  const weights = new Array<number>(locations.length).fill(0);
+  const worked = masterWeights(
+    along,
+    chosen.map((i) => locations[i] ?? {}),
+    at,
+  );
+  for (const [n, i] of chosen.entries()) weights[i] = worked[n] ?? 0;
   return weights;
 }
 

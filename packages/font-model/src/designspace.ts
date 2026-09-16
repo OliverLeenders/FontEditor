@@ -24,6 +24,15 @@ export type MasterId = string;
  * a family drawn from Regular out to Black and back to Thin has its default at
  * 400 on a 100–900 axis, and everything that reads a location has to know which
  * end is home.
+ *
+ * The three numbers are where the drawings are — the *design* coordinates a
+ * master's location is given in. What somebody choosing a weight from a menu
+ * sees is the *user* scale, and the two are not always the same: a family drawn
+ * with stems of 20, 80 and 220 units says Thin, Regular and Black are at those
+ * stems, and its map says they are 100, 400 and 900 to anyone asking for a
+ * weight. Kept in design coordinates here because everything that interpolates
+ * works in them, so a map changes what the font tells the world and nothing
+ * about how a letter is worked out. Without a map the two scales are the same.
  */
 export type Axis = {
   readonly tag: string;
@@ -31,6 +40,39 @@ export type Axis = {
   readonly min: number;
   readonly default: number;
   readonly max: number;
+  /**
+   * The user scale against the design scale, as pairs, when they differ.
+   *
+   * Absent for the ordinary axis, where a weight of 700 is drawn at 700.
+   * Between the pairs the scales are straight lines, which is what a
+   * designspace's `<map>` and a font's `avar` both mean.
+   */
+  readonly map?: AxisMap;
+  /**
+   * The stops of an axis with nothing between them, in design coordinates.
+   *
+   * An italic that is drawn upright and italic and never halfway: a designspace
+   * says so, and a variable font cannot vary along it. Absent for an axis that
+   * is continuous, which nearly all of them are.
+   */
+  readonly values?: readonly number[];
+  /** What the file said about this axis that the model does not read. */
+  readonly kept?: KeptXml;
+};
+
+/** `[user, design]` pairs, in the order the file gave them. */
+export type AxisMap = readonly (readonly [user: number, design: number])[];
+
+/**
+ * Part of a designspace nobody here reads, kept to be written back.
+ *
+ * The attributes on the element and its child elements, as XML. Labels, a
+ * `lib`, PostScript names for an instance, the variable fonts a version 5 file
+ * describes: somebody's data, carried the way a `.glif`'s unread elements are.
+ */
+export type KeptXml = {
+  readonly attributes: Readonly<Record<string, string>>;
+  readonly children: readonly string[];
 };
 
 /** Where something sits on the axes, by tag. */
@@ -47,6 +89,28 @@ export type Master = {
   readonly id: MasterId;
   readonly name: string;
   readonly location: Location;
+  /**
+   * Where a master that draws only some glyphs keeps them.
+   *
+   * A family whose bold `$` needs a third drawing halfway along does not need a
+   * third whole font for it: the extra drawing is a layer of an existing
+   * master's UFO, with the few glyphs that need it and nothing else. Every other
+   * glyph is worked out as if this master were not there.
+   */
+  readonly sparse?: SparseSource;
+  readonly kept?: KeptXml;
+};
+
+/** A master drawn as a layer of another master's source. */
+export type SparseSource = {
+  /** The master whose UFO the layer is in. */
+  readonly of: MasterId;
+  /** The layer's name in that UFO. */
+  readonly layer: string;
+  /** The directory the layer was read from, so it is written back to the same one. */
+  readonly directory?: string;
+  /** The layer's `layerinfo.plist`, when it had one: a colour, a lib. Carried unread. */
+  readonly layerInfo?: string;
 };
 
 export type InstanceId = string;
@@ -74,6 +138,7 @@ export type Instance = {
   readonly name: string;
   readonly location: Location;
   readonly familyName: string;
+  readonly kept?: KeptXml;
 };
 
 export function instance(
@@ -93,6 +158,102 @@ export function axis(tag: string, name: string, min: number, value: number, max:
 
 export function master(id: MasterId, name: string, location: Location = {}): Master {
   return { id, name, location };
+}
+
+/** Whether a master draws only some of the glyphs. */
+export const isSparse = (m: Master): boolean => m.sparse !== undefined;
+
+/** Whether an axis has stops rather than a range. */
+export const isDiscrete = (a: Axis): boolean => a.values !== undefined;
+
+/**
+ * A value on the user scale, on the design scale.
+ *
+ * Straight between the pairs, and past the ends carried on at the offset of the
+ * nearest one — which is what fontTools does, and so what every build does with
+ * a value somebody put outside the map.
+ */
+export function toDesign(a: Axis, user: number): number {
+  return piecewise(a.map ?? [], user);
+}
+
+/** A value on the design scale, on the user scale. The same map, read backwards. */
+export function toUser(a: Axis, design: number): number {
+  return piecewise(
+    (a.map ?? []).map(([user, at]) => [at, user] as const),
+    design,
+  );
+}
+
+/** The axis's range as a menu offers it. */
+export function userRange(a: Axis): { min: number; default: number; max: number } {
+  return { min: toUser(a, a.min), default: toUser(a, a.default), max: toUser(a, a.max) };
+}
+
+/** A location in design coordinates, on the user scale. */
+export function userLocation(axes: readonly Axis[], location: Location): Location {
+  const at: Record<string, number> = {};
+  for (const a of axes) at[a.tag] = toUser(a, location[a.tag] ?? a.default);
+  return at;
+}
+
+/**
+ * What a font's `avar` says about one axis, or `null` where it has nothing to.
+ *
+ * The map again, on the −1 to 1 scale both ends of it are normalised to: the
+ * user scale by the user range, the design scale by the design range. Always
+ * holding −1, 0 and 1 — the format requires them — and nothing else where the
+ * map is straight, which is when an axis needs no entry at all.
+ */
+export function avarSegments(a: Axis): (readonly [number, number])[] | null {
+  if (a.map === undefined || a.map.length === 0) return null;
+
+  const user = userRange(a);
+  const pairs = new Map<number, number>([
+    [-1, -1],
+    [0, 0],
+    [1, 1],
+  ]);
+  for (const [u, d] of a.map) {
+    const from = normalisedValue(user, u);
+    const to = normalisedValue(a, d);
+    pairs.set(from, to);
+  }
+
+  const out = [...pairs.entries()].sort((one, two) => one[0] - two[0]);
+  return out.every(([from, to]) => Math.abs(from - to) < 1e-9) ? null : out;
+}
+
+/** One value on the −1 to 1 scale of a range. */
+function normalisedValue(
+  range: { min: number; default: number; max: number },
+  value: number,
+): number {
+  const v = clamp(value, range.min, range.max);
+  if (v === range.default) return 0;
+  if (v < range.default) {
+    return range.min === range.default ? 0 : -(range.default - v) / (range.default - range.min);
+  }
+  return range.max === range.default ? 0 : (v - range.default) / (range.max - range.default);
+}
+
+function piecewise(pairs: readonly (readonly [number, number])[], value: number): number {
+  if (pairs.length === 0) return value;
+
+  const sorted = [...pairs].sort((one, two) => one[0] - two[0]);
+  const first = sorted[0]!;
+  const last = sorted[sorted.length - 1]!;
+  if (value <= first[0]) return value + first[1] - first[0];
+  if (value >= last[0]) return value + last[1] - last[0];
+
+  for (let i = 1; i < sorted.length; i++) {
+    const [x1, y1] = sorted[i]!;
+    if (value > x1) continue;
+    const [x0, y0] = sorted[i - 1]!;
+    if (value === x1) return y1;
+    return y0 + ((value - x0) * (y1 - y0)) / (x1 - x0);
+  }
+  return value;
 }
 
 /** The weight axis, which is the one nearly every family has. */

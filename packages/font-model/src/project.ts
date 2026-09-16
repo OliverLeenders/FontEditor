@@ -2,6 +2,7 @@ import {
   type Axis,
   type Instance,
   type InstanceId,
+  type KeptXml,
   type Location,
   type Master,
   type MasterId,
@@ -13,6 +14,7 @@ import {
   settledLocation,
 } from "./designspace.js";
 import type { FontDocument } from "./document.js";
+import type { Rule, RuleId, RulesProcessing } from "./rules.js";
 
 /**
  * A typeface, which may be drawn more than once.
@@ -52,6 +54,15 @@ export type FontProject = {
    * cannot be switched to.
    */
   readonly instances: readonly Instance[];
+  /** The glyphs swapped for others in parts of the designspace. See `rules.ts`. */
+  readonly rules: readonly Rule[];
+  readonly rulesProcessing: RulesProcessing;
+  /**
+   * What the designspace file said that the model does not read: its format
+   * version, its `lib`, its labels and variable-font definitions. `null` for a
+   * family that was never a file, which is every family begun here.
+   */
+  readonly kept: KeptXml | null;
 };
 
 /** The name a font's first master is given, before anybody says otherwise. */
@@ -75,6 +86,9 @@ export function project(
     sources: { [id]: document },
     current: id,
     instances: [],
+    rules: [],
+    rulesProcessing: "first",
+    kept: null,
   };
 }
 
@@ -141,7 +155,8 @@ export function setAxes(p: FontProject, axes: readonly Axis[]): FontProject {
 }
 
 /** Why a master could not be added or moved, or `null` when it can. */
-export type MasterProblem = "no-name" | "name-taken" | "location-taken" | "last-master" | "missing";
+export type MasterProblem =
+  "no-name" | "name-taken" | "location-taken" | "last-master" | "missing" | "holds-layers";
 
 /**
  * Add a master, drawn from one that is already there.
@@ -168,7 +183,10 @@ export function addMaster(
   const at = settledLocation(p.axes, location);
   if (p.masters.some((m) => sameLocation(p.axes, m.location, at))) return "location-taken";
 
-  const source = p.sources[from];
+  // A sparse master is a handful of glyphs, and a new master is a whole font:
+  // it is drawn from the master the layer belongs to.
+  const whole = masterById(p, from)?.sparse?.of ?? from;
+  const source = p.sources[whole];
   if (source === undefined) return "missing";
 
   return {
@@ -187,6 +205,8 @@ export function addMaster(
 export function removeMaster(p: FontProject, id: MasterId): FontProject | MasterProblem {
   if (p.masters.length <= 1) return "last-master";
   if (masterById(p, id) === null) return "missing";
+  // The sparse masters kept in its file would have nowhere to be written.
+  if (p.masters.some((m) => m.sparse?.of === id)) return "holds-layers";
 
   const sources = { ...p.sources };
   delete sources[id];
@@ -344,7 +364,33 @@ export function masterProblemSays(problem: MasterProblem): string {
       return "A font needs at least one master.";
     case "missing":
       return "That master is not in this font.";
+    case "holds-layers":
+      return "Other masters are drawn as layers of this one; remove those first.";
   }
+}
+
+/** Add a rule at the end, where it is applied last. */
+export function addRule(p: FontProject, r: Rule): FontProject {
+  return { ...p, rules: [...p.rules, r] };
+}
+
+/** Replace a rule, keeping its place in the order. */
+export function replaceRule(p: FontProject, r: Rule): FontProject {
+  if (!p.rules.some((it) => it.id === r.id)) return p;
+  return { ...p, rules: p.rules.map((it) => (it.id === r.id ? r : it)) };
+}
+
+export function removeRule(p: FontProject, id: RuleId): FontProject {
+  return { ...p, rules: p.rules.filter((it) => it.id !== id) };
+}
+
+export function setRulesProcessing(p: FontProject, processing: RulesProcessing): FontProject {
+  return p.rulesProcessing === processing ? p : { ...p, rulesProcessing: processing };
+}
+
+/** Which masters draw only some glyphs, in the order the project lists them. */
+export function sparseFlags(p: FontProject): boolean[] {
+  return p.masters.map((m) => m.sparse !== undefined);
 }
 
 /** Whether a value the model handed back is a project or a refusal. */

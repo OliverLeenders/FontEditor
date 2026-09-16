@@ -10,7 +10,7 @@ import { fontDocument } from "./document.js";
 import type { Glyph } from "./glyph.js";
 import { glyph as makeGlyph } from "./glyph.js";
 import type { Node } from "./node.js";
-import { masterWeights } from "./variation.js";
+import { weightsAmong } from "./variation.js";
 
 /**
  * Working a drawing out between the masters.
@@ -93,17 +93,29 @@ export function interpolateFont(
   locations: readonly Location[],
   sources: readonly FontDocument[],
   at: Location,
+  /** Which masters draw only some glyphs. Absent where none do. */
+  sparse: readonly boolean[] = [],
 ): { document: FontDocument; refused: GlyphName[] } {
-  const weights = masterWeights(axes, locations, at);
-  const base = sources[0];
+  const base = sources.find((_, i) => sparse[i] !== true);
   if (base === undefined) {
     return { document: fontDocument(), refused: [] };
   }
 
   const glyphs: Glyph[] = [];
   const refused: GlyphName[] = [];
+  // Most glyphs are in every master, so most glyphs share one set of weights;
+  // worked out once per set of masters rather than once per glyph.
+  const known = new Map<string, number[]>();
 
   for (const name of base.glyphOrder) {
+    const present = glyphPresence(sources, sparse, name);
+    const key = present.map((p) => (p ? "1" : "0")).join("");
+    let weights = known.get(key);
+    if (weights === undefined) {
+      weights = weightsAmong(axes, locations, present, at);
+      known.set(key, weights);
+    }
+
     const worked = interpolateGlyph(
       sources.map((s) => s.glyphs[name] ?? null),
       weights,
@@ -111,6 +123,13 @@ export function interpolateFont(
     if (worked === null) refused.push(name);
     else glyphs.push(worked);
   }
+
+  const weights = weightsAmong(
+    axes,
+    locations,
+    sources.map((_, i) => sparse[i] !== true),
+    at,
+  );
 
   // The information, features and kerning of the master nearest the location:
   // none of it interpolates in any way this editor can act on, and the answer
@@ -121,6 +140,22 @@ export function interpolateFont(
     document: { ...document, kerning: nearest.kerning, features: nearest.features },
     refused,
   };
+}
+
+/**
+ * Which masters take part in working out one glyph.
+ *
+ * Every whole master, and a sparse one only where it draws the glyph. A whole
+ * master without it is still counted, so that the glyph is refused rather than
+ * quietly worked out from the others: missing from a whole master is a mistake,
+ * where missing from a sparse one is the point of it.
+ */
+export function glyphPresence(
+  sources: readonly (FontDocument | null)[],
+  sparse: readonly boolean[],
+  name: GlyphName,
+): boolean[] {
+  return sources.map((s, i) => sparse[i] !== true || s?.glyphs[name] !== undefined);
 }
 
 /** One contour, point by point. */
