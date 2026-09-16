@@ -557,7 +557,8 @@ than its source said. Now:
   compiles mark attachment from the text while this editor compiles it from the anchors, and
   the accents have to land in the same place.
 
-Reverse substitution, mark filtering sets and `table` blocks stay refused by name.
+Reverse substitution, mark filtering sets and `table` blocks were refused by name here, and
+were done afterwards — see the loose ends below.
 
 #### Phase 23 — Right-to-left text, and a script and language for the Proof — done
 
@@ -628,6 +629,29 @@ is what the tests are about rather than the markup:
   rather than showing an empty frame.
 - **The mark swatch** gives the same colour the same component, so a menu does not remount
   its icons as it draws.
+
+#### The loose ends — done
+
+Not a phase: the things noticed while doing the others, gathered up once the phases were
+finished.
+
+- **The rest of the feature file.** Reverse substitution (`rsub a' b by a.fina;`, GSUB type
+  8, the one rule read from the end of the line); the two lookup flags that name marks rather
+  than switch something on — `MarkAttachmentType` and `UseMarkFilteringSet` — with the classes
+  and sets they name written into GDEF; and `table GDEF { … }` for the glyph classes a font
+  wants to state outright and for ligature carets. GDEF is written in one place now, from the
+  anchors and from the file together. What is still refused is refused for a reason and says
+  it: the tables this editor writes itself, attachment points, and carets tied to a contour
+  point.
+- **The build's chunks.** React in a chunk of its own, so it stays cached across releases; the
+  editor's own startup chunk is a third smaller for it. The size warning now goes off above
+  what HarfBuzz's own build weighs, rather than on every build.
+- **The suite under load.** font-io's tests compile fonts and deflate WOFF2s — a second each
+  on an idle machine, and longer on one that is also building the editor. They had vitest's
+  five-second limit, and failed there rather than saying anything about the code.
+- **The glyph strip** is laid right to left when the Spacing line is, so "the letters either
+  side" means the same thing in both places. It is still unshaped and one cell per glyph,
+  which is what makes it a way to move about.
 
 #### Parked
 
