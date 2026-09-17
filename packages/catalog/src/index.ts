@@ -25,3 +25,5 @@ export {
   glyphSet,
   setCounts,
 } from "./query.js";
+
+export { loadUnicodeNames, unicodeName, unicodeNamesReady } from "./unicode-names.js";
