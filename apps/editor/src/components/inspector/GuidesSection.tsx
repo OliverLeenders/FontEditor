@@ -58,6 +58,8 @@ export function GuidesSection(): React.JSX.Element {
       title="Guides"
       note={guides.length === 0 ? undefined : String(guides.length)}
       relevant={guides.length > 0}
+      empty={guides.length === 0}
+      emptyNote="none"
     >
       <div className={styles.components}>
         {guides.length === 0 && (

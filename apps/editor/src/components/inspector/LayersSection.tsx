@@ -59,6 +59,8 @@ export function LayersSection(): React.JSX.Element {
       title="Layers"
       note={drawingIn === null ? undefined : `drawing in ${layerLabel(drawingIn)}`}
       relevant={layers.length > 0 || drawingIn !== null}
+      empty={layers.length === 0 && drawingIn === null}
+      emptyNote="none"
     >
       <div className={styles.components}>
         <div className={styles.layerRow} data-here={drawingIn === null ? "true" : undefined}>

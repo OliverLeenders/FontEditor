@@ -73,10 +73,17 @@ describe("the tip beside a cell", () => {
     expect(tip.textContent).toContain(name);
     if (code !== undefined) {
       expect(tip.textContent).toContain(`U+${code.toString(16).toUpperCase().padStart(4, "0")}`);
-      // The table is unpacked on the first hover, so the name arrives after it.
-      await waitFor(() => {
-        expect(screen.getByRole("tooltip").textContent.toUpperCase()).toMatch(/LETTER|DIGIT|SIGN/);
-      });
+      // The table is unpacked on the first hover, so the name arrives after it:
+      // a megabyte and a half of text inflated while the rest of the suite is
+      // running, which is worth waiting longer than the default second for.
+      await waitFor(
+        () => {
+          expect(screen.getByRole("tooltip").textContent.toUpperCase()).toMatch(
+            /LETTER|DIGIT|SIGN/,
+          );
+        },
+        { timeout: 10000 },
+      );
     }
   });
 

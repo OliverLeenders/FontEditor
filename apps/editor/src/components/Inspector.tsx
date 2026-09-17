@@ -49,6 +49,11 @@ export function Inspector(): React.JSX.Element | null {
   const shownY = room > 1 ? Math.max(0, Math.min(y, room - 168)) : y;
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
+  // Every control in the transform section acts on the points selected, and is
+  // dead without them — so with none, the section has nothing in it.
+  const selectedPoints = useStoreValue(
+    (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
+  );
 
   // The field is only a draft until it is committed, so it holds its own text.
   // Reset when the open glyph changes, or it would show the last glyph's name.
@@ -250,7 +255,14 @@ export function Inspector(): React.JSX.Element | null {
         <PointSection />
         <CurveSection />
 
-        <Section name="transform" title="Transform" icon={ScalingIcon} relevant={false}>
+        <Section
+          name="transform"
+          title="Transform"
+          icon={ScalingIcon}
+          relevant={false}
+          empty={selectedPoints === 0}
+          emptyNote="nothing selected"
+        >
           <TransformPanel />
         </Section>
       </div>

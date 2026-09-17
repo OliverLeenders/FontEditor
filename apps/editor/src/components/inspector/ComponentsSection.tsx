@@ -58,6 +58,8 @@ export function ComponentsSection(): React.JSX.Element {
       title="Components"
       note={components.length === 0 ? undefined : String(components.length)}
       relevant={components.length > 0}
+      empty={components.length === 0}
+      emptyNote="none"
     >
       <div className={styles.components}>
         {components.map((c) => (

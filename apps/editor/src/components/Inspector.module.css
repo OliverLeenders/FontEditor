@@ -252,6 +252,13 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* What a section is short of, rather than what it holds: said more quietly
+   than a count, since it is the answer to a question nobody asked. */
+.sectionNote[data-empty] {
+  font-style: italic;
+  opacity: 0.75;
+}
+
 .sectionBody {
   display: flex;
   flex-direction: column;
@@ -456,6 +463,15 @@
  * detent either side of the rail, at the one position on this slider that means
  * something on its own.
  */
+/* The slider and the number that says where it is, which is narrow: three
+   digits and a sign, and the track takes the rest. */
+.panRow {
+  display: grid;
+  grid-template-columns: 1fr 4.2rem;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .panTrack {
   position: relative;
   display: flex;

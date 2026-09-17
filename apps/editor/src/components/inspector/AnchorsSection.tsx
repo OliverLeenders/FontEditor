@@ -45,6 +45,8 @@ export function AnchorsSection(): React.JSX.Element {
       title="Anchors"
       note={anchors.length === 0 ? undefined : String(anchors.length)}
       relevant={anchors.length > 0}
+      empty={anchors.length === 0}
+      emptyNote="none"
     >
       <div className={styles.components}>
         {anchors.length === 0 && (

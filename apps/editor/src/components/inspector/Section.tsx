@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
 import { ChevronRightIcon, type IconComponent } from "../icons.js";
@@ -16,6 +18,16 @@ import { ChevronRightIcon, type IconComponent } from "../icons.js";
  * somebody folded or unfolded by hand — rather than the state, so a section
  * nobody has touched keeps following the work, and one you closed stays closed
  * even when it fills up.
+ *
+ * A section with nothing in it at all is the one case where the remembered
+ * choice gives way: a Point section held open by a choice made an hour ago is
+ * a column of dashes, and a panel of those says nothing about the glyph. So an
+ * empty section folds, and says in its own title bar what it is short of. The
+ * choice is not forgotten — it applies again the moment there is something to
+ * show — and a click still opens the section, which is how the buttons in an
+ * empty Layers or Guides section stay reachable. That click lasts until the
+ * section fills or empties again, rather than being remembered as a choice: it
+ * was about this moment.
  */
 export function Section({
   name,
@@ -23,6 +35,8 @@ export function Section({
   icon: Icon,
   note,
   relevant = true,
+  empty = false,
+  emptyNote,
   children,
 }: {
   /** The key the choice is remembered under. Stable, and not the title. */
@@ -41,11 +55,38 @@ export function Section({
   readonly note?: string | undefined;
   /** Whether this would open on its own, having heard nothing from anyone. */
   readonly relevant?: boolean;
+  /**
+   * Nothing to show: no point selected, no anchors, no curve under the caret.
+   *
+   * What it is short of goes in {@link emptyNote}, which takes the title bar's
+   * note while it lasts.
+   */
+  readonly empty?: boolean;
+  /** What the title bar says instead of a count while the section is empty. */
+  readonly emptyNote?: string | undefined;
   readonly children: React.ReactNode;
 }): React.JSX.Element {
   const store = useEditorStore();
   const chosen = useStoreValue((s) => s.inspector.sections[name]);
-  const open = chosen ?? relevant;
+
+  // Opened or folded by hand while there was nothing in it. Dropped as soon as
+  // the section fills or empties again, so it never outlives what it was about.
+  const [now, setNow] = useState<boolean | null>(null);
+  const was = useRef(empty);
+  useEffect(() => {
+    if (was.current !== empty) {
+      was.current = empty;
+      setNow(null);
+    }
+  }, [empty]);
+
+  const open = now ?? (empty ? false : (chosen ?? relevant));
+  const say = (to: boolean): void => {
+    if (empty) setNow(to);
+    else store.toggleInspectorSection(name, to);
+  };
+
+  const shortOf = empty ? emptyNote : note;
 
   return (
     <section className={styles.section}>
@@ -54,7 +95,7 @@ export function Section({
           type="button"
           className={styles.sectionToggle}
           aria-expanded={open}
-          onClick={() => store.toggleInspectorSection(name, !open)}
+          onClick={() => say(!open)}
         >
           <span className={styles.chevron} data-open={open ? "true" : undefined}>
             <ChevronRightIcon />
@@ -63,8 +104,10 @@ export function Section({
             <Icon />
           </span>
           <span className={styles.sectionTitle}>{title}</span>
-          {note === undefined || note === "" ? null : (
-            <span className={styles.sectionNote}>{note}</span>
+          {shortOf === undefined || shortOf === "" ? null : (
+            <span className={styles.sectionNote} data-empty={empty ? "true" : undefined}>
+              {shortOf}
+            </span>
           )}
         </button>
       </h2>

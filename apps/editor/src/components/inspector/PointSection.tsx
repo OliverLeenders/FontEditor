@@ -125,6 +125,8 @@ export function PointSection(): React.JSX.Element {
       title="Point"
       note={pointCount === 0 ? undefined : `${pointCount} selected`}
       relevant={pointCount > 0 || coordX !== null}
+      empty={pointCount === 0 && coordX === null}
+      emptyNote="nothing selected"
     >
       <Field label="Type" group>
         <div className={styles.segmented}>

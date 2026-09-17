@@ -154,9 +154,11 @@ describe("guides in the inspector", () => {
 describe("what the inspector says when there is nothing to say", () => {
   it("points at the canvas rather than showing an empty list", () => {
     render(<Inspector />);
-    // Empty, so the section is folded: opening it is what somebody looking for
-    // where anchors come from would do, and the answer is there when they do.
-    fireEvent.click(screen.getByRole("button", { name: "Anchors" }));
+    // Empty, so the section is folded and says so: opening it is what somebody
+    // looking for where anchors come from would do, and the answer is there
+    // when they do.
+    expect(screen.getByRole("button", { name: /^Anchors/ }).textContent).toContain("none");
+    fireEvent.click(screen.getByRole("button", { name: /^Anchors/ }));
 
     expect(screen.getAllByText("Right-click the canvas to add one").length).toBeGreaterThan(0);
   });
@@ -192,12 +194,69 @@ describe("folding the inspector", () => {
   });
 
   it("unfolds one that would have stayed shut", () => {
+    const store = withFurniture();
+    render(<Inspector />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Guides/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Guides/ }));
+
+    expect(store.getState().inspector.sections["guides"]).toBe(true);
+    expect(screen.getByLabelText("X of the guide stem")).toBeTruthy();
+  });
+});
+
+/**
+ * A section with nothing in it.
+ *
+ * Which is most of them, most of the time: the Point fields are a column of
+ * dashes until something is selected, and a choice made an hour ago used to
+ * hold that column open for the rest of the session.
+ */
+describe("a section with nothing in it", () => {
+  it("folds, and says what it is short of rather than a count", () => {
+    render(<Inspector />);
+
+    const point = screen.getByRole("button", { name: /^Point/ });
+    expect(point.getAttribute("aria-expanded")).toBe("false");
+    expect(point.textContent).toContain("nothing selected");
+    expect(screen.queryByLabelText("X of the selected point")).toBeNull();
+  });
+
+  it("opens when it is asked to, so what is in it can still be reached", () => {
     const store = freshStore();
     render(<Inspector />, store);
 
-    fireEvent.click(screen.getByRole("button", { name: "Transform" }));
+    fireEvent.click(screen.getByRole("button", { name: /^Layers/ }));
 
-    expect(store.getState().inspector.sections["transform"]).toBe(true);
+    expect(screen.getByRole("button", { name: "Add background" })).toBeTruthy();
+    // Opened for now rather than chosen: the section was empty, and the choice
+    // would have outlived what it was about.
+    expect(store.getState().inspector.sections["layers"]).toBeUndefined();
+  });
+
+  it("folds again when what filled it goes away, and the choice comes back", () => {
+    const store = withFurniture();
+    render(<Inspector />, store);
+
+    // Held open by a choice, with a guide in it.
+    fireEvent.click(screen.getByRole("button", { name: /^Guides/ }));
+    fireEvent.click(screen.getByRole("button", { name: /^Guides/ }));
+    expect(store.getState().inspector.sections["guides"]).toBe(true);
+
+    act(() => {
+      const editor = store.editor;
+      const g = editor.document.glyphs[editor.currentGlyph]!;
+      store.setEditor({
+        ...editor,
+        document: putGlyph(editor.document, { ...g, guides: [] }),
+      });
+    });
+
+    const guides = screen.getByRole("button", { name: /^Guides/ });
+    expect(guides.getAttribute("aria-expanded")).toBe("false");
+    expect(guides.textContent).toContain("none");
+    // The choice is not forgotten, only overruled while there is nothing to show.
+    expect(store.getState().inspector.sections["guides"]).toBe(true);
   });
 });
 
