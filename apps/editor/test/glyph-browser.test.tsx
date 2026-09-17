@@ -157,7 +157,12 @@ describe("what is done to the cells picked", () => {
     // The first colour, found as the first item with no word of the others in it.
     const colour = within(screen.getByRole("menu"))
       .getAllByRole("menuitemcheckbox")
-      .find((item) => !/Open|Rename|Duplicate|Round|No colour|Delete/.test(item.textContent));
+      .find(
+        (item) =>
+          !/Open|Rename|Duplicate|Round|No colour|Delete|Copy to|Swap with|Clear/.test(
+            item.textContent,
+          ),
+      );
     if (colour === undefined) throw new Error("no colour in the menu");
     const name = colour.textContent;
     fireEvent.click(colour);

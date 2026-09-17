@@ -1,5 +1,11 @@
 import type { CatalogQuery } from "@typewright/catalog";
-import { type ExtraLayer, type FamilyMaster, placeMarks, readMarks } from "@typewright/font-io";
+import {
+  type ExtraLayer,
+  type FamilyMaster,
+  layersIntoDocument,
+  placeMarks,
+  readMarks,
+} from "@typewright/font-io";
 import {
   canRedoSession,
   canUndoSession,
@@ -25,13 +31,20 @@ import {
   type ToolResult,
   begin,
   commit,
+  addLayerNamed,
+  clearLayerAt,
+  copyToLayerAt,
   currentGlyph,
   drawGlyphHere,
+  drawInLayer,
+  removeLayerNamed,
+  swapWithLayerAt,
   result,
   setActiveTool,
 } from "@typewright/tools";
 import {
   type Axis,
+  BACKGROUND,
   type KeptXml,
   type Rule,
   type RuleId,
@@ -98,7 +111,6 @@ import {
   addRule,
   compareWith,
   glyphFromFamily,
-  layersOf,
   loadWhole,
   moveInstance,
   moveMaster,
@@ -598,14 +610,12 @@ export class EditorStore {
    */
   async familyMasters(): Promise<FamilyMaster[]> {
     const all = await this.allMasters();
-    const { project, layers } = this.state;
     return all.map((m) => {
       const of = m.sparse === undefined ? -1 : all.findIndex((it) => it.id === m.sparse?.of);
       return {
         name: m.name,
         location: m.location,
         document: m.document,
-        layers: layersOf(project, layers, m.id),
         ...(m.sparse === undefined || of < 0 ? {} : { sparse: { ...m.sparse, of } }),
         ...(m.kept === undefined ? {} : { kept: m.kept }),
       };
@@ -793,15 +803,78 @@ export class EditorStore {
     return await this.disk.allImages();
   }
 
+  // ---- layers --------------------------------------------------------------
+
+  /** Draw in a layer, or in the main drawing for `null`. */
+  drawInLayer(layer: string | null): void {
+    this.applyTool(drawInLayer(this.editor, layer));
+  }
+
+  /** Between the main drawing and the background, which is what B does. */
+  toggleBackground(): void {
+    this.drawInLayer(this.editor.layer === BACKGROUND ? null : BACKGROUND);
+  }
+
+  addLayer(name: string): void {
+    this.applyTool(addLayerNamed(this.editor, name));
+  }
+
+  removeLayer(name: string): void {
+    this.applyTool(removeLayerNamed(this.editor, name));
+  }
+
+  copyToLayer(names: readonly string[], layer: string): void {
+    this.applyTool(copyToLayerAt(this.editor, names, layer));
+  }
+
+  swapWithLayer(names: readonly string[], layer: string): void {
+    this.applyTool(swapWithLayerAt(this.editor, names, layer));
+  }
+
+  clearLayer(names: readonly string[], layer: string): void {
+    this.applyTool(clearLayerAt(this.editor, names, layer));
+  }
+
+  /** Show a layer behind the drawing, or stop showing it. */
+  toggleLayerShown(name: string): void {
+    const shown = this.state.shownLayers;
+    this.patch({
+      shownLayers: shown.includes(name) ? shown.filter((n) => n !== name) : [...shown, name],
+    });
+  }
+
   /**
-   * The layers of the source this editor does not edit.
+   * Move layers kept the old way — whole, beside the document — into it.
    *
-   * For an export that has to carry them: a UFO written without them is one
-   * whose `layercontents.plist` lists only the layer we edit, which every other
-   * tool reads as the designer's sketch having been deleted.
+   * A project saved before layers could be drawn in kept them in a file of
+   * their own, marked with the master whose file they came from. Each is read
+   * into that master's document once, and the file is cleared. Returns whether
+   * the open document changed, since it then has to be saved.
    */
-  layers(): readonly ExtraLayer[] {
-    return this.state.layers;
+  private async migrateLayers(carried: readonly ExtraLayer[]): Promise<boolean> {
+    const { project } = this.state;
+    const first = project.masters[0]?.id;
+    const of = (id: string) => carried.filter((layer) => (layer.master ?? first) === id);
+    const ids = randomIds();
+    const quiet = (): void => undefined;
+    let changed = false;
+
+    const mine = of(project.current);
+    if (mine.length > 0 && this.editor.document.layers.length === 0) {
+      const document = layersIntoDocument(this.editor.document, mine, ids, quiet);
+      this.patch({
+        session: { ...this.state.session, editor: { ...this.editor, document } },
+      });
+      changed = true;
+    }
+    for (const m of project.masters) {
+      if (m.id === project.current || of(m.id).length === 0) continue;
+      const parked = await this.disk.getMaster(m.id);
+      if (parked === null || parked.document.layers.length > 0) continue;
+      await this.disk.putMaster(m.id, layersIntoDocument(parked.document, of(m.id), ids, quiet));
+    }
+    await this.disk.putLayers([]);
+    return changed;
   }
 
   /** Read the list of pictures back from the store. */
@@ -1024,15 +1097,14 @@ export class EditorStore {
       this.fitGlyph();
     }
 
-    // The layers of the source, if this project was opened from one. They are
-    // not in the document, so nothing above brings them back — and the save
-    // that would write the font without them is exactly the one after a reload.
-    this.patch({ layers: await this.disk.layers() });
+    // Layers a project from before kept beside the document, moved into it.
+    const carried = await this.disk.layers();
+    const migrated = carried.length > 0 && (await this.migrateLayers(carried));
 
     // Only a document read back from the glyph files is genuinely on disk. One
     // recovered from the journal is ahead of them, and the starter font shown
     // when the store is empty has never been written at all.
-    const onDisk = loaded.kind === "loaded" && !loaded.recovered;
+    const onDisk = loaded.kind === "loaded" && !loaded.recovered && !migrated;
     await this.disk.settle(this.editor.document, !onDisk);
   }
 

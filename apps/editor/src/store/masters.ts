@@ -255,30 +255,11 @@ export async function adoptFamily(
     if (source !== undefined) await host.disk.putMaster(m.id, source.document);
   }
 
-  // Every master's other layers, each marked with the master whose file it is
-  // in, so that writing the family back puts each into its own UFO.
-  const layers = family.masters.flatMap((m, i) =>
-    (m.layers ?? []).map((layer) => ({ ...layer, master: ids[i]! })),
-  );
-  host.patch({ layers });
-  await host.disk.putLayers(layers);
+  // Each master's layers are in its own document; the file they were once
+  // kept in beside the font is cleared.
+  await host.disk.putLayers([]);
 
   await rememberDesignspace(host, next);
-}
-
-/**
- * The carried layers of one master's file.
- *
- * A layer marked with no master came with a font of one master, and belongs to
- * the master that font became: the first.
- */
-export function layersOf(
-  project: FontProject,
-  layers: readonly ExtraLayer[],
-  id: MasterId,
-): ExtraLayer[] {
-  const first = project.masters[0]?.id;
-  return layers.filter((layer) => (layer.master ?? first) === id);
 }
 
 /**

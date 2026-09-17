@@ -22,6 +22,8 @@ export type RenderPalette = {
   /** The lines the designer put there, as against the font's own metrics. */
   /** An instance between the masters: a reading, not a drawing. */
   readonly instance: string;
+  /** The glyph's other drawings, shown behind the one being edited. */
+  readonly behind: string;
   readonly designGuide: string;
   readonly designGuideSelected: string;
   readonly outline: string;
@@ -99,6 +101,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   guideEmphasis: "#C2CDD8",
   guideLabel: "#7C8896",
   instance: "#B9A2D8",
+  behind: "#8FA3B8",
   designGuide: "#7FA8D6",
   designGuideSelected: "#2C6DAF",
   outline: "#131922",
@@ -138,6 +141,7 @@ export const DARK_PALETTE: RenderPalette = {
   guideEmphasis: "#33404E",
   guideLabel: "#8B99A8",
   instance: "#6E5A8C",
+  behind: "#5C6F83",
   designGuide: "#4E7BA8",
   designGuideSelected: "#7FB4EE",
   outline: "#E5EBF2",

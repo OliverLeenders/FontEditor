@@ -1,3 +1,4 @@
+import { currentGlyph } from "@typewright/tools";
 import { useRef, useState } from "react";
 
 import { glyphsTracing } from "../store/images.js";
@@ -24,9 +25,7 @@ const ACCEPT = "image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,
 export function Tracing(): React.JSX.Element {
   const store = useEditorStore();
   const images = useStoreValue((s) => s.images);
-  const current = useStoreValue(
-    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.image ?? null,
-  );
+  const current = useStoreValue((s) => currentGlyph(s.session.editor)?.image ?? null);
   const glyph = useStoreValue((s) => s.session.editor.currentGlyph);
   const showing = useStoreValue((s) => s.showImage);
   const opacity = useStoreValue((s) => s.imageOpacity);

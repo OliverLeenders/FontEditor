@@ -515,6 +515,42 @@ export const LayersIcon: IconComponent = () => (
   </Glyph>
 );
 
+/** Shown: a layer drawn behind the glyph. */
+export const EyeIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+    <circle cx="12" cy="12" r="3" />
+  </Glyph>
+);
+
+/** Not shown. */
+export const EyeOffIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49" />
+    <path d="M14.084 14.158a3 3 0 0 1-4.242-4.242" />
+    <path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143" />
+    <path d="m2 2 20 20" />
+  </Glyph>
+);
+
+/** Copy one drawing into another place. */
+export const CopyIcon: IconComponent = () => (
+  <Glyph>
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </Glyph>
+);
+
+/** Trade two things for each other: a drawing and its background. */
+export const ArrowLeftRightIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M8 3 4 7l4 4" />
+    <path d="M4 7h16" />
+    <path d="m16 21 4-4-4-4" />
+    <path d="M20 17H4" />
+  </Glyph>
+);
+
 /** A new master, drawn from one that already exists. */
 export const CopyPlusIcon: IconComponent = () => (
   <Glyph>

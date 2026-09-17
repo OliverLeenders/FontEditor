@@ -70,6 +70,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "I", what: "Show or hide the inspector" },
       { keys: "H", what: "Handles near the work, or all of them always" },
       { keys: "S", what: "Snapping on or off" },
+      { keys: "B", what: "Draw in the background, or back in the letter" },
       { keys: "Ctrl-A", what: "Select every point" },
       { keys: "Ctrl-C · Ctrl-X · Ctrl-V", what: "Copy, cut and paste contours" },
       { keys: "Escape", what: "Abandon whatever is being drawn or dragged" },

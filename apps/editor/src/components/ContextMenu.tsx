@@ -35,6 +35,7 @@ import {
   setNodeHvLock,
   setPointType,
   unroundedSelected,
+  currentGlyph,
 } from "@typewright/tools";
 import type { HitTarget } from "@typewright/view";
 import { useEffect, useRef } from "react";
@@ -101,6 +102,7 @@ const EMPTY_GLYPH = {
   kept: [],
   metricKeys: NO_METRIC_KEYS,
   markColor: null,
+  layers: {},
 };
 
 /**
@@ -151,7 +153,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       // letter is what most anchors are.
       {
         kind: "item",
-        label: `Add anchor here (${freeAnchorName(editor.document.glyphs[editor.currentGlyph] ?? EMPTY_GLYPH)})`,
+        label: `Add anchor here (${freeAnchorName(currentGlyph(editor) ?? EMPTY_GLYPH)})`,
         icon: AnchorIcon,
         run: () => store.applyTool(addAnchorAt(editor, request.point, ids)),
       },
@@ -370,9 +372,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
 
   if (target.kind === "component") {
     const { componentId } = target;
-    const placed = editor.document.glyphs[editor.currentGlyph]?.components.find(
-      (c) => c.id === componentId,
-    );
+    const placed = currentGlyph(editor)?.components.find((c) => c.id === componentId);
     const aligns = attachmentFor(editor, componentId) !== null;
 
     return [
@@ -468,8 +468,8 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
   //
   // `status === "flat"` is not the same question: a curve whose handles happen
   // to lie on its chord is also flat. Ask the model what kind of segment it is.
-  const glyph = editor.document.glyphs[editor.currentGlyph];
-  const c = glyph === undefined ? null : contourById(glyph, segment.contourId);
+  const glyph = currentGlyph(editor);
+  const c = glyph === null ? null : contourById(glyph, segment.contourId);
   const isLine = (c === null ? null : segmentAt(c, segment.segmentIndex))?.kind === "line";
 
   // Only from the curve. `segmentParameterAt` projects onto the curve, so a

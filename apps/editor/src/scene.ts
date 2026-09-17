@@ -9,6 +9,7 @@ import {
   type Glyph,
   type PlacedGlyph,
   NO_METRIC_KEYS,
+  inLayer,
   drawableGlyph,
   filledContours,
   glyphBounds,
@@ -38,6 +39,7 @@ import {
   shownSection,
   snapHold,
   tunniSegments,
+  currentGlyph as editedGlyph,
 } from "@typewright/tools";
 import { type Comb, combFor } from "@typewright/view";
 
@@ -57,6 +59,7 @@ const EMPTY: Glyph = {
   kept: [],
   metricKeys: NO_METRIC_KEYS,
   markColor: null,
+  layers: {},
 };
 
 /** Resolved component outlines are throwaway; their ids never leave the frame. */
@@ -178,7 +181,9 @@ export function sceneFor(
   picture: (name: string) => Decoded | null = () => null,
 ): Scene {
   const editor = state.session.editor;
-  const glyph = editor.document.glyphs[editor.currentGlyph] ?? EMPTY;
+  // The drawing the tools are pointed at: the glyph itself, or its drawing in
+  // the layer being drawn in.
+  const glyph = editedGlyph(editor) ?? EMPTY;
 
   const source: ComponentSource = { glyphOf: (name) => editor.document.glyphs[name] ?? null };
 
@@ -223,6 +228,8 @@ export function sceneFor(
     // The same letter at a weight nobody drew. Under the drawing, faint, and
     // never while space is held: previewing means the shape by itself.
     instance: state.previewing ? [] : instanceFor(state),
+    // The glyph's other drawings, faint, under everything but the tracing.
+    behind: state.previewing ? [] : behindFor(state, source),
     guides: state.previewing ? [] : guidesInForce(editor),
     hoveredGuide: editor.hoveredGuide,
     selectedGuide: editor.selectedGuide,
@@ -277,6 +284,30 @@ function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[] } {
   // The filled contours, not the drawn ones: the hairs point out of the ink, and
   // only the corrected winding says which side that is.
   return { comb: combFor(filledContours(glyph), state.session.editor.view) };
+}
+
+/**
+ * The drawings shown behind the one being edited, as outlines.
+ *
+ * The main drawing whenever a layer is being drawn in — the letter is what a
+ * background is drawn against — and every layer that is shown, except the one
+ * being drawn in, which is on top already.
+ */
+function behindFor(state: StoreState, source: ComponentSource): Contour[] {
+  const editor = state.session.editor;
+  const whole = editor.document.glyphs[editor.currentGlyph];
+  if (whole === undefined) return [];
+
+  const out: Contour[] = [];
+  const add = (g: Glyph): void => {
+    out.push(...g.contours, ...resolvedComponents(g, source, () => true));
+  };
+  if (editor.layer !== null) add(whole);
+  for (const name of state.shownLayers) {
+    if (name === editor.layer || whole.layers[name] === undefined) continue;
+    add(inLayer(whole, name));
+  }
+  return out;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { placeImageByCrop, shownImageCrop } from "@typewright/tools";
+import { currentGlyph, placeImageByCrop, shownImageCrop } from "@typewright/tools";
 import { useMemo, useRef, useState } from "react";
 
 import { glyphsTracing } from "../store/images.js";
@@ -25,9 +25,7 @@ export function Sheet(): React.JSX.Element | null {
   const store = useEditorStore();
   const editor = useStoreValue((s) => s.session.editor);
   const glyph = useStoreValue((s) => s.session.editor.currentGlyph);
-  const image = useStoreValue(
-    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.image ?? null,
-  );
+  const image = useStoreValue((s) => currentGlyph(s.session.editor)?.image ?? null);
 
   const [drag, setDrag] = useState<{ from: Point; to: Point } | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);

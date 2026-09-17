@@ -9,6 +9,7 @@ import {
   selectedCanBeTangent,
   selectedCoordinate,
   selectedNode,
+  currentGlyph,
 } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
@@ -310,23 +311,10 @@ function HandleRow({
  * The type shared by every selected on-curve point, or `null` when they differ —
  * so a mixed selection shows neither button pressed rather than lying about one.
  */
-function selectedPointType(s: {
-  session: {
-    editor: {
-      currentGlyph: string;
-      selection: readonly { contourId: string; nodeId: string; part: string }[];
-      document: {
-        glyphs: Record<
-          string,
-          { contours: readonly { id: string; nodes: readonly { id: string; type: string }[] }[] }
-        >;
-      };
-    };
-  };
-}): string | null {
+function selectedPointType(s: { session: { editor: EditorState } }): string | null {
   const editor = s.session.editor;
-  const glyph = editor.document.glyphs[editor.currentGlyph];
-  if (glyph === undefined) return null;
+  const glyph = currentGlyph(editor);
+  if (glyph === null) return null;
 
   let found: string | null = null;
   for (const item of editor.selection) {

@@ -101,7 +101,6 @@ export async function importFont(
 
   await adoptDocument(host, read.document);
   await adoptImages(host, read.images);
-  await adoptLayers(host, read.layers);
 
   const { info, glyphOrder } = read.document;
   return {
@@ -220,23 +219,6 @@ export async function adoptImages(
 }
 
 /**
- * Put the layers a source arrived with into the store.
- *
- * Replacing whatever was there rather than adding to it: these belong to the
- * font that was just opened, and the one before it has gone. Called with an
- * empty list for a font that has none — a binary, a new font — which is what
- * clears the previous font's layers out.
- */
-export async function adoptLayers(host: FontHost, layers: readonly ExtraLayer[]): Promise<void> {
-  // In the session and in the store both. The session is what a save reads, so
-  // it works in a browser that will not keep a file; the store is what makes
-  // them survive the reload that would otherwise be followed by a save without
-  // them.
-  host.patch({ layers });
-  await host.disk.putLayers(layers);
-}
-
-/**
  * Make a document the one being edited, on screen and on disk.
  *
  * Shared by opening a font and by starting a new one, because they differ only
@@ -259,12 +241,9 @@ export async function adoptDocument(host: FontHost, document: FontDocument): Pro
   // here means Save can never quietly write this font over that one; opening a
   // folder sets the link again straight afterwards.
   host.setFolder(null);
-  // And the layers of whatever source was open, which belonged to it. Cleared
-  // here rather than at each caller so that opening anything — a binary, a new
-  // font, a UFO with one layer — cannot leave the last font's sketch behind to
-  // be written into the next one. A caller with layers of its own sets them
-  // straight afterwards.
-  host.patch({ layers: [] });
+  // Layers are in the document now. The file they were once kept in beside
+  // it is cleared, so a project from before cannot bring the last font's
+  // sketch back into this one.
   await host.disk.putLayers([]);
   await host.disk.replaceAll(document);
 }

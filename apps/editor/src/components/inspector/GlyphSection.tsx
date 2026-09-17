@@ -243,4 +243,5 @@ const EMPTY_GLYPH = {
   kept: [],
   metricKeys: NO_METRIC_KEYS,
   markColor: null,
+  layers: {},
 };

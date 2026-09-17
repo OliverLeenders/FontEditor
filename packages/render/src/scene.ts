@@ -176,6 +176,12 @@ export type Scene = {
    * to the master in front of you.
    */
   readonly instance: readonly Contour[];
+  /**
+   * The glyph's other drawings: its layers that are shown, and its main drawing
+   * while a layer is being drawn in. Outlines only, faint and under everything,
+   * because none of them is what the tools are pointed at.
+   */
+  readonly behind: readonly Contour[];
   readonly guides: readonly SceneGuide[];
   /** The guide under the pointer, and the one selected, by id. */
   readonly hoveredGuide: GuideId | null;
@@ -331,6 +337,7 @@ export type SceneInit = {
   readonly metricLines?: readonly MetricLine[];
   readonly image?: SceneImage | null;
   readonly instance?: readonly Contour[];
+  readonly behind?: readonly Contour[];
   readonly guides?: readonly SceneGuide[];
   readonly hoveredGuide?: GuideId | null;
   readonly selectedGuide?: GuideId | null;
@@ -364,6 +371,7 @@ export function scene(init: SceneInit): Scene {
     metricLines: init.metricLines ?? [],
     image: init.image ?? null,
     instance: init.instance ?? [],
+    behind: init.behind ?? [],
     guides: init.guides ?? [],
     hoveredGuide: init.hoveredGuide ?? null,
     selectedGuide: init.selectedGuide ?? null,

@@ -1,8 +1,8 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@typewright/catalog";
 import type { WrittenFile } from "@typewright/disk";
-import type { ExtraLayer } from "@typewright/font-io";
 import { type EditSession, session as newSession } from "@typewright/edit-core";
 import { editorState } from "@typewright/tools";
+import { BACKGROUND } from "@typewright/font-model";
 import {
   type FontDocument,
   type FontProject,
@@ -72,21 +72,13 @@ export type StoreState = {
    */
   readonly images: readonly ImageEntry[];
   /**
-   * The layers of the source that are not the one being drawn.
+   * The layers shown behind the drawing on the canvas, by name.
    *
-   * Held whole rather than as a listing, because nothing here ever wants part
-   * of one: they arrive when a font is opened and leave when a UFO is written,
-   * and in between the editor has no way to look at them and no business doing
-   * so. Beside the document rather than in it, for the reason the pictures are
-   * — a second set of glyphs is the size of the first, and the document is a
-   * value history copies on every edit.
-   *
-   * Here as well as in the working store, and that is deliberate: the store may
-   * be unavailable — a private window, a browser that refuses OPFS — and a save
-   * that dropped somebody's sketch layer because their browser would not keep a
-   * file is the bug this whole arrangement exists to stop.
+   * Where you are looking rather than what the font is, so not in the document
+   * and not undone: the background starts shown, since a background nobody can
+   * see is not one, and the rest are shown when somebody asks.
    */
-  readonly layers: readonly ExtraLayer[];
+  readonly shownLayers: readonly string[];
   /**
    * Counted up whenever something asks for the Designspace panel to open — the
    * masters panel's link to it — so the panel opens on a change rather than
@@ -302,7 +294,7 @@ export function initialState(preferences: Preferences): StoreState {
     folder: NO_FOLDER,
     projects: NO_PROJECTS,
     images: [],
-    layers: [],
+    shownLayers: [BACKGROUND],
     designspaceRequest: 0,
     showImage: preferences.showImage,
     imageOpacity: preferences.imageOpacity,

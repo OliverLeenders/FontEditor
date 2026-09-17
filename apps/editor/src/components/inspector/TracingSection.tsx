@@ -1,4 +1,4 @@
-import { fitImageToGlyph, moveImageTo, scaleImageTo } from "@typewright/tools";
+import { currentGlyph, fitImageToGlyph, moveImageTo, scaleImageTo } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
@@ -16,9 +16,7 @@ import { Field, shown } from "./fields.js";
  */
 export function TracingSection(): React.JSX.Element | null {
   const store = useEditorStore();
-  const image = useStoreValue(
-    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.image ?? null,
-  );
+  const image = useStoreValue((s) => currentGlyph(s.session.editor)?.image ?? null);
 
   const commitImage = (axis: "x" | "y", value: number): void => {
     if (!Number.isFinite(value) || image === null) return;

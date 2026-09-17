@@ -10,8 +10,10 @@ import {
 } from "@typewright/tools";
 import {
   type FontDocument,
+  BACKGROUND,
   MARK_COLORS,
   NOTDEF,
+  layerLabel,
   drawableGlyph,
   sameMarkColor,
 } from "@typewright/font-model";
@@ -29,7 +31,15 @@ import { isDarkNow, watchScheme } from "../scheme.js";
 import { wholeOf } from "../store/masters.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { type Item, Menu } from "./ContextMenu.js";
-import { CopyPlusIcon, GridIcon, PenToolIcon, TrashIcon, TypeIcon } from "./icons.js";
+import {
+  ArrowLeftRightIcon,
+  CopyIcon,
+  CopyPlusIcon,
+  GridIcon,
+  PenToolIcon,
+  TrashIcon,
+  TypeIcon,
+} from "./icons.js";
 import { markSwatch } from "./MarkSwatch.js";
 import { CleanUpMenu } from "./CleanUpMenu.js";
 import { ExportFont } from "./ExportFont.js";
@@ -348,6 +358,34 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           store.applyTool(roundGlyphsAt(store.editor, names));
         },
       },
+      { kind: "separator" },
+      // Between each glyph picked and a layer: the background whether or not the
+      // font has one yet, since the first copy into it is how it is begun, and
+      // every other layer the font has.
+      ...layerTargets(document).flatMap((layer): Item[] => {
+        const label = layerLabel(layer);
+        const drawnIn = names.some((each) => grid.glyphs[each]?.layers[layer] !== undefined);
+        return [
+          {
+            kind: "item",
+            label: `Copy to ${label}`,
+            icon: CopyIcon,
+            run: () => store.copyToLayer(names, layer),
+          },
+          {
+            kind: "item",
+            label: `Swap with ${label}`,
+            icon: ArrowLeftRightIcon,
+            run: () => store.swapWithLayer(names, layer),
+          },
+          {
+            kind: "item",
+            label: `Clear ${label}`,
+            disabled: !drawnIn,
+            run: () => store.clearLayer(names, layer),
+          },
+        ];
+      }),
       { kind: "separator" },
       // The colour marks, each drawn as itself and ticked when it is the one on
       // every glyph picked: a row of words would have to be read, and a mark is
@@ -672,6 +710,11 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
       </div>
     </div>
   );
+}
+
+/** The layers the grid's menu offers: the background always, then the font's others. */
+function layerTargets(document: FontDocument): string[] {
+  return [BACKGROUND, ...document.layers.map((l) => l.name).filter((n) => n !== BACKGROUND)];
 }
 
 /**

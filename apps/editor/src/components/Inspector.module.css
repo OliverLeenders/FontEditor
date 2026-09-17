@@ -606,3 +606,66 @@
 .curvature .align {
   grid-column: 1 / -1;
 }
+
+/* A drawing of the glyph: the button that points the tools at it, its name, and
+   what can be done between it and the letter. */
+.layerRow {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto auto auto;
+  align-items: center;
+  gap: 0.25rem;
+}
+.layerRow[data-here="true"] .layerName {
+  color: var(--accent);
+  font-weight: 600;
+}
+.layerRow .rowAction[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: currentColor;
+}
+.layerName {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.layerAdd {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+}
+.layerAdd .input {
+  flex: 1;
+  min-width: 0;
+}
+.layerAddButton {
+  flex: none;
+  padding: 0.12rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.layerAddButton:hover:not(:disabled) {
+  color: var(--ink);
+}
+.layerAddButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.layerRemove {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+.layerRemove summary {
+  cursor: pointer;
+}
+.layerRemove .layerAddButton {
+  margin: 0.25rem 0.25rem 0 0;
+}

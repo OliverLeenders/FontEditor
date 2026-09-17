@@ -6,6 +6,7 @@ import {
   flipComponent,
   moveComponentTo,
   removeComponent,
+  currentGlyph,
 } from "@typewright/tools";
 import { useState } from "react";
 
@@ -30,9 +31,7 @@ import { shown } from "./fields.js";
 export function ComponentsSection(): React.JSX.Element {
   const store = useEditorStore();
   const components = useStoreValue(
-    (s) =>
-      s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.components ??
-      EMPTY_COMPONENTS,
+    (s) => currentGlyph(s.session.editor)?.components ?? EMPTY_COMPONENTS,
   );
   const selectedComponent = useStoreValue((s) => s.session.editor.selectedComponent);
   const [adding, setAdding] = useState("");
@@ -40,7 +39,7 @@ export function ComponentsSection(): React.JSX.Element {
   /** Place one component at an exact offset. */
   const commitComponent = (id: string, axis: "x" | "y", value: number): void => {
     if (!Number.isFinite(value)) return;
-    const glyph = store.editor.document.glyphs[store.editor.currentGlyph];
+    const glyph = currentGlyph(store.editor);
     const found = glyph?.components.find((c) => c.id === id);
     if (found === undefined) return;
 

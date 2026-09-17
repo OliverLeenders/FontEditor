@@ -10,6 +10,7 @@ import { ComponentsSection } from "./inspector/ComponentsSection.js";
 import { CurveSection } from "./inspector/CurveSection.js";
 import { GlyphSection } from "./inspector/GlyphSection.js";
 import { GuidesSection } from "./inspector/GuidesSection.js";
+import { LayersSection } from "./inspector/LayersSection.js";
 import { PointSection } from "./inspector/PointSection.js";
 import { Section } from "./inspector/Section.js";
 import { TracingSection } from "./inspector/TracingSection.js";
@@ -241,6 +242,7 @@ export function Inspector(): React.JSX.Element | null {
 
       <div className={styles.body}>
         <GlyphSection />
+        <LayersSection />
         <ComponentsSection />
         <AnchorsSection />
         <TracingSection />

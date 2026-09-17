@@ -14,6 +14,7 @@ import {
   pointerMove,
   pointerUp,
   selectionBox,
+  currentGlyph,
 } from "@typewright/tools";
 import { type GuideId, isHorizontal, isVertical } from "@typewright/font-model";
 import {
@@ -183,8 +184,8 @@ export function GlyphCanvas({
     // controls and the margin lines follow.
     if (!state.showNeighbours || editor.activeTool !== "select") return false;
 
-    const glyph = editor.document.glyphs[editor.currentGlyph];
-    if (glyph === undefined || withinGlyph(glyph, point)) return false;
+    const glyph = currentGlyph(editor);
+    if (glyph === null || withinGlyph(glyph, point)) return false;
     if (targetAt(point) !== null) return false;
 
     const neighbours = neighboursFor(editor.document, editor.currentGlyph, state.stripText);
@@ -267,8 +268,8 @@ export function GlyphCanvas({
     // grab at its handles, and the space inside it looks like empty canvas.
     const inside = box !== null && boxContains(box, point);
 
-    const glyph = editor.document.glyphs[editor.currentGlyph];
-    if (glyph === undefined) {
+    const glyph = currentGlyph(editor);
+    if (glyph === null) {
       canvas.style.cursor = "";
       return;
     }

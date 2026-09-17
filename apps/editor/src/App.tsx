@@ -200,6 +200,12 @@ export function App(): React.JSX.Element {
       // a contour inside the select tool.
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "s") {
         store.toggleSnapPoints();
+        return;
+      }
+      // "B" draws in the background, and again draws in the letter. Adding the
+      // background layer the first time, as an undoable step of its own.
+      if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "b") {
+        store.toggleBackground();
       }
     };
     const onKeyUp = (event: KeyboardEvent): void => {

@@ -1,4 +1,4 @@
-import { moveAnchorToPoint, removeAnchorAt, renameAnchorTo } from "@typewright/tools";
+import { currentGlyph, moveAnchorToPoint, removeAnchorAt, renameAnchorTo } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
@@ -15,10 +15,7 @@ import { shown } from "./fields.js";
  */
 export function AnchorsSection(): React.JSX.Element {
   const store = useEditorStore();
-  const anchors = useStoreValue(
-    (s) =>
-      s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.anchors ?? EMPTY_ANCHORS,
-  );
+  const anchors = useStoreValue((s) => currentGlyph(s.session.editor)?.anchors ?? EMPTY_ANCHORS);
   const selectedAnchor = useStoreValue((s) => s.session.editor.selectedAnchor);
 
   /**
@@ -29,7 +26,7 @@ export function AnchorsSection(): React.JSX.Element {
    */
   const commitAnchor = (id: string, axis: "x" | "y", value: number): void => {
     if (!Number.isFinite(value)) return;
-    const glyph = store.editor.document.glyphs[store.editor.currentGlyph];
+    const glyph = currentGlyph(store.editor);
     const found = glyph?.anchors.find((a) => a.id === id);
     if (found === undefined) return;
 

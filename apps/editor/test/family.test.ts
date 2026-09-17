@@ -156,7 +156,7 @@ describe("a family that uses more of the designspace", () => {
   it("keeps the map, the rule, and which master is a layer of which", async () => {
     const store = freshStore();
     await store.importFont(richer(), "Chalk.zip");
-    const { project, layers } = store.getState();
+    const { project } = store.getState();
 
     expect(project.axes[0]?.map?.[2]).toEqual([700, 600]);
     expect(project.rules.map((r) => r.name)).toEqual(["heavy"]);
@@ -164,9 +164,10 @@ describe("a family that uses more of the designspace", () => {
 
     const [regular, , mid] = project.masters;
     expect(mid?.sparse).toMatchObject({ of: regular?.id, layer: "{650}" });
-    // The sketch is the regular's, and the layer that became the Mid is not
-    // carried as well.
-    expect(layers.map((l) => [l.name, l.master])).toEqual([["sketch", regular?.id]]);
+    // The sketch is the regular's — the master open, whose glyph draws in it —
+    // and the layer that became the Mid is not one of its layers as well.
+    expect(store.editor.document.layers.map((l) => l.name)).toEqual(["sketch"]);
+    expect(Object.keys(store.editor.document.glyphs["a"]?.layers ?? {})).toEqual(["sketch"]);
   });
 
   it("writes back the same arrangement it opened", async () => {

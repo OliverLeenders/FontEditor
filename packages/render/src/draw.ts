@@ -59,6 +59,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   // and context that draws over your work is a distraction rather than a help.
   drawNeighbours(ctx, s);
   if (s.options.margins) drawMargins(ctx, s);
+  drawBehind(ctx, s);
   drawComponents(ctx, s);
   // Under the drawing: the instance is what the design says happens at another
   // weight, and the thing being edited has to stay on top of it.
@@ -143,6 +144,26 @@ export function drawMetricLines(ctx: Canvas2D, s: Scene): void {
  * this canvas — where a wash of colour reads as what it is: where the letter
  * goes at a weight you are not drawing.
  */
+export function drawBehind(ctx: Canvas2D, s: Scene): void {
+  if (s.behind.length === 0) return;
+
+  // A thin line and the faintest fill: a background is something to draw
+  // against, and it should read as the shape it is without looking like one
+  // the pointer can take hold of.
+  ctx.save();
+  ctx.beginPath();
+  for (const c of s.behind.filter((c) => c.nodes.length >= 2)) traceContour(ctx, s.view, c);
+  ctx.globalAlpha = 0.12;
+  ctx.fillStyle = s.palette.behind;
+  ctx.fill();
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = s.palette.behind;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
 export function drawInstance(ctx: Canvas2D, s: Scene): void {
   if (s.instance.length === 0) return;
 

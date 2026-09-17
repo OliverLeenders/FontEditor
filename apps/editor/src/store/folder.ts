@@ -20,8 +20,7 @@ import {
 import { crc32, entryBytes, readUfo, ufoFiles } from "@typewright/font-io";
 import { type FontDocument, randomIds } from "@typewright/font-model";
 
-import { type FontHost, adoptDocument, adoptImages, adoptLayers } from "./fonts.js";
-import { layersOf } from "./masters.js";
+import { type FontHost, adoptDocument, adoptImages } from "./fonts.js";
 import { type FolderState, NO_FOLDER } from "./state.js";
 
 /**
@@ -101,7 +100,6 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
 
   await adoptDocument(host, read.document);
   await adoptImages(host, read.images);
-  await adoptLayers(host, read.layers);
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
   await saveProject({ ...project, name: nameOf(read.document, folder), folder });
@@ -197,26 +195,22 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
     // that names images it does not contain opens blank in every other tool,
     // and one whose `layercontents.plist` lists only the layer we edit has
     // thrown away the designer's sketch as far as anything reading it can tell.
-    const written = await writeFolder(
-      folder,
-      ufoFiles(document, await host.disk.allImages(), ownLayers(host)),
-      {
-        // Only the files that differ from what the last save left. A UFO is one
-        // file per glyph, so moving one point changes one of several hundred,
-        // and rewriting the rest is the whole of the wait.
-        known: sameFolder(before, folder) ? before.written : undefined,
-        // A record made in an earlier session describes a folder nothing has
-        // watched since, so each file is asked whether anything else has
-        // touched it. Within a session nothing has, and asking would be a read
-        // per file for an answer that is always the same.
-        verify: !before.checked,
-        onProgress: (done, total) => {
-          host.patch({
-            folder: { ...host.state().folder, progress: { done, total } },
-          });
-        },
+    const written = await writeFolder(folder, ufoFiles(document, await host.disk.allImages()), {
+      // Only the files that differ from what the last save left. A UFO is one
+      // file per glyph, so moving one point changes one of several hundred,
+      // and rewriting the rest is the whole of the wait.
+      known: sameFolder(before, folder) ? before.written : undefined,
+      // A record made in an earlier session describes a folder nothing has
+      // watched since, so each file is asked whether anything else has
+      // touched it. Within a session nothing has, and asking would be a read
+      // per file for an answer that is always the same.
+      verify: !before.checked,
+      onProgress: (done, total) => {
+        host.patch({
+          folder: { ...host.state().folder, progress: { done, total } },
+        });
       },
-    );
+    });
 
     host.patch({
       folder: {
@@ -401,21 +395,12 @@ export function unsaved(folder: FolderState, now: FontDocument): boolean {
  * Costs one serialisation of the font, once, after it has loaded. That is the
  * price of the question, and it is the same work a save does before it writes.
  */
-/**
- * The layers of the master being written: a folder is one UFO, and a family's
- * other masters keep layers of their own in files of their own.
- */
-function ownLayers(host: FontHost) {
-  const { project, layers } = host.state();
-  return layersOf(project, layers, project.current);
-}
-
 export async function confirmSaved(host: FontHost, savedHash: string | null): Promise<void> {
   if (savedHash === null) return;
 
   const before = host.state().folder;
   const document = host.state().session.editor.document;
-  const entries = ufoFiles(document, await host.disk.allImages(), ownLayers(host));
+  const entries = ufoFiles(document, await host.disk.allImages());
   const now = hashOfWritten(
     entries.map((entry): [string, WrittenFile] => [
       entry.path,

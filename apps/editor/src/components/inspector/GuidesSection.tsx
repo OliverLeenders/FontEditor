@@ -5,6 +5,7 @@ import {
   removeGuideAt,
   renameGuideTo,
   turnGuideTo,
+  currentGlyph,
 } from "@typewright/tools";
 import { useMemo } from "react";
 
@@ -29,9 +30,7 @@ export function GuidesSection(): React.JSX.Element {
   // and `useSyncExternalStore` compares snapshots with `Object.is` — so the
   // component would re-render for ever. See `useStoreValue`.
   const fontGuides = useStoreValue((s) => s.session.editor.document.guides);
-  const glyphGuides = useStoreValue(
-    (s) => s.session.editor.document.glyphs[s.session.editor.currentGlyph]?.guides ?? EMPTY_GUIDES,
-  );
+  const glyphGuides = useStoreValue((s) => currentGlyph(s.session.editor)?.guides ?? EMPTY_GUIDES);
   // Joined here, where a new array costs one render rather than all of them.
   const guides = useMemo(
     () => [
