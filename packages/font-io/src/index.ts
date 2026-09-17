@@ -33,7 +33,19 @@ export { exportFileName } from "./file-name.js";
 
 export { exportVariableTrueType } from "./variable-truetype.js";
 
-export { toWoff } from "./woff.js";
+export { fromWoff, isWoff, toWoff } from "./woff.js";
+export type {
+  AnchorPoint,
+  ContextRule,
+  ReadGdef,
+  ReadLayout,
+  ReadLookup,
+  Subtable,
+  ValueRecord,
+} from "./layout-read.js";
+export { readGdef, readLayout } from "./layout-read.js";
+export type { LayoutTables, RecoveredAnchor, RecoveredLayout } from "./layout-source.js";
+export { recoverLayout } from "./layout-source.js";
 export type { Woff2Result } from "./woff2.js";
 export { toWoff2 } from "./woff2.js";
 

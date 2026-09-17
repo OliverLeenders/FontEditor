@@ -5,7 +5,10 @@ import { opentype } from "./opentype.js";
 import type { Affine } from "@typewright/geometry";
 
 import type { PathCommand } from "./commands.js";
+import { GPOS, GSUB, readGdef, readLayout } from "./layout-read.js";
+import type { LayoutTables } from "./layout-source.js";
 import { type SourceKerning, kerningFromGpos, kerningFromKernTable } from "./readkern.js";
+import { readTablesOf } from "./sfnt.js";
 
 /**
  * The only file that knows which parser we use.
@@ -73,6 +76,14 @@ export type SourceFont = {
   readonly outlines: string;
   readonly glyphs: readonly SourceGlyph[];
   readonly kerning: SourceKerning;
+  /**
+   * GSUB, GPOS and GDEF as they are, where they could be read: `null` for a
+   * font given as something other than a plain font file, and absent from
+   * source data written by hand.
+   */
+  readonly layout?: LayoutTables | null;
+  /** The legacy `kern` table's pairs, for a font whose GPOS has no kerning. */
+  readonly kernTable?: SourceKerning;
 };
 
 export class FontParseError extends Error {
@@ -231,5 +242,32 @@ export function parseFont(bytes: ArrayBuffer): SourceFont {
     outlines: font.outlinesFormat,
     glyphs: readGlyphs(font),
     kerning: readKerning(font),
+    layout: readLayoutTables(bytes, font.glyphs.length),
+    kernTable: kerningFromKernTable(font.kerningPairs),
+  };
+}
+
+/** The flavours of a plain font file: TrueType, CFF, and the old Apple TrueType mark. */
+const SFNT = new Set([0x00010000, 0x4f54544f, 0x74727565]);
+
+/**
+ * GSUB, GPOS and GDEF, read by this package rather than by the parser.
+ *
+ * `null` for anything but a plain font file — a WOFF has its tables packed,
+ * and is unpacked by whoever opens one before it comes here.
+ */
+function readLayoutTables(bytes: ArrayBuffer, glyphCount: number): LayoutTables | null {
+  const font = new Uint8Array(bytes);
+  if (font.length < 12 || !SFNT.has(new DataView(bytes).getUint32(0))) return null;
+
+  const tables = readTablesOf(font);
+  const find = (tag: string): Uint8Array | null => tables.find((t) => t.tag === tag)?.data ?? null;
+  const gsub = find(GSUB);
+  const gpos = find(GPOS);
+  const gdef = find("GDEF");
+  return {
+    gsub: gsub === null ? null : readLayout(gsub, GSUB, glyphCount),
+    gpos: gpos === null ? null : readLayout(gpos, GPOS, glyphCount),
+    gdef: gdef === null ? null : readGdef(gdef),
   };
 }

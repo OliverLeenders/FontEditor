@@ -90,6 +90,11 @@ export function withSfntVersion(font: Uint8Array, version: number): Uint8Array {
   return assemble(version, tables);
 }
 
+/** A font file made of these tables, from nothing. */
+export function sfntOf(sfntVersion: number, tables: readonly Table[]): Uint8Array {
+  return assemble(sfntVersion, tables);
+}
+
 export function withTable(font: Uint8Array, tag: string, data: Uint8Array): Uint8Array {
   const { sfntVersion, tables } = readTables(font);
 

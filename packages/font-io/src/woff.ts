@@ -1,5 +1,5 @@
 import { Bytes } from "./bytes.js";
-import { readTablesOf, tableChecksum } from "./sfnt.js";
+import { readTablesOf, sfntOf, tableChecksum } from "./sfnt.js";
 
 /**
  * WOFF, which is a font wrapped for the web.
@@ -93,6 +93,50 @@ export async function toWoff(sfnt: Uint8Array): Promise<Uint8Array> {
   return bytes;
 }
 
+/** Whether these bytes are a WOFF file. */
+export function isWoff(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= HEADER &&
+    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0) === SIGNATURE
+  );
+}
+
+/**
+ * Unwrap a WOFF into the font inside it.
+ *
+ * The other direction of `toWoff`, for a WOFF opened here: the tables are
+ * inflated and laid out as an ordinary font file, which is what everything that
+ * reads a font past its outlines — the layout tables above all — needs in hand.
+ * A table stored as it was, which the format marks by giving it the same length
+ * both ways, is taken as it is.
+ */
+export async function fromWoff(woff: Uint8Array): Promise<Uint8Array> {
+  const view = new DataView(woff.buffer, woff.byteOffset, woff.byteLength);
+  const flavour = view.getUint32(4);
+  const count = view.getUint16(12);
+
+  const tables: { tag: string; data: Uint8Array }[] = [];
+  for (let i = 0; i < count; i++) {
+    const at = HEADER + i * RECORD;
+    const tag = String.fromCharCode(...woff.subarray(at, at + 4));
+    const offset = view.getUint32(at + 4);
+    const compressed = view.getUint32(at + 8);
+    const original = view.getUint32(at + 12);
+    const stored = woff.subarray(offset, offset + compressed);
+    const data = compressed === original ? stored : await inflate(stored);
+    if (data === null) throw new Error(`the ${tag} table of this WOFF could not be unpacked`);
+    tables.push({ tag, data });
+  }
+  return sfntOf(flavour, tables);
+}
+
+async function inflate(data: Uint8Array): Promise<Uint8Array | null> {
+  const Stream = (globalThis as { DecompressionStream?: typeof DecompressionStream })
+    .DecompressionStream;
+  if (Stream === undefined) return null;
+  return await collect(new Stream("deflate"), data);
+}
+
 /**
  * A table, deflated — unless deflating made it bigger.
  *
@@ -118,7 +162,14 @@ async function deflate(data: Uint8Array): Promise<Uint8Array | null> {
 
   // "deflate" rather than "deflate-raw": WOFF wants the zlib wrapper, which is
   // two bytes of header and four of checksum round the same compressed data.
-  const stream = new Stream("deflate");
+  return await collect(new Stream("deflate"), data);
+}
+
+/** Everything a transform stream makes of some bytes, in one piece. */
+async function collect(
+  stream: CompressionStream | DecompressionStream,
+  data: Uint8Array,
+): Promise<Uint8Array> {
   const writer = stream.writable.getWriter();
 
   // A fresh copy, because the stream is entitled to detach what it is handed

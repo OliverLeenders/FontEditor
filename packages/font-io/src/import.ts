@@ -9,17 +9,20 @@ import {
   derivedVerticalMetrics,
   fontDocument,
   EMPTY_KERNING,
+  anchor,
   component,
   glyph,
   groupKey,
   setFontInfo,
   setKern,
+  setFeatures,
   setKernGroup,
   setKerning,
 } from "@typewright/font-model";
 
 import { contoursFromCommands } from "./commands.js";
 import { embeddingBits, setBits } from "./embedding.js";
+import { recoverLayout } from "./layout-source.js";
 import { type SourceKernSide, type SourceKerning } from "./readkern.js";
 import { type SourceFont, type SourceGlyph, parseFont } from "./source.js";
 
@@ -136,6 +139,21 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
     names.push(name);
   });
 
+  // What the font does besides draw: substitutions and positioning as feature
+  // source, mark attachment as anchors, kerning into the kerning model.
+  const layout =
+    source.layout === undefined || source.layout === null
+      ? null
+      : recoverLayout(source.layout, names, info.xHeight);
+  for (const message of layout?.warnings ?? []) warnings.push({ glyph: null, message });
+  if (source.layout === null) {
+    warnings.push({
+      glyph: null,
+      message:
+        "The substitutions and positioning of this file were not read: it is not a plain font file.",
+    });
+  }
+
   source.glyphs.forEach((g, index) => {
     const name = names[index]!;
     const components: Component[] = [];
@@ -158,6 +176,9 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
         advance: g.advance,
         contours: contoursFromCommands(g.commands, ids, epsilon),
         components,
+        anchors: (layout?.anchors.get(index) ?? []).map((a) =>
+          anchor(ids.anchor(), a.name, { x: a.x, y: a.y }),
+        ),
       }),
     );
   });
@@ -166,7 +187,14 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
     warnings.push({ glyph: null, message: "This font contains no glyphs." });
   }
 
-  const document = setKerning(fontDocument(glyphs, info), kerningFrom(source.kerning, names));
+  // GPOS kerning where the layout was read and has some; the legacy table where
+  // it has none, which is what a shaper falls back to as well.
+  const kerning =
+    layout === null ? source.kerning : (layout.kerning ?? source.kernTable ?? source.kerning);
+  const document = setFeatures(
+    setKerning(fontDocument(glyphs, info), kerningFrom(kerning, names)),
+    layout?.features ?? "",
+  );
   return { document: withLineMetrics(document, source), warnings };
 }
 

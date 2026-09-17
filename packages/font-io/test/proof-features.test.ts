@@ -17,6 +17,7 @@ import { Blob, Buffer, Face, Feature, Font, shape } from "harfbuzzjs";
 import { describe, expect, it } from "vitest";
 
 import { exportFont } from "../src/export.js";
+import { importFont } from "../src/import.js";
 import { writeMarks } from "../src/marks-source.js";
 
 /**
@@ -43,6 +44,8 @@ import { writeMarks } from "../src/marks-source.js";
 
 const OUT = process.env["FEATURES_OUT"] ?? "";
 const REFERENCE = process.env["FEATURES_REFERENCE"] ?? "";
+/** A second font fontTools compiles, of what this editor can only keep as source. */
+const IMPORT_REFERENCE = process.env["IMPORT_REFERENCE"] ?? "";
 
 const ids = counterIds("pf");
 
@@ -298,6 +301,175 @@ describe("the feature proof font", () => {
     const theirs = open(new Uint8Array(readFileSync(REFERENCE)));
     for (const s of STRINGS) {
       expect({ ...s, glyphs: setting(ours, s) }).toEqual({ ...s, glyphs: setting(theirs, s) });
+    }
+  });
+});
+
+/**
+ * The same fonts opened here as binaries, and exported again.
+ *
+ * Opening a font reads its GSUB, GPOS and GDEF back into feature source, anchors
+ * and kerning. Exported again, the font has to set every proof string as the
+ * one that was opened: a rule lost, reordered or misread on the way in is a
+ * glyph or a position that differs. Done with the font compiled here, and on CI
+ * with the one fontTools compiled, whose tables were written by something else.
+ */
+describe("a compiled font, opened and exported again", () => {
+  const roundTrip = (original: Uint8Array) => {
+    const read = importFont(original.slice().buffer, counterIds("rt"));
+    const again = exportFont(read.document);
+    return { read, again };
+  };
+
+  const agrees = (original: Uint8Array) => {
+    const { read, again } = roundTrip(original);
+    const before = open(original);
+    const after = open(again.bytes);
+    for (const s of STRINGS) {
+      expect({ ...s, glyphs: setting(after, s) }, read.document.features).toEqual({
+        ...s,
+        glyphs: setting(before, s),
+      });
+    }
+    return { read, again };
+  };
+
+  it("sets every string as the font it was opened from", () => {
+    const { read, again } = agrees(new Uint8Array(exportFont(proofFont()).bytes));
+    expect(read.warnings).toEqual([]);
+    expect(again.warnings).toEqual([]);
+  });
+
+  it("brings the marks back as anchors, and the rest as source", () => {
+    const { read } = roundTrip(new Uint8Array(exportFont(proofFont()).bytes));
+    const anchorsOf = (name: string) =>
+      read.document.glyphs[name]?.anchors.map((a) => [a.name, a.pt.x, a.pt.y]);
+    expect(anchorsOf("a")).toEqual(
+      expect.arrayContaining([
+        ["top", 250, 480],
+        ["bottom", 240, 0],
+      ]),
+    );
+    expect(anchorsOf("acutecomb")).toEqual(
+      expect.arrayContaining([
+        ["_top", 0, 500],
+        ["top", 0, 700],
+      ]),
+    );
+    expect(read.document.features).toMatch(/feature liga \{/);
+    expect(read.document.features).not.toMatch(/markClass/);
+  });
+
+  it.runIf(REFERENCE !== "")("sets every string as the font fontTools compiled", () => {
+    agrees(new Uint8Array(readFileSync(REFERENCE)));
+  });
+});
+
+/**
+ * What a font from elsewhere does that this editor keeps without compiling.
+ *
+ * Class kerning with an exception, a pair adjustment that is not kerning,
+ * cursive attachment, marks on a ligature, a lookup written as an extension, a
+ * feature that differs by script, and a stylistic set with a name. fontTools
+ * compiles it into the proof font on CI (`IMPORT_OUT` writes the file, and
+ * `compile_fea.py --plain` compiles it); opened here, what the editor compiles
+ * has to set text as before, and what it does not has to be in the source and
+ * named in the warnings.
+ */
+export const IMPORT_EXTRAS = `languagesystem DFLT dflt;
+languagesystem latn dflt;
+languagesystem arab dflt;
+
+@KERN_LEFT = [A T];
+@KERN_RIGHT = [a o];
+
+feature kern {
+    pos T o -80;
+    pos @KERN_LEFT @KERN_RIGHT -40;
+} kern;
+
+feature dist {
+    pos A B <5 0 10 0>;
+} dist;
+
+feature curs {
+    pos cursive f <anchor 0 0> <anchor 500 100>;
+} curs;
+
+markClass acutecomb <anchor 0 500> @LIGATURE_ABOVE;
+
+feature mark {
+    pos ligature f_i <anchor 120 600> mark @LIGATURE_ABOVE
+        ligComponent <anchor 380 600> mark @LIGATURE_ABOVE;
+} mark;
+
+lookup LIGATURES useExtension {
+    sub f i by f_i;
+} LIGATURES;
+
+feature liga {
+    lookup LIGATURES;
+} liga;
+
+feature smcp {
+    script latn;
+    sub a by a.sc;
+    script arab;
+    sub b by b.sc;
+} smcp;
+
+feature ss01 {
+    featureNames {
+        name "Alternate a";
+    };
+    sub a by a.alt1;
+} ss01;
+`;
+
+const EXTRA_STRINGS: readonly Setting[] = [
+  { text: "Ta" },
+  { text: "To" },
+  { text: "Ao" },
+  { text: "fi" },
+  { text: "ab", script: "Latn", features: ["smcp"] },
+  { text: "ab", script: "Arab", features: ["smcp"] },
+  { text: "a", features: ["ss01"] },
+];
+
+describe("a font that does more than this editor compiles", () => {
+  it.runIf(OUT !== "")("is written out for fontTools to compile", () => {
+    mkdirSync(OUT, { recursive: true });
+    writeFileSync(join(OUT, "extras.fea"), IMPORT_EXTRAS);
+  });
+
+  it.runIf(IMPORT_REFERENCE !== "")("keeps what it compiles, and says what it does not", () => {
+    const original = new Uint8Array(readFileSync(IMPORT_REFERENCE));
+    const read = importFont(original.slice().buffer, counterIds("ex"));
+    const { features } = read.document;
+    const warnings = read.warnings.map((w) => w.message).join("\n");
+
+    // Kerning into the model, groups and the exception both.
+    const { kerning } = read.document;
+    expect(Object.keys(kerning.firstGroups)).toHaveLength(1);
+    expect(kerning.pairs["T"]?.["o"]).toBe(-80);
+
+    // The rest as source, and what is not compiled named.
+    expect(features, features).toMatch(/pos cursive f <anchor 0 0> <anchor 500 100>;/);
+    expect(features).toMatch(/pos ligature f_i <anchor 120 600> mark @MC_1 ligComponent/);
+    expect(features).toMatch(/pos A B <5 0 10 0>/);
+    expect(features).toMatch(/script arab;/);
+    expect(warnings).toMatch(/cursive attachment/);
+    expect(warnings).toMatch(/mark attachment to ligatures/);
+    expect(warnings).toMatch(/pair adjustments other than kerning/);
+    expect(warnings).toMatch(/names and parameters of ss01/);
+
+    const before = open(original);
+    const after = open(exportFont(read.document).bytes);
+    for (const s of EXTRA_STRINGS) {
+      expect({ ...s, glyphs: setting(after, s) }, features).toEqual({
+        ...s,
+        glyphs: setting(before, s),
+      });
     }
   });
 });
