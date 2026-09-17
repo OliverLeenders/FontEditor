@@ -110,6 +110,19 @@ note(f"{len(groups)} groups: {sorted(groups)}")
 layers = reader.getLayerNames()
 note(f"layers: {layers}, default {reader.getDefaultLayerName()!r}")
 
+# The other layers, read with validation as the drawing is: a layer this editor
+# wrote that fontTools refuses is a background nobody else can open.
+for layer_name in layers:
+    if layer_name == reader.getDefaultLayerName():
+        continue
+    try:
+        other = reader.getGlyphSet(layer_name, validateRead=True, validateWrite=True)
+        for name in other.keys():
+            other.readGlyph(name, SimpleNamespace(), RecordingPointPen())
+        note(f"layer {layer_name!r}: {sorted(other.keys())}")
+    except Exception as e:  # noqa: BLE001
+        problem(f"layer {layer_name}", f"{type(e).__name__}: {e}")
+
 glyphset = reader.getGlyphSet(validateRead=True, validateWrite=True)
 names = sorted(glyphset.keys())
 note(f"{len(names)} glyphs: {names}")

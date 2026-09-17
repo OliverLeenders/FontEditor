@@ -27,14 +27,26 @@ kerning = reader.readKerning()
 lib = reader.readLib()
 features = reader.readFeatures()
 
-glyphset = reader.getGlyphSet()
-glyphs = {}
-for name in glyphset.keys():
-    pen = RecordingPointPen()
-    glyph = SimpleNamespace()
-    glyphset.readGlyph(name, glyph, pen)
-    glyph.drawPoints = lambda p, _pen=pen: _pen.replay(p)
-    glyphs[name] = glyph
+def read_layer(glyphset):
+    out = {}
+    for name in glyphset.keys():
+        pen = RecordingPointPen()
+        glyph = SimpleNamespace()
+        glyphset.readGlyph(name, glyph, pen)
+        glyph.drawPoints = lambda p, _pen=pen: _pen.replay(p)
+        out[name] = glyph
+    return out
+
+
+glyphs = read_layer(reader.getGlyphSet())
+# Every other layer too, so what comes back has been through fontTools' writer
+# whole — the background and the sketch as well as the drawing.
+default = reader.getDefaultLayerName()
+others = {
+    name: read_layer(reader.getGlyphSet(name))
+    for name in reader.getLayerNames()
+    if name != default
+}
 
 if out.exists():
     import shutil
@@ -56,6 +68,11 @@ layer = writer.getGlyphSet()
 for name, glyph in glyphs.items():
     layer.writeGlyph(name, glyph, glyph.drawPoints)
 layer.writeContents()
+for layer_name, layer_glyphs in others.items():
+    other = writer.getGlyphSet(layerName=layer_name, defaultLayer=False)
+    for name, glyph in layer_glyphs.items():
+        other.writeGlyph(name, glyph, glyph.drawPoints)
+    other.writeContents()
 writer.writeLayerContents()
 writer.close()
 
