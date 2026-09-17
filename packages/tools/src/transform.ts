@@ -7,7 +7,7 @@ import {
   NO_LOCK,
   enforceTangents,
   updateContour,
-  updateGlyph,
+  updateGlyphInLayer,
 } from "@typewright/font-model";
 import type { Selection } from "@typewright/view";
 
@@ -37,6 +37,8 @@ export function transformedDocument(
   items: Selection,
   full: Affine,
   loosen: boolean,
+  /** The layer the points are in, or `null` for the main drawing. */
+  layer: string | null = null,
 ): FontDocument | null {
   const wanted = new Map<ContourId, Set<NodeId>>();
   for (const item of items) {
@@ -49,7 +51,7 @@ export function transformedDocument(
 
   let out: FontDocument | null = null;
   for (const [contourId, ids] of wanted) {
-    const next = updateGlyph(out ?? document, glyphName, (g) =>
+    const next = updateGlyphInLayer(out ?? document, glyphName, layer, (g) =>
       updateContour(g, contourId, (c) => {
         const nodes = c.nodes.map((n) =>
           ids.has(n.id)

@@ -3,7 +3,9 @@ import {
   type ContourId,
   type GlyphName,
   type Node,
+  inLayer,
   putGlyph,
+  withLayer,
   roundFont,
   updateContour,
   roundGlyph,
@@ -50,13 +52,19 @@ export function unroundedCount(state: EditorState): number {
  * takes back a great deal more than was meant.
  */
 export function roundGlyphAt(state: EditorState, name: GlyphName): ToolResult {
-  const glyph = state.document.glyphs[name];
-  if (glyph === undefined) return result(state);
+  const whole = state.document.glyphs[name];
+  if (whole === undefined) return result(state);
+  const layer = name === state.currentGlyph ? state.layer : null;
+  const glyph = inLayer(whole, layer);
 
   const rounded = roundGlyph(glyph);
   if (rounded === glyph) return result(state);
 
-  return done(state, { ...state, document: putGlyph(state.document, rounded) }, "Round glyph");
+  return done(
+    state,
+    { ...state, document: putGlyph(state.document, withLayer(whole, layer, rounded)) },
+    "Round glyph",
+  );
 }
 
 /**

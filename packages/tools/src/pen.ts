@@ -13,13 +13,19 @@ import {
   removeNode,
   setClosed,
   updateContour,
-  updateGlyph,
+  updateGlyphInLayer,
 } from "@typewright/font-model";
 import { screenTolerance } from "@typewright/view";
 
 import { type ToolResult, abort, begin, commit, result } from "./effects.js";
 import type { KeyInput, PointerInput } from "./input.js";
-import { type EditorState, type PenState, currentGlyph, editCurrentGlyph } from "./state.js";
+import {
+  type EditorState,
+  type PenState,
+  currentGlyph,
+  editCurrentGlyph,
+  glyphIn,
+} from "./state.js";
 
 export type PenOptions = {
   /**
@@ -152,7 +158,7 @@ export function pointerMove(
   const away = sub(input.point, anchor.pt);
   const mirrored: Vec2 = { x: anchor.pt.x - away.x, y: anchor.pt.y - away.y };
 
-  const document = updateGlyph(state.document, state.currentGlyph, (g) =>
+  const document = updateGlyphInLayer(state.document, state.currentGlyph, state.layer, (g) =>
     updateContour(g, pen.contourId, (contourValue) => {
       const index = contourValue.nodes.findIndex((n) => n.id === pen.lastNodeId);
       if (index < 0) return null;
@@ -254,7 +260,7 @@ function takeBackPoint(state: EditorState): ToolResult {
   );
   if (document === null) return result(state);
 
-  const nextGlyph = document.glyphs[state.currentGlyph];
+  const nextGlyph = glyphIn(document, state);
   const remaining = nextGlyph?.contours.find((candidate) => candidate.id === pen.contourId);
   const newLast = remaining?.nodes[remaining.nodes.length - 1];
 

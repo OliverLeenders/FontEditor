@@ -10,7 +10,8 @@ import {
   type Measurement,
   type NodeId,
   glyphNamed,
-  updateGlyph,
+  inLayer,
+  updateGlyphInLayer,
 } from "@typewright/font-model";
 
 export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure" | "section";
@@ -220,6 +221,12 @@ export type EditorState = {
   readonly activeTool: ToolId;
   /** Which glyph the canvas is editing. */
   readonly currentGlyph: GlyphName;
+  /**
+   * Which of its drawings: a layer's name, or `null` for the main drawing.
+   * Every tool reads and writes the glyph through this, so drawing in the
+   * background is the same tools drawing somewhere else.
+   */
+  readonly layer: string | null;
   /** The contour the pen is partway through, if any. */
   readonly pen: PenState | null;
   /** The shape being dragged out, if any. */
@@ -321,6 +328,7 @@ export type EditorStateInit = {
   readonly view: ViewTransform;
   readonly activeTool?: ToolId;
   readonly currentGlyph?: GlyphName;
+  readonly layer?: string | null;
   readonly selection?: Selection;
   readonly hoveredSegment?: SegmentRef | null;
   readonly focusedSegment?: SegmentRef | null;
@@ -332,6 +340,7 @@ export function editorState(init: EditorStateInit): EditorState {
     document: init.document,
     activeTool: init.activeTool ?? "select",
     currentGlyph: init.currentGlyph ?? init.document.glyphOrder[0] ?? "",
+    layer: init.layer ?? null,
     pen: null,
     shape: null,
     knife: null,
@@ -378,7 +387,16 @@ export function tunniSegments(state: EditorState): SegmentRef[] {
  * one field.
  */
 export function currentGlyph(state: EditorState): Glyph | null {
-  return glyphNamed(state.document, state.currentGlyph);
+  return glyphIn(state.document, state);
+}
+
+/**
+ * The glyph being edited as it is in some document — a document as it was when
+ * a drag began, say — in the layer being drawn.
+ */
+export function glyphIn(document: FontDocument, state: EditorState): Glyph | null {
+  const found = glyphNamed(document, state.currentGlyph);
+  return found === null ? null : inLayer(found, state.layer);
 }
 
 /**
@@ -389,7 +407,7 @@ export function editCurrentGlyph(
   state: EditorState,
   operation: (glyph: Glyph) => Glyph | null,
 ): FontDocument | null {
-  return updateGlyph(state.document, state.currentGlyph, operation);
+  return updateGlyphInLayer(state.document, state.currentGlyph, state.layer, operation);
 }
 
 /** The marquee rectangle for the renderer, or `null` when none is in progress. */

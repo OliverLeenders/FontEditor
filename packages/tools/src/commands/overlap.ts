@@ -2,8 +2,10 @@ import {
   type ContourId,
   type GlyphName,
   type IdFactory,
+  inLayer,
   putGlyph,
   removeOverlap,
+  withLayer,
   randomIds,
 } from "@typewright/font-model";
 import { type ToolResult, result } from "../effects.js";
@@ -49,8 +51,11 @@ export function overlapAt(
   only: ReadonlySet<ContourId> | null = null,
   ids: IdFactory = overlapIds,
 ): { readonly outcome: OverlapOutcome; readonly result: ToolResult } {
-  const g = state.document.glyphs[name];
-  if (g === undefined) return { outcome: "clean", result: result(state) };
+  const whole = state.document.glyphs[name];
+  if (whole === undefined) return { outcome: "clean", result: result(state) };
+  // The open glyph in the layer being drawn; any other glyph as the font draws it.
+  const layer = name === state.currentGlyph ? state.layer : null;
+  const g = inLayer(whole, layer);
 
   const union = removeOverlap(g, ids, only);
   if (union === null) return { outcome: "refused", result: result(state) };
@@ -60,7 +65,11 @@ export function overlapAt(
   // there is nothing left for it to point at. Clearing it is the honest answer:
   // a selection of ids that no longer exist draws nothing and moves nothing,
   // and undo puts the old one back with the old contours.
-  const after = { ...state, document: putGlyph(state.document, union.glyph), selection: [] };
+  const after = {
+    ...state,
+    document: putGlyph(state.document, withLayer(whole, layer, union.glyph)),
+    selection: [],
+  };
 
   return {
     outcome: union.crossings,

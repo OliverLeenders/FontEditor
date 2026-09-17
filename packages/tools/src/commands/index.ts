@@ -164,5 +164,14 @@ export {
   unlinkMetricKey,
 } from "./spacing.js";
 
+export {
+  addLayerNamed,
+  clearLayerAt,
+  copyToLayerAt,
+  drawInLayer,
+  removeLayerNamed,
+  swapWithLayerAt,
+} from "./layers.js";
+
 export type { TransformOrigin } from "./transform.js";
 export { BOX_CENTRE, transformOriginPoint, transformSelection } from "./transform.js";

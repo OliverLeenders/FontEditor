@@ -23,8 +23,8 @@ import {
   sidebearings,
   translateNodes,
   updateContour,
-  updateGlyph,
   updateGlyphComponent,
+  updateGlyphInLayer,
 } from "@typewright/font-model";
 import {
   type BoxFrame,
@@ -61,7 +61,7 @@ import {
 import { type ToolResult, begin, result } from "./effects.js";
 import type { PointerInput } from "./input.js";
 import { movedGuideIn } from "./commands/guides.js";
-import { type EditorState, type Gesture, currentGlyph } from "./state.js";
+import { type EditorState, type Gesture, currentGlyph, glyphIn } from "./state.js";
 import { transformedDocument } from "./transform.js";
 
 /**
@@ -87,6 +87,7 @@ export const EMPTY_GLYPH: Glyph = {
   kept: [],
   metricKeys: NO_METRIC_KEYS,
   markColor: null,
+  layers: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -631,7 +632,7 @@ const CONTINUE: Continuations = {
     // from those positions, so snapping has to ask where they started rather
     // than where the last frame left them — and the lines to catch on have to be
     // where they started too, or the drag would tow its own candidates along.
-    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const snapping = snappingFor(state, input, options, started, gesture.items);
     const snapped = snapDelta(
       selectionPoints(started, gesture.items),
@@ -640,7 +641,7 @@ const CONTINUE: Continuations = {
       gesture.snapped,
     );
 
-    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+    const document = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
       translateSelection(g, gesture.items, snapped.delta),
     );
     return {
@@ -651,7 +652,7 @@ const CONTINUE: Continuations = {
   },
 
   dragHandle: (state, gesture, input, delta, options) => {
-    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const moving: Selection = [
       { contourId: gesture.contourId, nodeId: gesture.nodeId, part: gesture.part },
     ];
@@ -661,7 +662,7 @@ const CONTINUE: Continuations = {
     // it is the position that snaps. A smooth node then swings its other handle
     // to match, which is the point: the snapped side is the one being aimed.
     const snapped = snapPoint(input.point, snapping, gesture.snapped);
-    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+    const document = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
       updateContour(g, gesture.contourId, (c) =>
         setHandle(c, gesture.nodeId, gesture.part, snapped.point, gesture.breakSmooth),
       ),
@@ -678,11 +679,11 @@ const CONTINUE: Continuations = {
     // belong to another glyph, so there is nothing of *this* drawing for them
     // to line up with except the metrics — and an accent lining itself up with
     // the letter under it is what anchors are for.
-    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const snapping = snappingFor(state, input, options, started, []);
     const snapped = snapDelta([gesture.origin], delta, snapping, gesture.snapped);
 
-    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+    const document = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
       updateGlyphComponent(g, gesture.componentId, (c) =>
         movedComponent(c, snapped.delta.x, snapped.delta.y),
       ),
@@ -698,11 +699,11 @@ const CONTINUE: Continuations = {
     // Snapped like a node, and against the same lines: an anchor is placed
     // relative to the drawing — the middle of a letter, the height its accents
     // sit at — so the stem edges and metric lines are exactly what it wants.
-    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const snapping = snappingFor(state, input, options, started, []);
     const snapped = snapPoint(input.point, snapping, gesture.snapped);
 
-    const document = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+    const document = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
       moveAnchorTo(g, gesture.anchorId, snapped.point),
     );
     return {
@@ -716,7 +717,7 @@ const CONTINUE: Continuations = {
     // Snapped like an anchor and against the same lines. A guide is placed
     // against the drawing — level with an overshoot, up the edge of a stem —
     // which is exactly what those lines are.
-    const started = gesture.before.glyphs[state.currentGlyph] ?? EMPTY_GLYPH;
+    const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const snapping = snappingFor(state, input, options, started, [], gesture.guideId);
     const snapped = snapPoint(input.point, snapping, gesture.snapped);
 
@@ -750,7 +751,7 @@ const CONTINUE: Continuations = {
     // line does move, and changes the advance alone.
     const document =
       gesture.side === "advance"
-        ? updateGlyph(gesture.before, state.currentGlyph, (g) => ({
+        ? updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) => ({
             ...g,
             // The measurement itself is rounded, not the offset: an advance is a
             // number someone will read in a field, and it should be whole even
@@ -759,7 +760,7 @@ const CONTINUE: Continuations = {
           }))
         : gesture.startLeft === null
           ? null
-          : updateGlyph(gesture.before, state.currentGlyph, (g) =>
+          : updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
               setLeftSidebearing(
                 g,
                 toGrid((gesture.startLeft ?? 0) + delta.x, snapping),
@@ -804,6 +805,7 @@ const CONTINUE: Continuations = {
       gesture.items,
       about(transform, pivot),
       !keepsAxes(transform),
+      state.layer,
     );
 
     return {
@@ -841,7 +843,7 @@ function continueTunni(
   delta: Vec2,
   apply: (c: Parameters<typeof setSegmentTunniPoint>[0], index: number, p: Vec2) => unknown,
 ): EditorState {
-  const next = updateGlyph(gesture.before, state.currentGlyph, (g) =>
+  const next = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
     updateContour(
       g,
       gesture.segment.contourId,

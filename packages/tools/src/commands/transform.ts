@@ -113,6 +113,7 @@ export function transformSelection(
     chosen,
     about(transform, centre),
     !keepsAxes(transform),
+    state.layer,
   );
 
   // A turn moves the box as well as the points. The caller says how far, because
