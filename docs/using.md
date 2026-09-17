@@ -170,6 +170,14 @@ source, and — once a font has more than one master — a family as a designspa
 UFO each, one variable font, and every named style as an ordinary static font. The web
 formats are written from the TrueType flavour, which is what WOFF2's transform is for.
 
+**Layers.** The Layers section of the inspector lists the glyph's other drawings — a
+background, a sketch — and which one the tools draw in. B draws in the background and back
+in the letter. Layers with their eye open show faint behind the drawing, and the letter
+always shows behind a layer being drawn in. Copy the drawing into a layer before reworking
+it, trade the two once the new one is better, or clear a layer — for the open glyph there,
+or for every glyph picked in the grid from its menu. A UFO's layers open as layers and save
+back into their own directories.
+
 **A family's designspace.** The Designspace button beside the font info edits what a
 `.designspace` says besides its masters: each axis's range as a menu offers it and its map
 to where the drawings are, and the rules — a glyph put in place of another where a range

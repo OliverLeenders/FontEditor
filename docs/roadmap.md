@@ -51,8 +51,8 @@ application installs from a release and updates itself.
 | 26    | The last interface tests            | done: every panel and control is rendered by a test                                        |
 | 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried           |
 | 28    | Binary import keeps its layout      | done: GSUB and GPOS as source, marks as anchors, kerning into the model, fontTools-checked |
-| 29    | Layers to draw on                   | next                                                                                       |
-| 30    | Making masters compatible           | planned                                                                                    |
+| 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph     |
+| 30    | Making masters compatible           | next                                                                                       |
 | 31    | A proof for judging features        | planned                                                                                    |
 | 32    | More outline operations             | planned                                                                                    |
 
@@ -87,10 +87,9 @@ The gaps worth naming, in the order they would bite someone using this:
   as it was found and written back where it was, unread. The model does not interpret any
   of it, which is the point: it is somebody's data passing through. Deleting is careful
   for the same reason — only `.glif` files the previous save listed are removed, and files
-  this editor never wrote are left alone. Layers other than the default one are carried
-  the same way — read whole, never looked at, written back where they were, and listed
-  again in `layercontents.plist` — so a source with a sketch layer beside the drawing
-  survives being opened, edited and saved. The one thing left to know is that a source
+  this editor never wrote are left alone. Layers other than the default one were carried
+  the same way until phase 29, and are now read into the glyphs that draw in them and
+  written back from there — see that phase. The one thing left to know is that a source
   whose default layer is not in `glyphs/` has its glyphs moved there, and the old
   directory is reported rather than deleted.
 
@@ -755,11 +754,36 @@ adjustment, cursive attachment, marks on a ligature, an extension lookup, per-sc
 features and a named stylistic set — are compiled by fontTools, opened here as binaries,
 exported again, and set by HarfBuzz against the fonts they were opened from.
 
-#### Phase 29 — Layers to draw on
+#### Phase 29 — Layers to draw on — done
 
-A UFO's other layers are read, carried and written back, but cannot be seen or edited. A
-background layer is where an outline is copied before it is reworked, and where a sketch is
-traced from; a layer is shown behind the drawing, and outlines move between it and the glyph.
+A UFO's other layers were read, carried and written back, but could not be seen or edited.
+Now:
+
+- **Layers are in the document.** Each glyph carries its drawing in every layer it draws in
+  — outline, components, anchors, guides, picture, advance — so a layer is renamed, deleted,
+  saved and undone with its glyph. The font keeps the list of layers, their directories,
+  their `layerinfo.plist`, and the glyphs only a layer draws, carried as they were. A
+  project saved the old way has its layers moved into the document the first time it opens.
+- **Any layer can be drawn in.** The editor's state says which drawing the tools are pointed
+  at, and every tool reads and writes the glyph through that one place — so drawing in the
+  background is the same tools drawing somewhere else. B draws in the background, adding the
+  layer the first time, and again draws in the letter.
+- **Layers are shown behind.** Faint, under everything but the tracing: the letter whenever
+  a layer is being drawn in, and every layer whose eye is open — the background's is, to
+  start with.
+- **Between a letter and its layers**: copy the drawing in, trade the two, clear the layer —
+  for the open glyph from a Layers section in the inspector, and for every glyph picked in
+  the grid from its menu. Layers are added and removed from the same section.
+- Renaming a glyph now repoints components in layer drawings as well.
+
+Found on the way, and fixed: the document was rebuilt in several places — a load across the
+storage worker, a font replaced wholesale, a snapshot — and two of them left out the font's
+own guides and what its file carried unread. A font opened and reloaded before anything was
+edited came back without them, and the next save wrote the loss out.
+
+Proved the way UFOs are: the proof UFO has a background and a sketch layer, fontTools reads
+every layer with validation on, writes them all back, and they are read again here and
+compared drawing by drawing.
 
 #### Phase 30 — Making masters compatible
 
