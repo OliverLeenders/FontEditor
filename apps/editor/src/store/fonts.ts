@@ -8,6 +8,8 @@ import {
   looksLikeArchive,
   looksLikeFamily,
   looksLikeUfo,
+  fromWoff,
+  isWoff,
   readFamily,
   unzip,
 } from "@typewright/font-io";
@@ -166,7 +168,11 @@ async function readBinary(bytes: ArrayBuffer): Promise<{
   layers: readonly ExtraLayer[];
 }> {
   const { importFont } = await import("@typewright/font-io/binary");
-  const parsed = importFont(bytes, randomIds());
+  // A WOFF is unpacked first: its tables are compressed, and reading what the
+  // font does — its GSUB, GPOS and GDEF — needs them as they are.
+  const packed = new Uint8Array(bytes);
+  const plain = isWoff(packed) ? await fromWoff(packed) : packed;
+  const parsed = importFont(plain.slice().buffer, randomIds());
   return {
     document: parsed.document,
     images: new Map<string, Uint8Array>(),

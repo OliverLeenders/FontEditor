@@ -78,4 +78,35 @@ describe("importing a font into the store", () => {
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(result.warnings[0]).toMatch(/more than once/);
   });
+
+  it("brings a font's substitutions with it, from a WOFF as from a plain file", async () => {
+    const { exportFont, toWoff } = await import("@typewright/font-io");
+    const { DEFAULT_FONT_INFO, contour, counterIds, fontDocument, glyph, node, setFeatures } =
+      await import("@typewright/font-model");
+    const ids = counterIds("wi");
+    const drawn = () =>
+      contour(
+        ids.contour(),
+        [node(ids.node(), { x: 0, y: 0 }), node(ids.node(), { x: 100, y: 700 })],
+        true,
+      );
+    const document = setFeatures(
+      fontDocument(
+        [
+          glyph(".notdef", { advance: 500 }),
+          glyph("f", { unicodes: [0x66], advance: 500, contours: [drawn()] }),
+          glyph("i", { unicodes: [0x69], advance: 500, contours: [drawn()] }),
+          glyph("f_i", { advance: 500, contours: [drawn()] }),
+        ],
+        { ...DEFAULT_FONT_INFO, familyName: "Woff" },
+      ),
+      "feature liga { sub f i by f_i; } liga;",
+    );
+    const woff = await toWoff(new Uint8Array(exportFont(document).bytes));
+
+    const store: Store = new EditorStore();
+    const result = await store.importFont(woff.slice().buffer, "Woff.woff");
+    expect(result.warnings).toEqual([]);
+    expect(store.editor.document.features).toMatch(/sub f i by f_i;/);
+  });
 });
