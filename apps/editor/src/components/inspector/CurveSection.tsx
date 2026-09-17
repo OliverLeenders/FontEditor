@@ -23,10 +23,16 @@ import { Field, shown } from "./fields.js";
 /**
  * The segment the selection is on: its tension, its curvature, and the pan.
  *
- * The Tunni controls as numbers. Tension is each handle's reach towards the
- * handle intersection, as a percentage — the proportion a designer already
- * talks in, and the one thing about a curve that carries from one segment to
- * the next where a length in units does not.
+ * The Tunni controls as numbers, in the two dimensions the geometry actually
+ * has: how much handle there is, and how it is split between the two ends.
+ *
+ * Tension is both handles' reach towards the handle intersection, as a
+ * percentage — the proportion a designer already talks in, and the one thing
+ * about a curve that carries from one segment to the next where a length in
+ * units does not. Pan is the split. Between them they say everything a pair of
+ * λs says, and each one on its own is a thing somebody means to change: a
+ * number for each handle made every change of tension a change of balance as
+ * well, and left the slider saying the same thing twice.
  */
 export function CurveSection(): React.JSX.Element {
   const store = useEditorStore();
@@ -65,22 +71,23 @@ export function CurveSection(): React.JSX.Element {
     [store],
   );
 
-  /** Set one handle's tension, leaving the other where it is. */
-  const commitTension = (which: "in" | "out", percent: number): void => {
+  /**
+   * Set the tension of both handles, keeping the balance between them.
+   *
+   * Typed as the mean of the two, which is what the pan is a split of: pan
+   * holds the sum and moves the split, this holds the split and moves the sum,
+   * so neither control moves the other's number.
+   */
+  const commitTension = (percent: number): void => {
     if (!Number.isFinite(percent)) return;
     const segment = store.editor.focusedSegment;
     const scales = focusedSegmentScales(store.editor);
     if (segment === null || scales === null) return;
 
-    store.applyTool(
-      setSegmentTension(
-        store.editor,
-        segment,
-        which === "in"
-          ? { lambda1: percent / 100, lambda2: scales.lambda2 }
-          : { lambda1: scales.lambda1, lambda2: percent / 100 },
-      ),
-    );
+    const mean = percent / 100;
+    const balanced = pannedLambdas({ lambda1: mean, lambda2: mean }, panOf(scales) ?? 0);
+    if (balanced === null) return;
+    store.applyTool(setSegmentTension(store.editor, segment, balanced));
   };
 
   /**
@@ -109,6 +116,26 @@ export function CurveSection(): React.JSX.Element {
     store.applyTool(holdSegmentTension(store.editor, held.segment, scales));
   };
 
+  /**
+   * Set the pan outright, as the field beside the slider does.
+   *
+   * One step of its own, unlike the slider's drag: a number typed is a single
+   * change however long it took to type. Held inside the slider's own travel,
+   * since a pan of one has shortened a handle into its anchor and the kernel
+   * refuses it.
+   */
+  const commitPan = (percent: number): void => {
+    if (!Number.isFinite(percent)) return;
+    const segment = store.editor.focusedSegment;
+    const scales = focusedSegmentScales(store.editor);
+    if (segment === null || scales === null) return;
+
+    const to = Math.max(-PAN_REACH, Math.min(PAN_REACH, percent / 100));
+    const panned = pannedLambdas(scales, to);
+    if (panned === null) return;
+    store.applyTool(setSegmentTension(store.editor, segment, panned));
+  };
+
   const endPan = (): void => {
     if (pan.current === null) return;
     pan.current = null;
@@ -119,6 +146,9 @@ export function CurveSection(): React.JSX.Element {
   // and pointing at each other; anywhere else the number exists and means
   // nothing anyone would want to type into. See `TunniStatus`.
   const curveReady = curveStatus === "ok" && tensionIn !== null && tensionOut !== null;
+  // The mean, since that is the number pan leaves alone: with the handles
+  // balanced it is each handle's own reach, and panned it is what they average.
+  const tension = tensionIn === null || tensionOut === null ? null : (tensionIn + tensionOut) / 2;
   const panValue =
     tensionIn === null || tensionOut === null
       ? 0
@@ -129,46 +159,35 @@ export function CurveSection(): React.JSX.Element {
       : curveStatus === "flat"
         ? "A straight segment has no tension"
         : curveStatus === "ok"
-          ? "How far each handle reaches towards where the two handle lines cross"
+          ? "How far the handles reach towards where the two handle lines cross; pan sets the balance between them"
           : "The handles of this segment do not make a proportion that can be typed";
 
   return (
-    <Section name="curve" title="Curve" icon={SplineIcon} relevant={curveStatus !== null}>
+    <Section
+      name="curve"
+      title="Curve"
+      icon={SplineIcon}
+      relevant={curveStatus !== null}
+      empty={curveStatus === null}
+      emptyNote="no segment"
+    >
       <Field label="Tension">
-        <div className={styles.pair}>
-          <Stepper
-            value={tensionIn === null ? null : shown(tensionIn * 100)}
-            label="tension at the start"
+        <Stepper
+          value={tension === null ? null : shown(tension * 100)}
+          label="tension"
+          disabled={!curveReady}
+          onStep={(next) => commitTension(next)}
+        >
+          <input
+            className={styles.input}
+            type="number"
+            aria-label="Tension of the segment"
+            title={curveHint}
             disabled={!curveReady}
-            onStep={(next) => commitTension("in", next)}
-          >
-            <input
-              className={styles.input}
-              type="number"
-              aria-label="Tension at the start of the segment"
-              title={curveHint}
-              disabled={!curveReady}
-              value={tensionIn === null ? "" : shown(tensionIn * 100)}
-              onChange={(event) => commitTension("in", Number(event.target.value))}
-            />
-          </Stepper>
-          <Stepper
-            value={tensionOut === null ? null : shown(tensionOut * 100)}
-            label="tension at the end"
-            disabled={!curveReady}
-            onStep={(next) => commitTension("out", next)}
-          >
-            <input
-              className={styles.input}
-              type="number"
-              aria-label="Tension at the end of the segment"
-              title={curveHint}
-              disabled={!curveReady}
-              value={tensionOut === null ? "" : shown(tensionOut * 100)}
-              onChange={(event) => commitTension("out", Number(event.target.value))}
-            />
-          </Stepper>
-        </div>
+            value={tension === null ? "" : shown(tension * 100)}
+            onChange={(event) => commitTension(Number(event.target.value))}
+          />
+        </Stepper>
       </Field>
 
       {/* What the curvature comb shows at this node, as a number: the radius
@@ -204,33 +223,57 @@ export function CurveSection(): React.JSX.Element {
             much there is of it, so the curve leans without swelling. The middle
             is where the two are equal, which is what balancing a segment does. */}
       <Field label="Pan">
-        <div className={styles.panTrack}>
-          {/* Behind the slider, so the thumb covers it exactly when the pan
+        <div className={styles.panRow}>
+          <div className={styles.panTrack}>
+            {/* Behind the slider, so the thumb covers it exactly when the pan
                 is where the mark says. */}
-          <span className={styles.centre} aria-hidden="true" />
-          <input
-            className={styles.slider}
-            type="range"
-            min={-PAN_REACH}
-            max={PAN_REACH}
-            step={0.01}
-            aria-label="Pan the curve between its two handles"
-            title="Lengthen one handle by as much as the other shortens; the middle is balanced — double-click to go there"
+            <span className={styles.centre} aria-hidden="true" />
+            <input
+              className={styles.slider}
+              type="range"
+              min={-PAN_REACH}
+              max={PAN_REACH}
+              step={0.01}
+              aria-label="Pan the curve between its two handles"
+              title="Lengthen one handle by as much as the other shortens; the middle is balanced — double-click to go there"
+              disabled={!curveReady}
+              value={curveReady ? panValue : 0}
+              onChange={(event) => movePan(Number(event.target.value))}
+              onPointerUp={endPan}
+              onKeyUp={endPan}
+              onBlur={endPan}
+              // Back to balanced, which is where the mark on the track is. The
+              // same gesture as double-clicking the Tunni point on the canvas,
+              // and for the same reason: the middle is a place aimed for often
+              // enough that hitting it by hand is a nuisance.
+              onDoubleClick={() => {
+                movePan(0);
+                endPan();
+              }}
+            />
+          </div>
+
+          {/* The same number, to read and to type. A slider says roughly, and
+              a lean worth keeping is one worth being able to write down — and
+              to give the segment beside it. */}
+          <Stepper
+            value={curveReady ? shown(panValue * 100) : null}
+            label="pan"
             disabled={!curveReady}
-            value={curveReady ? panValue : 0}
-            onChange={(event) => movePan(Number(event.target.value))}
-            onPointerUp={endPan}
-            onKeyUp={endPan}
-            onBlur={endPan}
-            // Back to balanced, which is where the mark on the track is. The
-            // same gesture as double-clicking the Tunni point on the canvas,
-            // and for the same reason: the middle is a place aimed for often
-            // enough that hitting it by hand is a nuisance.
-            onDoubleClick={() => {
-              movePan(0);
-              endPan();
-            }}
-          />
+            onStep={(next) => commitPan(next)}
+          >
+            <input
+              className={styles.input}
+              type="number"
+              min={-PAN_REACH * 100}
+              max={PAN_REACH * 100}
+              aria-label="Pan as a percentage"
+              title="Which way the reach leans, as a percentage of it: 0 is balanced, 100 is all at the start"
+              disabled={!curveReady}
+              value={curveReady ? shown(panValue * 100) : ""}
+              onChange={(event) => commitPan(Number(event.target.value))}
+            />
+          </Stepper>
         </div>
       </Field>
     </Section>

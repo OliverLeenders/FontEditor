@@ -58,7 +58,14 @@ dragging to leave only one handle, click the first point to close, Enter or Esca
 finish open, Backspace to take a point back.
 
 With the select tool: drag nodes, handles, the blue Tunni line and the amber Tunni
-point. Double-click a Tunni point to balance the segment. Double-click a contour — a point of it, a handle, or the curve itself — to select all of
+point. Double-click a Tunni point to balance the segment. The inspector's Curve section
+says the same thing in numbers, in the two dimensions the curve has: **tension** is how
+far both handles reach towards where the handle lines cross, and **pan** is how that
+reach is split between them. Typing a tension leaves the balance alone, and panning
+leaves the tension alone. The pan has a slider and a field beside it, both in percent:
+0 is balanced, a positive number leans the reach towards the start of the segment. Type
+one to give a second curve the lean of the first, or double-click the slider to come back
+to balanced. Double-click a contour — a point of it, a handle, or the curve itself — to select all of
 its points, and hold shift to gather another contour with it; the same is in the
 right-click menu. Shift extends the selection,
 Alt breaks a smooth node's handle link, arrow keys nudge, Backspace deletes selected
@@ -101,8 +108,17 @@ standing upright round it, and its handles then scale along its own axes. Ctrl-Z
 and Ctrl-Shift-Z redoes, and either stands the box upright again — how far the points
 were turned is not part of the history.
 
+**The inspector's sections follow the work.** A section opens when it has something to
+say and folds when it has not, with a word beside its title for what it is short of —
+_none_, _nothing selected_, _no segment_. Folding or opening one by hand is remembered,
+except while it is empty: a Point section held open by yesterday's click would be a column
+of dashes. Opening an empty section still works, which is how the buttons inside one are
+reached, and it lasts until the section fills or empties again.
+
 **Anchors and components.** Right-click empty canvas to put an anchor down; it is a
-small cross, named on hover, dragged like a point and snapped to the same lines. The
+small cross, named on hover, dragged like a point and snapped to the same lines. Both an
+anchor and a guide stay picked while the arrow keys nudge them and Backspace removes them;
+clicking the canvas where nothing is, or dragging a marquee, lets go. The
 inspector lists them with an editable name and coordinates. A component is added by name
 in the inspector and lands on its anchors where both glyphs have a matching pair — an
 `acute` carrying `_top` on a letter carrying `top` — and at the origin otherwise. Drag one

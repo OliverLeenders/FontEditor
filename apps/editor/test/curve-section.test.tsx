@@ -16,8 +16,10 @@ const { focusedSegmentScales, focusedSegmentStatus } = await import("@typewright
  * The geometry is the kernel's and is tested there. What this section decides
  * is when a number means something — a straight segment has no tension, and a
  * pair of handles that do not point at each other has no proportion anybody
- * could type — and that a slider, which is a drag, is one step of undo from
- * press to release however far it travels.
+ * could type — that a slider, which is a drag, is one step of undo from press
+ * to release however far it travels, and that the two controls are independent:
+ * tension is how much handle there is, pan is how it is split, and neither
+ * moves the other's number.
  */
 
 type Store = ReturnType<typeof freshStore>;
@@ -65,37 +67,62 @@ describe("a straight segment", () => {
   it("has no tension to type, and says so", () => {
     render(<CurveSection />, focusedOn("flat"));
 
-    expect(input("Tension at the start of the segment").disabled).toBe(true);
-    expect(input("Tension at the start of the segment").title).toBe(
-      "A straight segment has no tension",
-    );
+    expect(input("Tension of the segment").disabled).toBe(true);
+    expect(input("Tension of the segment").title).toBe("A straight segment has no tension");
   });
 });
 
 describe("a curve", () => {
-  it("shows each handle's tension as a percentage", () => {
+  it("shows the handles' tension as one percentage", () => {
     const store = focusedOn("ok");
     render(<CurveSection />, store);
+    const { lambda1, lambda2 } = scales(store);
 
-    expect(Number(input("Tension at the start of the segment").value)).toBeCloseTo(
-      scales(store).lambda1 * 100,
-      0,
-    );
-    expect(Number(input("Tension at the end of the segment").value)).toBeCloseTo(
-      scales(store).lambda2 * 100,
+    expect(Number(input("Tension of the segment").value)).toBeCloseTo(
+      ((lambda1 + lambda2) / 2) * 100,
       0,
     );
   });
 
-  it("takes a typed tension on one side and leaves the other", () => {
+  it("takes a typed tension for both handles at once", () => {
     const store = focusedOn("ok");
-    const before = scales(store);
     render(<CurveSection />, store);
 
-    fireEvent.change(input("Tension at the start of the segment"), { target: { value: "60" } });
+    fireEvent.change(input("Tension of the segment"), { target: { value: "60" } });
 
-    expect(scales(store).lambda1).toBeCloseTo(0.6, 3);
-    expect(scales(store).lambda2).toBeCloseTo(before.lambda2, 6);
+    const { lambda1, lambda2 } = scales(store);
+    expect((lambda1 + lambda2) / 2).toBeCloseTo(0.6, 3);
+  });
+
+  it("keeps the balance between the handles while the tension changes", () => {
+    const store = focusedOn("ok");
+    render(<CurveSection />, store);
+    const slider = input("Pan the curve between its two handles");
+
+    fireEvent.change(slider, { target: { value: "0.4" } });
+    fireEvent.blur(slider);
+    const panned = scales(store);
+
+    fireEvent.change(input("Tension of the segment"), { target: { value: "80" } });
+
+    const after = scales(store);
+    // Tension changed, and the split between the two handles did not: the two
+    // controls are the curve's two dimensions rather than two views of one.
+    expect((after.lambda1 + after.lambda2) / 2).toBeCloseTo(0.8, 3);
+    expect(after.lambda1 / after.lambda2).toBeCloseTo(panned.lambda1 / panned.lambda2, 6);
+    expect(Number(slider.value)).toBeCloseTo(0.4, 6);
+  });
+
+  it("leaves the tension where it is while the pan moves", () => {
+    const store = focusedOn("ok");
+    render(<CurveSection />, store);
+
+    fireEvent.change(input("Tension of the segment"), { target: { value: "50" } });
+    const slider = input("Pan the curve between its two handles");
+    fireEvent.change(slider, { target: { value: "-0.3" } });
+    fireEvent.blur(slider);
+
+    expect(Number(input("Tension of the segment").value)).toBeCloseTo(50, 3);
   });
 });
 
@@ -139,5 +166,63 @@ describe("harmonising", () => {
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "Harmonise" }).disabled).toBe(
       true,
     );
+  });
+});
+
+/**
+ * The pan as a number.
+ *
+ * A slider says roughly, and a lean worth keeping is worth being able to write
+ * down — and to type into the segment beside it, which is how two curves are
+ * made to match.
+ */
+describe("the pan field", () => {
+  it("says where the slider is, as a percentage", () => {
+    const store = focusedOn("ok");
+    render(<CurveSection />, store);
+    const slider = input("Pan the curve between its two handles");
+
+    fireEvent.change(slider, { target: { value: "0.4" } });
+    fireEvent.blur(slider);
+
+    expect(Number(input("Pan as a percentage").value)).toBeCloseTo(40, 1);
+  });
+
+  it("moves the handles when a number is typed, and the slider with them", () => {
+    const store = focusedOn("ok");
+    const before = scales(store);
+    render(<CurveSection />, store);
+
+    fireEvent.change(input("Pan as a percentage"), { target: { value: "-25" } });
+
+    const after = scales(store);
+    expect(after.lambda1 + after.lambda2).toBeCloseTo(before.lambda1 + before.lambda2, 6);
+    expect((after.lambda1 - after.lambda2) / (after.lambda1 + after.lambda2)).toBeCloseTo(-0.25, 6);
+    expect(Number(input("Pan the curve between its two handles").value)).toBeCloseTo(-0.25, 2);
+  });
+
+  it("holds a typed number inside the travel the curve allows", () => {
+    const store = focusedOn("ok");
+    render(<CurveSection />, store);
+
+    // All of the reach at one end leaves the other handle in its own anchor,
+    // which the kernel refuses, so the slider stops just short of it.
+    fireEvent.change(input("Pan as a percentage"), { target: { value: "150" } });
+
+    expect(Number(input("Pan as a percentage").value)).toBeCloseTo(98, 1);
+  });
+
+  it("is one step of undo, however many digits it took", () => {
+    const store = focusedOn("ok");
+    const before = scales(store);
+    render(<CurveSection />, store);
+
+    fireEvent.change(input("Pan as a percentage"), { target: { value: "30" } });
+    act(() => {
+      store.undo();
+    });
+
+    expect(scales(store).lambda1).toBeCloseTo(before.lambda1, 6);
+    expect(scales(store).lambda2).toBeCloseTo(before.lambda2, 6);
   });
 });
