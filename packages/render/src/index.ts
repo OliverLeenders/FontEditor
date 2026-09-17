@@ -40,7 +40,13 @@ export type {
 export { DEFAULT_METRICS, DEFAULT_OPTIONS, scene } from "./scene.js";
 
 export type { GlyphCellState } from "./draw.js";
-export { drawGlyphCell, drawGlyphThumbnail, drawScene } from "./draw.js";
+export {
+  drawGlyphCell,
+  drawGlyphThumbnail,
+  drawScene,
+  formatCodePoint,
+  sampleText,
+} from "./draw.js";
 
 export type { ProofScene, RunScene } from "./run.js";
 export { drawProof, drawRun } from "./run.js";

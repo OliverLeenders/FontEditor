@@ -74,6 +74,31 @@ export class RecordingContext implements Canvas2D {
     this.record("drawImage", [x, y, width, height]);
   }
 
+  /**
+   * What text would measure, in a model rather than in a font.
+   *
+   * Node has no font to ask, so this answers with the proportions of a
+   * conventional sans: two thirds of the size wide per character, three
+   * quarters above the baseline and a fifth below. A test that asserts a
+   * drawing fits its box is then asserting the arithmetic around the
+   * measurement, which is the part that goes wrong; what a real font would
+   * measure is its own business.
+   */
+  measureText(text: string): {
+    width: number;
+    actualBoundingBoxAscent: number;
+    actualBoundingBoxDescent: number;
+  } {
+    const size = Number.parseFloat(this.font) || 10;
+    return {
+      width: text.length * size * 0.66,
+      // A mark on a dotted circle, as a cell's sample draws it, reaches higher
+      // than a plain letter: the point of measuring at all.
+      actualBoundingBoxAscent: size * (/[\u0300-\u036F]/.test(text) ? 1.1 : 0.75),
+      actualBoundingBoxDescent: size * 0.2,
+    };
+  }
+
   save(): void {
     this.stack.push({
       fillStyle: this.fillStyle,

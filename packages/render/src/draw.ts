@@ -898,6 +898,20 @@ const CELL_LABEL_HEIGHT = 30;
 /** How faintly a glyph the open master does not draw is shown. */
 const ABSENT_ALPHA = 0.28;
 
+/**
+ * A combining mark, which is drawn on the dotted circle the standard shows it
+ * on.
+ *
+ * On its own a mark sample is an accent floating in the middle of a cell, and
+ * several of them in a row are indistinguishable specks. The circle is what
+ * every chart of the marks puts under them, and it also says *that* the
+ * character is a mark rather than a small letter.
+ */
+const COMBINING = /\p{Mn}|\p{Mc}|\p{Me}/u;
+
+/** Neither drawn by the system nor worth a box: a character with no glyph. */
+const UNPRINTABLE = /\p{Cc}|\p{Cf}|\p{Cs}|\p{Co}|\p{Cn}|\p{Zl}|\p{Zp}/u;
+
 /** How strongly a mark's colour washes the letter's ground: a tint, not a fill. */
 const MARK_WASH = 0.15;
 
@@ -955,6 +969,7 @@ export function drawGlyphCell(
   }
 
   const faint = state.absent === true;
+  if (glyph === null) drawCellSample(ctx, box, palette, state.codePoint);
   if (glyph !== null) {
     if (faint) ctx.globalAlpha = ABSENT_ALPHA;
     drawGlyphThumbnail(
@@ -982,6 +997,85 @@ export function drawGlyphCell(
     // Five pixels clear of the mark's bar, which starts four up from the foot.
     ctx.fillText(formatCodePoint(state.codePoint), centre, box.y + box.height - 9, inset);
   }
+}
+
+/**
+ * The character a cell stands for, in whatever font the system has.
+ *
+ * Drawn only where the font being made has nothing: a screenful of empty boxes
+ * after the missing glyphs of a block have been added says only how much there
+ * is to do, and which box is which is exactly what is being looked for. The
+ * sample is the answer every other tool gives, and it costs no data at all —
+ * the system already has fonts for these characters.
+ *
+ * A space is left alone, since a blank sample is the same as none, and so is
+ * anything the system will not draw either.
+ */
+function drawCellSample(
+  ctx: Canvas2D,
+  box: { x: number; y: number; width: number; height: number },
+  palette: RenderPalette,
+  codePoint: number | null,
+): void {
+  const text = sampleText(codePoint);
+  if (text === null) return;
+
+  // The room the sample has, which is the cell above its labels less a margin.
+  const art = box.height - CELL_LABEL_HEIGHT;
+  const room = art - SAMPLE_MARGIN * 2;
+  const width = box.width - SAMPLE_MARGIN * 2;
+
+  ctx.save();
+  ctx.fillStyle = palette.cellSample;
+  ctx.textAlign = "center";
+  // Alphabetic, because the sample is placed by what it measures rather than by
+  // the font's line box: an accent is drawn above the em, and centring on the
+  // line box is what let a capital with one climb out of its cell.
+  ctx.textBaseline = "alphabetic";
+
+  let size = Math.round(art * 0.52);
+  ctx.font = sampleFont(size);
+  let measured = ctx.measureText(text);
+  const tall = (measured.actualBoundingBoxAscent ?? 0) + (measured.actualBoundingBoxDescent ?? 0);
+  // Shrunk to what it measures, which is a fifth smaller for a capital with an
+  // accent and not at all for a lowercase letter. A floor of 8 pixels stops a
+  // script with very tall marks from shrinking to nothing.
+  if (tall > room) {
+    size = Math.max(8, Math.floor((size * room) / tall));
+    ctx.font = sampleFont(size);
+    measured = ctx.measureText(text);
+  }
+
+  const ascent = measured.actualBoundingBoxAscent ?? size * 0.75;
+  const descent = measured.actualBoundingBoxDescent ?? size * 0.2;
+  // Centred on what it actually covers, so a mark high above the baseline sits
+  // in the middle of the cell rather than hanging off the top of it.
+  const baseline = box.y + SAMPLE_MARGIN + (room - (ascent + descent)) / 2 + ascent;
+  ctx.fillText(text, box.x + box.width / 2, baseline, width);
+  ctx.restore();
+}
+
+/** Kept clear of the cell's border and its labels on every side. */
+const SAMPLE_MARGIN = 6;
+
+function sampleFont(size: number): string {
+  return `${String(size)}px ui-sans-serif, system-ui, sans-serif`;
+}
+
+/**
+ * The character to show for a code point, or `null` for one worth showing
+ * nothing for.
+ *
+ * Shared with the browser's tip, which shows the same sample in markup beside
+ * the words: a mark on its own is as hard to read in a tooltip as in a cell,
+ * and the two disagreeing about which characters get the dotted circle would
+ * be a small, confusing difference.
+ */
+export function sampleText(codePoint: number | null): string | null {
+  if (codePoint === null) return null;
+  const char = String.fromCodePoint(codePoint);
+  if (UNPRINTABLE.test(char) || char.trim() === "") return null;
+  return COMBINING.test(char) ? `\u25CC${char}` : char;
 }
 
 /** `U+0041`, padded to at least four digits as the standard writes them. */

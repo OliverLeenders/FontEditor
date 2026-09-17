@@ -1,4 +1,19 @@
 /**
+ * What a canvas can say about a piece of text before it is drawn.
+ *
+ * The two bounding-box fields are optional because they are what a test double
+ * is allowed not to know; a real `TextMetrics` has them, and satisfies this
+ * structurally. Width alone is not enough for the one caller that measures: a
+ * letter with an accent on it is taller than the em, and how much taller is
+ * something only the font being used can answer.
+ */
+export type TextSize = {
+  readonly width: number;
+  readonly actualBoundingBoxAscent?: number;
+  readonly actualBoundingBoxDescent?: number;
+};
+
+/**
  * The only drawing surface the renderer knows about.
  *
  * Deliberately hand-written rather than imported as `CanvasRenderingContext2D`:
@@ -57,6 +72,8 @@ export interface Canvas2D {
   stroke(): void;
   clearRect(x: number, y: number, width: number, height: number): void;
   setLineDash(segments: number[]): void;
+  /** How big a piece of text would be, in the font currently set. */
+  measureText(text: string): TextSize;
   /** `maxWidth` squeezes over-long glyph names rather than letting them spill. */
   fillText(text: string, x: number, y: number, maxWidth?: number): void;
   /**

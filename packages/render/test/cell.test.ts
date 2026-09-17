@@ -46,7 +46,9 @@ describe("drawGlyphCell", () => {
   it("still draws a labelled cell for a glyph with no outline", () => {
     const ctx = draw(null);
     expect(ctx.filledIn(LIGHT_PALETTE.outline)).toHaveLength(0);
-    expect(ctx.texts()).toEqual(["A", "U+0041"]);
+    // The sample between them: the character as the system draws it, since the
+    // font has not drawn it yet.
+    expect(ctx.texts()).toEqual(["A", "A", "U+0041"]);
     expect(ctx.strokedIn(LIGHT_PALETTE.cellRule)).toHaveLength(1);
   });
 
@@ -91,6 +93,103 @@ describe("drawGlyphCell", () => {
     for (const op of ctx.all("fillText")) {
       expect(op.args[2]).toBeLessThanOrEqual(box.width);
     }
+  });
+});
+
+/**
+ * The character a cell stands for, shown where the font has not drawn it.
+ *
+ * Adding the missing glyphs of a block fills the browser with empty boxes at
+ * once, and which box is which is the only question being asked of them.
+ */
+describe("the sample in an undrawn cell", () => {
+  const sample = (ctx: RecordingContext) =>
+    ctx.all("fillText").find((o) => o.fillStyle === LIGHT_PALETTE.cellSample)?.text ?? null;
+
+  it("draws the character, and only where there is no outline", () => {
+    expect(sample(draw(null))).toBe("A");
+    expect(sample(draw(square))).toBeNull();
+  });
+
+  it("puts a combining mark on the dotted circle it is always shown on", () => {
+    // U+0308, the diaeresis: on its own it is a speck in the middle of a cell.
+    expect(sample(draw(null, { name: "uni0308", codePoint: 0x308 }))).toBe("\u25CC\u0308");
+  });
+
+  it("draws nothing for a glyph with no code point, a space or a control", () => {
+    expect(sample(draw(null, { name: "a.alt", codePoint: null }))).toBeNull();
+    expect(sample(draw(null, { name: "space", codePoint: 0x20 }))).toBeNull();
+    expect(sample(draw(null, { name: "uni0009", codePoint: 0x09 }))).toBeNull();
+  });
+
+  /**
+   * What the sample covers, from the same measurement the drawing used.
+   *
+   * A cell is 62 pixels tall above its labels, and a capital with an accent on
+   * it measures taller than the em it is set in — which is how one came to be
+   * drawn over the top edge of its cell.
+   */
+  const covers = (ctx: RecordingContext) => {
+    const op = ctx.all("fillText").find((o) => o.fillStyle === LIGHT_PALETTE.cellSample)!;
+    const size = Number.parseFloat(op.font ?? "0");
+    const baseline = op.args[1] ?? 0;
+    const metrics = new RecordingContext();
+    metrics.font = op.font ?? "";
+    const { actualBoundingBoxAscent, actualBoundingBoxDescent } = metrics.measureText(
+      op.text ?? "",
+    );
+    return {
+      top: baseline - actualBoundingBoxAscent,
+      bottom: baseline + actualBoundingBoxDescent,
+      size,
+    };
+  };
+
+  it("keeps the sample inside the cell, above the labels", () => {
+    for (const code of [0x41, 0xcb, 0x308, 0x67]) {
+      const { top, bottom } = covers(draw(null, { codePoint: code }));
+      expect(top).toBeGreaterThanOrEqual(box.y);
+      expect(bottom).toBeLessThanOrEqual(box.y + box.height - 30);
+    }
+  });
+
+  it("shrinks a sample the font draws taller than the cell", () => {
+    // A font whose letters reach twice the size they are set at — Devanagari
+    // and Thai marks come close, and it is the case that overflowed a cell.
+    class Tall extends RecordingContext {
+      override measureText(sample: string): {
+        width: number;
+        actualBoundingBoxAscent: number;
+        actualBoundingBoxDescent: number;
+      } {
+        const size = Number.parseFloat(this.font) || 10;
+        return {
+          width: sample.length * size,
+          actualBoundingBoxAscent: size * 2,
+          actualBoundingBoxDescent: size * 0.2,
+        };
+      }
+    }
+    const ctx = new Tall();
+    drawGlyphCell(ctx, null, box, LIGHT_PALETTE, metrics, {
+      name: "uni00CB",
+      codePoint: 0xcb,
+      focused: false,
+      current: false,
+    });
+
+    const op = ctx.all("fillText").find((o) => o.fillStyle === LIGHT_PALETTE.cellSample)!;
+    const size = Number.parseFloat(op.font ?? "0");
+    const baseline = op.args[1] ?? 0;
+    expect(size).toBeLessThan(32);
+    expect(baseline - size * 2).toBeGreaterThanOrEqual(box.y);
+    expect(baseline + size * 0.2).toBeLessThanOrEqual(box.y + box.height - 30);
+  });
+
+  it("keeps the sample inside the cell sideways as well", () => {
+    const ctx = draw(null);
+    const op = ctx.all("fillText").find((o) => o.fillStyle === LIGHT_PALETTE.cellSample)!;
+    expect(op.args[2]).toBeLessThanOrEqual(box.width);
   });
 });
 

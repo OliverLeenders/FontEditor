@@ -46,6 +46,14 @@ export type RenderPalette = {
   readonly cellRule: string;
   /** The glyph name and code point beneath a cell. */
   readonly cellLabel: string;
+  /**
+   * The character a cell stands for, drawn in a system font where the font
+   * being made has not drawn it yet.
+   *
+   * Faint on purpose, and fainter than anything the font itself draws: it is a
+   * note about what belongs in the cell, and must never be mistaken for work.
+   */
+  readonly cellSample: string;
   /** Behind the cell the keyboard is on. */
   readonly cellFocus: string;
   /** Behind the cell that is open in the editor. */
@@ -120,6 +128,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   preview: "#7C8896",
   cellRule: "#E3E9EF",
   cellLabel: "#6B7783",
+  cellSample: "rgba(107,119,131,0.42)",
   cellFocus: "rgba(44,109,175,0.12)",
   cellCurrent: "rgba(169,111,34,0.14)",
   margin: "#9AAEC4",
@@ -160,6 +169,7 @@ export const DARK_PALETTE: RenderPalette = {
   preview: "#74828F",
   cellRule: "#232F3C",
   cellLabel: "#8B98A5",
+  cellSample: "rgba(139,152,165,0.45)",
   cellFocus: "rgba(116,174,226,0.16)",
   cellCurrent: "rgba(214,160,90,0.18)",
   margin: "#4B5D70",
