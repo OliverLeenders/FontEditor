@@ -182,6 +182,25 @@ export {
 } from "./document.js";
 
 export type { Glyph, GlyphInit, MetricKeys } from "./glyph.js";
+export type { LayerDrawing, LayerInfo, LayerProblem } from "./layers.js";
+export {
+  BACKGROUND,
+  addLayer,
+  clearLayer,
+  copyToLayer,
+  drawingOf,
+  hasLayer,
+  inLayer,
+  layerInfo,
+  layerLabel,
+  layerProblem,
+  layerProblemSays,
+  removeLayer,
+  setLayers,
+  swapWithLayer,
+  updateGlyphInLayer,
+  withLayer,
+} from "./layers.js";
 export {
   addContour,
   addAnchor,

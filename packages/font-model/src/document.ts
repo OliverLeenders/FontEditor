@@ -1,5 +1,6 @@
 import type { Glyph } from "./glyph.js";
 import type { Guide } from "./guide.js";
+import type { LayerInfo } from "./layers.js";
 import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js";
 import { renamedMetricKey } from "./metric-key-text.js";
 import { type TextToken, codePointFromName, textTokens } from "./text.js";
@@ -250,6 +251,11 @@ export type FontDocument = {
    * note about where it came from.
    */
   readonly kept: Kept;
+  /**
+   * The font's layers other than the main drawing, in order. Each glyph's
+   * drawing in one is on the glyph; see `layers.ts`.
+   */
+  readonly layers: readonly LayerInfo[];
 };
 
 export function fontDocument(
@@ -270,6 +276,7 @@ export function fontDocument(
     features: "",
     guides: [],
     kept: NOTHING_KEPT,
+    layers: [],
   };
 }
 
@@ -559,9 +566,18 @@ function withKeysRenamed(g: Glyph, from: GlyphName, to: GlyphName): Glyph {
 
 /** Point a glyph's components at a renamed base, leaving it alone if none do. */
 function withComponentBase(g: Glyph, from: GlyphName, to: GlyphName): Glyph {
-  if (!g.components.some((c) => c.base === from)) return g;
-  return {
-    ...g,
-    components: g.components.map((c) => (c.base === from ? { ...c, base: to } : c)),
-  };
+  const places = (list: Glyph["components"]): boolean => list.some((c) => c.base === from);
+  const moved = (list: Glyph["components"]): Glyph["components"] =>
+    list.map((c) => (c.base === from ? { ...c, base: to } : c));
+
+  // The glyph's layers too: a background that places the renamed glyph is
+  // pointing at it as surely as the letter is.
+  const layered = Object.entries(g.layers).filter(([, drawing]) => places(drawing.components));
+  if (!places(g.components) && layered.length === 0) return g;
+
+  const layers = { ...g.layers };
+  for (const [name, drawing] of layered) {
+    layers[name] = { ...drawing, components: moved(drawing.components) };
+  }
+  return { ...g, components: moved(g.components), layers };
 }

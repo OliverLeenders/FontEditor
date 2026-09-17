@@ -6,6 +6,7 @@ import type { ImageRef } from "./image.js";
 import type { Component } from "./component.js";
 import { type Contour, type Segment, contourBounds, segments, unionRect } from "./contour.js";
 import type { AnchorId, ComponentId, ContourId, GuideId } from "./ids.js";
+import type { LayerDrawing } from "./layers.js";
 
 /**
  * A single glyph.
@@ -80,6 +81,12 @@ export type Glyph = {
    * this again" — and nothing the compiled font carries. See `mark-color.ts`.
    */
   readonly markColor: string | null;
+  /**
+   * How the glyph is drawn in the font's other layers, by layer name: a
+   * background, a sketch, an earlier version. See `layers.ts`. Empty for a
+   * glyph drawn only once, which is nearly every glyph.
+   */
+  readonly layers: Readonly<Record<string, LayerDrawing>>;
 };
 
 /**
@@ -121,6 +128,7 @@ export type GlyphInit = {
   readonly kept?: readonly string[];
   readonly metricKeys?: MetricKeys;
   readonly markColor?: string | null;
+  readonly layers?: Readonly<Record<string, LayerDrawing>>;
 };
 
 export function glyph(name: string, init: GlyphInit = {}): Glyph {
@@ -136,6 +144,7 @@ export function glyph(name: string, init: GlyphInit = {}): Glyph {
     kept: init.kept ?? [],
     metricKeys: init.metricKeys ?? NO_METRIC_KEYS,
     markColor: init.markColor ?? null,
+    layers: init.layers ?? {},
   };
 }
 
