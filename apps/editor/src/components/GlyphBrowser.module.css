@@ -198,6 +198,56 @@
 
 /* Asked when a glyph the open master does not draw is opened. Pinned to the
    foot of the grid, over the cells, where the question is next to the answer. */
+/* Beside the cell the pointer rests on, inside the grid area so it scrolls out
+   of the way with it rather than floating over the window. It takes no pointer
+   events of its own: a tip that can be hovered is a tip that flickers. */
+.tip {
+  position: absolute;
+  z-index: 4;
+  width: 14rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  pointer-events: none;
+}
+
+.tipHead {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.tipHead b {
+  overflow: hidden;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tipSample {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.tipCode {
+  margin-left: auto;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.tipName {
+  color: var(--ink-2);
+}
+
+.tipNote {
+  color: var(--ink-3);
+}
+
 .offer {
   position: absolute;
   right: 0.75rem;

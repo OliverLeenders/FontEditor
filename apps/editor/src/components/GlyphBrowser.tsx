@@ -1,5 +1,19 @@
-import { GLYPH_SETS, catalog, filterCatalog, setCounts } from "@typewright/catalog";
-import { CanvasSurface, DARK_PALETTE, LIGHT_PALETTE, drawGlyphCell } from "@typewright/render";
+import {
+  GLYPH_SETS,
+  catalog,
+  filterCatalog,
+  loadUnicodeNames,
+  setCounts,
+  unicodeName,
+} from "@typewright/catalog";
+import {
+  CanvasSurface,
+  DARK_PALETTE,
+  LIGHT_PALETTE,
+  drawGlyphCell,
+  formatCodePoint,
+  sampleText,
+} from "@typewright/render";
 import {
   deleteGlyphs,
   duplicateGlyph,
@@ -244,6 +258,75 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   useEffect(() => {
     setFocused((f) => Math.min(f, Math.max(0, shown.length - 1)));
   }, [shown.length]);
+
+  /**
+   * The cell the pointer is resting on, and what the tip beside it says.
+   *
+   * A cell has room for a glyph name and a code point, and `uni0308` with
+   * `U+0308` under it says the same thing twice while answering neither "which
+   * mark is this" nor "what is it for". The tip is where the words go.
+   *
+   * Held by index and redrawn from the layout rather than followed with the
+   * pointer: the tip belongs to a cell, and a tip that slides about while the
+   * pointer moves inside one cell is harder to read than one that stays put.
+   */
+  const [hovered, setHovered] = useState<{ index: number; top: number; left: number } | null>(null);
+  // Set once the table of Unicode names has been unpacked, which happens on the
+  // first hover and never in a session that does not hover a cell: it is four
+  // hundred kilobytes, and nothing else in the editor wants it.
+  const [named, setNamed] = useState(false);
+  useEffect(() => {
+    if (hovered === null || named) return;
+    let watching = true;
+    void loadUnicodeNames().then(() => {
+      if (watching) setNamed(true);
+    });
+    return () => {
+      watching = false;
+    };
+  }, [hovered, named]);
+
+  const hover = (event: { clientX: number; clientY: number }): void => {
+    const scroller = scrollRef.current;
+    const index = cellFromEvent(event, scroller, layout);
+    const box = index === null ? null : cellBox(layout, index);
+    if (index === null || box === null || scroller === null) {
+      setHovered(null);
+      return;
+    }
+    // Under the cell, or over it near the foot of the list, and never off the
+    // left or right of the grid.
+    const top = box.y - scroller.scrollTop;
+    const below = top + box.height + 6;
+    const room = scroller.clientHeight - below > 96;
+    setHovered((was) =>
+      was?.index === index
+        ? was
+        : {
+            index,
+            top: room ? below : Math.max(4, top - 96),
+            left: Math.max(4, Math.min(box.x, scroller.clientWidth - 232)),
+          },
+    );
+  };
+
+  /** What the tip says about the cell under the pointer. */
+  const tip = useMemo(() => {
+    if (hovered === null) return null;
+    const entry = shown[hovered.index];
+    if (entry === undefined) return null;
+    const code = entry.codePoint;
+    return {
+      name: entry.name,
+      sample: sampleText(code),
+      codePoint: code === null ? null : formatCodePoint(code),
+      // `named` is read so that the tip is worked out again once the table is
+      // there, rather than keeping the `null` from before it arrived.
+      unicode: code === null || !named ? null : unicodeName(code),
+      block: entry.block?.label ?? null,
+      drawn: entry.drawn,
+    };
+  }, [hovered, shown, named]);
 
   /** The cell being renamed, and the draft text over it. */
   const [renaming, setRenaming] = useState<{ index: number; draft: string } | null>(null);
@@ -610,7 +693,13 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
             }}
             onScroll={(event) => {
               if (renaming !== null) setRenameScroll(event.currentTarget.scrollTop);
+              // The tip belongs beside its cell, and the cell has moved.
+              setHovered(null);
             }}
+            onPointerMove={(event) => {
+              if (event.pointerType === "mouse") hover(event);
+            }}
+            onPointerLeave={() => setHovered(null)}
             onClick={(event) => {
               const index = cellFromEvent(event, scrollRef.current, layout);
               if (index !== null) {
@@ -644,6 +733,36 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
             />
           </div>
           <canvas ref={canvasRef} className={styles.canvas} aria-hidden="true" />
+
+          {/* What a cell cannot say in the room it has: the name the standard
+              gives the character, the block it comes from, and whether the glyph
+              has been drawn. Hidden while a menu or a rename field is open, both
+              of which are about a cell the pointer may no longer be over. */}
+          {tip === null || menu !== null || renaming !== null ? null : (
+            <div
+              className={styles.tip}
+              role="tooltip"
+              style={{
+                top: `${String(hovered?.top ?? 0)}px`,
+                left: `${String(hovered?.left ?? 0)}px`,
+              }}
+            >
+              <div className={styles.tipHead}>
+                {tip.sample === null ? null : (
+                  <span className={styles.tipSample}>{tip.sample}</span>
+                )}
+                <b>{tip.name}</b>
+                {tip.codePoint === null ? null : (
+                  <span className={styles.tipCode}>{tip.codePoint}</span>
+                )}
+              </div>
+              {tip.unicode === null ? null : <div className={styles.tipName}>{tip.unicode}</div>}
+              <div className={styles.tipNote}>
+                {tip.block ?? "Unencoded"}
+                {tip.drawn ? "" : " · not yet drawn"}
+              </div>
+            </div>
+          )}
 
           {/* The grid is drawn on a canvas, so the field for renaming a cell has
               to be placed over it from the same layout the drawing used. Sitting
