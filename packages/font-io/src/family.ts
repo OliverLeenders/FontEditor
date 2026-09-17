@@ -7,7 +7,7 @@ import type {
   Rule,
   RulesProcessing,
 } from "@typewright/font-model";
-import { fontDocument, orderedGlyphs } from "@typewright/font-model";
+import { fontDocument, orderedGlyphs, removeLayer } from "@typewright/font-model";
 
 import {
   type Designspace,
@@ -319,7 +319,11 @@ export function readFamily(
     // The layer is this master now, and no longer something its file carries:
     // it is written back from the master, and writing it twice would be two
     // directories claiming one name.
-    masters[at] = { ...parent, layers: parent.layers.filter((l) => l !== layer) };
+    masters[at] = {
+      ...parent,
+      document: removeLayer(parent.document, layerName),
+      layers: parent.layers.filter((l) => l !== layer),
+    };
     masters.push({
       name: masterName(source),
       location: source.location,

@@ -1,6 +1,11 @@
 import {
   verticalGuide,
   glyphNamed,
+  BACKGROUND,
+  addLayer,
+  copyToLayer,
+  inLayer,
+  withLayer,
   DEFAULT_FONT_INFO,
   addAnchor,
   anchor,
@@ -259,7 +264,19 @@ function proof(): FontDocument {
     lib: { "com.tunni.proof": { written: "by the proof", version: 2 } },
   });
 
-  return setFeatures(setKerning(carrying, kerning), FEATURES);
+  // Two layers besides the drawing: a background holding a copy of the O, and
+  // a sketch in which the a is drawn wider — so fontTools reads layer glyphs
+  // this editor wrote, writes them back, and they are asked for again.
+  const withLayers = addLayer(addLayer(carrying, BACKGROUND), "sketch");
+  const o = copyToLayer(withLayers.glyphs["O"]!, BACKGROUND);
+  const a = withLayer(withLayers.glyphs["a"]!, "sketch", {
+    ...inLayer(withLayers.glyphs["a"]!, "sketch"),
+    advance: 640,
+    contours: [ring(40, 600, 520, -10)],
+  });
+  const layered = { ...withLayers, glyphs: { ...withLayers.glyphs, O: o, a } };
+
+  return setFeatures(setKerning(layered, kerning), FEATURES);
 }
 
 describe("the proof font", () => {
@@ -371,5 +388,22 @@ describe("the proof font", () => {
     }
 
     expect(after.features.trim()).toBe(before.features.trim());
+
+    // The layers, through fontTools and back: the list, and each drawing in it.
+    expect(after.layers.map((l) => l.name)).toEqual(before.layers.map((l) => l.name));
+    const layerShape = (d: FontDocument, layer: string) =>
+      orderedGlyphs(d)
+        .filter((g) => g.layers[layer] !== undefined)
+        .map((g) => {
+          const drawn = inLayer(g, layer);
+          return {
+            name: g.name,
+            advance: drawn.advance,
+            nodes: drawn.contours.map((c) => c.nodes.length),
+          };
+        });
+    for (const layer of [BACKGROUND, "sketch"]) {
+      expect(layerShape(after, layer)).toEqual(layerShape(before, layer));
+    }
   });
 });

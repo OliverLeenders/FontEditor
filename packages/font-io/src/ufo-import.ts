@@ -5,10 +5,12 @@ import {
   type IdFactory,
   type Guide,
   type Kerning,
+  type LayerInfo,
   type PlainValue,
   type StyleMapStyle,
   DEFAULT_FONT_INFO,
   EMPTY_KERNING,
+  drawingOf,
   fontDocument,
   hasMetricKeys,
   groupKey,
@@ -186,18 +188,79 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
     if (name !== "" && !name.includes("/")) images.set(name, f.bytes);
   }
 
+  // The other layers, read into the glyphs they draw. Handed back as found as
+  // well, for a family whose designspace makes one of them a master.
+  const layers = extraLayers(files, root, listing);
   return {
     images,
-    layers: extraLayers(files, root, listing),
-    document: setKept(
-      setGuides(
-        setFeatures(setKerning(fontDocument(spacedGlyphs, info), kerning), features),
-        guides,
+    layers,
+    document: layersIntoDocument(
+      setKept(
+        setGuides(
+          setFeatures(setKerning(fontDocument(spacedGlyphs, info), kerning), features),
+          guides,
+        ),
+        { fontInfo: keptInfo, lib: keptLib },
       ),
-      { fontInfo: keptInfo, lib: keptLib },
+      layers,
+      ids,
+      warn,
     ),
     warnings,
   };
+}
+
+/**
+ * A UFO's other layers, read into the document: each glyph's drawing in a layer
+ * onto that glyph, and the layer itself into the font's list.
+ *
+ * A `.glif` for a name the font has no glyph of is kept as it was, with the
+ * layer, and written back with it: a glyph only a sketch layer draws is still
+ * somebody's sketch.
+ */
+export function layersIntoDocument(
+  document: FontDocument,
+  layers: readonly ExtraLayer[],
+  ids: IdFactory,
+  warn: (glyph: string | null, message: string) => void,
+): FontDocument {
+  if (layers.length === 0) return document;
+
+  const glyphs: Record<string, Glyph> = { ...document.glyphs };
+  const infos: LayerInfo[] = [];
+  for (const layer of layers) {
+    const text = (path: string): string | null =>
+      layer.files.find((f) => f.path === path)?.text ?? null;
+    const orphans: { name: string; path: string; text: string }[] = [];
+
+    for (const [name, file] of stringEntries(parsePlistDict(text("contents.plist") ?? ""))) {
+      const source = text(file);
+      if (source === null) {
+        warn(name, `listed in ${layer.directory}/contents.plist but ${file} is not there`);
+        continue;
+      }
+      const base = glyphs[name];
+      if (base === undefined) {
+        orphans.push({ name, path: file, text: source });
+        continue;
+      }
+      const parsed = parseGlif(source, ids, (message) => warn(name, `${layer.name}: ${message}`));
+      if (parsed === null) {
+        warn(name, `${layer.directory}/${file} is not a glif`);
+        continue;
+      }
+      glyphs[name] = { ...base, layers: { ...base.layers, [layer.name]: drawingOf(parsed) } };
+    }
+
+    infos.push({
+      name: layer.name,
+      directory: layer.directory,
+      info: text("layerinfo.plist"),
+      orphans,
+    });
+  }
+
+  return { ...document, glyphs, layers: [...document.layers, ...infos] };
 }
 
 /**

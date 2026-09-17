@@ -59,7 +59,13 @@ export type { ImportResult, ImportWarning } from "./import.js";
 export { documentFrom, importFont } from "./import.js";
 
 export type { UfoImport, UfoImportError, UfoWarning } from "./ufo-import.js";
-export { importUfo, looksLikeArchive, looksLikeUfo, readUfo } from "./ufo-import.js";
+export {
+  importUfo,
+  layersIntoDocument,
+  looksLikeArchive,
+  looksLikeUfo,
+  readUfo,
+} from "./ufo-import.js";
 export type { ExtraLayer, LayerFile } from "./ufo-layers.js";
 export {
   DEFAULT_LAYER_DIRECTORY,

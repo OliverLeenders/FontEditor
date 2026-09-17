@@ -1,4 +1,13 @@
-import { counterIds, fontDocument, glyph } from "@typewright/font-model";
+import {
+  BACKGROUND,
+  addLayer,
+  copyToLayer,
+  counterIds,
+  fontDocument,
+  glyph,
+  inLayer,
+  withLayer,
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { readUfo } from "../src/ufo-import.js";
@@ -180,5 +189,75 @@ describe("a source with a second layer, opened and written back", () => {
   it("writes no layer directory for a font that was given none", () => {
     const plain = ufoFiles(fontDocument([glyph("a", { advance: 500 })]));
     expect(plain.some((f) => f.path.startsWith("glyphs."))).toBe(false);
+  });
+});
+
+describe("layers read into the glyphs they draw", () => {
+  it("puts a layer's drawing on its glyph, and writes an edit to it back", () => {
+    const read = readUfo(source(), ids);
+    if ("reason" in read) throw new Error(read.reason);
+    const { document } = read;
+
+    expect(document.layers.map((l) => [l.name, l.directory])).toEqual([
+      ["sketch", "glyphs.sketch"],
+    ]);
+    expect(document.glyphs["a"]?.layers["sketch"]?.advance).toBe(999);
+
+    const edited = {
+      ...document,
+      glyphs: {
+        ...document.glyphs,
+        a: withLayer(document.glyphs["a"]!, "sketch", {
+          ...inLayer(document.glyphs["a"]!, "sketch"),
+          advance: 321,
+        }),
+      },
+    };
+    const byPath = new Map(ufoFiles(edited).map((f) => [f.path, entryText(f)]));
+    expect(byPath.get("glyphs.sketch/a.glif")).toContain('width="321"');
+    expect(byPath.get("glyphs/a.glif")).toContain('width="500"');
+  });
+
+  it("keeps a glyph only the layer draws, and writes it back with the layer", () => {
+    const files = [
+      ...source(),
+      {
+        path: "glyphs.sketch/contents.plist",
+        bytes: bytes(
+          '<plist version="1.0"><dict><key>a</key><string>a.glif</string><key>ghost</key><string>ghost.glif</string></dict></plist>',
+        ),
+      },
+      {
+        path: "glyphs.sketch/ghost.glif",
+        bytes: bytes(
+          '<?xml version="1.0"?><glyph name="ghost" format="2"><advance width="7"/></glyph>',
+        ),
+      },
+    ];
+    // The later file of a path wins: the listing above replaces the source's own.
+    const read = readUfo([...new Map(files.map((f) => [f.path, f])).values()], ids);
+    if ("reason" in read) throw new Error(read.reason);
+
+    expect(read.document.glyphs["ghost"]).toBeUndefined();
+    expect(read.document.layers[0]?.orphans.map((o) => o.name)).toEqual(["ghost"]);
+
+    const byPath = new Map(ufoFiles(read.document).map((f) => [f.path, entryText(f)]));
+    expect(byPath.get("glyphs.sketch/ghost.glif")).toContain('width="7"');
+    expect(byPath.get("glyphs.sketch/contents.plist")).toContain("ghost");
+  });
+
+  it("gives a layer added here a directory of its own", () => {
+    const document = addLayer(
+      fontDocument([copyToLayer(glyph("a", { advance: 500 }), BACKGROUND)]),
+      BACKGROUND,
+    );
+    const files = ufoFiles(document);
+    expect(files.some((f) => f.path === "glyphs.public.background/a.glif")).toBe(true);
+    expect(
+      parseLayerContents(entryText(files.find((f) => f.path === "layercontents.plist")!)),
+    ).toEqual([
+      { name: "public.default", directory: "glyphs" },
+      { name: BACKGROUND, directory: "glyphs.public.background" },
+    ]);
   });
 });

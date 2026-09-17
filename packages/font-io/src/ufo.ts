@@ -9,7 +9,9 @@ import {
   glyphFileName,
   groupNameOf,
   hasMetricKeys,
+  inLayer,
   isGroupKey,
+  orderedGlyphs,
   segments,
 } from "@typewright/font-model";
 
@@ -458,6 +460,29 @@ export function ufoFiles(
   images: ReadonlyMap<string, Uint8Array> = new Map(),
   layers: readonly ExtraLayer[] = [],
 ): ZipEntry[] {
+  // The document's own layers, written from the glyphs that draw in them, and
+  // after them any written elsewhere — a master drawn as a layer of this one's
+  // file — which win over a layer of the same name.
+  const given = new Set(layers.map((l) => l.name));
+  const directories = new Set([
+    DEFAULT_LAYER_DIRECTORY,
+    ...layers.map((l) => l.directory.toLowerCase()),
+  ]);
+  const own = document.layers
+    .filter((l) => !given.has(l.name))
+    .map((l) => {
+      const directory =
+        l.directory !== null && !directories.has(l.directory.toLowerCase())
+          ? l.directory
+          : layerDirectoryFor(l.name, directories);
+      directories.add(directory.toLowerCase());
+      const drawn = orderedGlyphs(document)
+        .filter((g) => g.layers[l.name] !== undefined)
+        .map((g) => inLayer(g, l.name));
+      return layerOf(l.name, directory, drawn, l.info ?? undefined, l.orphans);
+    });
+  layers = [...own, ...layers];
+
   const entries: ZipEntry[] = [
     {
       path: "metainfo.plist",
@@ -612,10 +637,14 @@ export function layerOf(
   directory: string,
   glyphs: readonly Glyph[],
   layerInfo?: string,
+  orphans: readonly { readonly name: string; readonly path: string; readonly text: string }[] = [],
 ): ExtraLayer {
-  const taken = new Set<string>();
-  const contents: Array<readonly [string, string]> = [];
-  const files: { path: string; text: string }[] = [];
+  const taken = new Set<string>(orphans.map((o) => o.path.toLowerCase()));
+  const contents: Array<readonly [string, string]> = orphans.map((o) => [o.name, o.path] as const);
+  const files: { path: string; text: string }[] = orphans.map((o) => ({
+    path: o.path,
+    text: o.text,
+  }));
 
   for (const g of glyphs) {
     let file = glyphFileName(g.name, ".glif");
