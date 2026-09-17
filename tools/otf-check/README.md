@@ -52,6 +52,20 @@ python compile_fea.py /tmp/fea/Features.otf /tmp/fea/features.fea /tmp/fea/FromF
 FEATURES_REFERENCE=/tmp/fea/FromFeaLib.otf pnpm --filter @typewright/font-io exec vitest run proof-features
 ```
 
+## Opening a font
+
+The same run doubles as the check of the importer. With `FEATURES_REFERENCE` set, the font
+fontTools compiled is opened here as a binary — its GSUB and GPOS read back into feature
+source, anchors and kerning — exported again, and set against itself. A second file,
+`extras.fea`, holds what the editor keeps as source without compiling; `--plain` compiles
+it without the proof's GDEF checks, and `IMPORT_REFERENCE` opens the result, checks the
+source and the warnings, and sets the parts the editor does compile against the original.
+
+```bash
+python compile_fea.py --plain /tmp/fea/Features.otf /tmp/fea/extras.fea /tmp/fea/Extras.otf
+IMPORT_REFERENCE=/tmp/fea/Extras.otf pnpm --filter @typewright/font-io exec vitest run proof-features
+```
+
 ## The variable font
 
 `check_vf.py` is the same idea taken further. A variable font's deltas cannot be

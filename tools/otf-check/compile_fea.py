@@ -10,6 +10,9 @@ GDEF is left as the editor wrote it, from the glyphs' anchors, which is where
 this editor keeps which glyphs are marks; the feature file does not say.
 
     python compile_fea.py Features.otf features.fea FromFeaLib.otf
+
+With `--plain` it only compiles, for a feature file that is not the proof's and
+has none of the GDEF the checks below look for — the one the import test opens.
 """
 
 import sys
@@ -17,7 +20,8 @@ import sys
 from fontTools.feaLib.builder import addOpenTypeFeaturesFromString
 from fontTools.ttLib import TTFont
 
-source, features, target = sys.argv[1:4]
+plain = "--plain" in sys.argv
+source, features, target = [arg for arg in sys.argv[1:] if arg != "--plain"][:3]
 
 font = TTFont(source)
 for tag in ("GSUB", "GPOS"):
@@ -27,11 +31,14 @@ for tag in ("GSUB", "GPOS"):
 with open(features, encoding="utf-8") as handle:
     text = handle.read()
 
-addOpenTypeFeaturesFromString(font, text, tables=["GSUB", "GPOS"])
+# A plain file may name its stylistic sets, and those names live in `name`.
+addOpenTypeFeaturesFromString(font, text, tables=["GSUB", "GPOS", *(["name"] if plain else [])])
 font.save(target)
 
 lookups = {tag: len(font[tag].table.LookupList.Lookup) for tag in ("GSUB", "GPOS") if tag in font}
 print(f"fontTools compiled {features} into {target}: {lookups}")
+if plain:
+    sys.exit(0)
 
 # What the shaping comparison cannot see.
 #

@@ -252,8 +252,21 @@ jobs:
           python tools/otf-check/compile_fea.py
           "$RUNNER_TEMP/fea/Features.otf" "$RUNNER_TEMP/fea/features.fea" "$RUNNER_TEMP/fea/FromFeaLib.otf"
 
-      - name: Set text with both, and compare
-        run: FEATURES_REFERENCE="$RUNNER_TEMP/fea/FromFeaLib.otf" pnpm --filter @typewright/font-io exec vitest run proof-features
+      # A second file, of what this editor keeps as source without compiling —
+      # cursive attachment, marks on ligatures, pair adjustments that are not
+      # kerning — beside class kerning, an extension lookup and per-script
+      # features. With FEATURES_REFERENCE as well, both fontTools fonts are
+      # opened here as binaries, exported again, and set against themselves.
+      - name: Compile the import proof file with fontTools
+        run: >
+          python tools/otf-check/compile_fea.py --plain
+          "$RUNNER_TEMP/fea/Features.otf" "$RUNNER_TEMP/fea/extras.fea" "$RUNNER_TEMP/fea/Extras.otf"
+
+      - name: Set text with both, compare, and open both as binaries
+        run: >
+          FEATURES_REFERENCE="$RUNNER_TEMP/fea/FromFeaLib.otf"
+          IMPORT_REFERENCE="$RUNNER_TEMP/fea/Extras.otf"
+          pnpm --filter @typewright/font-io exec vitest run proof-features
 
       - name: Export the render proof font
         run: RENDER_OUT="$RUNNER_TEMP/render" pnpm --filter @typewright/font-io exec vitest run proof-render
