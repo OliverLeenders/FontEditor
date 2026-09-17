@@ -236,17 +236,21 @@ export function pairPosGlyphs(pairs: ReadonlyMap<number, ReadonlyMap<number, num
  * everything.
  */
 /**
- * The kerning lookups, one per subtable.
+ * The kerning, as one lookup of its subtables.
  *
- * A lookup each rather than one lookup of several subtables, because the order
- * they are tried in is the order they are given — and the exceptions have to be
- * tried before the classes they are exceptions to.
+ * One lookup rather than one each, and the difference is the whole of what an
+ * exception means. Within a lookup the subtables are tried in order and the
+ * first that has the pair is the one applied, so the exceptions, written first,
+ * win over the classes they are exceptions to. As separate lookups every one of
+ * them applies, and a pair with an exception was kerned by the exception and by
+ * its class together — which is how this was written until a font opened from
+ * elsewhere set `To` differently once it had been exported again.
  *
- * `IgnoreMarks` on every one of them, so an accent standing between two letters
- * does not stop them kerning.
+ * `IgnoreMarks`, so an accent standing between two letters does not stop them
+ * kerning.
  */
 export function kerningLookups(subtables: readonly Uint8Array[]): Lookup[] {
-  return subtables.map((sub) => ({ type: 2, flags: 0x0008, subtables: [sub] }));
+  return subtables.length === 0 ? [] : [{ type: 2, flags: 0x0008, subtables: [...subtables] }];
 }
 
 export function gposTable(subtables: readonly Uint8Array[]): Uint8Array {
