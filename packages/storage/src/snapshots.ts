@@ -7,6 +7,7 @@ import {
   setGuides,
   setKept,
   setKerning,
+  setLayers,
 } from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
@@ -181,7 +182,7 @@ export function documentOf(snapshot: StoredSnapshot): {
   // Whatever the font carries that this editor cannot model, which rides along
   // in the stored font info. A copy that came back without it would quietly
   // strip somebody's source the next time they saved.
-  document = setKept(setGuides(document, read.guides), read.kept);
+  document = setLayers(setKept(setGuides(document, read.guides), read.kept), read.layers);
 
   return { document, problems };
 }

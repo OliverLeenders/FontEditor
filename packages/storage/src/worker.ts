@@ -12,7 +12,10 @@ import {
   orderedGlyphs,
   setFeatures,
   setGlyphOrder,
+  setGuides,
+  setKept,
   setKerning,
+  setLayers,
 } from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
@@ -168,16 +171,29 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
       }
       // The stored order is authoritative: `fontDocument` would otherwise
       // order by the array it was handed, losing the font's own arrangement.
-      const { info, glyphOrder, features } = decodeFontInfo(request.info);
+      const { info, glyphOrder, features, guides, kept, layers } = decodeFontInfo(request.info);
       // Everything the document carries, not only its glyphs: `replaceDocument`
       // writes every file the project has, so whatever is left out here is
       // written over as empty.
-      const document = setFeatures(
-        setKerning(
-          setGlyphOrder(fontDocument(glyphs, info), glyphOrder),
-          decodeKerning(request.kerning),
+      //
+      // The font's guides, what its file carried unread, and its layers were
+      // once left out here: a font opened and reloaded before anything was
+      // edited came back without them.
+      const document = setLayers(
+        setKept(
+          setGuides(
+            setFeatures(
+              setKerning(
+                setGlyphOrder(fontDocument(glyphs, info), glyphOrder),
+                decodeKerning(request.kerning),
+              ),
+              features,
+            ),
+            guides,
+          ),
+          kept,
         ),
-        features,
+        layers,
       );
       const report = await replaceDocument(required(), document);
       return report;

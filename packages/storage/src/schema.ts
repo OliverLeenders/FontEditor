@@ -11,6 +11,7 @@ import {
   type HandleLock,
   type ImageRef,
   type Kept,
+  type LayerInfo,
   type MetricKeys,
   type PlainValue,
   type Node,
@@ -24,6 +25,7 @@ import {
   anchor,
   component,
   contour,
+  drawingOf,
   glyph,
   guide,
   hasMetricKeys,
@@ -130,7 +132,19 @@ export type StoredGlyph = {
   };
   /** The glyph's colour mark, as `"r,g,b,a"`. Written only when there is one. */
   readonly markColor?: string;
+  /**
+   * How the glyph is drawn in the font's other layers, by layer name. Written
+   * only when it is drawn in any, and absent from every glyph written before
+   * layers could be drawn in.
+   */
+  readonly layers?: Readonly<Record<string, StoredDrawing>>;
 };
+
+/** A glyph's drawing in a layer: the parts of a stored glyph that a drawing has. */
+export type StoredDrawing = Pick<
+  StoredGlyph,
+  "advance" | "contours" | "components" | "anchors" | "guides" | "image" | "kept"
+>;
 
 /** A guide: a point, an angle, and what it is called. */
 export type StoredGuide = {
@@ -164,6 +178,8 @@ export type StoredFontInfo = {
    * next save to disk would write a font missing what the reader kept.
    */
   readonly kept?: { readonly fontInfo: PlainRecord; readonly lib: PlainRecord };
+  /** The font's layers other than the main drawing. Omitted when there are none. */
+  readonly layers?: readonly LayerInfo[];
 };
 
 type PlainRecord = Readonly<Record<string, PlainValue>>;
@@ -195,6 +211,30 @@ export function encodeGlyph(g: Glyph): StoredGlyph {
     ...(g.kept.length === 0 ? {} : { kept: [...g.kept] }),
     ...(hasMetricKeys(g.metricKeys) ? { metricKeys: writtenKeys(g.metricKeys) } : {}),
     ...(g.markColor === null ? {} : { markColor: g.markColor }),
+    ...(Object.keys(g.layers).length === 0
+      ? {}
+      : {
+          layers: Object.fromEntries(
+            Object.entries(g.layers).map(([layer, drawing]) => [
+              layer,
+              encodeDrawing(glyph(g.name, drawing)),
+            ]),
+          ),
+        }),
+  };
+}
+
+/** The drawing parts of a glyph, encoded as a glyph encodes them. */
+function encodeDrawing(g: Glyph): StoredDrawing {
+  const stored = encodeGlyph(g);
+  return {
+    advance: stored.advance,
+    contours: stored.contours,
+    ...(stored.components === undefined ? {} : { components: stored.components }),
+    ...(stored.anchors === undefined ? {} : { anchors: stored.anchors }),
+    ...(stored.guides === undefined ? {} : { guides: stored.guides }),
+    ...(stored.image === undefined ? {} : { image: stored.image }),
+    ...(stored.kept === undefined ? {} : { kept: stored.kept }),
   };
 }
 
@@ -235,6 +275,7 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
     ...document.info,
     ...(document.guides.length === 0 ? {} : { guides: document.guides.map(encodeGuide) }),
     ...(nothingKept(document.kept) ? {} : { kept: document.kept }),
+    ...(document.layers.length === 0 ? {} : { layers: document.layers }),
   };
   return document.features === "" ? base : { ...base, features: document.features };
 }
@@ -297,6 +338,7 @@ export function decodeFontInfo(raw: unknown): {
   features: string;
   guides: readonly Guide[];
   kept: Kept;
+  layers: readonly LayerInfo[];
 } {
   if (!isRecord(raw)) {
     return {
@@ -305,6 +347,7 @@ export function decodeFontInfo(raw: unknown): {
       features: "",
       guides: [],
       kept: NOTHING_KEPT,
+      layers: [],
     };
   }
 
@@ -316,7 +359,33 @@ export function decodeFontInfo(raw: unknown): {
     features: typeof raw["features"] === "string" ? raw["features"] : "",
     guides: readGuides(raw["guides"]),
     kept: readKept(raw["kept"]),
+    layers: readLayers(raw["layers"]),
   };
+}
+
+/** The list of layers, believing nothing about it. */
+function readLayers(raw: unknown): LayerInfo[] {
+  if (!Array.isArray(raw)) return [];
+  const out: LayerInfo[] = [];
+  for (const item of raw) {
+    if (!isRecord(item) || typeof item["name"] !== "string") continue;
+    const orphans = Array.isArray(item["orphans"])
+      ? item["orphans"].filter(
+          (o): o is { name: string; path: string; text: string } =>
+            isRecord(o) &&
+            typeof o["name"] === "string" &&
+            typeof o["path"] === "string" &&
+            typeof o["text"] === "string",
+        )
+      : [];
+    out.push({
+      name: item["name"],
+      directory: typeof item["directory"] === "string" ? item["directory"] : null,
+      info: typeof item["info"] === "string" ? item["info"] : null,
+      orphans,
+    });
+  }
+  return out;
 }
 
 /**
@@ -547,8 +616,26 @@ export function decodeGlyph(raw: unknown): Decoded<Glyph> {
       kept,
       metricKeys: readMetricKeys(source["metricKeys"]),
       markColor: typeof source["markColor"] === "string" ? source["markColor"] : null,
+      layers: decodeLayers(source),
     }),
   );
+}
+
+/**
+ * A glyph's layer drawings, each read as a glyph is. One that will not read is
+ * left out rather than failing the glyph: losing a sketch is recoverable,
+ * losing the letter is not.
+ */
+function decodeLayers(source: Record<string, unknown>): Glyph["layers"] {
+  const raw = source["layers"];
+  if (!isRecord(raw)) return {};
+  const out: Record<string, ReturnType<typeof drawingOf>> = {};
+  for (const [layer, drawing] of Object.entries(raw)) {
+    if (!isRecord(drawing)) continue;
+    const decoded = decodeGlyph({ ...drawing, schema: source["schema"], name: source["name"] });
+    if (decoded.ok) out[layer] = drawingOf(decoded.value);
+  }
+  return out;
 }
 
 function decodeAnchor(raw: unknown): Anchor | null {

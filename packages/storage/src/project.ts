@@ -8,6 +8,7 @@ import {
   setGuides,
   setKept,
   setKerning,
+  setLayers,
 } from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
@@ -288,7 +289,7 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
   // is appended, so a glyph file that appeared without the index being rewritten
   // still shows up rather than vanishing.
   const rawInfo = await store.read(FONT_INFO_PATH);
-  const { info, glyphOrder, features, guides, kept } = decodeFontInfo(parseOrNull(rawInfo));
+  const { info, glyphOrder, features, guides, kept, layers } = decodeFontInfo(parseOrNull(rawInfo));
   const kerning = decodeKerning(parseOrNull(await store.read(KERNING_PATH)));
 
   const ordered: Glyph[] = [];
@@ -304,21 +305,24 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
     if (!seen.has(name)) ordered.push(g);
   }
 
-  const document = setKept(
-    setGuides(
-      setFeatures(
-        setKerning(
-          setGlyphOrder(
-            fontDocument(ordered, info),
-            ordered.map((g) => g.name),
+  const document = setLayers(
+    setKept(
+      setGuides(
+        setFeatures(
+          setKerning(
+            setGlyphOrder(
+              fontDocument(ordered, info),
+              ordered.map((g) => g.name),
+            ),
+            kerning,
           ),
-          kerning,
+          features,
         ),
-        features,
+        guides,
       ),
-      guides,
+      kept,
     ),
-    kept,
+    layers,
   );
   return { kind: "loaded", document, recovered, problems };
 }
