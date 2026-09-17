@@ -20,41 +20,41 @@ is wrong with it. Several fonts are kept at once, each in a working copy of its 
 window splits into two panes, and a second font opens in a window of its own. The desktop
 application installs from a release and updates itself.
 
-| Phase |                                     | Status                                                                               |
-| ----- | ----------------------------------- | ------------------------------------------------------------------------------------ |
-| 0     | Foundations and the geometry kernel | done                                                                                 |
-| 1     | The editing surface                 | done                                                                                 |
-| 2     | Undo, redo, persistence             | done                                                                                 |
-| 3     | From paths to a glyph               | done, and anchors with it                                                            |
-| 4     | From a glyph to a font              | done                                                                                 |
-| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways                      |
-| 6     | Proofing and shaping                | done, and set by HarfBuzz since phase 17                                             |
-| 7     | Spacing and kerning                 | done                                                                                 |
-| 8     | OpenType features                   | most of `.fea` compiles to GSUB and GPOS, and anchors to marks                       |
-| 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools  |
-| 10    | Production polish                   | lint, format and about 2,700 tests, run on CI; preferences persist                   |
-| 11    | The drawing hand                    | done                                                                                 |
-| 12    | Not losing what was opened          | done                                                                                 |
-| 13    | The family, named                   | done                                                                                 |
-| 14    | What ships to a browser             | done                                                                                 |
-| 15    | Several fonts, and a name           | done                                                                                 |
-| 16    | The details a font is judged on     | done                                                                                 |
-| 17    | Proving it where it will be used    | done: HarfBuzz sets the proof, FreeType draws the fonts in CI, ttfautohint hints     |
-| 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                      |
-| 19    | Releases                            | done: versions, a release workflow and updates; the installers are unsigned          |
-| 20    | A split window                      | done                                                                                 |
-| 21    | Two fonts side by side              | done: a window per font                                                              |
-| 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools |
-| 23    | Right-to-left text                  | done: bidi runs, and direction, script and language chosen in each bar               |
-| 24    | The web build, hosted               | later                                                                                |
-| 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                  |
-| 26    | The last interface tests            | done: every panel and control is rendered by a test                                  |
-| 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried     |
-| 28    | Binary import keeps its layout      | next                                                                                 |
-| 29    | Layers to draw on                   | planned                                                                              |
-| 30    | Making masters compatible           | planned                                                                              |
-| 31    | A proof for judging features        | planned                                                                              |
-| 32    | More outline operations             | planned                                                                              |
+| Phase |                                     | Status                                                                                     |
+| ----- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| 0     | Foundations and the geometry kernel | done                                                                                       |
+| 1     | The editing surface                 | done                                                                                       |
+| 2     | Undo, redo, persistence             | done                                                                                       |
+| 3     | From paths to a glyph               | done, and anchors with it                                                                  |
+| 4     | From a glyph to a font              | done                                                                                       |
+| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways                            |
+| 6     | Proofing and shaping                | done, and set by HarfBuzz since phase 17                                                   |
+| 7     | Spacing and kerning                 | done                                                                                       |
+| 8     | OpenType features                   | most of `.fea` compiles to GSUB and GPOS, and anchors to marks                             |
+| 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools        |
+| 10    | Production polish                   | lint, format and about 2,700 tests, run on CI; preferences persist                         |
+| 11    | The drawing hand                    | done                                                                                       |
+| 12    | Not losing what was opened          | done                                                                                       |
+| 13    | The family, named                   | done                                                                                       |
+| 14    | What ships to a browser             | done                                                                                       |
+| 15    | Several fonts, and a name           | done                                                                                       |
+| 16    | The details a font is judged on     | done                                                                                       |
+| 17    | Proving it where it will be used    | done: HarfBuzz sets the proof, FreeType draws the fonts in CI, ttfautohint hints           |
+| 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                            |
+| 19    | Releases                            | done: versions, a release workflow and updates; the installers are unsigned                |
+| 20    | A split window                      | done                                                                                       |
+| 21    | Two fonts side by side              | done: a window per font                                                                    |
+| 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools       |
+| 23    | Right-to-left text                  | done: bidi runs, and direction, script and language chosen in each bar                     |
+| 24    | The web build, hosted               | later                                                                                      |
+| 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                        |
+| 26    | The last interface tests            | done: every panel and control is rendered by a test                                        |
+| 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried           |
+| 28    | Binary import keeps its layout      | done: GSUB and GPOS as source, marks as anchors, kerning into the model, fontTools-checked |
+| 29    | Layers to draw on                   | next                                                                                       |
+| 30    | Making masters compatible           | planned                                                                                    |
+| 31    | A proof for judging features        | planned                                                                                    |
+| 32    | More outline operations             | planned                                                                                    |
 
 ### What the table missed
 
@@ -720,12 +720,40 @@ finds the rules and the map honoured, and on CI fontTools reads the proof family
 both fonts at eight places between the masters, where its own `VariationModel`, given the
 masters' points, has to agree with them — see `tools/otf-check/check_designspace_vf.py`.
 
-#### Phase 28 — Importing an OTF or TTF keeps its layout
+#### Phase 28 — Importing an OTF or TTF keeps its layout — done
 
-A binary font comes in with its outlines and its kerning. Its GSUB, its mark positioning and
-its GDEF are dropped, and the import warnings do not mention it. Lookups can be written back
-out as feature source, mark positioning as anchors on the glyphs, and what still cannot come
-back is named in the warnings rather than lost quietly.
+A binary font came in with its outlines and its kerning. Its GSUB, its mark positioning and
+its GDEF were dropped, and the import warnings did not mention it. Now:
+
+- **GSUB, GPOS and GDEF are read here**, by a reader of this package's own beside its
+  writers: every lookup type of both tables, extensions unwrapped, contexts in all three
+  formats with class 0 spelled out, value records and anchors in every format. A lookup that
+  points past the end of its table costs that lookup and is named.
+- **Kerning goes into the model.** Pair adjustments in `kern` or `dist` that move only the
+  advance become the Spacing workspace's kerning — class pairs as groups, glyph pairs as
+  exceptions.
+- **Mark attachment goes onto the glyphs as anchors**, named by where the letters carry
+  them — `top`, `bottom`, `center`, numbered where two classes would share one — and
+  mark-to-mark classes keep the names their marks already have.
+- **Everything else becomes feature source**, written to be read: glyph sets that recur are
+  named classes (`@sc` where the names agree), every lookup a named block in the order the
+  font applies them — lookups only a context calls go first, since a rule can only call one
+  written above it — and features per script and language where they differ.
+- **What this editor cannot compile is kept as source and named**: cursive attachment,
+  marks on ligatures, pair adjustments that are not kerning. A saved UFO carries them; the
+  import warnings say the exported font does not. Feature names and parameters, required
+  features, device tables and feature variations are named as not imported.
+- **A WOFF is unpacked first**, so its layout comes in too.
+
+Found on the way, and fixed: kerning was exported as a lookup per subtable, so a pair with
+an exception was kerned by the exception and by its class together. The two are now one
+lookup, where the first subtable that has the pair wins.
+
+Proved on CI with fonts this editor did not write: the proof feature file and a second file
+of what the editor only keeps — class kerning with an exception, a non-kerning pair
+adjustment, cursive attachment, marks on a ligature, an extension lookup, per-script
+features and a named stylistic set — are compiled by fontTools, opened here as binaries,
+exported again, and set by HarfBuzz against the fonts they were opened from.
 
 #### Phase 29 — Layers to draw on
 

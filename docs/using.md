@@ -159,6 +159,12 @@ width along it is measured in a row — stem, counter, stem — with the stretch
 told apart from the gaps between them. Shift holds the line to an eighth-turn, Escape
 takes it away, and it stays where it was put while you work under it.
 
+**What comes in.** An OTF, TTF or WOFF opened here brings what the font does as well as
+its outlines: kerning into the Spacing workspace, mark attachment as anchors on the glyphs,
+and every substitution and positioning rule as feature source in the Features workspace.
+What this editor cannot compile yet — cursive attachment, marks on ligatures — is kept in
+the source and named in the import report.
+
 **What comes out.** OTF and TTF to install, WOFF and WOFF2 for a web page, a UFO as
 source, and — once a font has more than one master — a family as a designspace with a
 UFO each, one variable font, and every named style as an ordinary static font. The web
