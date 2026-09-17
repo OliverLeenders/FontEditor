@@ -37,18 +37,18 @@ flank is rounded and the right one placed by reflection, so the block stays
 symmetrical and the seam lands on an exact half; everything else rides the same
 linear map, so the isometric proportions do not shift.
 
-Two details also change with size, and they do not change at the same size:
+Two details change with size, both at the same size:
 
-| Size      | Nick | Letter |
-| --------- | ---- | ------ |
-| 16–24     | no   | bold   |
-| 32–48     | yes  | bold   |
-| 56 and up | yes  | medium |
+| Size      | Nick                   | Letter                     |
+| --------- | ---------------------- | -------------------------- |
+| 16–24     | deeper                 | very nearly fills the face |
+| 28 and up | as `mark.svg` draws it | as `mark.svg` draws it     |
 
-The nick is a six-unit slot: under 32 pixels it is less than two and reads as
-dirt. The letter turns bold earlier, because the shear compresses the crossbar
-while leaving the stem near full width, so the arm running away from the viewer
-is the first thing to thin out.
+At 24 pixels and below — the taskbar and the title bar — the nick as drawn is
+two pixels of pale blue and the letter three pixels wide, and neither survives
+antialiasing. From 28 up the mark holds up as it is: a heavier letter and nick
+were drawn up to 48 once, and at the desktop's sizes they looked coarse beside
+the mark itself.
 
 The `.ico` carries 16, 20, 24, 32, 40, 48, 56, 64, 96, 128 and 256. A size the
 shell wants and does not find is one it resamples for itself.

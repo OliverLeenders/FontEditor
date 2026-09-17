@@ -61,23 +61,20 @@ $BLOCK = @{
 # What it needs at that size is not to be there, but to be deeper. Ten units is
 # two pixels at 24, and two pixels of pale blue against white survives neither
 # antialiasing nor whatever rescaling the shell does on its way to the taskbar.
+# From 28 up the drawn depth has the pixels it needs, and the deep one only
+# looks heavy beside the mark it was taken from.
 $NICK = @(@(6.8,57.2),@(50,78.8),@(50,88.4),@(6.8,66.8))
 $NICK_DEEP = @(@(6.8,53.6),@(50,75.2),@(50,89.6),@(6.8,68))
 
-# The letter, in two weights, already sheared onto the face.
+# The letter as mark.svg draws it, already sheared onto the face.
 #
-# The shear is not kind to a crossbar: it compresses the bar while leaving the
-# stem near full width, so the arm that runs away from the viewer thins out
-# first. At and below 48 pixels that arm is under a pixel and the T reads as a
-# bent stick, so the bold cut is used there and the medium one is kept for the
-# sizes with room for it.
+# A bold cut used to stand in up to 48 pixels, on the reasoning that the shear
+# thins the crossbar first. At 32 and 48 — the desktop and a folder's icons — it
+# looked coarse beside the mark itself, which holds up at those sizes. So the
+# mark's own letter is drawn from 28 up.
 $MEDIUM = @{
   bar  = @(@(25.376,23.816),@(50.432,11.288),@(56.48,14.312),@(31.424,26.84))
   stem = @(@(34.88,19.064),@(40.928,16.04),@(65.12,28.136),@(59.072,31.16))
-}
-$BOLD = @{
-  bar  = @(@(24.08,24.464),@(51.728,10.64),@(59.072,14.312),@(31.424,28.136))
-  stem = @(@(34.232,19.388),@(41.576,15.716),@(65.768,27.812),@(58.424,31.484))
 }
 
 # The letter at the sizes where it is barely a letter at all.
@@ -105,11 +102,12 @@ $C = @{ left = "#EDF3F9"; right = "#7E97B2"; nick = "#2C6DAF"; top = "#131922"; 
   edge actually falls.
 #>
 function Render($size) {
-  # Everything gets heavier below 48, because below 48 is where a detail either
-  # survives or is not there at all: the deeper nick, and the bold cut of the
-  # letter whose crossbar the shear thins first.
-  $nick = if ($size -le 48) { $NICK_DEEP } else { $NICK }
-  $letter = if ($size -le 32) { $HUGE } elseif ($size -le 48) { $BOLD } else { $MEDIUM }
+  # Everything gets heavier at 24 and below, the sizes of the taskbar and the
+  # title bar, because there a detail either survives or is not there at all:
+  # the deeper nick, and the letter that very nearly is the face. From 28 up the
+  # icon is the mark.
+  $nick = if ($size -le 24) { $NICK_DEEP } else { $NICK }
+  $letter = if ($size -le 24) { $HUGE } else { $MEDIUM }
   $out = New-Object System.Drawing.Bitmap $size, $size
   $g = [System.Drawing.Graphics]::FromImage($out)
   $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
