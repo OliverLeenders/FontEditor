@@ -116,3 +116,45 @@ describe("dragging a guide", () => {
     expect(guideAt(s, g.id).pt.x).toBeCloseTo(305.7, 10);
   });
 });
+
+/**
+ * Letting a guide go.
+ *
+ * A guide stays picked so that the arrow keys nudge it and Backspace removes
+ * it, which means there has to be a way of saying "not that one any more". The
+ * obvious ones — click the empty canvas, drag a marquee across it — did
+ * nothing, and the only way out was to pick something else.
+ */
+describe("letting a guide go", () => {
+  const picked = (): EditorState => {
+    const ids = counterIds();
+    const g = verticalGuide(ids.guide(), 300);
+    const state = pointerDown(withGuides(g), pointerInput(vec(300, 400))).state;
+    expect(state.selectedGuide).toBe(g.id);
+    return state;
+  };
+
+  it("lets go when the canvas is clicked where nothing is", () => {
+    const after = pointerDown(picked(), pointerInput(vec(50, 50))).state;
+    expect(after.selectedGuide).toBeNull();
+    // And it is a marquee that began, so the same press can gather points.
+    expect(after.gesture?.kind).toBe("marquee");
+  });
+
+  it("lets go when a marquee is dragged across the glyph", () => {
+    let s = pointerDown(picked(), pointerInput(vec(50, 50))).state;
+    s = pointerMove(s, pointerInput(vec(400, 600))).state;
+    expect(s.selectedGuide).toBeNull();
+  });
+
+  it("keeps hold of a guide the pointer lands on", () => {
+    const ids = counterIds();
+    const first = verticalGuide(ids.guide(), 300);
+    const second = horizontalGuide(ids.guide(), 100);
+    let s = pointerDown(withGuides(first, second), pointerInput(vec(300, 400))).state;
+    expect(s.selectedGuide).toBe(first.id);
+    // The other guide, which is picked up instead of nothing being picked.
+    s = pointerDown(s, pointerInput(vec(80, 100))).state;
+    expect(s.selectedGuide).toBe(second.id);
+  });
+});

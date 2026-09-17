@@ -185,10 +185,32 @@ export function pointerDown(
 
   const target = pickAt(state, input.point, options);
   if (target === null) {
+    // A guide first, but only where nothing on the outline is: a guide runs the
+    // width of the canvas and would otherwise steal every click that crossed
+    // it. Asked before anything is let go, so that clicking one guide while
+    // another is held picks up the new one.
+    const guide = pickGuide(state, input.point);
+    if (guide !== null) {
+      return startGuideDrag(
+        { ...base, selectedAnchor: null, selectedComponent: null },
+        input,
+        guide,
+      );
+    }
+
     // Nothing under the pointer, so nothing is being worked on — including the
-    // anchor that was.
+    // anchor, the component and the guide that were. The guide is let go here
+    // rather than only when the next point is picked: it used to have no way
+    // out but picking something else, since the arrow keys and Backspace go on
+    // meaning it for as long as it is held.
+    const letGo: EditorState = {
+      ...base,
+      selectedAnchor: null,
+      selectedComponent: null,
+      selectedGuide: null,
+    };
     if (state.selectedAnchor !== null || state.selectedComponent !== null) {
-      return startMarquee({ ...base, selectedAnchor: null, selectedComponent: null }, input);
+      return startMarquee(letGo, input);
     }
     // Inside the box, with nothing of the outline under the pointer: take hold
     // of the selection and move it. Anything pickable still wins — a point you
@@ -200,15 +222,10 @@ export function pointerDown(
     // it still starts a marquee. Otherwise the box would make the points inside
     // it the only ones that could not be gathered.
     if (box !== null && !input.modifiers.shift && boxContains(box, input.point)) {
-      return startSelectionDrag(base, input);
+      return startSelectionDrag(letGo, input);
     }
 
-    // Only where nothing on the outline is: a guide runs the width of the
-    // canvas and would otherwise steal every click that crossed it.
-    const guide = pickGuide(state, input.point);
-    if (guide !== null) return startGuideDrag(base, input, guide);
-
-    return startMarquee(base, input);
+    return startMarquee(letGo, input);
   }
 
   switch (target.kind) {
@@ -223,9 +240,13 @@ export function pointerDown(
         target,
       );
     case "anchor":
-      return startAnchorDrag({ ...base, selectedComponent: null }, input, target.anchorId);
+      return startAnchorDrag(
+        { ...base, selectedComponent: null, selectedGuide: null },
+        input,
+        target.anchorId,
+      );
     case "component":
-      return startComponentDrag(base, input, target.componentId);
+      return startComponentDrag({ ...base, selectedGuide: null }, input, target.componentId);
     case "tunniPoint":
       return startTunniDrag(base, input, "dragTunniPoint", target.segmentIndex, target.contourId);
     case "tunniLine":
