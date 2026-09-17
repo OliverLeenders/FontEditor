@@ -170,6 +170,15 @@ source, and — once a font has more than one master — a family as a designspa
 UFO each, one variable font, and every named style as an ordinary static font. The web
 formats are written from the TrueType flavour, which is what WOFF2's transform is for.
 
+**Which glyph is which.** A cell in the font's grid has room for a glyph name and a code
+point, which for a mark is `uni0308` above `U+0308` and says nothing about which mark it
+is. Rest the pointer on a cell and a tip beside it gives the character, the name the
+standard gives it — COMBINING DIAERESIS — the block it comes from, and whether it has been
+drawn. A glyph the font has not drawn yet shows the character faintly in one of the
+system's own fonts instead of an empty box, with a combining mark on the dotted circle it
+is always shown on, so a screenful of empty cells after **Add missing** can be read at a
+glance.
+
 **Layers.** The Layers section of the inspector lists the glyph's other drawings — a
 background, a sketch — and which one the tools draw in. B draws in the background and back
 in the letter. Layers with their eye open show faint behind the drawing, and the letter
