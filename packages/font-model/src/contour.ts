@@ -642,6 +642,45 @@ export function insertNodeOnSegment(
   return settled({ ...c, nodes });
 }
 
+/** How near an end, or another new node, an inserted parameter may not be. */
+const T_EDGE = 1e-4;
+
+/**
+ * Insert several nodes along one segment, at the parameters of the segment as
+ * it is now.
+ *
+ * Splitting changes the parameterisation of what is left, so the parameters are
+ * taken from the back: everything before a split keeps its share of the segment
+ * still at `index`, scaled by where the split was. Doing it the other way round
+ * means every later parameter meaning something else by the time it is used,
+ * which is how points end up somewhere nobody asked for.
+ *
+ * Parameters at the ends, or so close to each other that the nodes would land on
+ * top of one another, are dropped rather than refused: this is fed by root
+ * finding, where a curve that turns exactly at its own end point is ordinary.
+ */
+export function insertNodesOnSegment(
+  c: Contour,
+  index: number,
+  ts: readonly number[],
+  ids: IdFactory,
+): Contour | null {
+  const wanted = [...ts].filter((t) => t > T_EDGE && t < 1 - T_EDGE).sort((l, r) => r - l);
+
+  let next = c;
+  let above = 1;
+  let inserted = 0;
+  for (const t of wanted) {
+    if (above - t < T_EDGE) continue;
+    const split = insertNodeOnSegment(next, index, t / above, ids);
+    if (split === null) continue;
+    next = split;
+    above = t;
+    inserted++;
+  }
+  return inserted === 0 ? null : next;
+}
+
 /**
  * Remove a node and fit what is left to the shape it had.
  *

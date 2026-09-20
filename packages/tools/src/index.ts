@@ -21,7 +21,7 @@ export { NO_MODIFIERS, keyInput, modifiers, pointerInput } from "./input.js";
 export type { Effect, ToolResult } from "./effects.js";
 export { abort, begin, commit, result } from "./effects.js";
 
-export type { GuideScope, NewGlyph } from "./commands/index.js";
+export type { GuideScope, NewGlyph, Turn } from "./commands/index.js";
 
 export type {
   EditorState,
@@ -161,6 +161,8 @@ export {
   retractHandle,
   reverseContourAt,
   reverseSelectedContour,
+  addPointsAtTurns,
+  turnsMissing,
   segmentParameterAt,
   selectAllPoints,
   setNodeHvLock,

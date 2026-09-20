@@ -64,6 +64,7 @@ export {
   extendSegmentHandles,
   isHalfHandled,
   insertNodeOnSegment,
+  insertNodesOnSegment,
   makeSegmentCurve,
   makeSegmentLine,
   moveSegmentTunniLine,

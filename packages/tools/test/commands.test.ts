@@ -74,9 +74,11 @@ import {
   putGlyphInKernGroup,
   renameKernGroupTo,
   takeGlyphFromKernGroup,
+  addPointsAtTurns,
   clearSelection,
   convertSegment,
   deleteSelectedPoints,
+  turnsMissing,
   createGlyphs,
   deleteGlyph,
   insertPointOnSegment,
@@ -136,6 +138,32 @@ function ring(): Contour {
       node(ids.node(), vec(-250, 0), { type: "smooth", in: vec(-250, -k), out: vec(-250, k) }),
     ],
     true,
+  );
+}
+
+/** One curve bowing out to the right and back: an extreme halfway, no point on it. */
+function bow(): Contour {
+  const ids = counterIds("b");
+  return contour(
+    ids.contour(),
+    [
+      node(ids.node(), vec(0, 0), { out: vec(200, 0) }),
+      node(ids.node(), vec(0, 300), { in: vec(200, 300) }),
+    ],
+    false,
+  );
+}
+
+/** One curve leaning one way and then the other: an inflection halfway. */
+function ess(): Contour {
+  const ids = counterIds("s");
+  return contour(
+    ids.contour(),
+    [
+      node(ids.node(), vec(0, 0), { out: vec(0, 100) }),
+      node(ids.node(), vec(100, 100), { in: vec(100, 0) }),
+    ],
+    false,
   );
 }
 
@@ -390,6 +418,63 @@ describe("handles and segments", () => {
     const next = insertPointOnSegment(s, ref, 0.5, counterIds("x")).state;
     expect(only(next).nodes).toHaveLength(5);
     expect(segmentCount(only(next))).toBe(5);
+  });
+
+  it("puts a point where the curve turns back, and leaves the shape alone", () => {
+    // A bow to the right: x runs out to 200 and comes back, so the segment has
+    // a vertical extreme halfway along with nothing on it.
+    const { s, c } = start(bow());
+    const ref = { contourId: c.id, segmentIndex: 0 };
+    expect(turnsMissing(s, ref, "extreme")).toBe(1);
+
+    const next = addPointsAtTurns(s, ref, "extreme", counterIds("x")).state;
+    const added = only(next).nodes[1]!;
+
+    expect(only(next).nodes).toHaveLength(3);
+    // At the rightmost point of the curve, which the control points overstate.
+    expect(added.pt.x).toBeCloseTo(150, 6);
+    expect(added.pt.y).toBeCloseTo(150, 6);
+    // And the outline is where it was: the split is the curve's own.
+    expect(turnsMissing(next, ref, "extreme")).toBe(0);
+  });
+
+  it("offers nothing on a ring that already has its points at its extremes", () => {
+    const { s, c } = start();
+    for (let index = 0; index < 4; index++) {
+      expect(turnsMissing(s, { contourId: c.id, segmentIndex: index }, "extreme")).toBe(0);
+    }
+    expect(
+      addPointsAtTurns(s, { contourId: c.id, segmentIndex: 0 }, "extreme", counterIds("x")).state,
+    ).toBe(s);
+  });
+
+  it("puts a point where the curve changes which way it bends", () => {
+    const { s, c } = start(ess());
+    const ref = { contourId: c.id, segmentIndex: 0 };
+    expect(turnsMissing(s, ref, "inflection")).toBe(1);
+    expect(turnsMissing(s, ref, "extreme")).toBe(0);
+
+    const next = addPointsAtTurns(s, ref, "inflection", counterIds("x")).state;
+    expect(only(next).nodes).toHaveLength(3);
+    expect(only(next).nodes[1]!.pt.x).toBeCloseTo(50, 6);
+  });
+
+  it("works across the contour when no one segment was named", () => {
+    // Which is what the inspector's buttons do: a selection is the thing being
+    // worked on, and "add the extremes" is asked of a shape more often than of
+    // one curve.
+    const { s, c } = start(bow());
+    const selected = selectPoint(s, c, 0);
+    expect(turnsMissing(selected, null, "extreme")).toBe(1);
+
+    const next = addPointsAtTurns(selected, null, "extreme", counterIds("x")).state;
+    expect(only(next).nodes).toHaveLength(3);
+  });
+
+  it("takes a line for what it is, which turns nowhere", () => {
+    const { s, c } = start(triangle());
+    expect(turnsMissing(s, { contourId: c.id, segmentIndex: 0 }, "extreme")).toBe(0);
+    expect(turnsMissing(s, { contourId: c.id, segmentIndex: 0 }, "inflection")).toBe(0);
   });
 
   it("finds where along a segment a click landed", () => {

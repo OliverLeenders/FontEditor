@@ -82,6 +82,7 @@ export {
   evaluateQuadratic,
   extrema,
   flatten,
+  inflections,
   isFiniteCubic,
   isFlat,
   lineAsCubic,

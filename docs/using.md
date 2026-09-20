@@ -85,6 +85,15 @@ are the joins either side, and the lengths the one curve needs. A point taken of
 is usually one that was surplus, so taking it off should not leave a dent to redraw by
 hand.
 
+**Points where a curve turns.** The Curve section has two buttons, and the right-click
+menu on a curve offers the same: **extremes**, where the outline stops going one way in x
+or y and starts going the other — the top of an `o`, the side of a bowl — and
+**inflections**, where it stops bending one way and starts bending the other. Every font
+format wants a point at an extreme, because a TrueType curve is rounded to the grid at its
+points and a shape with nothing at its own top rounds into a flat. Each button says how
+many it would add and is dead when there are none; right-clicking one curve does that
+curve, and the buttons do the whole of whatever is selected.
+
 **Locking a handle to an axis** snaps it to north, south, east or west — whichever it is
 nearer — and holds it there while it is dragged. A smooth node's two handles are one
 straight line, so they go to the same axis and not to one each. On a tangent node the
@@ -231,8 +240,9 @@ one of those offers to draw it there. Whatever else the file said is kept and wr
 
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,
 reverse contour and delete. A handle offers the axis lock, its node's type, retract,
-and reverse. A segment offers insert-point-here, line/curve conversion, balance and
-reverse. Which items appear depends on what is under the pointer, using the same hit
+and reverse. A segment offers insert-point-here, a point at each extreme or inflection it
+has none on, line/curve conversion, balance and reverse. Which items appear depends on
+what is under the pointer, using the same hit
 index the tools use — the menu can never offer an action for something the canvas is
 not showing. Space previews without controls, the wheel pans, Ctrl-wheel zooms at the
 cursor, middle-drag pans, and Ctrl-0 refits. Ctrl-wheel also sets the type size in the

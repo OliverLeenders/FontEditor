@@ -70,7 +70,9 @@ export {
   turnGuideTo,
 } from "./guides.js";
 
+export type { Turn } from "./contours.js";
 export {
+  addPointsAtTurns,
   balanceSegmentAt,
   convertSegment,
   focusedSegmentScales,
@@ -80,6 +82,7 @@ export {
   reverseContourAt,
   reverseSelectedContour,
   setSegmentTension,
+  turnsMissing,
 } from "./contours.js";
 
 export { infoProblem, setInfo } from "./font.js";

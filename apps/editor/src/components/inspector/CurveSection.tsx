@@ -1,5 +1,7 @@
+import { randomIds } from "@typewright/font-model";
 import { type HandleScales, pannedLambdas, panOf } from "@typewright/geometry";
 import {
+  addPointsAtTurns,
   begin,
   commit,
   focusedSegmentScales,
@@ -9,6 +11,7 @@ import {
   result,
   selectedCurvature,
   setSegmentTension,
+  turnsMissing,
 } from "@typewright/tools";
 import type { SegmentRef } from "@typewright/view";
 import { useEffect, useRef } from "react";
@@ -49,6 +52,17 @@ export function CurveSection(): React.JSX.Element {
   const curvatureRatio = useStoreValue((s) => selectedCurvature(s.session.editor)?.ratio ?? null);
   const pointCount = useStoreValue(
     (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
+  );
+
+  // How many points the two buttons below would add. Counted rather than
+  // guessed at: the buttons act on the focused segment when there is one and on
+  // everything selected when there is not, and a designer should be able to see
+  // which of those they are about to get.
+  const extremes = useStoreValue((s) =>
+    turnsMissing(s.session.editor, s.session.editor.focusedSegment, "extreme"),
+  );
+  const bends = useStoreValue((s) =>
+    turnsMissing(s.session.editor, s.session.editor.focusedSegment, "inflection"),
   );
 
   /**
@@ -219,6 +233,39 @@ export function CurveSection(): React.JSX.Element {
         </div>
       </Field>
 
+      {/* The two places on a curve worth a point of their own: where it turns
+            back in x or y, which is what a font format rounds to the grid, and
+            where it stops bending one way and starts bending the other. On the
+            focused segment, or across what is selected when no segment is. */}
+      <Field label="Add points" group>
+        <div className={styles.segmented}>
+          <button
+            type="button"
+            disabled={extremes === 0}
+            title="Put a point where the curve turns back in x or y"
+            onClick={() =>
+              store.applyTool(
+                addPointsAtTurns(store.editor, store.editor.focusedSegment, "extreme", ids),
+              )
+            }
+          >
+            {extremes === 0 ? "Extremes" : `Extremes (${String(extremes)})`}
+          </button>
+          <button
+            type="button"
+            disabled={bends === 0}
+            title="Put a point where the curve changes which way it bends"
+            onClick={() =>
+              store.applyTool(
+                addPointsAtTurns(store.editor, store.editor.focusedSegment, "inflection", ids),
+              )
+            }
+          >
+            {bends === 0 ? "Inflections" : `Inflections (${String(bends)})`}
+          </button>
+        </div>
+      </Field>
+
       {/* Pan moves length from one handle to the other without changing how
             much there is of it, so the curve leans without swelling. The middle
             is where the two are equal, which is what balancing a segment does. */}
@@ -288,3 +335,6 @@ export function CurveSection(): React.JSX.Element {
  * be a place the slider could reach and the curve could not.
  */
 const PAN_REACH = 0.98;
+
+/** New points need ids, and the panel is as good an owner of a factory as the menu. */
+const ids = randomIds();

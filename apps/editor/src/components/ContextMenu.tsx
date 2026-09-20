@@ -1,6 +1,7 @@
 import { NO_METRIC_KEYS, contourById, randomIds, segmentAt } from "@typewright/font-model";
 import {
   addGuideAt,
+  addPointsAtTurns,
   guideById,
   moveGuideToScope,
   pickGuide,
@@ -29,6 +30,7 @@ import {
   reverseContourAt,
   segmentHasMissingHandle,
   segmentParameterAt,
+  turnsMissing,
   roundGlyphAt,
   roundSelection,
   selectAllPoints,
@@ -485,6 +487,29 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         run: () => store.applyTool(insertPointOnSegment(editor, segment, t, ids)),
       });
     }
+  }
+
+  // Where the curve turns, on this segment. Offered only where there is a turn
+  // with no point on it already: an item that would do nothing is worse than no
+  // item, since the only way to find that out is to try it.
+  const extremes = turnsMissing(editor, segment, "extreme");
+  if (extremes > 0) {
+    items.push({
+      kind: "item",
+      label: extremes === 1 ? "Add point at extreme" : "Add points at extremes",
+      icon: FrameIcon,
+      run: () => store.applyTool(addPointsAtTurns(editor, segment, "extreme", ids)),
+    });
+  }
+
+  const bends = turnsMissing(editor, segment, "inflection");
+  if (bends > 0) {
+    items.push({
+      kind: "item",
+      label: bends === 1 ? "Add point at inflection" : "Add points at inflections",
+      icon: WavesIcon,
+      run: () => store.applyTool(addPointsAtTurns(editor, segment, "inflection", ids)),
+    });
   }
 
   items.push({

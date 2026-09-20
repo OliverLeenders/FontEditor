@@ -1,13 +1,25 @@
-import { type HandleScales, type TunniStatus } from "@typewright/geometry";
 import {
+  type Cubic,
+  type HandleScales,
+  type TunniStatus,
+  derivative,
+  extrema,
+  inflections,
+} from "@typewright/geometry";
+import {
+  type Contour,
   type ContourId,
   type IdFactory,
   balanceSegment,
   contourById,
   insertNodeOnSegment,
+  insertNodesOnSegment,
   makeSegmentCurve,
   makeSegmentLine,
   reverseContour,
+  segmentAt,
+  segmentCount,
+  segmentCubic,
   segmentLambdas,
   segmentTunniStatus,
   setSegmentLambdas,
@@ -55,6 +67,157 @@ export function insertPointOnSegment(
     ),
   );
   return done(state, document === null ? null : { ...state, document }, "Insert point");
+}
+
+// ---------------------------------------------------------------------------
+// where a curve turns
+//
+// The two places a segment has that are worth a point of their own. An extreme
+// is where the outline stops going one way in x or y and starts going the other
+// — the top of an o, the side of a bowl — and every font format wants a point
+// there: a TrueType curve is rounded to the grid at its points, and a shape with
+// no point at its own top rounds into a flat. An inflection is where it stops
+// bending one way and starts bending the other, which is the join two people
+// draw differently and is where a single segment is hardest to control.
+//
+// Both are roots of a polynomial, so they are found rather than guessed, and
+// both come out as parameters of the segment they were found on — which is why
+// inserting them is the model's job and not done here one at a time.
+// ---------------------------------------------------------------------------
+
+/** A turn worth a point: where the curve reverses in x or y, or changes its bend. */
+export type Turn = "extreme" | "inflection";
+
+/**
+ * How near an end, or another turn, a turn may be before it is the same point.
+ *
+ * In the parameter rather than in units, which is coarse where a segment is
+ * long — and right anyway: two roots this close are one turn the arithmetic
+ * found twice, whatever the segment measures.
+ */
+const TOGETHER = 1e-3;
+
+/** The parameters of a segment's turns, with the ones nobody could tell apart dropped. */
+function turnsOn(c: Contour, index: number, kind: Turn): number[] {
+  const segment = segmentAt(c, index);
+  if (segment === null || segment.kind === "line") return [];
+
+  const geometry = segmentCubic(segment);
+  const roots = kind === "extreme" ? extrema(geometry) : inflections(geometry);
+
+  const kept: number[] = [];
+  for (const t of roots) {
+    if (t <= TOGETHER || t >= 1 - TOGETHER) continue;
+    if (kept.some((each) => Math.abs(each - t) <= TOGETHER)) continue;
+    if (kind === "extreme" && !turnsBack(geometry, t)) continue;
+    kept.push(t);
+  }
+  return kept;
+}
+
+/**
+ * Whether the curve really turns back at `t`, rather than pausing there.
+ *
+ * A doubled root is a place where one coordinate's speed touches zero and goes
+ * on the way it was going — the middle of a flattened s, say. The arithmetic
+ * calls it an extreme and a designer would not: nothing on either side of it is
+ * further out, and a point there is a point in the way.
+ */
+function turnsBack(s: Cubic, t: number): boolean {
+  const step = 1e-3;
+  const before = derivative(s, Math.max(0, t - step));
+  const after = derivative(s, Math.min(1, t + step));
+  return before.x * after.x < 0 || before.y * after.y < 0;
+}
+
+/** Which contours an invocation with no segment of its own works on. */
+function contoursIn(state: EditorState): ContourId[] {
+  const chosen = new Set<ContourId>();
+  for (const item of state.selection) chosen.add(item.contourId);
+  if (state.focusedSegment !== null) chosen.add(state.focusedSegment.contourId);
+  if (chosen.size > 0) return [...chosen];
+
+  // Nothing is selected, so the glyph is what is being worked on. Adding the
+  // extremes to a whole letter is the usual reason to ask for them at all.
+  const glyph = currentGlyph(state);
+  return glyph === null ? [] : glyph.contours.map((each) => each.id);
+}
+
+/**
+ * Put a point at every turn of a contour that has not got one.
+ *
+ * Walked from the last segment back, because inserting into one renumbers the
+ * segments after it and nothing before it.
+ */
+function turned(c: Contour, kind: Turn, ids: IdFactory): Contour | null {
+  let next = c;
+  let changed = false;
+  for (let index = segmentCount(c) - 1; index >= 0; index--) {
+    const added = insertNodesOnSegment(next, index, turnsOn(next, index, kind), ids);
+    if (added === null) continue;
+    next = added;
+    changed = true;
+  }
+  return changed ? next : null;
+}
+
+/**
+ * How many points would be added, for a menu item to know whether to offer
+ * itself and a button to know whether to be live.
+ */
+export function turnsMissing(state: EditorState, segment: SegmentRef | null, kind: Turn): number {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return 0;
+
+  if (segment !== null) {
+    const c = contourById(glyph, segment.contourId);
+    return c === null ? 0 : turnsOn(c, segment.segmentIndex, kind).length;
+  }
+
+  let count = 0;
+  for (const contourId of contoursIn(state)) {
+    const c = contourById(glyph, contourId);
+    if (c === null) continue;
+    for (let index = 0; index < segmentCount(c); index++) count += turnsOn(c, index, kind).length;
+  }
+  return count;
+}
+
+/**
+ * Add the points, on one segment or across whatever is being worked on.
+ *
+ * One step whichever it is: "add the extremes" is a single thing to have asked
+ * for, and undoing it a point at a time would be a chore rather than a mercy.
+ */
+export function addPointsAtTurns(
+  state: EditorState,
+  segment: SegmentRef | null,
+  kind: Turn,
+  ids: IdFactory,
+): ToolResult {
+  const document = editCurrentGlyph(state, (g) => {
+    if (segment !== null) {
+      return updateContour(g, segment.contourId, (c) =>
+        insertNodesOnSegment(c, segment.segmentIndex, turnsOn(c, segment.segmentIndex, kind), ids),
+      );
+    }
+
+    let glyph = g;
+    let changed = false;
+    for (const contourId of contoursIn(state)) {
+      const next = updateContour(glyph, contourId, (c) => turned(c, kind, ids));
+      if (next === null) continue;
+      glyph = next;
+      changed = true;
+    }
+    return changed ? glyph : null;
+  });
+
+  return done(
+    state,
+    document === null ? null : { ...state, document },
+    kind === "extreme" ? "Add points at extremes" : "Add points at inflections",
+  );
 }
 
 export function convertSegment(

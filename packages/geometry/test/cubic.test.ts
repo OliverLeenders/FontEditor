@@ -11,6 +11,7 @@ import {
   evaluate,
   extrema,
   flatten,
+  inflections,
   isFlat,
   lineAsCubic,
   project,
@@ -102,6 +103,29 @@ describe("extrema and bounds", () => {
     expect(box.minY).toBeCloseTo(0, 12);
     expect(box.maxX).toBeCloseTo(100, 12);
     expect(box.maxY).toBeCloseTo(75, 12);
+  });
+});
+
+describe("inflections", () => {
+  it("finds the one an s-curve has, where it changes which way it bends", () => {
+    // Handles on opposite sides of the chord: the curve leans one way out of
+    // the first anchor and the other way into the second.
+    const s = cubic(vec(0, 0), vec(0, 100), vec(100, 0), vec(100, 100));
+    const roots = inflections(s);
+
+    expect(roots).toHaveLength(1);
+    expect(roots[0]!).toBeCloseTo(0.5, 12);
+    // Which is where the curvature changes sign, and nowhere else.
+    expect(curvature(s, roots[0]! - 0.1)!).toBeLessThan(0);
+    expect(curvature(s, roots[0]! + 0.1)!).toBeGreaterThan(0);
+  });
+
+  it("finds none on a curve that bends one way throughout", () => {
+    expect(inflections(ARCH)).toEqual([]);
+  });
+
+  it("finds none on a straight segment, which bends no way at all", () => {
+    expect(inflections(lineAsCubic(vec(0, 0), vec(100, 40)))).toEqual([]);
   });
 });
 

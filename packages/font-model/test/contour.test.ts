@@ -10,6 +10,7 @@ import {
   enforceTangents,
   contourBounds,
   insertNodeOnSegment,
+  insertNodesOnSegment,
   makeSegmentLine,
   moveSegmentTunniLine,
   nodeById,
@@ -747,6 +748,44 @@ describe("locking one handle at a time", () => {
     const freed = setHvLock(both, c.nodes[0]!.id, "in", false)!;
 
     expect(freed.nodes[0]!.type).toBe("corner");
+  });
+});
+
+describe("several points on one segment", () => {
+  /** One curve, open, so the segment indices are easy to talk about. */
+  const arch = () =>
+    contour(
+      "m",
+      [node("a", vec(0, 0), { out: vec(0, 100) }), node("b", vec(100, 0), { in: vec(100, 100) })],
+      false,
+    );
+
+  it("puts each one where its own parameter said, not where the last split left it", () => {
+    const wanted = [
+      evaluate(segmentCubic(segmentAt(arch(), 0)!), 0.25),
+      evaluate(segmentCubic(segmentAt(arch(), 0)!), 0.75),
+    ];
+    const split = insertNodesOnSegment(arch(), 0, [0.25, 0.75], counterIds("x"))!;
+
+    expect(split.nodes).toHaveLength(4);
+    expect(distance(split.nodes[1]!.pt, wanted[0]!)).toBeCloseTo(0, 9);
+    expect(distance(split.nodes[2]!.pt, wanted[1]!)).toBeCloseTo(0, 9);
+  });
+
+  it("draws what it drew before, since every split is the curve's own", () => {
+    const split = insertNodesOnSegment(arch(), 0, [0.2, 0.5, 0.8], counterIds("x"))!;
+    const whole = segmentCubic(segmentAt(arch(), 0)!);
+
+    // The old midpoint is still on the outline, at a parameter of one of the
+    // pieces rather than of the whole.
+    expect(distance(split.nodes[2]!.pt, evaluate(whole, 0.5))).toBeCloseTo(0, 9);
+    expect(segmentCount(split)).toBe(4);
+  });
+
+  it("drops the ones at the ends, and the ones that would land on each other", () => {
+    expect(insertNodesOnSegment(arch(), 0, [0, 1], counterIds("x"))).toBeNull();
+    const together = insertNodesOnSegment(arch(), 0, [0.5, 0.500001], counterIds("x"))!;
+    expect(together.nodes).toHaveLength(3);
   });
 });
 

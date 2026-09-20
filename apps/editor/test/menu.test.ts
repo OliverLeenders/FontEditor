@@ -7,8 +7,17 @@ installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
 const { itemsFor } = await import("../src/components/ContextMenu.js");
-const { contourById, segmentAt, segmentCount, sidebearings } =
-  await import("@typewright/font-model");
+const {
+  addContour,
+  contour,
+  contourById,
+  counterIds,
+  node: newNode,
+  segmentAt,
+  segmentCount,
+  sidebearings,
+  updateGlyph,
+} = await import("@typewright/font-model");
 const { segmentCubic } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
@@ -134,6 +143,97 @@ describe("context menu", () => {
   it("does not offer to insert a point at a segment's very end", () => {
     const s = segment();
     expect(labels(store, s, s.cubic.a)).not.toContain("Insert point here");
+  });
+
+  /**
+   * Draw a bow into the current glyph: out to the right and back, so the curve
+   * has a vertical extreme halfway along with no point on it.
+   *
+   * The starter font is drawn the way a font should be, with a point at every
+   * extreme, which is the wrong shape for testing the item that adds them.
+   */
+  function bow(): {
+    kind: string;
+    contourId: string;
+    segmentIndex: number;
+    cubic: unknown;
+    status: string;
+  } {
+    const ids = counterIds("bow");
+    const drawn = contour(
+      ids.contour(),
+      [
+        newNode(ids.node(), { x: 0, y: 0 }, { out: { x: 200, y: 0 } }),
+        newNode(ids.node(), { x: 0, y: 300 }, { in: { x: 200, y: 300 } }),
+      ],
+      false,
+    );
+    const name = store.editor.currentGlyph;
+    store.setEditor({
+      ...store.editor,
+      document: updateGlyph(store.editor.document, name, (g) => addContour(g, drawn))!,
+    });
+
+    const glyph = store.editor.document.glyphs[name]!;
+    const c = contourById(glyph, drawn.id)!;
+    return {
+      kind: "segment",
+      contourId: drawn.id,
+      segmentIndex: 0,
+      cubic: segmentCubic(segmentAt(c, 0)!),
+      status: "ok",
+    };
+  }
+
+  it("offers a point at an extreme only where the curve turns with nothing on it", () => {
+    // The starter font's own curves turn at their own points, so there is
+    // nothing to add and the item is not there to be tried.
+    expect(labels(store, segment())).not.toContain("Add point at extreme");
+
+    expect(labels(store, bow())).toContain("Add point at extreme");
+  });
+
+  it("adds it where the curve turns, not where the handles reach", () => {
+    const curve = bow();
+    run(store, curve, "Add point at extreme");
+
+    const glyph = store.editor.document.glyphs[store.editor.currentGlyph]!;
+    const c = contourById(glyph, curve.contourId)!;
+
+    expect(c.nodes).toHaveLength(3);
+    expect(c.nodes[1]!.pt.x).toBeCloseTo(150, 6);
+    // And it is not offered twice.
+    expect(labels(store, curve)).not.toContain("Add point at extreme");
+  });
+
+  it("names the inflection separately, and offers it where there is one", () => {
+    const ids = counterIds("ess");
+    const drawn = contour(
+      ids.contour(),
+      [
+        newNode(ids.node(), { x: 0, y: 0 }, { out: { x: 0, y: 100 } }),
+        newNode(ids.node(), { x: 100, y: 100 }, { in: { x: 100, y: 0 } }),
+      ],
+      false,
+    );
+    const name = store.editor.currentGlyph;
+    store.setEditor({
+      ...store.editor,
+      document: updateGlyph(store.editor.document, name, (g) => addContour(g, drawn))!,
+    });
+
+    const items = labels(store, {
+      kind: "segment",
+      contourId: drawn.id,
+      segmentIndex: 0,
+      cubic: segmentCubic(
+        segmentAt(contourById(store.editor.document.glyphs[name]!, drawn.id)!, 0)!,
+      ),
+      status: "ok",
+    });
+
+    expect(items).toContain("Add point at inflection");
+    expect(items).not.toContain("Add point at extreme");
   });
 
   it("flips between Make line and Make curve with the segment's kind", () => {

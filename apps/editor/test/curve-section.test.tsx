@@ -9,6 +9,8 @@ installBrowserGlobals();
 
 const { CurveSection } = await import("../src/components/inspector/CurveSection.js");
 const { focusedSegmentScales, focusedSegmentStatus } = await import("@typewright/tools");
+const { addContour, contour, counterIds, node, updateGlyph } =
+  await import("@typewright/font-model");
 
 /**
  * The Tunni controls as numbers: tension, curvature, and the pan between them.
@@ -62,6 +64,97 @@ function scales(store: Store): { lambda1: number; lambda2: number } {
   if (found === null) throw new Error("no scales");
   return found;
 }
+
+type Point = { x: number; y: number };
+
+/**
+ * A store whose current glyph holds one curve of its own, focused on it.
+ *
+ * The starter font is drawn the way a font should be, with a point at every
+ * extreme — which is the wrong shape for testing a button that adds them.
+ */
+function drawing(from: Point, out: Point, into: Point, to: Point): Store {
+  const store = freshStore();
+  act(() => {
+    const ids = counterIds("curve");
+    const name = store.editor.document.glyphOrder[0]!;
+    const drawn = contour(
+      ids.contour(),
+      [node(ids.node(), from, { out }), node(ids.node(), to, { in: into })],
+      false,
+    );
+
+    store.setCurrentGlyph(name);
+    store.setEditor({
+      ...store.editor,
+      document: updateGlyph(store.editor.document, name, (g) => addContour(g, drawn))!,
+      selection: [],
+      focusedSegment: { contourId: drawn.id, segmentIndex: 0 },
+    });
+  });
+  return store;
+}
+
+/** A bow out to the right and back: an extreme halfway, with no point on it. */
+const bow = (): Store =>
+  drawing({ x: 0, y: 0 }, { x: 200, y: 0 }, { x: 200, y: 300 }, { x: 0, y: 300 });
+
+/** A curve leaning one way and then the other: an inflection halfway. */
+const ess = (): Store =>
+  drawing({ x: 0, y: 0 }, { x: 0, y: 100 }, { x: 100, y: 0 }, { x: 100, y: 100 });
+
+/** The curve the test drew, which is the last one in the glyph. */
+function drawn(store: Store) {
+  const contours = store.editor.document.glyphs[store.editor.currentGlyph]!.contours;
+  return contours[contours.length - 1]!;
+}
+
+const disabled = (name: string): boolean =>
+  screen.getByRole("button", { name }).hasAttribute("disabled");
+
+describe("the points a curve turns at", () => {
+  it("says how many there are to add, and adds them", () => {
+    const store = bow();
+    render(<CurveSection />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Extremes (1)" }));
+
+    expect(drawn(store).nodes).toHaveLength(3);
+    // At the rightmost point of the curve, which is not where the handles are.
+    expect(drawn(store).nodes[1]!.pt.x).toBeCloseTo(150, 6);
+    // And there is nothing left for the button to offer.
+    expect(disabled("Extremes")).toBe(true);
+  });
+
+  it("counts the inflections apart, since they are a different question", () => {
+    const store = ess();
+    render(<CurveSection />, store);
+
+    expect(disabled("Extremes")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Inflections (1)" }));
+
+    expect(drawn(store).nodes).toHaveLength(3);
+  });
+
+  it("offers neither on a straight segment", () => {
+    render(<CurveSection />, focusedOn("flat"));
+
+    expect(disabled("Extremes")).toBe(true);
+    expect(disabled("Inflections")).toBe(true);
+  });
+
+  it("is one step of undo, however many points it added", () => {
+    const store = bow();
+    render(<CurveSection />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Extremes (1)" }));
+    act(() => {
+      store.undo();
+    });
+
+    expect(drawn(store).nodes).toHaveLength(2);
+  });
+});
 
 describe("a straight segment", () => {
   it("has no tension to type, and says so", () => {

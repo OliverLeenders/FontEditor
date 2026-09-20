@@ -155,6 +155,29 @@ export function extrema(s: Cubic): number[] {
 }
 
 /**
+ * Parameters in (0, 1) where the curve changes which way it bends.
+ *
+ * The cross product of the first and second derivatives, which is where the
+ * signed curvature changes sign. It looks like a cubic in `t` and is not: the
+ * cubic term cancels, leaving `At² + Bt + C` in the first differences of the
+ * control points. A curve with none — which is most of the segments in a
+ * letter — gives back nothing rather than a root at an end.
+ */
+export function inflections(s: Cubic): number[] {
+  const u = sub(s.c1, s.a);
+  const v = sub(s.c2, s.c1);
+  const w = sub(s.b, s.c2);
+
+  const uv = cross(u, v);
+  const uw = cross(u, w);
+  const vw = cross(v, w);
+
+  return unitRoots(0, uv - uw + vw, uw - 2 * uv, uv)
+    .filter((t) => t > 0 && t < 1)
+    .sort((l, r) => l - r);
+}
+
+/**
  * One cubic through what two of them drew, for a point being taken out.
  *
  * Deleting a node leaves the two segments it joined to be drawn by one, and the
