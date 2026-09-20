@@ -1,0 +1,137 @@
+/* The window's own strip: the font's name at one end, its preferences at the
+   other. Thin on purpose — every row it takes is a row the drawing loses — and
+   above the panes rather than inside one, so a split window has one of it. */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.15rem 0.4rem 0.15rem 0.6rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface-2);
+}
+
+.name {
+  overflow: hidden;
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.holder {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.button {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.button:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+.button[aria-expanded="true"] {
+  background: var(--surface);
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+.button svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* Hung from the right edge of the button, which is at the right edge of the
+   window: growing rightwards from there would leave it. */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 0.5rem;
+  min-width: 15.5rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+}
+
+.label {
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.choices {
+  display: flex;
+  gap: 0.15rem;
+}
+
+.choice {
+  padding: 0.14rem 0.45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+.choice:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.choice[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.note {
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
+
+.reset {
+  align-self: center;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.reset:hover {
+  color: var(--ink);
+  border-color: var(--accent);
+}

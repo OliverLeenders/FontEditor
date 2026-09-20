@@ -68,6 +68,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "Ctrl-wheel", what: "Zoom at the pointer" },
       { keys: "Wheel · middle-drag", what: "Pan" },
       { keys: "I", what: "Show or hide the inspector" },
+      { keys: "Ctrl-,", what: "Preferences" },
       { keys: "H", what: "Handles near the work, or all of them always" },
       { keys: "S", what: "Snapping on or off" },
       { keys: "B", what: "Draw in the background, or back in the letter" },
