@@ -63,6 +63,10 @@ function at(index: number) {
 
 function browser() {
   const store = freshStore();
+  // In the font's own order, so a cell is where the glyph order says it is.
+  act(() => {
+    store.setCatalogQuery({ order: "font" });
+  });
   render(<GlyphBrowser onOpen={vi.fn()} />, store);
   return { store, grid: screen.getByRole("grid", { name: "Glyphs" }) };
 }

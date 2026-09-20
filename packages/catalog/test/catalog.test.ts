@@ -88,10 +88,11 @@ describe("listCatalog", () => {
 
   it("lists the code points of a set the font has no glyph for", () => {
     const ascii = listed({ set: "ascii" });
-    // The two the font has, and the ninety-three of ASCII it has not.
+    // The two the font has, and the ninety-three of ASCII it has not. By code
+    // point, which is what the browser opens on, so the space comes first.
     expect(ascii.filter((entry) => entry.inFont).map((entry) => entry.name)).toEqual([
-      "A",
       "space",
+      "A",
     ]);
     expect(ascii.filter((entry) => !entry.inFont)).toHaveLength(93);
     expect(missing({ set: "ascii" })).not.toContain(0x41);
@@ -153,6 +154,11 @@ describe("filterCatalog", () => {
   });
 
   it("filters by state", () => {
+    // In the font's own order, which is what these are about: the filter, not
+    // the ordering, which has its own tests below.
+    const names = (query: Partial<typeof DEFAULT_QUERY>) =>
+      filterCatalog(entries, { ...DEFAULT_QUERY, order: "font", ...query }).map((e) => e.name);
+
     expect(names({ set: "drawn" })).toEqual([".notdef", "A", "Omega", "A.alt"]);
     expect(names({ set: "undrawn" })).toEqual(["space", "smile"]);
     expect(names({ set: "unencoded" })).toEqual([".notdef", "A.alt"]);
@@ -185,7 +191,7 @@ describe("filterCatalog", () => {
     // Broad on a single letter, but it is what keeps "alt" finding "A.alt", and
     // narrowing is one more keystroke. Worth revisiting once the grid exists and
     // there is something to judge ranked results against.
-    expect(names({ search: "A" })).toEqual(["A", "space", "Omega", "A.alt"]);
+    expect(names({ search: "A" })).toEqual(["space", "A", "Omega", "A.alt"]);
     // "s" matches no code point here, so it falls back to names alone.
     expect(names({ search: "s" })).toEqual(["space", "smile"]);
   });

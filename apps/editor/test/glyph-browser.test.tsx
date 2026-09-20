@@ -64,8 +64,12 @@ function at(index: number, modifiers: Partial<MouseEvent> = {}) {
 
 function browser(store: Store = freshStore()) {
   const onOpen = vi.fn();
+  // In the font's own order: these tests reach a cell by where it is, and what
+  // the list is sorted by is tested where the sorting is.
+  act(() => {
+    store.setCatalogQuery({ order: "font" });
+  });
   render(<GlyphBrowser onOpen={onOpen} />, store);
-  // Font order, which is the browser's own until it is asked for another.
   const order = [...store.editor.document.glyphOrder];
   return { store, onOpen, order };
 }
@@ -89,11 +93,13 @@ const picked = () => /(\d+) picked/.exec(document.body.textContent)?.[1] ?? null
 describe("what the font has not got", () => {
   /** The browser on ASCII in code-point order, where the holes fall in place. */
   function ascii(): ReturnType<typeof browser> {
-    const store = freshStore();
+    // Asked for after the browser is up, since it opens the list in the font's
+    // own order for the tests that reach a cell by where it is.
+    const shown = browser();
     act(() => {
-      store.setCatalogQuery({ set: "ascii", order: "codePoint" });
+      shown.store.setCatalogQuery({ set: "ascii", order: "codePoint" });
     });
-    return browser(store);
+    return shown;
   }
 
   /** The index of the first cell for a code point the font has no glyph for. */

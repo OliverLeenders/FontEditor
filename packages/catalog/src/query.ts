@@ -97,7 +97,17 @@ export type CatalogQuery = {
   readonly order: CatalogOrder;
 };
 
-export const DEFAULT_QUERY: CatalogQuery = { set: "all", search: "", order: "font" };
+/**
+ * What the browser opens on.
+ *
+ * By code point rather than by the font's own order. Font order is meaningful —
+ * `.notdef` first, related glyphs adjacent — but it is meaningful to whoever
+ * arranged it, and a font that came in from a binary has whatever order its
+ * `cmap` happened to be written in. A chart in code-point order is the one
+ * arrangement every reader already knows, and it is the order a block of the
+ * standard is read in, holes and all.
+ */
+export const DEFAULT_QUERY: CatalogQuery = { set: "all", search: "", order: "codePoint" };
 
 /**
  * Work out what the user meant by what they typed.
