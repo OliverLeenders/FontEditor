@@ -9,6 +9,12 @@ installBrowserGlobals();
 
 const { GlyphBrowser } = await import("../src/components/GlyphBrowser.js");
 const { DEFAULT_GRID } = await import("@typewright/view");
+const { loadUnicodeNames } = await import("@typewright/catalog");
+
+// Unpacked once, here, rather than being waited for inside a test: it is a
+// megabyte and a half of text, and how long that takes depends on what else the
+// suite is running — which is not what any of these tests is about.
+await loadUnicodeNames();
 
 /**
  * What a cell cannot say for itself.
@@ -73,17 +79,11 @@ describe("the tip beside a cell", () => {
     expect(tip.textContent).toContain(name);
     if (code !== undefined) {
       expect(tip.textContent).toContain(`U+${code.toString(16).toUpperCase().padStart(4, "0")}`);
-      // The table is unpacked on the first hover, so the name arrives after it:
-      // a megabyte and a half of text inflated while the rest of the suite is
-      // running, which is worth waiting longer than the default second for.
-      await waitFor(
-        () => {
-          expect(screen.getByRole("tooltip").textContent.toUpperCase()).toMatch(
-            /LETTER|DIGIT|SIGN/,
-          );
-        },
-        { timeout: 10000 },
-      );
+      // The table is asked for on the first hover, so the name lands a tick
+      // after it even when the table is already unpacked.
+      await waitFor(() => {
+        expect(screen.getByRole("tooltip").textContent.toUpperCase()).toMatch(/LETTER|DIGIT|SIGN/);
+      });
     }
   });
 
