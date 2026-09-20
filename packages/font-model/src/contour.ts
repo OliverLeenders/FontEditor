@@ -16,6 +16,7 @@ import {
   lerp,
   lineAsCubic,
   moveTunniLine,
+  refitJoin,
   setLambdas,
   setTunniPoint,
   split,
@@ -642,9 +643,47 @@ export function insertNodeOnSegment(
 }
 
 /**
+ * Remove a node and fit what is left to the shape it had.
+ *
+ * The two segments the node joined become one, and the neighbours' handles were
+ * the length they were because each drew half the distance — keeping them is
+ * what makes a deleted point dent the outline. The directions are kept, since
+ * they are the join with whatever lies beyond and a smooth node either side
+ * rests on them, and only the two lengths are fitted, against the pair of curves
+ * that were there. Two straight segments stay straight.
+ *
+ * Falls back to {@link removeNode} wherever there is nothing to fit: an end of
+ * an open contour, a contour down to its last nodes, a pair of lines.
+ */
+export function removeNodeFitted(c: Contour, id: NodeId): Contour | null {
+  const i = nodeIndex(c, id);
+  if (i < 0) return null;
+  const count = c.nodes.length;
+  if (count < 3) return removeNode(c, id);
+
+  const previous = (i - 1 + count) % count;
+  const following = (i + 1) % count;
+  const before = c.closed || i > 0 ? segmentAt(c, previous) : null;
+  const after = c.closed || i < count - 1 ? segmentAt(c, i) : null;
+  if (before === null || after === null) return removeNode(c, id);
+  if (before.kind === "line" && after.kind === "line") return removeNode(c, id);
+
+  const fitted = refitJoin(segmentCubic(before), segmentCubic(after));
+  const from = c.nodes[previous];
+  const to = c.nodes[following];
+  if (fitted === null || from === undefined || to === undefined) return removeNode(c, id);
+
+  const nodes = c.nodes.slice();
+  nodes[previous] = withHandleRaw(from, "out", fitted.c1);
+  nodes[following] = withHandleRaw(to, "in", fitted.c2);
+  nodes.splice(i, 1);
+  return settled({ ...c, nodes });
+}
+
+/**
  * Remove a node. The neighbours keep the handles they already had, so the curve
- * changes shape — refitting it to approximate the original is a separate,
- * later operation.
+ * changes shape — see {@link removeNodeFitted} for the deletion that fits it
+ * back.
  */
 export function removeNode(c: Contour, id: NodeId): Contour | null {
   const i = nodeIndex(c, id);

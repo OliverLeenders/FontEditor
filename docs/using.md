@@ -79,6 +79,12 @@ segment on one side and a curve on the other can be made **tangent**, from the i
 or the right-click menu: the curve then leaves along the line, and stays that way when
 either end of the line moves.
 
+**Deleting a point keeps the shape.** The two segments it joined become one, and the
+neighbours' handles are fitted to what the pair drew — the same directions, since those
+are the joins either side, and the lengths the one curve needs. A point taken off a curve
+is usually one that was surplus, so taking it off should not leave a dent to redraw by
+hand.
+
 **Locking a handle to an axis** snaps it to north, south, east or west — whichever it is
 nearer — and holds it there while it is dragged. A smooth node's two handles are one
 straight line, so they go to the same axis and not to one each. On a tangent node the

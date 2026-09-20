@@ -14,6 +14,7 @@ import {
   moveSegmentTunniLine,
   nodeById,
   removeNode,
+  removeNodeFitted,
   reverseContour,
   segmentAt,
   segmentCount,
@@ -746,6 +747,72 @@ describe("locking one handle at a time", () => {
     const freed = setHvLock(both, c.nodes[0]!.id, "in", false)!;
 
     expect(freed.nodes[0]!.type).toBe("corner");
+  });
+});
+
+describe("removing a node and fitting what is left", () => {
+  /** A quarter arc, as two segments with a point in the middle of it. */
+  const halved = () => {
+    const whole = contour(
+      "q",
+      [node("a", vec(0, 0), { out: vec(0, 110) }), node("b", vec(200, 200), { in: vec(90, 200) })],
+      false,
+    );
+    return { whole, split: insertNodeOnSegment(whole, 0, 0.4, counterIds("h"))! };
+  };
+
+  it("puts the curve back where inserting a point left it", () => {
+    const { whole, split } = halved();
+    const back = removeNodeFitted(split, split.nodes[1]!.id)!;
+
+    expect(back.nodes).toHaveLength(2);
+    // Within half a unit of the handles it had, on an arc reaching 200 across
+    // and 200 up: the fit is an approximation and lands well inside the grid a
+    // font is rounded to.
+    expect(distance(back.nodes[0]!.out!, whole.nodes[0]!.out!)).toBeLessThan(0.5);
+    expect(distance(back.nodes[1]!.in!, whole.nodes[1]!.in!)).toBeLessThan(0.5);
+  });
+
+  it("dents the outline when the handles are left as they were", () => {
+    // What the fitting is for: the same deletion without it leaves the
+    // neighbours reaching half as far as the one segment needs.
+    const { whole, split } = halved();
+    const plain = removeNode(split, split.nodes[1]!.id)!;
+
+    expect(distance(plain.nodes[0]!.out!, whole.nodes[0]!.out!)).toBeGreaterThan(20);
+  });
+
+  it("keeps the directions the neighbours leave and arrive by", () => {
+    // They are the join with whatever is beyond, and a smooth node either side
+    // rests on them. Only the lengths are the fit's business.
+    const { split } = halved();
+    const angle = (from: { x: number; y: number }, to: { x: number; y: number }): number =>
+      Math.atan2(to.y - from.y, to.x - from.x);
+    const was = angle(split.nodes[0]!.pt, split.nodes[0]!.out!);
+    const back = removeNodeFitted(split, split.nodes[1]!.id)!;
+
+    expect(angle(back.nodes[0]!.pt, back.nodes[0]!.out!)).toBeCloseTo(was, 9);
+  });
+
+  it("leaves two straight segments straight", () => {
+    const lines = contour(
+      "l",
+      [node("a", vec(0, 0)), node("b", vec(50, 0)), node("c", vec(100, 40))],
+      false,
+    );
+    const back = removeNodeFitted(lines, "b")!;
+
+    expect(back.nodes).toHaveLength(2);
+    expect(back.nodes[0]!.out).toBeNull();
+    expect(back.nodes[1]!.in).toBeNull();
+  });
+
+  it("has nothing to fit at the end of an open contour, and simply removes it", () => {
+    const { split } = halved();
+    const end = removeNodeFitted(split, split.nodes[0]!.id)!;
+
+    expect(end.nodes).toHaveLength(2);
+    expect(end.nodes[0]!.pt).toEqual(split.nodes[1]!.pt);
   });
 });
 

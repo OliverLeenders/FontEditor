@@ -155,6 +155,213 @@ export function extrema(s: Cubic): number[] {
 }
 
 /**
+ * One cubic through what two of them drew, for a point being taken out.
+ *
+ * Deleting a node leaves the two segments it joined to be drawn by one, and the
+ * neighbours' handles were the right length for half the distance each. Keeping
+ * them is what makes a deleted point dent the outline. The directions the curve
+ * leaves and arrives by are kept — they are the join with whatever is beyond,
+ * and a smooth node either side depends on them — and only the two lengths are
+ * fitted, by least squares against points sampled off the pair.
+ *
+ * Two unknowns, so each fit is a 2×2 solve. It is done a few times over, with
+ * every sample asked again between rounds which point of the fitted curve it is
+ * nearest: where a sample sits along the pair is not where it sits along the
+ * answer, and a fit against the first guess at that is visibly off. Where the
+ * solve degenerates — a cusp, a zero-length side, handles the fit would send
+ * backwards — each length falls back to a third of the chord, which is the
+ * length that draws a circular-ish arc and is what every curve fitter starts
+ * from.
+ *
+ * `null` when there is no direction to leave or arrive by, which is a pair of
+ * segments with nothing to fit.
+ */
+export function refitJoin(before: Cubic, after: Cubic): Cubic | null {
+  const from = before.a;
+  const to = after.b;
+
+  const leaving = unit(sub(coincident(before.c1, from) ? before.b : before.c1, from));
+  const arriving = unit(sub(coincident(after.c2, to) ? after.a : after.c2, to));
+  if (leaving === null || arriving === null) return null;
+
+  const chord = Math.hypot(to.x - from.x, to.y - from.y);
+  const plain = fallback(from, to, leaving, arriving, chord / 3);
+
+  const points: Vec2[] = [];
+  for (let i = 0; i <= SAMPLES; i++) points.push(evaluate(before, i / SAMPLES));
+  for (let i = 1; i <= SAMPLES; i++) points.push(evaluate(after, i / SAMPLES));
+
+  // Chord length to start with: the fit is only as good as the correspondence
+  // between a sample and the `u` it is called, and uniform `u` across a pair of
+  // unequal segments would pull the result towards the shorter one. It is only
+  // a start, because distance along the pair is not distance along the answer.
+  let params = chordParameters(points);
+  if (params === null) return plain;
+
+  let best = plain;
+  let bestError = Infinity;
+  for (let round = 0; round < ROUNDS; round++) {
+    const fitted = handlesFor(points, params, from, to, leaving, arriving, chord);
+    if (fitted === null) break;
+
+    // Each sample is re-asked which point of the fitted curve it is nearest,
+    // and the next fit is against those answers. Repeating that is what turns a
+    // fit that is roughly right into one that puts a curve which *can* be
+    // recovered exactly back exactly, and it is also what makes the error worth
+    // measuring: the distance to the nearest point of the curve is what a
+    // designer sees, and the distance at a guessed parameter is not.
+    params = params.map((u, i) => nearer(fitted, points[i]!, u));
+    const error = worstDistance(fitted, points, params);
+    if (error < bestError) {
+      best = fitted;
+      bestError = error;
+    }
+  }
+  return best;
+}
+
+/** How many points are read off the pair, each side of the join. */
+const SAMPLES = 24;
+
+/**
+ * How many times to fit and re-parameterise.
+ *
+ * It converges quickly and then finely: a curve that was one curve before a
+ * point was put in the middle of it comes back within a hundredth of a unit by
+ * about twenty, and a pair that no single cubic can draw has settled long
+ * before. Two dozen rounds of a 2×2 solve over fifty points is nothing beside
+ * the redraw that follows.
+ */
+const ROUNDS = 24;
+
+/**
+ * The two handle lengths that put the curve closest to the samples, by the
+ * normal equations of Q(u) = a·B0 + (a + αT1)·B1 + (b + βT2)·B2 + b·B3, where α
+ * and β are the only unknowns.
+ *
+ * `null` where the solve degenerates, or where it asks for a handle behind its
+ * own anchor — which is not a shorter handle but a loop, a segment crossing
+ * itself where the original did not.
+ */
+function handlesFor(
+  points: readonly Vec2[],
+  params: readonly number[],
+  from: Vec2,
+  to: Vec2,
+  leaving: Vec2,
+  arriving: Vec2,
+  chord: number,
+): Cubic | null {
+  let c00 = 0;
+  let c01 = 0;
+  let c11 = 0;
+  let x0 = 0;
+  let x1 = 0;
+
+  for (let i = 0; i < points.length; i++) {
+    const u = params[i]!;
+    const p = points[i]!;
+    const v = 1 - u;
+    const b0 = v * v * v;
+    const b1 = 3 * v * v * u;
+    const b2 = 3 * v * u * u;
+    const b3 = u * u * u;
+
+    const a1 = scale(leaving, b1);
+    const a2 = scale(arriving, b2);
+    const restX = p.x - (from.x * (b0 + b1) + to.x * (b2 + b3));
+    const restY = p.y - (from.y * (b0 + b1) + to.y * (b2 + b3));
+
+    c00 += a1.x * a1.x + a1.y * a1.y;
+    c01 += a1.x * a2.x + a1.y * a2.y;
+    c11 += a2.x * a2.x + a2.y * a2.y;
+    x0 += restX * a1.x + restY * a1.y;
+    x1 += restX * a2.x + restY * a2.y;
+  }
+
+  const det = c00 * c11 - c01 * c01;
+  if (Math.abs(det) < 1e-12) return null;
+
+  const alpha = (x0 * c11 - c01 * x1) / det;
+  const beta = (c00 * x1 - x0 * c01) / det;
+  const tiny = chord * 1e-6;
+  if (!(alpha > tiny) || !(beta > tiny)) return null;
+
+  return {
+    a: from,
+    c1: addScaled(from, leaving, alpha),
+    c2: addScaled(to, arriving, beta),
+    b: to,
+  };
+}
+
+/** The furthest any sample is from where its own parameter puts the curve. */
+function worstDistance(s: Cubic, points: readonly Vec2[], params: readonly number[]): number {
+  let worst = 0;
+  for (let i = 0; i < points.length; i++) {
+    const at = evaluate(s, params[i]!);
+    worst = Math.max(worst, Math.hypot(at.x - points[i]!.x, at.y - points[i]!.y));
+  }
+  return worst;
+}
+
+/**
+ * The parameter of the curve nearest `p`, starting from `u`.
+ *
+ * Newton on `(Q(u) − p) · Q'(u)`, which is zero exactly where the curve is at
+ * its closest. Two steps, which is where a step stops buying anything at this
+ * distance from the answer, and the result is held inside the segment: at the
+ * ends the derivative of a handle-retracted curve vanishes, and the step is a
+ * division by nearly nothing.
+ */
+function nearer(s: Cubic, p: Vec2, u: number): number {
+  let at = u;
+  for (let step = 0; step < 2; step++) {
+    const q = evaluate(s, at);
+    const d1 = derivative(s, at);
+    const d2 = secondDerivative(s, at);
+
+    const dx = q.x - p.x;
+    const dy = q.y - p.y;
+    const numerator = dx * d1.x + dy * d1.y;
+    const denominator = d1.x * d1.x + d1.y * d1.y + dx * d2.x + dy * d2.y;
+    if (!Number.isFinite(denominator) || Math.abs(denominator) < 1e-12) return at;
+
+    const moved = at - numerator / denominator;
+    if (!Number.isFinite(moved)) return at;
+    at = Math.min(1, Math.max(0, moved));
+  }
+  return at;
+}
+
+function fallback(from: Vec2, to: Vec2, leaving: Vec2, arriving: Vec2, reach: number): Cubic {
+  return {
+    a: from,
+    c1: addScaled(from, leaving, reach),
+    c2: addScaled(to, arriving, reach),
+    b: to,
+  };
+}
+
+function unit(v: Vec2): Vec2 | null {
+  const reach = Math.hypot(v.x, v.y);
+  if (!(reach > 0) || !Number.isFinite(reach)) return null;
+  return { x: v.x / reach, y: v.y / reach };
+}
+
+/** Each sample's share of the distance walked to reach it, from 0 to 1. */
+function chordParameters(points: readonly Vec2[]): number[] | null {
+  const walked: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    const step = Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
+    walked.push(walked[i - 1]! + step);
+  }
+  const total = walked[walked.length - 1]!;
+  if (!(total > 0)) return null;
+  return walked.map((each) => each / total);
+}
+
+/**
  * The box round the four control points.
  *
  * Looser than {@link bounds} and far cheaper — no root finding, four comparisons

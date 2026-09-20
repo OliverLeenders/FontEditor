@@ -87,6 +87,7 @@ export {
   lineAsCubic,
   project,
   quadraticToCubic,
+  refitJoin,
   reverse,
   secondDerivative,
   split,

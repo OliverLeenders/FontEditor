@@ -14,6 +14,7 @@ import {
   isFlat,
   lineAsCubic,
   project,
+  refitJoin,
   reverse,
   split,
   subcurve,
@@ -101,6 +102,54 @@ describe("extrema and bounds", () => {
     expect(box.minY).toBeCloseTo(0, 12);
     expect(box.maxX).toBeCloseTo(100, 12);
     expect(box.maxY).toBeCloseTo(75, 12);
+  });
+});
+
+describe("refitting a join", () => {
+  it("puts back the curve a split took apart", () => {
+    // The pair came from one cubic, so one cubic draws them exactly and the fit
+    // should find it rather than something near it.
+    const [before, after] = split(ARCH, 0.4);
+    const joined = refitJoin(before, after)!;
+
+    expect(distance(joined.c1, ARCH.c1)).toBeLessThan(0.05);
+    expect(distance(joined.c2, ARCH.c2)).toBeLessThan(0.05);
+  });
+
+  it("keeps the directions the curve leaves and arrives by", () => {
+    // What the neighbours' own joins are made of: a smooth node either side
+    // stays smooth only because these are left alone.
+    const [before, after] = split(ARCH, 0.25);
+    const joined = refitJoin(before, after)!;
+
+    const leaving = Math.atan2(joined.c1.y - joined.a.y, joined.c1.x - joined.a.x);
+    const wanted = Math.atan2(before.c1.y - before.a.y, before.c1.x - before.a.x);
+    expect(leaving).toBeCloseTo(wanted, 9);
+  });
+
+  it("draws close to a pair that no single cubic can draw exactly", () => {
+    // Two quarter arcs of different radius: the fit is an approximation, and
+    // what it has to be is close, not exact. Measured as the distance to the
+    // nearest point of the curve — which is what the eye judges, where the
+    // distance at a matched parameter is an artefact of the matching.
+    const before = cubic(vec(0, 0), vec(0, 55), vec(45, 100), vec(100, 100));
+    const after = cubic(vec(100, 100), vec(180, 100), vec(240, 60), vec(240, 0));
+    const joined = refitJoin(before, after)!;
+
+    let worst = 0;
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40;
+      const wanted = t < 0.5 ? evaluate(before, t * 2) : evaluate(after, (t - 0.5) * 2);
+      worst = Math.max(worst, distance(project(joined, wanted).point, wanted));
+    }
+    // Two units off a pair spanning 240, which is inside the width of the line
+    // the outline is drawn with.
+    expect(worst).toBeLessThan(2);
+  });
+
+  it("gives back nothing where there is no direction to fit", () => {
+    const nowhere = cubic(vec(50, 50), vec(50, 50), vec(50, 50), vec(50, 50));
+    expect(refitJoin(nowhere, nowhere)).toBeNull();
   });
 });
 

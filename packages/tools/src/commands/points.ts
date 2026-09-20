@@ -14,7 +14,7 @@ import {
   isHalfHandled,
   nodeById,
   nodeIndex,
-  removeNode,
+  removeNodeFitted,
   setHandle,
   setHvLock,
   setNodeType,
@@ -201,6 +201,11 @@ export function nodeHvLocked(state: EditorState, contourId: ContourId, nodeId: N
  *
  * Handles in the selection are ignored: Backspace on a handle should not delete
  * the point it belongs to, which is a much larger edit than the one asked for.
+ *
+ * What is left is fitted to the shape that was there — see `removeNodeFitted`.
+ * A point taken off a curve is usually one somebody decided was surplus, and a
+ * deletion that dents the outline means redrawing by hand what the arithmetic
+ * can work out.
  */
 export function deleteSelectedPoints(state: EditorState): ToolResult {
   const points = state.selection.filter((item) => item.part === "point");
@@ -209,7 +214,7 @@ export function deleteSelectedPoints(state: EditorState): ToolResult {
   let editor = state;
   for (const item of points) {
     const document = editCurrentGlyph(editor, (g) =>
-      updateContour(g, item.contourId, (c) => removeNode(c, item.nodeId)),
+      updateContour(g, item.contourId, (c) => removeNodeFitted(c, item.nodeId)),
     );
     if (document !== null) editor = { ...editor, document };
   }
