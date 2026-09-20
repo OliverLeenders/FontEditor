@@ -244,6 +244,12 @@
   color: var(--ink-2);
 }
 
+/* The name a cell that is not in the font would be given if it were made. */
+.tipHead b[data-proposed] {
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
 .tipNote {
   color: var(--ink-3);
 }

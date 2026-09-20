@@ -1,7 +1,7 @@
 import {
   GLYPH_SETS,
   catalog,
-  filterCatalog,
+  listCatalog,
   loadUnicodeNames,
   setCounts,
   unicodeName,
@@ -15,6 +15,7 @@ import {
   sampleText,
 } from "@typewright/render";
 import {
+  createGlyphs,
   deleteGlyphs,
   duplicateGlyph,
   duplicateName,
@@ -51,6 +52,7 @@ import {
   CopyPlusIcon,
   GridIcon,
   PenToolIcon,
+  SquarePlusIcon,
   TrashIcon,
   TypeIcon,
 } from "./icons.js";
@@ -136,7 +138,16 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
 
   const entries = useMemo(() => catalog(grid), [grid]);
   const counts = useMemo(() => setCounts(entries), [entries]);
-  const shown = useMemo(() => filterCatalog(entries, query), [entries, query]);
+  // Every glyph the query keeps, and every code point it covers that the font
+  // has not got — see `listCatalog`. The second kind is a cell to be made
+  // rather than one to open, and is left out of everything that acts on a
+  // glyph: it has no name in the font to act on.
+  const shown = useMemo(() => listCatalog(entries, query), [entries, query]);
+  const toMake = useMemo(() => shown.filter((entry) => !entry.inFont).length, [shown]);
+  const inFont = (index: number): string | null => {
+    const entry = shown[index];
+    return entry === undefined || !entry.inFont ? null : entry.name;
+  };
 
   // One layout, computed in render, used by the spacer, the keyboard and the
   // canvas alike. Deriving it separately in the frame callback is what let the
@@ -153,10 +164,12 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
    * on purpose.
    */
   const selection = useMemo(() => {
-    const names = shown.filter((entry) => picked.has(entry.name)).map((entry) => entry.name);
+    const names = shown
+      .filter((entry) => entry.inFont && picked.has(entry.name))
+      .map((entry) => entry.name);
     if (names.length > 0) return names;
-    const name = shown[focused]?.name;
-    return name === undefined ? [] : [name];
+    const at = shown[focused];
+    return at === undefined || !at.inFont ? [] : [at.name];
   }, [shown, picked, focused]);
   const selectionSet = useMemo(() => new Set(selection), [selection]);
 
@@ -204,8 +217,6 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         ascender: info.ascender,
         descender: info.descender,
       };
-      const focusedName = state.shown[state.focused]?.name ?? null;
-
       for (let i = range.first; i <= range.last; i++) {
         const entry = state.shown[i];
         const box = cellBox(layout, i);
@@ -214,6 +225,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         // Content coordinates to viewport coordinates. The canvas stays the size
         // of the viewport however tall the grid gets; only this offset moves.
         const cellGlyph = entry.drawn ? state.document.glyphs[entry.name] : undefined;
+        const missing = !entry.inFont;
         drawGlyphCell(
           ctx,
           // Components drawn in, so a composite shows the letter it is made of.
@@ -224,11 +236,15 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           {
             name: entry.name,
             codePoint: entry.codePoint,
-            focused: entry.name === focusedName,
-            current: entry.name === state.currentGlyph,
-            selected: state.selectionSet.size > 1 && state.selectionSet.has(entry.name),
-            markColor: state.document.glyphs[entry.name]?.markColor ?? null,
-            absent: state.document !== state.own && state.own.glyphs[entry.name] === undefined,
+            focused: i === state.focused,
+            current: !missing && entry.name === state.currentGlyph,
+            selected: !missing && state.selectionSet.size > 1 && state.selectionSet.has(entry.name),
+            markColor: missing ? null : (state.document.glyphs[entry.name]?.markColor ?? null),
+            absent:
+              !missing &&
+              state.document !== state.own &&
+              state.own.glyphs[entry.name] === undefined,
+            missing,
           },
         );
       }
@@ -325,6 +341,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
       unicode: code === null || !named ? null : unicodeName(code),
       block: entry.block?.label ?? null,
       drawn: entry.drawn,
+      inFont: entry.inFont,
     };
   }, [hovered, shown, named]);
 
@@ -344,17 +361,17 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
    * same, is how the wrong one gets renamed.
    */
   const commitRename = (index: number, to: string): void => {
-    const name = shown[index]?.name;
+    const name = inFont(index);
     setRenaming(null);
-    if (name === undefined || to.trim() === "" || to.trim() === name) return;
+    if (name === null || to.trim() === "" || to.trim() === name) return;
 
     store.setCurrentGlyph(name);
     store.applyTool(renameCurrentGlyph(store.editor, to));
   };
 
   const startRename = (index: number): void => {
-    const name = shown[index]?.name;
-    if (name === undefined || name === NOTDEF) return;
+    const name = inFont(index);
+    if (name === null || name === NOTDEF) return;
     setRenameScroll(scrollRef.current?.scrollTop ?? 0);
     setRenaming({ index, draft: name });
   };
@@ -402,8 +419,28 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
    * opens. Renaming and duplicating are about one glyph and are offered for one.
    */
   const cellItems = (index: number): Item[] => {
-    const name = shown[index]?.name;
-    if (name === undefined) return [];
+    const entry = shown[index];
+    if (entry === undefined) return [];
+    // What is on offer for a code point with no glyph: making it, with or
+    // without opening it. Nothing else on this menu is about anything that
+    // exists yet.
+    if (!entry.inFont) {
+      return [
+        {
+          kind: "item",
+          label: "Add to font",
+          icon: SquarePlusIcon,
+          run: () => makeAt(index, false),
+        },
+        {
+          kind: "item",
+          label: "Add and open",
+          icon: PenToolIcon,
+          run: () => makeAt(index, true),
+        },
+      ];
+    }
+    const name = entry.name;
     const names = selectionSet.has(name) ? selection : [name];
     const several = names.length > 1;
     const marks = names.map((each) => document.glyphs[each]?.markColor ?? null);
@@ -502,10 +539,35 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   const openAt = (index: number): void => {
     const entry = shown[index];
     if (entry === undefined) return;
+    // A cell the font has nothing for: the gesture that opens a glyph makes
+    // this one, which is what somebody looking at a hole in a block came to do.
+    if (!entry.inFont) {
+      makeAt(index, true);
+      return;
+    }
     // Not drawn in this master: asked rather than done, because opening it
     // means adding a glyph to a master that was deliberately drawn without it.
     if (absent(entry.name)) setOffer(entry.name);
     else onOpen(entry.name);
+  };
+
+  /**
+   * Make the glyph a cell stands for.
+   *
+   * The advance a new glyph starts with is half the em, as it is everywhere
+   * else a glyph is made: a width to be spaced rather than a drawing decision.
+   * Opening it is what the double-click asked for; the menu can add one without
+   * leaving the grid, which is how a row of them gets added.
+   */
+  const makeAt = (index: number, open: boolean): void => {
+    const entry = shown[index];
+    if (entry === undefined || entry.inFont || entry.codePoint === null) return;
+
+    const advance = Math.round(document.info.unitsPerEm / 2);
+    store.applyTool(
+      createGlyphs(store.editor, [{ name: entry.name, unicodes: [entry.codePoint] }], advance),
+    );
+    if (open) onOpen(entry.name);
   };
 
   /**
@@ -517,13 +579,30 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
     index: number,
     how: { readonly toggle: boolean; readonly extend: boolean },
   ): void => {
-    const name = shown[index]?.name;
-    if (name === undefined) return;
+    const entry = shown[index];
+    if (entry === undefined) return;
+    // A cell the font has nothing for takes the focus and nothing else: what is
+    // picked is what the menu and Delete are about, and neither has anything to
+    // say about a glyph that does not exist.
+    if (!entry.inFont) {
+      setPicked(new Set());
+      setAnchor(index);
+      setFocused(index);
+      return;
+    }
+    const name = entry.name;
 
     if (how.extend) {
       const from = Math.min(anchor, index);
       const to = Math.max(anchor, index);
-      setPicked(new Set(shown.slice(from, to + 1).map((entry) => entry.name)));
+      setPicked(
+        new Set(
+          shown
+            .slice(from, to + 1)
+            .filter((each) => each.inFont)
+            .map((each) => each.name),
+        ),
+      );
     } else if (how.toggle) {
       const next = new Set(selection);
       // The last one stays: picking nothing would leave the menu with nothing
@@ -627,9 +706,10 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               </select>
             </label>
             <span className={styles.count}>
-              {shown.length === entries.length
+              {shown.length - toMake === entries.length
                 ? `${String(entries.length)} glyphs`
-                : `${String(shown.length)} of ${String(entries.length)}`}
+                : `${String(shown.length - toMake)} of ${String(entries.length)}`}
+              {toMake > 0 ? ` · ${String(toMake)} not in the font` : ""}
               {selection.length > 1 ? ` · ${String(selection.length)} picked` : ""}
             </span>
           </div>
@@ -649,7 +729,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") {
                 event.preventDefault();
                 event.stopPropagation();
-                setPicked(new Set(shown.map((entry) => entry.name)));
+                setPicked(new Set(shown.filter((e) => e.inFont).map((e) => e.name)));
                 return;
               }
               if (event.ctrlKey || event.metaKey) return;
@@ -716,8 +796,8 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               event.preventDefault();
               // Pointing outside the picked cells picks the one pointed at, so
               // the menu is never about glyphs other than the one under it.
-              const name = shown[index]?.name;
-              if (name !== undefined && !selectionSet.has(name)) {
+              const name = inFont(index);
+              if (name === null || !selectionSet.has(name)) {
                 pick(index, { toggle: false, extend: false });
               } else {
                 setFocused(index);
@@ -751,7 +831,9 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
                 {tip.sample === null ? null : (
                   <span className={styles.tipSample}>{tip.sample}</span>
                 )}
-                <b>{tip.name}</b>
+                {/* The name a glyph would be given, said as a proposal rather
+                    than as a fact, since the font has no glyph by that name. */}
+                <b data-proposed={tip.inFont ? undefined : "true"}>{tip.name}</b>
                 {tip.codePoint === null ? null : (
                   <span className={styles.tipCode}>{tip.codePoint}</span>
                 )}
@@ -759,8 +841,14 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               {tip.unicode === null ? null : <div className={styles.tipName}>{tip.unicode}</div>}
               <div className={styles.tipNote}>
                 {tip.block ?? "Unencoded"}
-                {tip.drawn ? "" : " · not yet drawn"}
+                {/* Three things a cell can be, and the tip says which: in the
+                    font and drawn, in the font and empty, or not there at all
+                    and one keystroke from being made. */}
+                {tip.inFont ? (tip.drawn ? "" : " · not yet drawn") : " · not in the font"}
               </div>
+              {tip.inFont ? null : (
+                <div className={styles.tipNote}>Press Enter, or double-click, to make it</div>
+              )}
             </div>
           )}
 

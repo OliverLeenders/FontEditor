@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { installBrowserGlobals } from "./browser-globals.js";
@@ -67,6 +67,24 @@ function browser() {
   return { store, grid: screen.getByRole("grid", { name: "Glyphs" }) };
 }
 
+/** The browser on ASCII, where the code points the font lacks have cells. */
+function asciiBrowser() {
+  const store = freshStore();
+  act(() => {
+    store.setCatalogQuery({ set: "ascii", order: "codePoint" });
+  });
+  render(<GlyphBrowser onOpen={vi.fn()} />, store);
+
+  const held = new Set(Object.values(store.editor.document.glyphs).flatMap((g) => [...g.unicodes]));
+  let index = 0;
+  for (let code = 0x20; code <= 0x7e; code++) {
+    if (!held.has(code))
+      return { store, grid: screen.getByRole("grid", { name: "Glyphs" }), index };
+    index++;
+  }
+  throw new Error("the starter font has all of ASCII");
+}
+
 describe("the tip beside a cell", () => {
   it("names the character the standard's way, and says where it is from", async () => {
     const { store, grid } = browser();
@@ -100,6 +118,19 @@ describe("the tip beside a cell", () => {
     fireEvent.pointerMove(grid, at(index));
     const tip = await screen.findByRole("tooltip");
     expect(tip.textContent).toContain("not yet drawn");
+  });
+
+  it("says when the font has no glyph for the cell at all, and how to make one", async () => {
+    // Three states a cell can be in, and the tip is where they are told apart:
+    // drawn, in the font and empty, and not there yet.
+    const { grid, index } = asciiBrowser();
+
+    fireEvent.pointerMove(grid, at(index));
+    const tip = await screen.findByRole("tooltip");
+
+    expect(tip.textContent).toContain("not in the font");
+    expect(tip.textContent).toContain("Press Enter");
+    expect(tip.textContent).not.toContain("not yet drawn");
   });
 
   it("goes away when the pointer leaves the grid", async () => {

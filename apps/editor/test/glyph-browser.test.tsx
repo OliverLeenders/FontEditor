@@ -78,6 +78,127 @@ function menuItem(label: string | RegExp): HTMLButtonElement {
 
 const picked = () => /(\d+) picked/.exec(document.body.textContent)?.[1] ?? null;
 
+/**
+ * The cells for code points the font has not got.
+ *
+ * Browsing a block is how somebody decides what to draw next, and a grid that
+ * lists only what exists cannot show what is missing. These cells are offers,
+ * not glyphs: nothing that acts on a glyph acts on them, and the gesture that
+ * opens a glyph makes this one instead.
+ */
+describe("what the font has not got", () => {
+  /** The browser on ASCII in code-point order, where the holes fall in place. */
+  function ascii(): ReturnType<typeof browser> {
+    const store = freshStore();
+    act(() => {
+      store.setCatalogQuery({ set: "ascii", order: "codePoint" });
+    });
+    return browser(store);
+  }
+
+  /** The index of the first cell for a code point the font has no glyph for. */
+  function firstHole(store: Store): { index: number; codePoint: number } {
+    const held = new Set(
+      Object.values(store.editor.document.glyphs).flatMap((g) => [...g.unicodes]),
+    );
+    let index = 0;
+    for (let code = 0x20; code <= 0x7e; code++) {
+      if (!held.has(code)) return { index, codePoint: code };
+      index++;
+    }
+    throw new Error("the starter font has all of ASCII");
+  }
+
+  it("counts them apart from the glyphs", () => {
+    const { store } = ascii();
+    const said = /(\d+) not in the font/.exec(document.body.textContent)?.[1];
+    expect(said).toBeDefined();
+
+    const held = new Set(
+      Object.values(store.editor.document.glyphs).flatMap((g) => [...g.unicodes]),
+    );
+    let holes = 0;
+    for (let code = 0x20; code <= 0x7e; code++) if (!held.has(code)) holes++;
+    expect(Number(said)).toBe(holes);
+  });
+
+  it("makes the glyph and opens it when one is double-clicked", () => {
+    const { store, onOpen } = ascii();
+    const { index, codePoint } = firstHole(store);
+
+    fireEvent.doubleClick(grid(), at(index));
+
+    const made = Object.values(store.editor.document.glyphs).find((g) =>
+      g.unicodes.includes(codePoint),
+    );
+    expect(made).toBeDefined();
+    expect(onOpen).toHaveBeenCalledWith(made!.name);
+    // Half the em, as every other way of making a glyph starts one.
+    expect(made!.advance).toBe(Math.round(store.editor.document.info.unitsPerEm / 2));
+  });
+
+  it("makes it on Enter, which is what opens a glyph", () => {
+    const { store } = ascii();
+    const { index, codePoint } = firstHole(store);
+
+    fireEvent.click(grid(), at(index));
+    fireEvent.keyDown(grid(), { key: "Enter" });
+
+    expect(
+      Object.values(store.editor.document.glyphs).some((g) => g.unicodes.includes(codePoint)),
+    ).toBe(true);
+  });
+
+  it("is not picked, so the count and the Delete key pass it by", () => {
+    const { store } = ascii();
+    const { index } = firstHole(store);
+    const before = store.editor.document.glyphOrder.length;
+
+    fireEvent.click(grid(), at(index));
+    expect(picked()).toBeNull();
+
+    fireEvent.keyDown(grid(), { key: "Delete" });
+    expect(store.editor.document.glyphOrder).toHaveLength(before);
+  });
+
+  it("is left out when every glyph shown is picked", () => {
+    const { store } = ascii();
+    fireEvent.keyDown(grid(), { key: "a", ctrlKey: true });
+
+    const held = new Set(
+      Object.values(store.editor.document.glyphs).flatMap((g) => [...g.unicodes]),
+    );
+    let inAscii = 0;
+    for (let code = 0x20; code <= 0x7e; code++) if (held.has(code)) inAscii++;
+    expect(picked()).toBe(String(inAscii));
+  });
+
+  it("offers making it, and nothing that is about a glyph", () => {
+    const { store } = ascii();
+    const { index } = firstHole(store);
+    fireEvent.contextMenu(grid(), at(index));
+
+    expect(menuItem("Add to font")).toBeTruthy();
+    expect(menuItem("Add and open")).toBeTruthy();
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Delete" })).toBeNull();
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Rename…" })).toBeNull();
+  });
+
+  it("offers a character searched for that the font has not got", () => {
+    const store = freshStore();
+    act(() => {
+      store.setCatalogQuery({ set: "all", search: "U+01E7" });
+    });
+    browser(store);
+
+    expect(/1 not in the font/.test(document.body.textContent)).toBe(true);
+    fireEvent.doubleClick(grid(), at(0));
+    expect(
+      Object.values(store.editor.document.glyphs).some((g) => g.unicodes.includes(0x1e7)),
+    ).toBe(true);
+  });
+});
+
 describe("picking cells", () => {
   it("picks one cell with a click, and says nothing about a count", () => {
     browser();

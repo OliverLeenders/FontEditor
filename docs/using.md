@@ -226,6 +226,18 @@ system's own fonts instead of an empty box, with a combining mark on the dotted 
 is always shown on, so a screenful of empty cells after **Add missing** can be read at a
 glance.
 
+**What the font has not got.** Choosing a Unicode block — or ASCII — lists the whole of
+it, and the code points with no glyph get cells of their own: the character fainter
+still, in a dashed box, with the code point under it and no name, since the font has not
+named it yet. Sorting by code point puts them in their places, so a block reads as a
+chart with gaps; in font order they follow the glyphs, a glyph the font has not got
+having no place in the order the font declares. Searching does the same for one
+character: type a `ǧ` the font has not got and it is offered rather than answered with an
+empty grid. **Double-click one, or press Enter on it, to make that glyph and open it**;
+its menu adds it without opening. They are offers and not glyphs, so they are not picked,
+not counted among the glyphs, and nothing that acts on a glyph — deleting, renaming,
+marking — acts on them. **Add missing** still makes the whole block at once.
+
 **Layers.** The Layers section of the inspector lists the glyph's other drawings — a
 background, a sketch — and which one the tools draw in. B draws in the background and back
 in the letter. Layers with their eye open show faint behind the drawing, and the letter

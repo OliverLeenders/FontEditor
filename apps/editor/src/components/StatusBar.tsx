@@ -161,7 +161,7 @@ export function StatusBar({
  */
 const HINTS: Record<ViewId, string> = {
   glyph: "hold M to measure a stem · L lays a ruler across · space previews · ctrl-0 fits",
-  font: "double-click a glyph to edit it · arrow keys move · enter opens · delete removes",
+  font: "double-click a glyph to edit it · arrow keys move · enter opens, or makes one the font has not got · delete removes",
   spacing: "",
   features: "",
   proof: "",
