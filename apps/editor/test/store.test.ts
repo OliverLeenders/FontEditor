@@ -5,7 +5,8 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
-const { setPointType, deleteSelectedPoints, begin, commit } = await import("@typewright/tools");
+const { setPointType, deleteSelectedPoints, begin, commit, setSidebearing } =
+  await import("@typewright/tools");
 const { glyphBounds, sidebearings, updateGlyph } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
@@ -291,6 +292,52 @@ describe("EditorStore", () => {
       // The feedback loop this guards against redrew sixty times a second.
       expect(store.editor.view).toBe(view);
     });
+  });
+});
+
+describe("spacing taken from another glyph", () => {
+  /** Two glyphs of the starter font, the second keyed to the first. */
+  function pair(store: Store): { from: string; follows: string } {
+    const drawn = store.editor.document.glyphOrder.filter(
+      (name) => (store.editor.document.glyphs[name]?.contours.length ?? 0) > 0,
+    );
+    const from = drawn[0]!;
+    const follows = drawn[1]!;
+    store.setEditor({
+      ...store.editor,
+      document: updateGlyph(store.editor.document, follows, (g) => ({
+        ...g,
+        metricKeys: { left: from, right: "", width: "" },
+      }))!,
+    });
+    return { from, follows };
+  }
+
+  const leftOf = (store: Store, name: string): number =>
+    sidebearings(store.editor.document.glyphs[name]!, store.editor.document)!.left;
+
+  it("follows the glyph it names as that glyph is edited", () => {
+    // The keys used to be followed only where somebody asked what they came to
+    // — the fields, and the font as compiled — so the canvas, the strip and the
+    // saved file kept the keyed glyph at its old spacing until an export.
+    const store = freshStore();
+    const { from, follows } = pair(store);
+
+    store.applyTool(setSidebearing(store.editor, from, "left", 123));
+
+    expect(leftOf(store, from)).toBe(123);
+    expect(leftOf(store, follows)).toBe(123);
+  });
+
+  it("takes both back together, since they are one step", () => {
+    const store = freshStore();
+    const { from, follows } = pair(store);
+    const before = leftOf(store, follows);
+
+    store.applyTool(setSidebearing(store.editor, from, "left", 123));
+    store.undo();
+
+    expect(leftOf(store, follows)).toBe(before);
   });
 });
 

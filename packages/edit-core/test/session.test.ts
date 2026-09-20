@@ -8,10 +8,13 @@ import {
   counterIds,
   fontDocument,
   glyph,
+  glyphNamed,
   node,
   nodeById,
   orderedGlyphs,
+  rectContour,
   segmentTunniPoint,
+  sidebearings,
 } from "@typewright/font-model";
 import {
   type EditorState,
@@ -23,6 +26,7 @@ import {
   pointerInput,
   pointerMove,
   pointerUp,
+  setSidebearing,
 } from "@typewright/tools";
 import type { ViewTransform } from "@typewright/view";
 import { describe, expect, it } from "vitest";
@@ -83,6 +87,74 @@ function drag(
   }
   return apply(next, pointerUp(next.editor), now);
 }
+
+/**
+ * Two glyphs, the second taking its left side from the first.
+ *
+ * Rectangles, so a sidebearing is a number that can be read straight off the
+ * drawing rather than worked out from a curve.
+ */
+function keyed(): EditSession {
+  const ids = counterIds("k");
+  const n = addContour(
+    glyph("n", { advance: 600 }),
+    rectContour(ids, { minX: 80, minY: 0, maxX: 440, maxY: 700 }),
+  );
+  const m = addContour(
+    glyph("m", { advance: 900, metricKeys: { left: "n", right: "", width: "" } }),
+    rectContour(ids, { minX: 200, minY: 0, maxX: 700, maxY: 700 }),
+  );
+  return session(editorState({ document: fontDocument([n, m]), view: VIEW }));
+}
+
+const sidesOf = (s: EditSession, name: string) =>
+  sidebearings(glyphNamed(s.editor.document, name)!, s.editor.document);
+
+/**
+ * Spacing keys, once a step is closed.
+ *
+ * A key says a relationship — "my left side is n's" — and it was followed only
+ * where somebody asked what it came to. The document kept the numbers the keyed
+ * glyph was last given, so editing `n` left `m` drawn and saved at its old
+ * spacing until the font was next compiled.
+ */
+describe("spacing keys", () => {
+  it("re-spaces the glyphs that follow the one just edited", () => {
+    const s = keyed();
+    expect(sidesOf(s, "m")?.left).toBe(200);
+
+    const after = apply(s, setSidebearing(s.editor, "n", "left", 120));
+
+    expect(sidesOf(after, "n")?.left).toBe(120);
+    expect(sidesOf(after, "m")?.left).toBe(120);
+  });
+
+  it("does it inside the same step, so one undo takes back both", () => {
+    const s = keyed();
+    const after = apply(s, setSidebearing(s.editor, "n", "left", 120));
+    expect(after.history.entries).toHaveLength(1);
+
+    const back = undo(after);
+    expect(sidesOf(back, "n")?.left).toBe(80);
+    expect(sidesOf(back, "m")?.left).toBe(200);
+
+    const again = redo(back);
+    expect(sidesOf(again, "m")?.left).toBe(120);
+  });
+
+  it("waits for the gesture to end rather than following every pointer move", () => {
+    // A drag produces a document a hundred times a second and none of them is a
+    // state anybody has settled on.
+    const s = keyed();
+    const down = apply(s, pointerDown(s.editor, pointerInput(vec(80, 350))));
+    const moved = apply(down, pointerMove(down.editor, pointerInput(vec(140, 350))));
+    expect(moved.pending).not.toBeNull();
+    expect(sidesOf(moved, "m")?.left).toBe(200);
+
+    const up = apply(moved, pointerUp(moved.editor));
+    expect(sidesOf(up, "m")?.left).toBe(sidesOf(up, "n")?.left);
+  });
+});
 
 describe("transactions", () => {
   it("records a whole drag as one step", () => {

@@ -1,4 +1,4 @@
-import type { FontDocument } from "@typewright/font-model";
+import { type FontDocument, withResolvedMetrics } from "@typewright/font-model";
 import type { EditorState, ToolResult } from "@typewright/tools";
 import type { Selection } from "@typewright/view";
 
@@ -59,6 +59,12 @@ export function session(editor: EditorState, limit?: number): EditSession {
  * nothing about them changes here — which was the point of defining the seam
  * early. A tool knows where an undoable step begins and ends; inferring it later
  * from a stream of state changes would be guesswork.
+ *
+ * A committed step also leaves the font's spacing keys settled — see
+ * {@link settledKeys}. This is the seam for it because a step is exactly the
+ * unit that has to be consistent: the glyphs that follow the one just edited are
+ * re-spaced inside the same step, so one undo takes back the edit and everything
+ * that followed from it.
  */
 export function apply(
   s: EditSession,
@@ -67,6 +73,7 @@ export function apply(
   options: PushOptions = {},
 ): EditSession {
   const before = s.editor;
+  let state = outcome.state;
   let nextHistory = s.history;
   let pending = s.pending;
 
@@ -86,15 +93,16 @@ export function apply(
         // Reference equality is exact here: the model is persistent, so an
         // unchanged document is the very same object. A gesture that touched
         // nothing leaves no step behind.
-        if (pending.document !== outcome.state.document) {
+        if (pending.document !== state.document) {
+          state = settledKeys(state);
           nextHistory = push(
             nextHistory,
             {
               label: pending.label,
               before: pending.document,
-              after: outcome.state.document,
+              after: state.document,
               selectionBefore: pending.selection,
-              selectionAfter: outcome.state.selection,
+              selectionAfter: state.selection,
               at: now,
             },
             // A step that asked not to coalesce gets a zero window, so it
@@ -112,7 +120,32 @@ export function apply(
     }
   }
 
-  return { editor: outcome.state, history: nextHistory, pending };
+  return { editor: state, history: nextHistory, pending };
+}
+
+/**
+ * The editor with every glyph that takes its spacing from another moved and
+ * widened to what that other glyph says now.
+ *
+ * A key is a rule — "my left side is `n`'s" — and until now it was followed only
+ * where somebody asked what it worked out to: the fields that show it, and the
+ * font as it was compiled. The document itself kept whatever numbers the keyed
+ * glyph was last given, so editing `n` left `m` drawn and saved at its old
+ * spacing, and the two only agreed again on export.
+ *
+ * So a step ends with the keys followed, and the numbers in the document are the
+ * ones the keys say. Everything that draws a glyph — the canvas, the strip, the
+ * spacing line, the proof — reads those numbers and needs to know nothing about
+ * keys.
+ *
+ * Done on the commit rather than on every intermediate state: dragging a
+ * sidebearing produces a document a hundred times a second, and none of those is
+ * a state anybody has settled on. Keys that cannot be followed are left alone
+ * and reported by preflight, which is where a broken key belongs.
+ */
+function settledKeys(state: EditorState): EditorState {
+  const settled = withResolvedMetrics(state.document).document;
+  return settled === state.document ? state : { ...state, document: settled };
 }
 
 /**

@@ -110,10 +110,11 @@ outside its own sidebearings is still that shape where it hangs over the next le
 saying where this glyph's spacing comes from: its left sidebearing, its right, or its
 whole advance, each the name of another glyph. Set one and the number beside it goes grey
 and shows what the rule works out to, following the chain — `ü` from `u` from `n` — and
-following it again the moment `n` moves. The rule is kept in the source and resolved
-where the font is compiled, so what comes out is an ordinary font. A rule that cannot be
-followed leaves the glyph as drawn and is reported, in the export warnings and in the
-preflight check.
+following it again the moment `n` moves: every edit that finishes leaves the glyphs that
+follow it re-spaced, inside the same step, so one undo takes back the change and
+everything that came of it. The rule is kept in the source and resolved where the font is compiled, so what comes out is an
+ordinary font. A rule that cannot be followed leaves the glyph as drawn and is reported,
+in the export warnings and in the preflight check.
 
 The inspector transforms whatever is selected by a number rather than by dragging: move,
 scale, rotate, slant, flip. It turns about any of the nine points of the selection's box,
