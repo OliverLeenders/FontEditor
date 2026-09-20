@@ -51,14 +51,17 @@
  * The disclosure mark: a triangle, drawn rather than typed, so it keeps its
  * size when the label does not and needs no glyph from the reader's fonts.
  */
+/* Drawn as an icon rather than out of borders, so it is the chevron the rest
+   of the interface uses and not a shape only this button knows how to make. */
 .caret {
-  width: 0;
-  height: 0;
-  margin-left: 0.1rem;
-  border-left: 0.22rem solid transparent;
-  border-right: 0.22rem solid transparent;
-  border-top: 0.26rem solid currentColor;
-  opacity: 0.55;
+  display: grid;
+  place-items: center;
+  margin-left: 0.05rem;
+  opacity: 0.6;
+}
+.caret svg {
+  width: 0.8rem;
+  height: 0.8rem;
 }
 
 /*

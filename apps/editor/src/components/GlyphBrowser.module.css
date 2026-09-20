@@ -115,12 +115,34 @@
   min-width: 16rem;
 }
 
+/* The field and the glass in front of it, which is one control. */
+.searching {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 11rem;
+  align-items: center;
+}
+
+.searchMark {
+  position: absolute;
+  left: 0.45rem;
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+.searchMark svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
 .search {
   flex: 1;
   /* A floor rather than zero: the bar's transient notes would otherwise squeeze
      the field down to a few characters while one is showing. */
-  min-width: 11rem;
-  padding: 0.3rem 0.55rem;
+  min-width: 0;
+  padding: 0.3rem 0.55rem 0.3rem 1.65rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background: var(--canvas);
@@ -131,24 +153,6 @@
 .search:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
-}
-
-.orderLabel {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.76rem;
-  color: var(--ink-2);
-}
-
-.order {
-  padding: 0.25rem 0.35rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--canvas);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.76rem;
 }
 
 .count {

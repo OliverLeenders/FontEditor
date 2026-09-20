@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import menu from "./BarMenu.module.css";
 import { type Item, MenuItems } from "./MenuItems.js";
 import open from "./OpenFont.module.css";
-import { type IconComponent } from "./icons.js";
+import { ChevronDownIcon, type IconComponent } from "./icons.js";
 
 /**
  * A button in a bar, and the thing that opens under it.
@@ -131,7 +131,12 @@ export function BarMenu({
         {Icon === undefined ? null : <Icon />}
         {label}
         {badge}
-        <span className={menu.caret} aria-hidden="true" />
+        {/* The same chevron the rest of the interface points down with, rather
+            than a triangle drawn out of borders: one drawing of "there is more
+            under this", at one weight, wherever it appears. */}
+        <span className={menu.caret} aria-hidden="true">
+          <ChevronDownIcon />
+        </span>
       </button>
 
       {shown ? (

@@ -624,6 +624,25 @@ export const ScalingIcon: IconComponent = () => (
   </Glyph>
 );
 
+/** Searching: the glass, which every field with one in it is recognised by. */
+export const SearchIcon: IconComponent = () => (
+  <Glyph>
+    <path d="m21 21-4.34-4.34" />
+    <circle cx="11" cy="11" r="8" />
+  </Glyph>
+);
+
+/** Sorting: bars from wide to narrow, with an arrow down the order they take. */
+export const SortIcon: IconComponent = () => (
+  <Glyph>
+    <path d="m3 16 4 4 4-4" />
+    <path d="M7 20V4" />
+    <path d="M11 4h10" />
+    <path d="M11 8h7" />
+    <path d="M11 12h4" />
+  </Glyph>
+);
+
 /** Settings: the gear, which is where every application keeps its preferences. */
 export const SettingsIcon: IconComponent = () => (
   <Glyph>

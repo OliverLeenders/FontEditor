@@ -205,6 +205,54 @@ describe("what the font has not got", () => {
   });
 });
 
+/**
+ * The bar over the list.
+ *
+ * Two fields side by side, one of which makes glyphs, and a control that says
+ * what order the list is in. What is asked here is that they are told apart:
+ * the search field is marked as one, and the order is a menu like every other
+ * on the bar rather than a select with the browser's own arrow on it.
+ */
+describe("the bar", () => {
+  it("opens in code-point order, which is the one order every reader knows", () => {
+    const store = freshStore();
+    render(<GlyphBrowser onOpen={vi.fn()} />, store);
+
+    expect(store.getState().catalogQuery.order).toBe("codePoint");
+    expect(screen.getByRole("button", { name: /Code point/ })).toBeTruthy();
+  });
+
+  it("says what the list is sorted by, and sorts it another way when asked", () => {
+    const store = freshStore();
+    render(<GlyphBrowser onOpen={vi.fn()} />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: /Code point/ }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Name" }));
+
+    expect(store.getState().catalogQuery.order).toBe("name");
+    expect(screen.getByRole("button", { name: /Name/ })).toBeTruthy();
+  });
+
+  it("ticks the order in force", () => {
+    render(<GlyphBrowser onOpen={vi.fn()} />);
+    fireEvent.click(screen.getByRole("button", { name: /Code point/ }));
+
+    const ticked = screen.getByRole("menuitemcheckbox", { name: "Code point" });
+    expect(ticked.getAttribute("aria-checked")).toBe("true");
+    expect(
+      screen.getByRole("menuitemcheckbox", { name: "Font order" }).getAttribute("aria-checked"),
+    ).toBe("false");
+  });
+
+  it("marks the search field, so it is not the field that makes glyphs", () => {
+    render(<GlyphBrowser onOpen={vi.fn()} />);
+    const search = screen.getByLabelText("Search glyphs");
+
+    expect(search.parentElement?.querySelector("svg")).toBeTruthy();
+    expect(screen.getByLabelText("New glyph name or character")).not.toBe(search);
+  });
+});
+
 describe("picking cells", () => {
   it("picks one cell with a click, and says nothing about a count", () => {
     browser();

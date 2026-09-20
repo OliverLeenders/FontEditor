@@ -1,4 +1,5 @@
 import {
+  type CatalogOrder,
   GLYPH_SETS,
   catalog,
   listCatalog,
@@ -45,6 +46,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isDarkNow, watchScheme } from "../scheme.js";
 import { wholeOf } from "../store/masters.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { BarMenu } from "./BarMenu.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import {
   ArrowLeftRightIcon,
@@ -52,6 +54,8 @@ import {
   CopyPlusIcon,
   GridIcon,
   PenToolIcon,
+  SearchIcon,
+  SortIcon,
   SquarePlusIcon,
   TrashIcon,
   TypeIcon,
@@ -683,28 +687,35 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               way to add to it. */}
           <div className={`${styles.group} ${styles.listControls}`}>
             <NewGlyph />
-            <input
-              type="search"
-              className={styles.search}
-              placeholder="Name, U+0041, or a character"
-              value={query.search}
-              aria-label="Search glyphs"
-              onChange={(event) => store.setCatalogQuery({ search: event.target.value })}
+            {/* The glass, because two fields side by side with nothing but their
+                placeholders to tell them apart is two fields nobody tells apart
+                at a glance — and one of them makes glyphs. */}
+            <div className={styles.searching}>
+              <span className={styles.searchMark} aria-hidden="true">
+                <SearchIcon />
+              </span>
+              <input
+                type="search"
+                className={styles.search}
+                placeholder="Name, U+0041, or a character"
+                value={query.search}
+                aria-label="Search glyphs"
+                onChange={(event) => store.setCatalogQuery({ search: event.target.value })}
+              />
+            </div>
+            {/* A menu like every other on this bar, rather than a select with
+                the browser's own arrow beside eight of our own triangles. */}
+            <BarMenu
+              label={orderLabel(query.order)}
+              icon={SortIcon}
+              title="What order the glyphs are listed in"
+              items={ORDERS.map((order) => ({
+                kind: "item" as const,
+                label: order.label,
+                checked: query.order === order.id,
+                run: () => store.setCatalogQuery({ order: order.id }),
+              }))}
             />
-            <label className={styles.orderLabel}>
-              Sort
-              <select
-                className={styles.order}
-                value={query.order}
-                onChange={(event) =>
-                  store.setCatalogQuery({ order: event.target.value as typeof query.order })
-                }
-              >
-                <option value="font">Font order</option>
-                <option value="codePoint">Code point</option>
-                <option value="name">Name</option>
-              </select>
-            </label>
             <span className={styles.count}>
               {shown.length - toMake === entries.length
                 ? `${String(entries.length)} glyphs`
@@ -920,6 +931,16 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
 }
 
 /** The layers the grid's menu offers: the background always, then the font's others. */
+/** The orders the list can be in, in the order the menu offers them. */
+const ORDERS: readonly { id: CatalogOrder; label: string }[] = [
+  { id: "codePoint", label: "Code point" },
+  { id: "font", label: "Font order" },
+  { id: "name", label: "Name" },
+];
+
+const orderLabel = (order: CatalogOrder): string =>
+  ORDERS.find((each) => each.id === order)?.label ?? "Order";
+
 function layerTargets(document: FontDocument): string[] {
   return [BACKGROUND, ...document.layers.map((l) => l.name).filter((n) => n !== BACKGROUND)];
 }

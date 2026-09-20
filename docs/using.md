@@ -251,7 +251,8 @@ it, and the code points with no glyph get cells of their own: the character fain
 still, in a dashed box, with the code point under it and no name, since the font has not
 named it yet. The list opens in code-point order, which puts them in their places, so a
 block reads as a chart with gaps; in font order they follow the glyphs, a glyph the font
-has not got having no place in the order the font declares.  Searching does the same for one
+has not got having no place in the order the font declares. The order is chosen from the
+sort menu at the right of the bar, beside the field the glass marks as the search. Searching does the same for one
 character: type a `ǧ` the font has not got and it is offered rather than answered with an
 empty grid. **Double-click one, or press Enter on it, to make that glyph and open it**;
 its menu adds it without opening. They are offers and not glyphs, so they are not picked,
