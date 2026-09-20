@@ -15,13 +15,8 @@ import type { StoreHost, StoreState } from "./state.js";
 export function preferencesOf(s: StoreState): Preferences {
   return {
     theme: s.theme,
-    outlineWidth: s.outlineWidth,
-    autoHideHandles: s.autoHideHandles,
+    views: s.views,
     skipChooser: s.skipChooser,
-    snapPoints: s.snapPoints,
-    showNeighbours: s.showNeighbours,
-    showAnchors: s.showAnchors,
-    showCurvature: s.showCurvature,
     showImage: s.showImage,
     imageOpacity: s.imageOpacity,
     applyFeatures: s.applyFeatures,
@@ -52,12 +47,7 @@ export function remember(host: StoreHost, changes: Partial<StoreState>): void {
 export function defaults(): Partial<StoreState> {
   return {
     theme: DEFAULT_PREFERENCES.theme,
-    outlineWidth: DEFAULT_PREFERENCES.outlineWidth,
-    autoHideHandles: DEFAULT_PREFERENCES.autoHideHandles,
-    snapPoints: DEFAULT_PREFERENCES.snapPoints,
-    showNeighbours: DEFAULT_PREFERENCES.showNeighbours,
-    showAnchors: DEFAULT_PREFERENCES.showAnchors,
-    showCurvature: DEFAULT_PREFERENCES.showCurvature,
+    views: DEFAULT_PREFERENCES.views,
     applyFeatures: DEFAULT_PREFERENCES.applyFeatures,
     spacingSize: DEFAULT_PREFERENCES.spacingSize,
     proofSize: DEFAULT_PREFERENCES.proofSize,

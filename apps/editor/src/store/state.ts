@@ -11,7 +11,7 @@ import {
 } from "@typewright/font-model";
 import type { AutosaveStatus, ImageEntry, SnapshotEntry } from "@typewright/storage";
 
-import type { InspectorPlacement, Preferences, ThemeChoice } from "../preferences.js";
+import type { InspectorPlacement, PaneViews, Preferences, ThemeChoice } from "../preferences.js";
 import type { Ownership, StorageState } from "../persistence.js";
 import { starterFont } from "../sample.js";
 import { PROOF_TEXT } from "../specimens.js";
@@ -101,31 +101,19 @@ export type StoreState = {
   readonly theme: ThemeChoice;
   /** What the glyph browser is filtered to. Not undoable, so it lives out here. */
   readonly catalogQuery: CatalogQuery;
-  /** Draw the glyphs either side, from the strip text, for judging spacing. */
-  readonly showNeighbours: boolean;
-  readonly showAnchors: boolean;
-  readonly showCurvature: boolean;
-  /** Show handles only where the work is. On by default; the canvas is calmer. */
-  readonly autoHideHandles: boolean;
-  readonly skipChooser: boolean;
   /**
-   * Let a drag catch on the glyph's own points as well as the font's lines.
+   * What each pane's canvas shows: the comb, the neighbours, the handles, and
+   * how heavy the outline is drawn.
    *
-   * The metric lines are always live and need no setting: the canvas draws them,
-   * so catching on one explains itself. These do not draw yet, which is what the
-   * switch is for.
+   * One set per pane. None of it is a fact about the font — a hairline is right
+   * for judging a curve against the grid and a heavier stroke for reading the
+   * shape across the room — so two panes are free to disagree, and the reason
+   * for splitting the window is usually that they should.
    */
-  readonly snapPoints: boolean;
+  readonly views: PaneViews;
+  readonly skipChooser: boolean;
   /** Apply the font's features when setting the spacing line and the proof. */
   readonly applyFeatures: boolean;
-  /**
-   * How heavy the outline is drawn, in screen pixels.
-   *
-   * A preference rather than a fact about the font: a hairline is right for
-   * judging a curve against the grid, and a heavier stroke is right for reading
-   * the shape across the room.
-   */
-  readonly outlineWidth: number;
   /**
    * The spacing workspace's own text and type size.
    *
@@ -301,14 +289,9 @@ export function initialState(preferences: Preferences): StoreState {
     ownership: "owner",
     stripText: "hello",
     catalogQuery: DEFAULT_QUERY,
-    showNeighbours: preferences.showNeighbours,
-    showAnchors: preferences.showAnchors,
-    showCurvature: preferences.showCurvature,
-    autoHideHandles: preferences.autoHideHandles,
+    views: preferences.views,
     skipChooser: preferences.skipChooser,
-    snapPoints: preferences.snapPoints,
     applyFeatures: preferences.applyFeatures,
-    outlineWidth: preferences.outlineWidth,
     spacingText: "nonno",
     spacingSize: preferences.spacingSize,
     spacingMode: "space",

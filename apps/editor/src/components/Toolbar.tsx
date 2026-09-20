@@ -1,5 +1,7 @@
 import type { ToolId } from "@typewright/tools";
 
+import { usePane } from "../pane.js";
+import { viewOf } from "../scene.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import {
   EllipseIcon,
@@ -15,7 +17,7 @@ import {
   SnapIcon,
   UndoIcon,
 } from "./icons.js";
-import { PreferencesPanel } from "./PreferencesPanel.js";
+import { ViewMenu } from "./ViewMenu.js";
 import { RemoveOverlap } from "./RemoveOverlap.js";
 import styles from "./Toolbar.module.css";
 
@@ -71,8 +73,9 @@ export function Toolbar(): React.JSX.Element {
   const store = useEditorStore();
   const activeTool = useStoreValue((s) => s.session.editor.activeTool);
   const scale = useStoreValue((s) => s.session.editor.view.scale);
-  const autoHide = useStoreValue((s) => s.autoHideHandles);
-  const snapPoints = useStoreValue((s) => s.snapPoints);
+  const pane = usePane();
+  const autoHide = useStoreValue((s) => viewOf(s, pane).autoHideHandles);
+  const snapPoints = useStoreValue((s) => viewOf(s, pane).snapPoints);
   const undoLabel = useStoreValue((s) => (canUndo(s) ? store.undoLabel() : null));
   const redoLabel = useStoreValue((s) => (canRedo(s) ? store.redoLabel() : null));
 
@@ -130,7 +133,7 @@ export function Toolbar(): React.JSX.Element {
         aria-pressed={autoHide}
         title={autoHide ? "Handles show near the work  (H)" : "All handles always shown  (H)"}
         aria-label="Handles"
-        onClick={() => store.toggleAutoHideHandles()}
+        onClick={() => store.toggleAutoHideHandles(pane)}
       >
         <HandlesIcon />
       </button>
@@ -148,7 +151,7 @@ export function Toolbar(): React.JSX.Element {
             : "Drags line up with the font's lines only  (S)"
         }
         aria-label="Snap"
-        onClick={() => store.toggleSnapPoints()}
+        onClick={() => store.toggleSnapPoints(pane)}
       >
         <SnapIcon />
       </button>
@@ -172,7 +175,7 @@ export function Toolbar(): React.JSX.Element {
 
       <div className={styles.divider} />
 
-      <PreferencesPanel />
+      <ViewMenu />
     </div>
   );
 }

@@ -44,6 +44,8 @@ import {
 import { type Comb, combFor } from "@typewright/view";
 
 import type { Decoded } from "./images.js";
+import type { PaneIndex } from "./layout.js";
+import type { ViewSettings } from "./preferences.js";
 import { isDarkNow } from "./scheme.js";
 import type { StoreState } from "./store/index.js";
 
@@ -165,8 +167,19 @@ export function withinGlyph(glyph: Glyph, p: Vec2): boolean {
  * Never while the pen is out — the pen keeps no hovered or focused segment, so
  * auto-hiding would take the handles away exactly while they are being placed.
  */
-export function handlesAutoHidden(state: StoreState): boolean {
-  return state.autoHideHandles && state.session.editor.activeTool === "select";
+export function handlesAutoHidden(state: StoreState, pane: PaneIndex = 0): boolean {
+  return viewOf(state, pane).autoHideHandles && state.session.editor.activeTool === "select";
+}
+
+/**
+ * What one pane's canvas shows.
+ *
+ * The first pane by default, which is the only one a window that has not been
+ * split has — so a caller with no pane in hand, a test or the status bar, asks
+ * about the window it can see.
+ */
+export function viewOf(state: StoreState, pane: PaneIndex = 0): ViewSettings {
+  return state.views[pane];
 }
 
 /**
@@ -179,8 +192,10 @@ export function sceneFor(
   state: StoreState,
   size: { width: number; height: number },
   picture: (name: string) => Decoded | null = () => null,
+  pane: PaneIndex = 0,
 ): Scene {
   const editor = state.session.editor;
+  const shows = viewOf(state, pane);
   // The drawing the tools are pointed at: the glyph itself, or its drawing in
   // the layer being drawn in.
   const glyph = editedGlyph(editor) ?? EMPTY;
@@ -208,7 +223,7 @@ export function sceneFor(
     // a line you can catch on but cannot see is indistinguishable from a bug.
     // Everything else keeps the renderer's own sizes; only the stroke is a
     // preference, so only the stroke is overridden.
-    metrics: { ...DEFAULT_METRICS, outlineWidth: state.outlineWidth },
+    metrics: { ...DEFAULT_METRICS, outlineWidth: shows.outlineWidth },
     // The names come with the lines; the renderer writes them at the edge.
     metricLines: metricLines(editor.document.info).map((line) => ({
       y: line.y,
@@ -234,7 +249,7 @@ export function sceneFor(
     hoveredGuide: editor.hoveredGuide,
     selectedGuide: editor.selectedGuide,
     snapGuides: snapGuidesFor(editor),
-    ...combParts(state, glyph),
+    ...combParts(state, glyph, shows.showCurvature),
     hoveredAnchor: editor.hoveredAnchor,
     selectedAnchor: editor.selectedAnchor,
     tunniSegments: tunniSegments(editor),
@@ -248,14 +263,14 @@ export function sceneFor(
     knifeStroke: knifeStroke(editor),
     measurement: measurementFor(state),
     section: sectionFor(state),
-    neighbours: state.showNeighbours
+    neighbours: shows.showNeighbours
       ? neighboursFor(editor.document, editor.currentGlyph, state.stripText)
       : [],
     options: {
       showControls: !state.previewing,
-      showCurvature: state.showCurvature,
-      autoHideHandles: handlesAutoHidden(state),
-      showAnchors: state.showAnchors,
+      showCurvature: shows.showCurvature,
+      autoHideHandles: handlesAutoHidden(state, pane),
+      showAnchors: shows.showAnchors,
     },
   });
 }
@@ -278,8 +293,12 @@ function resolvedComponents(
  * costs a walk along every outline, and nobody should pay for an instrument they
  * are not reading.
  */
-function combParts(state: StoreState, glyph: Glyph): { comb: readonly Comb[] } {
-  if (!state.showCurvature) return { comb: [] };
+function combParts(
+  state: StoreState,
+  glyph: Glyph,
+  showCurvature: boolean,
+): { comb: readonly Comb[] } {
+  if (!showCurvature) return { comb: [] };
 
   // The filled contours, not the drawn ones: the hairs point out of the ink, and
   // only the corrected winding says which side that is.
@@ -434,8 +453,11 @@ function measurementFor(state: StoreState): Scene["measurement"] {
  * turning the neighbours off turns the gap reading off with them, and the
  * stem-width reading — which is about this letter alone — carries on.
  */
-export function measurableNeighbours(state: StoreState): readonly PlacedGlyph[] {
-  if (!state.showNeighbours) return [];
+export function measurableNeighbours(
+  state: StoreState,
+  pane: PaneIndex = 0,
+): readonly PlacedGlyph[] {
+  if (!viewOf(state, pane).showNeighbours) return [];
   const editor = state.session.editor;
   return neighboursFor(editor.document, editor.currentGlyph, state.stripText);
 }

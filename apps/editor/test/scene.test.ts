@@ -116,7 +116,7 @@ describe("handlesAutoHidden", () => {
     // The pen keeps no hovered or focused segment, so hiding handles would take
     // them away exactly while they are being placed.
     store.applyTool(setActiveTool(store.editor, "pen"));
-    expect(store.getState().autoHideHandles).toBe(true);
+    expect(store.getState().views[0].autoHideHandles).toBe(true);
     expect(handlesAutoHidden(store.getState())).toBe(false);
   });
 });

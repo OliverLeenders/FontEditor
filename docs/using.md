@@ -125,7 +125,7 @@ in the inspector and lands on its anchors where both glyphs have a matching pair
 by the shape it draws, type its offset, right-click it to open the glyph it refers to,
 put it back where the anchors say, or decompose the glyph and keep the outlines.
 
-**The curvature comb** is off by default and turned on in the preferences. It stands a
+**The curvature comb** is off by default and turned on in the View menu. It stands a
 hair square to the outline every few pixels, as long as the curvature there, and joins the
 tips: what is read is that envelope, where a step at a node is a curvature break — a join
 smooth to the eye and not to the light falling on it — a pinch is a flat spot, and a
@@ -220,10 +220,15 @@ not showing. Space previews without controls, the wheel pans, Ctrl-wheel zooms a
 cursor, middle-drag pans, and Ctrl-0 refits. Ctrl-wheel also sets the type size in the
 Spacing and Proof workspaces.
 
-Preferences — theme, outline weight, what the canvas shows, the type sizes in Spacing
-and Proof — are kept in this browser rather than in the font, and are edited from the
-sliders button at the right of the toolbar. The theme follows the operating system
-until you choose light or dark yourself.
+Preferences are kept in this browser rather than in the font, and are in two places
+according to what they are about. The gear at the top right of the **window**, in the
+strip that names the font, holds what is true of the application: the theme, which
+follows the operating system until you choose light or dark yourself. Ctrl-, opens it
+from anywhere. The sliders button at the right of a **drawing toolbar** holds what that
+canvas shows — outline weight, handles, snapping, neighbours, anchors, the comb — and
+each pane keeps its own, so a split window can carry the comb on the letter being worked
+and leave it off the one beside it. The type sizes in Spacing and Proof are set in those
+workspaces and remembered the same way.
 
 Edits autosave to the browser's private filesystem after a second's pause, so closing
 the tab and coming back keeps your work. Note that this store belongs to the browser,

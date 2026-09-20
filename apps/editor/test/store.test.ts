@@ -195,9 +195,15 @@ describe("EditorStore", () => {
 
   describe("view preferences", () => {
     it("hides handles by default, and toggles", () => {
-      expect(store.getState().autoHideHandles).toBe(true);
+      expect(store.getState().views[0].autoHideHandles).toBe(true);
       store.toggleAutoHideHandles();
-      expect(store.getState().autoHideHandles).toBe(false);
+      expect(store.getState().views[0].autoHideHandles).toBe(false);
+    });
+
+    it("changes the pane it is told about and leaves the other", () => {
+      store.toggleCurvature(1);
+      expect(store.getState().views[1].showCurvature).toBe(true);
+      expect(store.getState().views[0].showCurvature).toBe(false);
     });
 
     it("keeps the inspector on screen when the window is small", () => {

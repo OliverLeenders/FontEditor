@@ -1,38 +1,38 @@
 import { useEffect, useRef, useState } from "react";
 
 import { MAX_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH } from "../limits.js";
-import type { ThemeChoice } from "../preferences.js";
+import { usePane } from "../pane.js";
+import { viewOf } from "../scene.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
-import styles from "./PreferencesPanel.module.css";
+import styles from "./ViewMenu.module.css";
 import { PreferencesIcon } from "./icons.js";
 
 /**
- * The settings that are about you rather than about the font.
+ * What this canvas shows, and how heavily it is drawn.
  *
  * A popover rather than a dialog over the whole window, because every one of
  * these is judged by looking at the canvas: an outline weight chosen against a
- * covered canvas is a weight chosen blind. It opens beside the work and the work
- * stays visible.
+ * covered canvas is a weight chosen blind. It opens beside the work and the
+ * work stays visible.
+ *
+ * Per pane, so a split window can draw with the comb on beside a clean copy of
+ * the same letter. What is true of the whole application — the theme — is in
+ * the window bar's preferences instead, since a window in two minds about
+ * whether it is dark is not a thing anybody wants.
  *
  * Handles and Snap keep their own toolbar buttons and appear here too. A toggle
- * reached every minute earns a button; the panel is where someone finds out it
+ * reached every minute earns a button; the menu is where someone finds out it
  * exists at all.
  */
-const THEMES: readonly { readonly id: ThemeChoice; readonly label: string }[] = [
-  { id: "system", label: "System" },
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" },
-];
-
-export function PreferencesPanel(): React.JSX.Element {
+export function ViewMenu(): React.JSX.Element {
   const store = useEditorStore();
-  const theme = useStoreValue((s) => s.theme);
-  const outlineWidth = useStoreValue((s) => s.outlineWidth);
-  const autoHide = useStoreValue((s) => s.autoHideHandles);
-  const snapPoints = useStoreValue((s) => s.snapPoints);
-  const neighbours = useStoreValue((s) => s.showNeighbours);
-  const anchors = useStoreValue((s) => s.showAnchors);
-  const curvature = useStoreValue((s) => s.showCurvature);
+  const pane = usePane();
+  const outlineWidth = useStoreValue((s) => viewOf(s, pane).outlineWidth);
+  const autoHide = useStoreValue((s) => viewOf(s, pane).autoHideHandles);
+  const snapPoints = useStoreValue((s) => viewOf(s, pane).snapPoints);
+  const neighbours = useStoreValue((s) => viewOf(s, pane).showNeighbours);
+  const anchors = useStoreValue((s) => viewOf(s, pane).showAnchors);
+  const curvature = useStoreValue((s) => viewOf(s, pane).showCurvature);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -59,32 +59,15 @@ export function PreferencesPanel(): React.JSX.Element {
         type="button"
         className={styles.button}
         aria-expanded={open}
-        aria-label="Preferences"
-        title="Theme, outline weight and what the canvas shows"
+        aria-label="View"
+        title="Outline weight and what this canvas shows"
         onClick={() => setOpen((was) => !was)}
       >
         <PreferencesIcon />
       </button>
 
       {open ? (
-        <div ref={ref} className={styles.panel} role="group" aria-label="Preferences">
-          <div className={styles.row}>
-            <span className={styles.label}>Theme</span>
-            <div className={styles.choices} role="group" aria-label="Theme">
-              {THEMES.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  className={styles.choice}
-                  aria-pressed={theme === choice.id}
-                  onClick={() => store.setTheme(choice.id)}
-                >
-                  {choice.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
+        <div ref={ref} className={styles.panel} role="group" aria-label="View">
           <div className={styles.row}>
             <span className={styles.label}>Outline</span>
             <div className={styles.slide}>
@@ -96,7 +79,7 @@ export function PreferencesPanel(): React.JSX.Element {
                 step={0.25}
                 value={outlineWidth}
                 aria-label="Outline thickness"
-                onChange={(event) => store.setOutlineWidth(Number(event.target.value))}
+                onChange={(event) => store.setOutlineWidth(Number(event.target.value), pane)}
               />
               <span className={styles.value}>{outlineWidth.toFixed(2)}</span>
             </div>
@@ -106,36 +89,36 @@ export function PreferencesPanel(): React.JSX.Element {
             label="Auto-hide handles"
             hint="Show handles only near the work  (H)"
             on={autoHide}
-            onChange={() => store.toggleAutoHideHandles()}
+            onChange={() => store.toggleAutoHideHandles(pane)}
           />
           <Switch
             label="Snap to points"
             hint="Drags line up with the glyph's own points  (S)"
             on={snapPoints}
-            onChange={() => store.toggleSnapPoints()}
+            onChange={() => store.toggleSnapPoints(pane)}
           />
           <Switch
             label="Show neighbours"
             hint="Draw the letters either side, from the strip text"
             on={neighbours}
-            onChange={() => store.toggleNeighbours()}
+            onChange={() => store.toggleNeighbours(pane)}
           />
           <Switch
             label="Show anchors"
             hint="The places accents attach, named on hover"
             on={anchors}
-            onChange={() => store.toggleAnchors()}
+            onChange={() => store.toggleAnchors(pane)}
           />
           <Switch
             label="Curvature comb"
             hint="How tightly the outline turns · a step at a join is a break"
             on={curvature}
-            onChange={() => store.toggleCurvature()}
+            onChange={() => store.toggleCurvature(pane)}
           />
 
           <div className={styles.footer}>
             <span className={styles.note}>Kept in this browser, not in the font.</span>
-            <button type="button" className={styles.reset} onClick={() => store.resetPreferences()}>
+            <button type="button" className={styles.reset} onClick={() => store.resetView(pane)}>
               Reset
             </button>
           </div>

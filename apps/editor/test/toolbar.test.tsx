@@ -80,22 +80,22 @@ describe("undo and redo", () => {
 describe("the toggles the toolbar keeps", () => {
   it("shows and changes whether handles hide themselves", () => {
     const { store } = render(<Toolbar />);
-    const before = store.getState().autoHideHandles;
+    const before = store.getState().views[0].autoHideHandles;
     expect(pressed("Handles")).toBe(String(before));
 
     fireEvent.click(screen.getByRole("button", { name: "Handles" }));
 
-    expect(store.getState().autoHideHandles).toBe(!before);
+    expect(store.getState().views[0].autoHideHandles).toBe(!before);
     expect(pressed("Handles")).toBe(String(!before));
   });
 
   it("shows and changes whether drags snap to the glyph's own points", () => {
     const { store } = render(<Toolbar />);
-    const before = store.getState().snapPoints;
+    const before = store.getState().views[0].snapPoints;
 
     fireEvent.click(screen.getByRole("button", { name: "Snap" }));
 
-    expect(store.getState().snapPoints).toBe(!before);
+    expect(store.getState().views[0].snapPoints).toBe(!before);
     expect(pressed("Snap")).toBe(String(!before));
   });
 });

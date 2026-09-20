@@ -39,11 +39,14 @@ import {
   neighbourAt,
   neighboursFor,
   sceneFor,
+  viewOf,
   withinGlyph,
 } from "../scene.js";
 import type { EditorStore } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore } from "../useStore.js";
+import type { PaneIndex } from "../layout.js";
+import { usePane } from "../pane.js";
 import type { MenuRequest } from "./ContextMenu.js";
 import styles from "./GlyphCanvas.module.css";
 
@@ -62,19 +65,20 @@ const HIT_PIXELS = 11;
  * What the select tool needs from the interface: what it may pick, and where a
  * drag may land. Read from the same rules the renderer draws by.
  */
-function selectOptions(store: EditorStore): ToolOptions {
+function selectOptions(store: EditorStore, pane: PaneIndex): ToolOptions {
   const state = store.getState();
+  const shows = viewOf(state, pane);
   return {
-    autoHideHandles: handlesAutoHidden(state),
-    snapExtremes: state.snapPoints,
-    snapNeighbours: state.snapPoints,
+    autoHideHandles: handlesAutoHidden(state, pane),
+    snapExtremes: shows.snapPoints,
+    snapNeighbours: shows.snapPoints,
     // Only what is drawn may be grabbed, which is the rule the margins and the
     // Tunni controls already follow.
-    anchors: state.showAnchors,
+    anchors: shows.showAnchors,
     // Worked out only for the ruler, which is the one tool that reads them, and
     // only while it is the tool in hand: this runs on every pointer move.
     neighbours:
-      state.session.editor.activeTool === "measure" ? measurableNeighbours(state) : undefined,
+      state.session.editor.activeTool === "measure" ? measurableNeighbours(state, pane) : undefined,
   };
 }
 
@@ -84,6 +88,7 @@ export function GlyphCanvas({
   onContextMenu: (request: MenuRequest) => void;
 }): React.JSX.Element {
   const store = useEditorStore();
+  const pane = usePane();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const surfaceRef = useRef<CanvasSurface | null>(null);
   const panFrom = useRef<{ x: number; y: number } | null>(null);
@@ -96,7 +101,7 @@ export function GlyphCanvas({
       store.setViewport(size.width, size.height);
       drawScene(
         ctx,
-        sceneFor(store.getState(), size, (name) => store.picture(name)),
+        sceneFor(store.getState(), size, (name) => store.picture(name), pane),
       );
     });
     surfaceRef.current = surface;
@@ -164,7 +169,7 @@ export function GlyphCanvas({
   // under the pointer is exactly how a menu comes to offer something the tool
   // will not do, or a cursor to promise a grab that does not happen.
   const targetAt = (point: { x: number; y: number }) =>
-    pickTarget(store.editor, point, { ...selectOptions(store), hitPixels: HIT_PIXELS });
+    pickTarget(store.editor, point, { ...selectOptions(store, pane), hitPixels: HIT_PIXELS });
 
   /**
    * Open the glyph beside this one, when the second click landed on it.
@@ -182,7 +187,7 @@ export function GlyphCanvas({
     const editor = store.editor;
     // Only what is drawn may be addressed, which is the same rule the Tunni
     // controls and the margin lines follow.
-    if (!state.showNeighbours || editor.activeTool !== "select") return false;
+    if (!viewOf(state, pane).showNeighbours || editor.activeTool !== "select") return false;
 
     const glyph = currentGlyph(editor);
     if (glyph === null || withinGlyph(glyph, point)) return false;
@@ -323,7 +328,7 @@ export function GlyphCanvas({
           return;
         }
         if (event.button !== 0) return;
-        store.applyTool(pointerDown(store.editor, toInput(event), selectOptions(store)));
+        store.applyTool(pointerDown(store.editor, toInput(event), selectOptions(store, pane)));
       }}
       onPointerMove={(event) => {
         const from = panFrom.current;
@@ -333,7 +338,7 @@ export function GlyphCanvas({
           return;
         }
         marginCursor(event);
-        store.applyTool(pointerMove(store.editor, toInput(event), selectOptions(store)));
+        store.applyTool(pointerMove(store.editor, toInput(event), selectOptions(store, pane)));
       }}
       onPointerUp={(event) => {
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -343,11 +348,11 @@ export function GlyphCanvas({
           panFrom.current = null;
           return;
         }
-        store.applyTool(pointerUp(store.editor, toInput(event), selectOptions(store)));
+        store.applyTool(pointerUp(store.editor, toInput(event), selectOptions(store, pane)));
       }}
       onPointerCancel={() => {
         panFrom.current = null;
-        store.applyTool(pointerUp(store.editor, undefined, selectOptions(store)));
+        store.applyTool(pointerUp(store.editor, undefined, selectOptions(store, pane)));
       }}
       onPointerLeave={(event) => {
         // The cursor belongs to the canvas, so it goes back with the pointer.

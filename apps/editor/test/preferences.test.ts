@@ -9,6 +9,7 @@ const {
   DEFAULT_PLACEMENT,
   DEFAULT_PREFERENCES,
   DEFAULT_SPLIT,
+  DEFAULT_VIEW,
   MAX_SPLIT_RATIO,
   MIN_SPLIT_RATIO,
   loadPreferences,
@@ -26,10 +27,15 @@ describe("reading preferences", () => {
   });
 
   it("reads back what was written", () => {
-    savePreferences({ ...DEFAULT_PREFERENCES, theme: "dark", outlineWidth: 3.5 });
+    savePreferences({
+      ...DEFAULT_PREFERENCES,
+      theme: "dark",
+      views: [{ ...DEFAULT_VIEW, outlineWidth: 3.5 }, DEFAULT_VIEW],
+    });
     const read = loadPreferences();
     expect(read.theme).toBe("dark");
-    expect(read.outlineWidth).toBe(3.5);
+    expect(read.views[0].outlineWidth).toBe(3.5);
+    expect(read.views[1].outlineWidth).toBe(DEFAULT_VIEW.outlineWidth);
   });
 
   it("survives a storage entry that is not JSON", () => {
@@ -51,8 +57,32 @@ describe("reading preferences", () => {
     );
     const read = loadPreferences();
     expect(read.theme).toBe("light");
-    expect(read.outlineWidth).toBe(DEFAULT_PREFERENCES.outlineWidth);
-    expect(read.snapPoints).toBe(false);
+    expect(read.views[0].outlineWidth).toBe(DEFAULT_VIEW.outlineWidth);
+    expect(read.views[0].snapPoints).toBe(false);
+  });
+
+  it("hands what one window was set to to both panes", () => {
+    // Written before the canvas settings were per pane, when there was one set
+    // of them for the window. Somebody who chose a heavier outline meant it,
+    // and meant it for whatever they were looking at.
+    localStorage.setItem(
+      "typewright.preferences",
+      JSON.stringify({ outlineWidth: 3, showCurvature: true }),
+    );
+    const read = loadPreferences();
+    expect(read.views[0]).toEqual({ ...DEFAULT_VIEW, outlineWidth: 3, showCurvature: true });
+    expect(read.views[1]).toEqual(read.views[0]);
+  });
+
+  it("gives each pane its own settings once they have been set apart", () => {
+    localStorage.setItem(
+      "typewright.preferences",
+      JSON.stringify({ views: [{ showCurvature: true }, { outlineWidth: 4 }] }),
+    );
+    const read = loadPreferences();
+    expect(read.views[0].showCurvature).toBe(true);
+    expect(read.views[1].showCurvature).toBe(false);
+    expect(read.views[1].outlineWidth).toBe(4);
   });
 
   it("refuses a theme it does not have", () => {
@@ -68,7 +98,7 @@ describe("reading preferences", () => {
       JSON.stringify({ outlineWidth: 99, proofSize: 1 }),
     );
     const read = loadPreferences();
-    expect(read.outlineWidth).toBe(MAX_OUTLINE_WIDTH);
+    expect(read.views[0].outlineWidth).toBe(MAX_OUTLINE_WIDTH);
     expect(read.proofSize).toBe(MIN_PROOF_SIZE);
   });
 
@@ -92,7 +122,7 @@ describe("reading preferences", () => {
     );
     const read = loadPreferences();
     expect(read.theme).toBe("dark");
-    expect(read.outlineWidth).toBe(3.5);
+    expect(read.views[0].outlineWidth).toBe(3.5);
   });
 
   it("prefers what is under the new name when both are there", () => {
@@ -122,8 +152,20 @@ describe("preferences and the store", () => {
     // A second store is what the next visit gets.
     const second = new EditorStore();
     expect(second.getState().theme).toBe("dark");
-    expect(second.getState().outlineWidth).toBe(4);
-    expect(second.getState().snapPoints).toBe(first.getState().snapPoints);
+    expect(second.getState().views[0].outlineWidth).toBe(4);
+    expect(second.getState().views[0].snapPoints).toBe(first.getState().views[0].snapPoints);
+  });
+
+  it("remembers the two panes apart", () => {
+    const first = new EditorStore();
+    first.setOutlineWidth(4, 0);
+    first.toggleCurvature(1);
+
+    const second = new EditorStore();
+    expect(second.getState().views[0].outlineWidth).toBe(4);
+    expect(second.getState().views[1].outlineWidth).toBe(DEFAULT_VIEW.outlineWidth);
+    expect(second.getState().views[1].showCurvature).toBe(true);
+    expect(second.getState().views[0].showCurvature).toBe(false);
   });
 
   it("remembers the type sizes the two workspaces are set at", () => {
@@ -151,8 +193,18 @@ describe("preferences and the store", () => {
     store.resetPreferences();
 
     expect(store.getState().theme).toBe(DEFAULT_PREFERENCES.theme);
-    expect(store.getState().outlineWidth).toBe(DEFAULT_PREFERENCES.outlineWidth);
-    expect(new EditorStore().getState().outlineWidth).toBe(DEFAULT_PREFERENCES.outlineWidth);
+    expect(store.getState().views[0].outlineWidth).toBe(DEFAULT_VIEW.outlineWidth);
+    expect(new EditorStore().getState().views[0].outlineWidth).toBe(DEFAULT_VIEW.outlineWidth);
+  });
+
+  it("resets one pane's canvas and leaves the other alone", () => {
+    const store = new EditorStore();
+    store.setOutlineWidth(5, 0);
+    store.setOutlineWidth(4, 1);
+    store.resetView(0);
+
+    expect(store.getState().views[0].outlineWidth).toBe(DEFAULT_VIEW.outlineWidth);
+    expect(store.getState().views[1].outlineWidth).toBe(4);
   });
 
   it("keeps the inspector where it was put", () => {

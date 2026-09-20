@@ -69,7 +69,15 @@ import {
   MIN_PROOF_SIZE,
   MIN_SPACING_SIZE,
 } from "../limits.js";
-import { type InspectorDock, type ThemeChoice, loadPreferences } from "../preferences.js";
+import type { PaneIndex } from "../layout.js";
+import {
+  type InspectorDock,
+  type PaneViews,
+  type ThemeChoice,
+  type ViewSettings,
+  DEFAULT_VIEW,
+  loadPreferences,
+} from "../preferences.js";
 import { Persistence, type PersistenceReport } from "../persistence.js";
 import {
   type FolderReport,
@@ -151,9 +159,12 @@ export { DEFAULT_PREFERENCES } from "../preferences.js";
 export type {
   InspectorDock,
   InspectorPlacement,
+  PaneViews,
   Preferences,
   ThemeChoice,
+  ViewSettings,
 } from "../preferences.js";
+export { DEFAULT_VIEW } from "../preferences.js";
 export { DOCK_WIDTH, MAX_DOCK_WIDTH, MIN_DOCK_WIDTH } from "../preferences.js";
 export type { Ownership, StorageState } from "../persistence.js";
 export type { FolderState, StoreState } from "./state.js";
@@ -927,8 +938,22 @@ export class EditorStore {
     this.patch({ catalogQuery });
   }
 
-  toggleAutoHideHandles(): void {
-    this.remember({ autoHideHandles: !this.state.autoHideHandles });
+  /**
+   * Change what one pane's canvas shows.
+   *
+   * Every view setting goes through here, so that "which pane" is asked once
+   * rather than in each of the six setters — and so that a caller who does not
+   * know about panes gets the first one, which is the only one a window that
+   * has not been split has.
+   */
+  private showInPane(pane: PaneIndex, changes: Partial<ViewSettings>): void {
+    const views: PaneViews = [this.state.views[0], this.state.views[1]];
+    const next = { ...views[pane], ...changes };
+    this.remember({ views: pane === 0 ? [next, views[1]] : [views[0], next] });
+  }
+
+  toggleAutoHideHandles(pane: PaneIndex = 0): void {
+    this.showInPane(pane, { autoHideHandles: !this.state.views[pane].autoHideHandles });
   }
 
   /** Whether to skip the chooser and open the last font. */
@@ -936,8 +961,8 @@ export class EditorStore {
     this.remember({ skipChooser: skip });
   }
 
-  toggleSnapPoints(): void {
-    this.remember({ snapPoints: !this.state.snapPoints });
+  toggleSnapPoints(pane: PaneIndex = 0): void {
+    this.showInPane(pane, { snapPoints: !this.state.views[pane].snapPoints });
   }
 
   setTheme(theme: ThemeChoice): void {
@@ -945,9 +970,9 @@ export class EditorStore {
     this.remember({ theme });
   }
 
-  setOutlineWidth(outlineWidth: number): void {
+  setOutlineWidth(outlineWidth: number, pane: PaneIndex = 0): void {
     const held = within(outlineWidth, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH);
-    if (held !== null) this.remember({ outlineWidth: held });
+    if (held !== null) this.showInPane(pane, { outlineWidth: held });
   }
 
   setSpacingText(spacingText: string): void {
@@ -998,12 +1023,12 @@ export class EditorStore {
     placeSplit(this.host, changes);
   }
 
-  toggleNeighbours(): void {
-    this.remember({ showNeighbours: !this.state.showNeighbours });
+  toggleNeighbours(pane: PaneIndex = 0): void {
+    this.showInPane(pane, { showNeighbours: !this.state.views[pane].showNeighbours });
   }
 
-  toggleAnchors(): void {
-    this.remember({ showAnchors: !this.state.showAnchors });
+  toggleAnchors(pane: PaneIndex = 0): void {
+    this.showInPane(pane, { showAnchors: !this.state.views[pane].showAnchors });
   }
 
   toggleImage(): void {
@@ -1015,8 +1040,13 @@ export class EditorStore {
     if (opacity !== null) this.remember({ imageOpacity: opacity });
   }
 
-  toggleCurvature(): void {
-    this.remember({ showCurvature: !this.state.showCurvature });
+  toggleCurvature(pane: PaneIndex = 0): void {
+    this.showInPane(pane, { showCurvature: !this.state.views[pane].showCurvature });
+  }
+
+  /** Put one pane's canvas settings back, leaving the other pane's alone. */
+  resetView(pane: PaneIndex = 0): void {
+    this.showInPane(pane, DEFAULT_VIEW);
   }
 
   toggleApplyFeatures(): void {

@@ -93,19 +93,20 @@ export const MAX_SPLIT_RATIO = 0.8;
 
 export const DEFAULT_SPLIT: SplitPlacement = { orientation: "row", ratio: 0.5 };
 
-export type Preferences = {
-  readonly theme: ThemeChoice;
+/**
+ * What one canvas shows, and how.
+ *
+ * Kept per pane rather than per window: a split window is two views of the same
+ * font, and the reason for opening one is usually that the two should differ —
+ * the comb on the letter being drawn and off the copy beside it, handles shown
+ * here and hidden there. None of it touches the font, so nothing here can make
+ * the two panes disagree about anything that will be exported.
+ */
+export type ViewSettings = {
   /** How heavy the outline is drawn, in screen pixels. */
   readonly outlineWidth: number;
   /** Show handles only where the work is. */
   readonly autoHideHandles: boolean;
-  /**
-   * Whether to open the last font without showing the list of fonts first.
-   *
-   * Off: the list is the program's front door, shown on every start. This is
-   * for somebody who works on one font and would rather go straight in.
-   */
-  readonly skipChooser: boolean;
   /** Let a drag catch on the glyph's own points as well as the font's lines. */
   readonly snapPoints: boolean;
   /** Draw the glyphs either side, from the strip text. */
@@ -120,6 +121,31 @@ export type Preferences = {
    * join and never while judging a shape.
    */
   readonly showCurvature: boolean;
+};
+
+export const DEFAULT_VIEW: ViewSettings = {
+  outlineWidth: DEFAULT_OUTLINE_WIDTH,
+  autoHideHandles: true,
+  snapPoints: true,
+  showNeighbours: true,
+  showAnchors: true,
+  showCurvature: false,
+};
+
+/** One for each pane, in pane order, whether or not the window is split. */
+export type PaneViews = readonly [ViewSettings, ViewSettings];
+
+export type Preferences = {
+  readonly theme: ThemeChoice;
+  /** What each pane's canvas shows. */
+  readonly views: PaneViews;
+  /**
+   * Whether to open the last font without showing the list of fonts first.
+   *
+   * Off: the list is the program's front door, shown on every start. This is
+   * for somebody who works on one font and would rather go straight in.
+   */
+  readonly skipChooser: boolean;
   /**
    * Show the picture a glyph is traced from, and how strongly.
    *
@@ -187,13 +213,8 @@ export const DEFAULT_PLACEMENT: InspectorPlacement = {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   theme: "system",
-  outlineWidth: DEFAULT_OUTLINE_WIDTH,
-  autoHideHandles: true,
+  views: [DEFAULT_VIEW, DEFAULT_VIEW],
   skipChooser: false,
-  snapPoints: true,
-  showNeighbours: true,
-  showAnchors: true,
-  showCurvature: false,
   showImage: true,
   imageOpacity: 0.5,
   applyFeatures: true,
@@ -241,16 +262,8 @@ export function loadPreferences(): Preferences {
 
   return {
     theme: isTheme(raw["theme"]) ? raw["theme"] : DEFAULT_PREFERENCES.theme,
-    outlineWidth: number(raw["outlineWidth"], DEFAULT_OUTLINE_WIDTH, {
-      min: MIN_OUTLINE_WIDTH,
-      max: MAX_OUTLINE_WIDTH,
-    }),
-    autoHideHandles: boolean(raw["autoHideHandles"], DEFAULT_PREFERENCES.autoHideHandles),
+    views: views(raw),
     skipChooser: boolean(raw["skipChooser"], DEFAULT_PREFERENCES.skipChooser),
-    snapPoints: boolean(raw["snapPoints"], DEFAULT_PREFERENCES.snapPoints),
-    showNeighbours: boolean(raw["showNeighbours"], DEFAULT_PREFERENCES.showNeighbours),
-    showAnchors: boolean(raw["showAnchors"], DEFAULT_PREFERENCES.showAnchors),
-    showCurvature: boolean(raw["showCurvature"], DEFAULT_PREFERENCES.showCurvature),
     showImage: boolean(raw["showImage"], DEFAULT_PREFERENCES.showImage),
     imageOpacity: number(raw["imageOpacity"], DEFAULT_PREFERENCES.imageOpacity, {
       min: 0.05,
@@ -329,6 +342,39 @@ function sectionsOf(raw: unknown): Record<string, boolean> {
     if (typeof value === "boolean") out[name] = value;
   }
   return out;
+}
+
+/**
+ * What each pane shows, from a file written by any version of this editor.
+ *
+ * These were one set of settings for the whole window until they were made per
+ * pane, so a file with the old keys in it hands the same settings to both
+ * panes: somebody who set a heavier outline meant it, and meant it for whatever
+ * they were looking at.
+ */
+function views(raw: Record<string, unknown>): PaneViews {
+  const stored = raw["views"];
+  const old = view(raw, DEFAULT_VIEW);
+  if (!Array.isArray(stored)) return [old, old];
+  return [view(asRecord(stored[0]), old), view(asRecord(stored[1]), old)];
+}
+
+function view(raw: Record<string, unknown>, fallback: ViewSettings): ViewSettings {
+  return {
+    outlineWidth: number(raw["outlineWidth"], fallback.outlineWidth, {
+      min: MIN_OUTLINE_WIDTH,
+      max: MAX_OUTLINE_WIDTH,
+    }),
+    autoHideHandles: boolean(raw["autoHideHandles"], fallback.autoHideHandles),
+    snapPoints: boolean(raw["snapPoints"], fallback.snapPoints),
+    showNeighbours: boolean(raw["showNeighbours"], fallback.showNeighbours),
+    showAnchors: boolean(raw["showAnchors"], fallback.showAnchors),
+    showCurvature: boolean(raw["showCurvature"], fallback.showCurvature),
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
 }
 
 export function savePreferences(preferences: Preferences): void {
