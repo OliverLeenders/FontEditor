@@ -16,12 +16,13 @@ export { UNICODE_BLOCKS, blockOf } from "./blocks.js";
 export type { CatalogEntry } from "./catalog.js";
 export { catalog } from "./catalog.js";
 
-export type { CatalogOrder, CatalogQuery, GlyphSet } from "./query.js";
+export type { CatalogOrder, CatalogQuery, GlyphSet, Listed } from "./query.js";
 export {
   DEFAULT_QUERY,
   GLYPH_SETS,
   codePointsOfSet,
   filterCatalog,
+  listCatalog,
   glyphSet,
   setCounts,
 } from "./query.js";

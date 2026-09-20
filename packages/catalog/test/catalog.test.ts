@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { blockOf } from "../src/blocks.js";
 import { catalog } from "../src/catalog.js";
-import { DEFAULT_QUERY, filterCatalog, setCounts } from "../src/query.js";
+import { DEFAULT_QUERY, filterCatalog, listCatalog, setCounts } from "../src/query.js";
 
 const ids = counterIds();
 
@@ -68,6 +68,82 @@ describe("blockOf", () => {
     expect(blockOf(0x1f600)?.id).toBe("emoji");
     // A gap in the curated list, not a block we claim to know.
     expect(blockOf(0x0800)).toBeNull();
+  });
+});
+
+/**
+ * What is *not* in the font.
+ *
+ * A font is browsed to find what to draw next as much as to find what is drawn,
+ * and a list of what exists cannot answer "what is this block short of": the
+ * glyphs that are missing are precisely the ones with nothing to list.
+ */
+describe("listCatalog", () => {
+  const listed = (query: Partial<typeof DEFAULT_QUERY>) =>
+    listCatalog(entries, { ...DEFAULT_QUERY, ...query });
+  const missing = (query: Partial<typeof DEFAULT_QUERY>) =>
+    listed(query)
+      .filter((entry) => !entry.inFont)
+      .map((entry) => entry.codePoint);
+
+  it("lists the code points of a set the font has no glyph for", () => {
+    const ascii = listed({ set: "ascii" });
+    // The two the font has, and the ninety-three of ASCII it has not.
+    expect(ascii.filter((entry) => entry.inFont).map((entry) => entry.name)).toEqual([
+      "A",
+      "space",
+    ]);
+    expect(ascii.filter((entry) => !entry.inFont)).toHaveLength(93);
+    expect(missing({ set: "ascii" })).not.toContain(0x41);
+    expect(missing({ set: "ascii" })).toContain(0x42);
+  });
+
+  it("names them as they would be named if they were made", () => {
+    const b = listed({ set: "ascii" }).find((entry) => entry.codePoint === 0x42)!;
+    expect(b.name).toBe("B");
+    expect(b.inFont).toBe(false);
+    expect(b.drawn).toBe(false);
+    expect(b.block?.id).toBe("basic-latin");
+  });
+
+  it("offers nothing for a set that is a state rather than a range", () => {
+    // "Drawn" is a property of the glyphs there are; it has no holes.
+    expect(missing({ set: "drawn" })).toEqual([]);
+    expect(missing({ set: "all" })).toEqual([]);
+  });
+
+  it("offers the character searched for when the font has not got it", () => {
+    // An empty grid says only that the search box works.
+    expect(missing({ search: "ä" })).toEqual([0xe4]);
+    expect(missing({ search: "U+00E4" })).toEqual([0xe4]);
+  });
+
+  it("says nothing about a character the font already has", () => {
+    expect(missing({ search: "U+0041" })).toEqual([]);
+  });
+
+  it("does not offer a glyph that exists and is merely filtered out of sight", () => {
+    // Omega is in the font; looking at Basic Latin does not make it missing.
+    expect(missing({ set: "block:basic-latin" })).not.toContain(0x3a9);
+  });
+
+  it("narrows the holes with the search, as it narrows the glyphs", () => {
+    const found = missing({ set: "ascii", search: "question" });
+    expect(found).toEqual([0x3f]);
+  });
+
+  it("puts them after the glyphs in font order, and in place in code-point order", () => {
+    // A glyph the font has not got has no place in the order the font declares.
+    const byFont = listed({ set: "ascii", order: "font" });
+    expect(byFont.slice(0, 2).every((entry) => entry.inFont)).toBe(true);
+    expect(byFont.slice(2).every((entry) => !entry.inFont)).toBe(true);
+
+    // In code-point order the block reads as a chart with gaps.
+    const byCode = listed({ set: "ascii", order: "codePoint" });
+    const codes = byCode.map((entry) => entry.codePoint);
+    expect(codes).toEqual([...codes].sort((a, b) => a! - b!));
+    expect(byCode.find((entry) => entry.codePoint === 0x41)!.inFont).toBe(true);
+    expect(byCode.find((entry) => entry.codePoint === 0x42)!.inFont).toBe(false);
   });
 });
 

@@ -1,4 +1,6 @@
-import { UNICODE_BLOCKS } from "./blocks.js";
+import { glyphNameForCodePoint } from "@typewright/font-model";
+
+import { UNICODE_BLOCKS, blockOf } from "./blocks.js";
 import type { CatalogEntry } from "./catalog.js";
 
 /**
@@ -148,7 +150,7 @@ function matches(entry: CatalogEntry, search: Search): boolean {
  * `null`, so a code-point sort reads as one ascending run with the leftovers
  * gathered at the end.
  */
-function ordered(entries: CatalogEntry[], order: CatalogOrder): CatalogEntry[] {
+function ordered<T extends CatalogEntry>(entries: T[], order: CatalogOrder): T[] {
   if (order === "font") return entries;
   if (order === "name") return [...entries].sort((a, b) => a.name.localeCompare(b.name));
 
@@ -158,6 +160,92 @@ function ordered(entries: CatalogEntry[], order: CatalogOrder): CatalogEntry[] {
     if (b.codePoint === null) return -1;
     return a.codePoint - b.codePoint;
   });
+}
+
+/**
+ * A cell of the browser: a glyph the font has, or a code point it has not.
+ *
+ * The second kind is why this exists. A font is browsed to find what to draw
+ * next as much as to find what is drawn, and a list of what is already there
+ * cannot answer "which of Latin Extended-A am I missing" — the glyphs that are
+ * missing are precisely the ones with nothing to list. So a set that covers a
+ * known range of code points lists the whole range, and the holes are cells of
+ * their own.
+ *
+ * Shaped like an entry rather than a second type beside it, so that everything
+ * which reads a cell — the grid, the keyboard, the tip — goes on reading one
+ * thing. What it does *not* have is stated in the fields it already had: no
+ * outline, no advance, no nodes. `inFont` is the one new fact.
+ */
+export type Listed = CatalogEntry & {
+  /** False for a code point the font has no glyph for: a cell to be made, not one to open. */
+  readonly inFont: boolean;
+};
+
+/** What a code point the font has not got looks like in the list. */
+function absentEntry(codePoint: number): Listed {
+  return {
+    name: glyphNameForCodePoint(codePoint),
+    codePoint,
+    unicodes: [codePoint],
+    advance: 0,
+    contourCount: 0,
+    nodeCount: 0,
+    drawn: false,
+    block: blockOf(codePoint),
+    inFont: false,
+  };
+}
+
+/**
+ * The cells to show: the glyphs a query keeps, and the code points it covers
+ * that the font has not got.
+ *
+ * Two sources of a hole. A set that is a range — a Unicode block, ASCII — knows
+ * every code point it covers, so every one of them with no glyph is listed.
+ * And a search that names a character the font has not got offers it: typing
+ * `ä` to look for a glyph that is not there should not answer with an empty
+ * grid, which says only that the search box works.
+ *
+ * Whether a code point is in the font is asked of the whole catalog rather than
+ * of what the query kept, since a glyph filtered out of sight is still in the
+ * font and offering to make a second one would be a bug wearing a feature's
+ * clothes.
+ *
+ * In font order the holes follow the glyphs: a glyph the font has not got has
+ * no place in the order the font declares. In the other two orders they fall
+ * where they belong — which is what makes a block read as a chart with gaps.
+ */
+export function listCatalog(entries: readonly CatalogEntry[], query: CatalogQuery): Listed[] {
+  const set = glyphSet(query.set);
+  const search = parseSearch(query.search);
+
+  const kept: Listed[] = entries
+    .filter((entry) => (set === null || set.includes(entry)) && matches(entry, search))
+    .map((entry) => ({ ...entry, inFont: true }));
+
+  const held = new Set<number>();
+  for (const entry of entries) for (const code of entry.unicodes) held.add(code);
+
+  const wanted = new Set<number>();
+  for (const code of codePointsOfSet(query.set) ?? []) {
+    if (!held.has(code)) wanted.add(code);
+  }
+  // The character searched for, whatever set is showing: the search is the more
+  // particular thing somebody asked for, and a set is where they happened to be.
+  const asked =
+    search.kind === "codePoint" ? search.value : search.kind === "text" ? search.codePoint : null;
+  if (asked !== null && !held.has(asked)) wanted.add(asked);
+
+  const missing = [...wanted]
+    .sort((a, b) => a - b)
+    .map(absentEntry)
+    .filter((entry) => matches(entry, search));
+  if (missing.length === 0) return ordered(kept, query.order);
+
+  return query.order === "font"
+    ? [...kept, ...missing]
+    : ordered([...kept, ...missing], query.order);
 }
 
 /** Apply a query to a catalog. */
