@@ -32,11 +32,28 @@
   --ok: #3f7d4e;
   /* Feature source. Hues of their own rather than the accent's, which sat too
      close to the ink the glyph names are set in: a keyword has to stand apart
-     from the names around it at a glance, and blue beside near-white does not. */
-  --syntax-keyword: #8b3fb0;
-  --syntax-tag: #2f7a45;
-  --syntax-class: #a2601c;
-  --syntax-number: #1f6fa8;
+     from the names around it at a glance, and blue beside near-white does not.
+
+     Held at one lightness and *not* at one chroma, which is the correction. How
+     much colour a hue can hold at a given lightness differs wildly — at L 0.5
+     violet reaches a chroma of 0.24 and green only 0.15 — so four colours picked
+     for equal lightness and nothing else came out unequally coloured: the
+     keyword at three quarters of what its hue allows and the tag at a low
+     ceiling's three quarters, which is six units of chroma from a grey of the
+     same lightness. The greys the text is set in sit in exactly this band
+     (--ink-2 is L 0.49), and a green that close to them is read as one.
+
+     So each is driven to about the same share of its own ceiling, and two hues
+     are corrected on the way: green from 150° to 145°, which is both truer and
+     roomier, and blue from 245° to 257°. Contrast on the editor's ground runs
+     5.5 to 6.6, where the least was 4.8.
+
+     Dark is left as it was: at L 0.78 a colour on a dark ground reads its hue
+     plainly, and nothing there is short of contrast. */
+  --syntax-keyword: #8f1dbd;
+  --syntax-tag: #187726;
+  --syntax-class: #984a14;
+  --syntax-number: #1460be;
   --shadow: 0 2px 4px rgba(19, 25, 34, 0.06), 0 10px 28px -14px rgba(19, 25, 34, 0.3);
 
   --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
