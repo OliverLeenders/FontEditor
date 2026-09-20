@@ -94,6 +94,26 @@ points and a shape with nothing at its own top rounds into a flat. Each button s
 many it would add and is dead when there are none; right-clicking one curve does that
 curve, and the buttons do the whole of whatever is selected.
 
+**What two masters have to agree on.** Interpolation is arithmetic on
+corresponding points: the third point of the second contour here is averaged with the third
+point of the second contour there. So which point a contour begins at, and which contour
+comes first, are not drawing decisions once a font has two masters — an `o` begun at the top
+in one and at the left in the other is compatible by every count and interpolates into a
+twist. Both are set from the right-click menu: **Start the contour here** on a point, and
+**Bring forward** and **Send back** on a contour, which say where it sits as they offer it.
+Turn **Point numbers** on in the View menu to read the pairing off the canvas — `2.3` is the
+third point of the second contour, and the first point of each contour is picked out, since
+that is where the pairing starts. The Masters panel's compatibility check opens the glyph
+and selects the contour a line is about.
+
+**Between the masters.** The Spacing line and the Proof have a **Between** switch and a
+slider for each axis: the text is then set with the family worked out at that place rather
+than with the master being edited. It is the same location the canvas draws its ghost weight
+at, so moving it moves both. A stem that thickens faster than its neighbours, or a
+sidebearing that drifts across the designspace, shows in a line of letters and in no single
+one of them. An instance is not a thing to edit, so while one is shown the spacing line says
+so and its nudges and fields are quiet; the judgement is carried out in a master.
+
 **Locking a handle to an axis** snaps it to north, south, east or west — whichever it is
 nearer — and holds it there while it is dragged. A smooth node's two handles are one
 straight line, so they go to the same axis and not to one each. On a tangent node the
@@ -229,9 +249,9 @@ glance.
 **What the font has not got.** Choosing a Unicode block — or ASCII — lists the whole of
 it, and the code points with no glyph get cells of their own: the character fainter
 still, in a dashed box, with the code point under it and no name, since the font has not
-named it yet. Sorting by code point puts them in their places, so a block reads as a
-chart with gaps; in font order they follow the glyphs, a glyph the font has not got
-having no place in the order the font declares. Searching does the same for one
+named it yet. The list opens in code-point order, which puts them in their places, so a
+block reads as a chart with gaps; in font order they follow the glyphs, a glyph the font
+has not got having no place in the order the font declares.  Searching does the same for one
 character: type a `ǧ` the font has not got and it is offered rather than answered with an
 empty grid. **Double-click one, or press Enter on it, to make that glyph and open it**;
 its menu adds it without opening. They are offers and not glyphs, so they are not picked,

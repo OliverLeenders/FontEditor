@@ -54,8 +54,8 @@ desktop application installs from a release and updates itself.
 | 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried           |
 | 28    | Binary import keeps its layout      | done: GSUB and GPOS as source, marks as anchors, kerning into the model, fontTools-checked |
 | 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph     |
-| 30    | Making masters compatible           | next                                                                                       |
-| 31    | A proof for judging features        | planned                                                                                    |
+| 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
+| 31    | A proof for judging features        | next                                                                                       |
 | 32    | More outline operations             | planned                                                                                    |
 
 ### What the table missed
@@ -836,12 +836,32 @@ down here because the commits were the only record of it.
   the stripe look thick beside `mark.svg` at the same size. Only 24 and below are cut deeper
   now; from 28 up the icon is the mark itself.
 
-#### Phase 30 — Making masters compatible
+#### Phase 30 — Making masters compatible — done
 
-The compatibility check in Masters says what disagrees and offers no way to put it right.
-Setting a contour's start point, reordering contours, and point numbers on the canvas that can
-be compared across masters are what fix it; a location slider in the Spacing line and the Proof
-shows the family between its masters.
+The compatibility check said what disagreed between two masters and offered no way to put it
+right — and two of the things it reports could not be changed at all. Now:
+
+- **A contour begins where you say.** Interpolation pairs the first node of a contour with
+  the first node of the same contour in the other master, so an `o` begun at the top in one
+  and at the left in the other is compatible by every count and interpolates into a twist.
+  **Start the contour here**, on the menu on a point, rotates the nodes until that one is
+  first; it is offered only where it would move something, and an open contour, which begins
+  where the drawing began, has no start to choose.
+- **Contours can be reordered.** The order is nothing at all in one master and is what the
+  contours are paired by in two, so a bowl drawn before its stem in one and after it in the
+  other makes a mess of every weight between. **Bring forward** and **Send back** move one
+  place at a time and say where the contour sits as they offer it.
+- **Point numbers**, in the View menu and so kept per canvas: `2.3` is the third point of the
+  second contour, and the first point of each contour is picked out in the accent, since that
+  is where the pairing starts. Off by default — it is an instrument like the comb, and numbers
+  over a drawing are the last thing wanted while drawing it.
+- **The family between its masters**, in the Spacing line and the Proof: a **Between** switch
+  and a slider per axis set the text with the font worked out at that place. It is the same
+  location the canvas has drawn its ghost weight at since the designspace went in, so the
+  three agree rather than offering three answers to one question. An instance is not a thing
+  to edit, so the spacing line's nudges and fields go quiet and say why.
+- **The compatibility report takes you to the trouble**: a line names a glyph and a contour,
+  and opens the glyph with that contour selected, rather than describing where to look.
 
 #### Phase 31 — A proof for judging features
 
