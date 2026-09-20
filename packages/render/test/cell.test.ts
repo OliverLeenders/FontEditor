@@ -102,6 +102,41 @@ describe("drawGlyphCell", () => {
  * Adding the missing glyphs of a block fills the browser with empty boxes at
  * once, and which box is which is the only question being asked of them.
  */
+/**
+ * A cell for a code point the font has no glyph for.
+ *
+ * It has to be told apart at a glance from a glyph that exists and has simply
+ * not been drawn yet — the two look alike otherwise, and one can be opened while
+ * the other has to be made first.
+ */
+describe("a cell the font has nothing for", () => {
+  it("draws its border dashed, where a glyph's is solid", () => {
+    expect(draw(null, { missing: true }).all("stroke")[0]!.lineDash).toEqual([3, 3]);
+    expect(draw(null).all("stroke")[0]!.lineDash).toEqual([]);
+  });
+
+  it("gives the character less ink than an undrawn glyph's", () => {
+    const missing = draw(null, { missing: true });
+    const undrawn = draw(null);
+    const alphaOf = (ctx: typeof missing): number =>
+      ctx.all("fillText").find((each) => each.text === "A")?.globalAlpha ?? 1;
+
+    expect(alphaOf(missing)).toBeLessThan(alphaOf(undrawn));
+  });
+
+  it("says the code point and not a name the font has not given", () => {
+    // What it would be called is a guess, and a cell should not state a guess
+    // as a fact.
+    expect(draw(null, { missing: true }).texts()).toEqual(["A", "U+0041"]);
+  });
+
+  it("is still outlined by the focus, which is about where the keyboard is", () => {
+    const ctx = draw(null, { missing: true, focused: true });
+    expect(ctx.strokedIn(LIGHT_PALETTE.marqueeStroke)).toHaveLength(1);
+    expect(ctx.all("stroke")[0]!.lineDash).toEqual([]);
+  });
+});
+
 describe("the sample in an undrawn cell", () => {
   const sample = (ctx: RecordingContext) =>
     ctx.all("fillText").find((o) => o.fillStyle === LIGHT_PALETTE.cellSample)?.text ?? null;

@@ -886,6 +886,16 @@ export type GlyphCellState = {
    * still the whole font and it is plain which glyphs this master has.
    */
   readonly absent?: boolean;
+  /**
+   * Not in the font at all: a code point of the set being browsed that has no
+   * glyph, offered so that what is missing can be seen and made.
+   *
+   * Drawn in a dashed box, with the character fainter than an undrawn glyph's
+   * and no name under it — a name it has not got yet would be the one thing on
+   * the cell that was not true. Two steps of one language: the less a cell has,
+   * the less ink it is given.
+   */
+  readonly missing?: boolean;
 };
 
 /**
@@ -897,6 +907,9 @@ const CELL_LABEL_HEIGHT = 30;
 
 /** How faintly a glyph the open master does not draw is shown. */
 const ABSENT_ALPHA = 0.28;
+
+/** And how faintly the character of a code point the font has no glyph for. */
+const MISSING_ALPHA = 0.55;
 
 /**
  * A combining mark, which is drawn on the dotted circle the standard shows it
@@ -956,9 +969,13 @@ export function drawGlyphCell(
   // straddling two and rendering as a soft two-pixel line.
   ctx.strokeStyle = state.focused ? palette.marqueeStroke : palette.cellRule;
   ctx.lineWidth = state.focused ? 2 : 1;
+  // Dashed for a cell that is not a glyph yet, which is what tells it apart at
+  // a glance from one that exists and simply has not been drawn.
+  if (state.missing === true && !state.focused) ctx.setLineDash([3, 3]);
   ctx.beginPath();
   ctx.rect(box.x + 0.5, box.y + 0.5, box.width - 1, box.height - 1);
   ctx.stroke();
+  ctx.setLineDash([]);
 
   const bar = markColor === null ? null : markColorCss(markColor);
   if (bar !== null) {
@@ -969,7 +986,11 @@ export function drawGlyphCell(
   }
 
   const faint = state.absent === true;
-  if (glyph === null) drawCellSample(ctx, box, palette, state.codePoint);
+  if (glyph === null) {
+    if (state.missing === true) ctx.globalAlpha = MISSING_ALPHA;
+    drawCellSample(ctx, box, palette, state.codePoint);
+    ctx.globalAlpha = 1;
+  }
   if (glyph !== null) {
     if (faint) ctx.globalAlpha = ABSENT_ALPHA;
     drawGlyphThumbnail(
@@ -990,7 +1011,10 @@ export function drawGlyphCell(
   const inset = box.width - 8;
 
   ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
-  ctx.fillText(state.name, centre, box.y + box.height - 18, inset);
+  // A glyph that is not in the font has no name of its own — what it would be
+  // called is a guess the cell should not state as a fact — so the row where
+  // the name goes stays empty and the code point speaks for the cell.
+  if (state.missing !== true) ctx.fillText(state.name, centre, box.y + box.height - 18, inset);
 
   if (state.codePoint !== null) {
     ctx.font = "9px ui-monospace, SFMono-Regular, Menlo, monospace";
