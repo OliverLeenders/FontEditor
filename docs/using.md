@@ -9,6 +9,11 @@ the spacing line or the proof, and the second pane's bar stacks the panes or clo
 The keyboard follows the pane you last pressed in; a glyph opened from the font's grid or
 the spacing line is drawn in the other pane when that pane is drawing.
 
+**Two drawings at once.** The drawing is the one workspace a split window may show
+twice, since what each canvas shows is its own. Both draw the same glyph with the same
+camera; the inspector and the glyph strip stay single and follow the pane the keyboard is
+in.
+
 **Windows.** A second font goes in a window of its own. File → New window opens one on the
 list of fonts — Ctrl-Shift-N in the desktop application — and the button beside each font
 in that list opens the font straight away. Each window is on one font and names it in its

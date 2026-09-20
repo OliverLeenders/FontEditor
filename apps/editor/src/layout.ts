@@ -3,12 +3,16 @@ import type { ViewId } from "./components/TabBar.js";
 /**
  * Which workspaces are on screen, and which of them the keyboard is in.
  *
- * One pane, or two. Each shows a workspace of its own, and no two show the
- * same one: a second Spacing line would need a second text and size, and a
- * second canvas a second view of the glyph, when the point of the split is to
- * see two *different* things about one font at once. The glyph workspace in
- * particular exists once — its toolbar, inspector and strip are the window's —
- * so asking for a workspace the other pane has swaps the two.
+ * One pane, or two. No two panes show the same workspace, with one exception:
+ * a second Spacing line would need a second text and size, and a second Proof a
+ * second paragraph, so asking for a workspace the other pane has swaps the two.
+ *
+ * The drawing is the exception. Two panes may both draw, on the same glyph and
+ * the same camera, because what each of them *shows* is its own — the comb on
+ * the one being worked and off the one being judged, handles here and none
+ * there. The inspector and the strip stay single and follow the pane the
+ * keyboard is in, since both are about the glyph rather than about a view of
+ * it.
  *
  * Plain values and functions, so the rules can be tested without a window.
  * How the split is shaped — side by side or stacked, and where the divider is —
@@ -51,7 +55,9 @@ export function choosePane(panes: Panes, index: PaneIndex, view: ViewId): Panes 
   if (here === view) return focusPane(panes, index);
 
   const there = viewIn(panes, other(index));
-  const swapped = there === view ? here : there;
+  // The drawing may be in both panes, so asking for it leaves the other pane
+  // where it is instead of taking its workspace in exchange.
+  const swapped = there === view && view !== "glyph" ? here : there;
   return index === 0
     ? { first: view, second: swapped, active: 0 }
     : { first: swapped ?? panes.first, second: view, active: 1 };
@@ -89,6 +95,21 @@ export function focusPane(panes: Panes, index: PaneIndex): Panes {
 export function openGlyphFrom(panes: Panes, index: PaneIndex): Panes {
   if (viewIn(panes, other(index)) === "glyph") return panes;
   return choosePane(panes, index, "glyph");
+}
+
+/**
+ * The pane the inspector and the strip belong to.
+ *
+ * Both are about the glyph rather than about a view of it, so there is one of
+ * each however many panes are drawing. It sits in the pane the keyboard is in
+ * when that pane is drawing, and otherwise in whichever pane is — which is the
+ * only sensible answer while somebody works in the browser or the feature file
+ * with a canvas open beside it.
+ */
+export function panelPane(panes: Panes): PaneIndex | null {
+  if (activeView(panes) === "glyph") return panes.active;
+  if (panes.first === "glyph") return 0;
+  return panes.second === "glyph" ? 1 : null;
 }
 
 /**

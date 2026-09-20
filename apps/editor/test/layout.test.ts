@@ -10,6 +10,7 @@ import {
   openGlyphBeside,
   openGlyphFrom,
   openSecondPane,
+  panelPane,
 } from "../src/layout.js";
 
 describe("a glyph opened from feature source", () => {
@@ -82,9 +83,18 @@ describe("choosing a workspace in a split window", () => {
   });
 
   it("swaps the panes rather than show one workspace twice", () => {
-    // The drawing exists once, so asking for it on the left moves it there.
-    expect(choosePane(split("font", "glyph", 0), 0, "glyph")).toEqual(split("glyph", "font", 0));
-    expect(choosePane(split("font", "glyph", 0), 1, "font")).toEqual(split("glyph", "font", 1));
+    // A second Spacing line would need a second text and size of its own.
+    expect(choosePane(split("spacing", "glyph", 0), 1, "spacing")).toEqual(
+      split("glyph", "spacing", 1),
+    );
+    expect(choosePane(split("font", "proof", 0), 0, "proof")).toEqual(split("proof", "font", 0));
+  });
+
+  it("draws in both panes when both are asked to", () => {
+    // What each canvas shows is its own — the comb on the letter being worked
+    // and off the one being judged — so the drawing is the one workspace a
+    // window may have twice.
+    expect(choosePane(split("font", "glyph", 0), 0, "glyph")).toEqual(split("glyph", "glyph", 0));
   });
 
   it("only moves the keyboard when the pane already shows it", () => {
@@ -112,5 +122,27 @@ describe("opening a glyph", () => {
   it("turns this pane to the drawing when no pane is drawing", () => {
     expect(openGlyphFrom(split("font", "proof", 0), 0)).toEqual(split("glyph", "proof", 0));
     expect(openGlyphFrom(split("font", null), 0)).toEqual(split("glyph", null));
+  });
+});
+
+/**
+ * Where the inspector and the strip go.
+ *
+ * There is one of each however many panes are drawing: both are about the
+ * glyph rather than about a view of it.
+ */
+describe("the pane the panels belong to", () => {
+  it("is the pane being drawn in", () => {
+    expect(panelPane(split("font", "glyph", 0))).toBe(1);
+    expect(panelPane(split("glyph", "proof", 1))).toBe(0);
+  });
+
+  it("follows the keyboard when both panes are drawing", () => {
+    expect(panelPane(split("glyph", "glyph", 0))).toBe(0);
+    expect(panelPane(split("glyph", "glyph", 1))).toBe(1);
+  });
+
+  it("is nowhere when nothing is being drawn", () => {
+    expect(panelPane(split("font", "proof", 0))).toBeNull();
   });
 });

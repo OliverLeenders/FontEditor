@@ -27,6 +27,7 @@ import { Shortcuts } from "./components/Shortcuts.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TabBar, type ViewId } from "./components/TabBar.js";
 import { Toolbar } from "./components/Toolbar.js";
+import { WindowBar } from "./components/WindowBar.js";
 import styles from "./App.module.css";
 import {
   type PaneIndex,
@@ -39,8 +40,10 @@ import {
   openGlyphBeside,
   openGlyphFrom,
   openSecondPane,
+  panelPane,
   viewIn,
 } from "./layout.js";
+import { PaneContext } from "./pane.js";
 import { useEditorStore, useStoreValue } from "./useStore.js";
 import { openWindow } from "./windows.js";
 
@@ -57,7 +60,9 @@ export function App(): React.JSX.Element {
   // One pane or two. Which workspaces they show is where somebody is rather
   // than a setting, so it is not remembered; the shape of the split is.
   const [panes, setPanes] = useState<Panes>(SINGLE_PANE);
-  const [menu, setMenu] = useState<MenuRequest | null>(null);
+  // The menu, and which pane it was opened in: two panes may both be drawing,
+  // and a menu belongs to the canvas it was asked for on.
+  const [menu, setMenu] = useState<(MenuRequest & { pane: PaneIndex }) | null>(null);
   const [keysShown, setKeysShown] = useState(false);
   // The workspace the keyboard is in: the only one, or the active one of two.
   const view = activeView(panes);
@@ -65,6 +70,11 @@ export function App(): React.JSX.Element {
   // rebuilt every time the workspace changes.
   const viewRef = useRef(view);
   viewRef.current = view;
+  // Which pane the keys that change a canvas — H and S — are about: the one
+  // being drawn in, which is where the inspector is. Read by the same handler,
+  // so it is a ref for the same reason.
+  const drawingRef = useRef(panelPane(panes) ?? 0);
+  drawingRef.current = panelPane(panes) ?? 0;
   const split = useStoreValue((s) => s.split);
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const inspectorOpen = useStoreValue((s) => s.inspector.open);
@@ -193,13 +203,13 @@ export function App(): React.JSX.Element {
       // Lower case only, and not while a tool key could mean something else —
       // "H" is free, where the tool letters are not.
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "h") {
-        store.toggleAutoHideHandles();
+        store.toggleAutoHideHandles(drawingRef.current);
         return;
       }
       // "S" is free too. The tool letters are V P K R E M, and "R" also reverses
       // a contour inside the select tool.
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "s") {
-        store.toggleSnapPoints();
+        store.toggleSnapPoints(drawingRef.current);
         return;
       }
       // "B" draws in the background, and again draws in the letter. Adding the
@@ -378,7 +388,10 @@ export function App(): React.JSX.Element {
             <GlyphBrowser onOpen={open} />
           </div>
         );
-      case "glyph":
+      case "glyph": {
+        // One inspector and one strip however many panes are drawing: both are
+        // about the glyph rather than about a view of it.
+        const panels = panelPane(panes) === index;
         return (
           <>
             <Toolbar />
@@ -389,11 +402,11 @@ export function App(): React.JSX.Element {
               {/* The canvas in a box of its own, so a docked inspector sits
                   beside it rather than over it and the drawing gets the rest. */}
               <div className={styles.drawing}>
-                <GlyphCanvas onContextMenu={setMenu} />
-                {menu !== null ? (
+                <GlyphCanvas onContextMenu={(request) => setMenu({ ...request, pane: index })} />
+                {menu !== null && menu.pane === index ? (
                   <ContextMenu store={store} request={menu} onClose={() => setMenu(null)} />
                 ) : null}
-                {!inspectorOpen ? (
+                {panels && !inspectorOpen ? (
                   <button
                     type="button"
                     className={styles.reveal}
@@ -404,11 +417,12 @@ export function App(): React.JSX.Element {
                   </button>
                 ) : null}
               </div>
-              <Inspector />
+              {panels ? <Inspector /> : null}
             </div>
-            <GlyphStrip />
+            {panels ? <GlyphStrip /> : null}
           </>
         );
+      }
     }
   };
 
@@ -425,38 +439,41 @@ export function App(): React.JSX.Element {
     const focus = (): void => setPanes((current) => focusPane(current, index));
 
     return (
-      <section
-        key={index}
-        className={styles.pane}
-        data-pane={index}
-        style={two ? { flexGrow: index === 0 ? split.ratio : 1 - split.ratio } : undefined}
-        onPointerDownCapture={focus}
-        onFocusCapture={focus}
-      >
-        <TabBar
-          current={shown}
-          onSelect={(id) => setPanes((current) => choosePane(current, index, id))}
-          glyphName={glyphName}
-          label={
-            !two
-              ? "Workspaces"
-              : index === 0
-                ? "Workspaces in the first pane"
-                : "Workspaces in the second pane"
-          }
-          active={two && panes.active === index}
-          orientation={split.orientation}
-          onSplit={two ? undefined : () => setPanes(openSecondPane)}
-          onFlip={
-            two && index === 1
-              ? () =>
-                  store.placeSplit({ orientation: split.orientation === "row" ? "column" : "row" })
-              : undefined
-          }
-          onClose={two && index === 1 ? () => setPanes(closeSecondPane) : undefined}
-        />
-        {workspace(shown, index)}
-      </section>
+      <PaneContext.Provider key={index} value={index}>
+        <section
+          className={styles.pane}
+          data-pane={index}
+          style={two ? { flexGrow: index === 0 ? split.ratio : 1 - split.ratio } : undefined}
+          onPointerDownCapture={focus}
+          onFocusCapture={focus}
+        >
+          <TabBar
+            current={shown}
+            onSelect={(id) => setPanes((current) => choosePane(current, index, id))}
+            glyphName={glyphName}
+            label={
+              !two
+                ? "Workspaces"
+                : index === 0
+                  ? "Workspaces in the first pane"
+                  : "Workspaces in the second pane"
+            }
+            active={two && panes.active === index}
+            orientation={split.orientation}
+            onSplit={two ? undefined : () => setPanes(openSecondPane)}
+            onFlip={
+              two && index === 1
+                ? () =>
+                    store.placeSplit({
+                      orientation: split.orientation === "row" ? "column" : "row",
+                    })
+                : undefined
+            }
+            onClose={two && index === 1 ? () => setPanes(closeSecondPane) : undefined}
+          />
+          {workspace(shown, index)}
+        </section>
+      </PaneContext.Provider>
     );
   };
 
@@ -473,6 +490,7 @@ export function App(): React.JSX.Element {
           </button>
         </div>
       ) : null}
+      <WindowBar />
       <UpdateNotice />
       <CloseWarning />
       {showChooser ? (
