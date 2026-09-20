@@ -17,8 +17,10 @@ UFO, and UFO comes back in. A family is several masters, a `.designspace` and on
 browser's own store besides, and copies of the whole font are kept as you work. Guides and a
 picture to trace from sit behind the drawing; before it goes out, nineteen checks say what
 is wrong with it. Several fonts are kept at once, each in a working copy of its own; the
-window splits into two panes, and a second font opens in a window of its own. The desktop
-application installs from a release and updates itself.
+window splits into two panes — the drawing may fill both, each canvas showing what it is
+asked to — and a second font opens in a window of its own. The grid lists what the font has
+not got as well as what it has, and a glyph is made from the hole where it belongs. The
+desktop application installs from a release and updates itself.
 
 | Phase |                                     | Status                                                                                     |
 | ----- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -785,6 +787,55 @@ Proved the way UFOs are: the proof UFO has a background and a sketch layer, font
 every layer with validation on, writes them all back, and they are read again here and
 compared drawing by drawing.
 
+#### After phase 29 — What the releases carried — done
+
+Not a phase: what was found by using the editor between 0.1.13 and 0.1.18, written
+down here because the commits were the only record of it.
+
+- **Which glyph is which.** A cell had room for a name and a code point, which for a
+  combining mark is `uni0308` above `U+0308` and answers nothing. The standard's own names
+  are now in the editor — packed from the UCD, unpacked the first time a tip asks for one —
+  and a tip beside a cell gives the character, its name, its block and whether it has been
+  drawn. A glyph the font has not drawn shows the character faintly in one of the system's
+  fonts rather than an empty box, so a screenful of cells after **Add missing** can be read.
+- **The glyphs the font has not got.** A block listed what the font had in it, which is the
+  wrong half of the question: the reason to open Latin Extended-A is to see what is missing.
+  Those code points now have cells of their own — dashed, fainter, the code point and no name
+  — and double-clicking one makes the glyph and opens it. The search offers a character the
+  font has not got rather than answering with an empty grid.
+- **The inspector says less.** A section with nothing in it folds itself and says what it is
+  short of, rather than showing a column of dashes; the curve's two dimensions are one field
+  each — tension is how much handle there is, pan is how it is split — where two λ fields made
+  every change of tension a change of balance as well; and the pan has a number beside its
+  slider, so a lean worth keeping can be written down and given to the next segment.
+- **Where a preference lives.** The theme was in the drawing toolbar's popover, which is a
+  pane's bar: reachable only with a glyph open, and offered twice in a split window. It is now
+  in a strip along the top of the window, with the font's name, opened by Ctrl-comma. What is
+  left in the pane's menu is what that canvas shows — and it is kept per pane, which is what
+  makes two canvases of one glyph worth having. So the drawing is the one workspace a split
+  window may show twice; the inspector and the strip stay single and follow the keyboard.
+- **Three things about a curve.** Locking a tangent node's handle to an axis did nothing
+  visible, because the pass every edit ends with swung it back onto the straight side; it now
+  gives up the type, as freeing one side of a smooth node does. Deleting a point left the
+  neighbours' handles as they were and dented the outline; what is left is now fitted to the
+  pair of curves that were there. And the two places worth a point — where the outline turns
+  back in x or y, and where it changes which way it bends — can be put in from the curve's
+  menu or the Curve section, one segment or a whole selection at a time.
+- **Spacing keys are followed as you work.** A key said a relationship and was resolved in
+  two places only: the fields that show it, and the font as compiled. Editing `n` left `m`
+  drawn and saved at its old spacing. Every committed step now settles the keys inside that
+  same step, so one undo takes back the edit and everything that came of it, and a measurement
+  a key speaks for is refused rather than sprung back.
+- **Two things that were simply hard to read.** The feature source's colours were picked for
+  one lightness, which forces unequal colour — the green tag ran six units of chroma from a
+  grey of the same lightness and was not recognisable as green; each is now driven to the same
+  share of its own hue's ceiling. And the sheet of keys was a poster nobody could read, since
+  no column layout could balance around a canvas group three times the length of the rest; it
+  is a rail of places now, one at a time, with a filter that narrows all of them at once.
+- **The desktop icon** was drawn with the heavier cuts up to 48 pixels, which made the T and
+  the stripe look thick beside `mark.svg` at the same size. Only 24 and below are cut deeper
+  now; from 28 up the icon is the mark itself.
+
 #### Phase 30 — Making masters compatible
 
 The compatibility check in Masters says what disagrees and offers no way to put it right.
@@ -800,9 +851,10 @@ waterfall of sizes to see where the text stops reading.
 
 #### Phase 32 — More outline operations
 
-Union is the only boolean. Subtract, intersect and exclude, adding points at the extremes,
-simplifying a contour, and offsetting a path are the operations reached for when drawing, and
-each is a menu item in every other editor.
+Union is the only boolean. Subtract, intersect and exclude, simplifying a contour, and
+offsetting a path are the operations reached for when drawing, and each is a menu item in
+every other editor. Points at the extremes were the fifth of these and shipped in 0.1.17,
+from the curve's own menu.
 
 #### Parked
 
