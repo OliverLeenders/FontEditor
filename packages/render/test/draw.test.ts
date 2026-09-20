@@ -737,6 +737,52 @@ describe("the curvature comb", () => {
     );
   };
 
+  /**
+   * Which point is which.
+   *
+   * The numbers are what one master is read against another with: interpolation
+   * pairs the third point of the second contour here with the third point of
+   * the second contour there, and until they can be read there is no seeing
+   * which two have fallen out of step.
+   */
+  describe("point numbers", () => {
+    const numbered = (on: boolean) =>
+      render({ ...base(ring()), options: { showPointNumbers: on } });
+
+    it("draws none unless they are asked for", () => {
+      expect(numbered(false).texts()).toEqual([]);
+    });
+
+    it("numbers every point as its contour and its place in it", () => {
+      expect(numbered(true).texts()).toEqual(["1.1", "1.2", "1.3", "1.4"]);
+    });
+
+    it("counts each contour from one of its own", () => {
+      const first = ring();
+      const second = { ...ring(), id: "second" };
+      const ctx = render({
+        ...base(first),
+        glyph: addContour(addContour(glyph("test", { advance: 600 }), first), second),
+        options: { showPointNumbers: true },
+      });
+
+      expect(ctx.texts()).toEqual(["1.1", "1.2", "1.3", "1.4", "2.1", "2.2", "2.3", "2.4"]);
+    });
+
+    it("picks the first of each contour out, since that is where pairing starts", () => {
+      const filled = numbered(true)
+        .all("fillText")
+        .map((op) => op.fillStyle);
+
+      expect(filled[0]).toBe(LIGHT_PALETTE.nodeSelected);
+      expect(filled[1]).toBe(LIGHT_PALETTE.node);
+    });
+
+    it("lays a halo under each, so a number over an outline stays legible", () => {
+      expect(numbered(true).all("strokeText")).toHaveLength(4);
+    });
+  });
+
   const combed = (extra: Record<string, unknown> = {}) => {
     const c = ring();
     return {

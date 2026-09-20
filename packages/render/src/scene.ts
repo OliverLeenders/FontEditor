@@ -120,6 +120,17 @@ export type RenderOptions = {
   readonly showAnchors: boolean;
   /** The curvature comb along the outline. Off by default: it is an instrument. */
   readonly showCurvature: boolean;
+  /**
+   * The number of every on-curve point, as contour and place within it.
+   *
+   * Off by default, and an instrument like the comb. It answers one question:
+   * whether this master pairs its points with another master's the way the
+   * drawing says it should. Interpolation runs down these lists, so "the third
+   * point of the second contour" is what is averaged with the same thing in the
+   * other master, and until they can be read there is no seeing which two have
+   * fallen out of step.
+   */
+  readonly showPointNumbers: boolean;
 };
 
 export const DEFAULT_OPTIONS: RenderOptions = {
@@ -128,6 +139,7 @@ export const DEFAULT_OPTIONS: RenderOptions = {
   showHandleIntersection: false,
   showAnchors: true,
   showCurvature: false,
+  showPointNumbers: false,
   margins: true,
   autoHideHandles: false,
 };

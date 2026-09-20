@@ -79,6 +79,8 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
     drawNodes(ctx, s);
+    // Over the points they name, and only when asked for.
+    drawPointNumbers(ctx, s);
     drawAnchors(ctx, s);
     drawPenPreview(ctx, s);
     drawShapePreview(ctx, s);
@@ -727,6 +729,48 @@ export function drawNodes(ctx: Canvas2D, s: Scene): void {
     }
   }
 }
+
+/**
+ * Which point is which, for comparing one master with another.
+ *
+ * `2.3` is the third point of the second contour, counted from one as a person
+ * counts, and the first point of each contour says its number in the accent so
+ * that where a contour begins can be seen at a glance — which is the other half
+ * of the same question, since interpolation begins there.
+ *
+ * Drawn above and to the right of the point, away from the shapes themselves,
+ * with a halo under it so it stays legible over an outline.
+ */
+export function drawPointNumbers(ctx: Canvas2D, s: Scene): void {
+  if (!s.options.showPointNumbers) return;
+
+  ctx.save();
+  ctx.font = `${String(NUMBER_SIZE)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.lineJoin = "round";
+
+  for (const [ci, c] of s.glyph.contours.entries()) {
+    for (const [ni, n] of c.nodes.entries()) {
+      const p = toScreen(s.view, n.pt);
+      const said = `${String(ci + 1)}.${String(ni + 1)}`;
+      const x = p.x + s.metrics.nodeRadius + 3;
+      const y = p.y - s.metrics.nodeRadius - 2;
+
+      ctx.strokeStyle = s.palette.halo;
+      ctx.lineWidth = 3;
+      ctx.strokeText(said, x, y);
+      // The first point of a contour is where interpolation starts pairing, so
+      // it is the one worth picking out of the row of numbers.
+      ctx.fillStyle = ni === 0 ? s.palette.nodeSelected : s.palette.node;
+      ctx.fillText(said, x, y);
+    }
+  }
+  ctx.restore();
+}
+
+/** Small enough to sit between points, large enough to read at any zoom. */
+const NUMBER_SIZE = 10;
 
 function traceNodeShape(ctx: Canvas2D, n: Node, p: Vec2, r: number, angle: number): void {
   ctx.beginPath();
