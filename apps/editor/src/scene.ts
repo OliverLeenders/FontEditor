@@ -271,6 +271,9 @@ export function sceneFor(
       showCurvature: shows.showCurvature,
       autoHideHandles: handlesAutoHidden(state, pane),
       showAnchors: shows.showAnchors,
+      // Not while space is held: previewing means the shape by itself, and a
+      // number beside every point is the opposite of that.
+      showPointNumbers: !state.previewing && shows.showPointNumbers,
     },
   });
 }

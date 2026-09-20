@@ -185,6 +185,61 @@ describe("context menu", () => {
     };
   }
 
+  /**
+   * The two things two masters have to agree on that are not the shape: which
+   * point a contour begins at, and which contour comes first.
+   */
+  it("begins the contour at the point the menu was opened on", () => {
+    const glyph = store.editor.document.glyphs[store.editor.currentGlyph]!;
+    const c = contourById(glyph, contourId)!;
+    const third = c.nodes[2]!.id;
+
+    const items = labels(store, { kind: "node", contourId, nodeId: third, point: { x: 0, y: 0 } });
+    expect(items).toContain("Start the contour here");
+
+    run(
+      store,
+      { kind: "node", contourId, nodeId: third, point: { x: 0, y: 0 } },
+      "Start the contour here",
+    );
+
+    const after = contourById(store.editor.document.glyphs[store.editor.currentGlyph]!, contourId)!;
+    expect(after.nodes[0]!.id).toBe(third);
+  });
+
+  it("offers it disabled on the point that is first already", () => {
+    const items = itemsFor(store, {
+      x: 0,
+      y: 0,
+      target: { kind: "node", contourId, nodeId } as never,
+      point: { x: 0, y: 0 },
+    });
+    const start = items.find((i) => i.kind === "item" && i.label === "Start the contour here");
+    expect(start !== undefined && start.kind === "item" && start.disabled).toBe(true);
+  });
+
+  it("moves a contour along the glyph's list, and says where it sits", () => {
+    // The starter font's first glyph may have one contour, which has no order
+    // to argue about; the o of the starter font has two.
+    const named = store.editor.document.glyphOrder.find(
+      (name) => (store.editor.document.glyphs[name]?.contours.length ?? 0) > 1,
+    );
+    if (named === undefined) return;
+    store.setCurrentGlyph(named);
+
+    const outer = store.editor.document.glyphs[named]!.contours[1]!.id;
+    const target = {
+      kind: "node",
+      contourId: outer,
+      nodeId: store.editor.document.glyphs[named]!.contours[1]!.nodes[0]!.id,
+      point: { x: 0, y: 0 },
+    };
+    expect(labels(store, target)).toContain("Bring forward (2 of 2)");
+
+    run(store, target, "Bring forward (2 of 2)");
+    expect(store.editor.document.glyphs[named]!.contours[0]!.id).toBe(outer);
+  });
+
   it("offers a point at an extreme only where the curve turns with nothing on it", () => {
     // The starter font's own curves turn at their own points, so there is
     // nothing to add and the item is not there to be tried.

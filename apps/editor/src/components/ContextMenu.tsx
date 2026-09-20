@@ -1,8 +1,18 @@
-import { NO_METRIC_KEYS, contourById, randomIds, segmentAt } from "@typewright/font-model";
 import {
+  type ContourId,
+  NO_METRIC_KEYS,
+  contourById,
+  randomIds,
+  segmentAt,
+} from "@typewright/font-model";
+import {
+  type EditorState,
   addGuideAt,
   addPointsAtTurns,
+  canStartContourAt,
+  contourPlace,
   guideById,
+  moveContour,
   moveGuideToScope,
   pickGuide,
   removeGuideAt,
@@ -30,6 +40,7 @@ import {
   reverseContourAt,
   segmentHasMissingHandle,
   segmentParameterAt,
+  startContourAt,
   turnsMissing,
   roundGlyphAt,
   roundSelection,
@@ -61,6 +72,9 @@ import {
   FrameIcon,
   GuideAcrossIcon,
   GuideUpIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  CircleDotIcon,
   SelectAllIcon,
   SplineIcon,
   TrashIcon,
@@ -277,6 +291,19 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
           ),
       },
       { kind: "separator" },
+      // Where a closed contour begins is where interpolation begins pairing its
+      // points with another master's, so on a font with two masters this is a
+      // repair rather than a preference. Offered only where it would move
+      // something: an open contour has no start to choose, and the first point
+      // is already the first.
+      {
+        kind: "item",
+        label: "Start the contour here",
+        icon: CircleDotIcon,
+        disabled: !canStartContourAt(editor, contourId, nodeId),
+        run: () => store.applyTool(startContourAt(editor, contourId, nodeId)),
+      },
+      ...orderItems(store, editor, contourId),
       {
         kind: "item",
         label: "Reverse contour",
@@ -459,6 +486,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       icon: SelectAllIcon,
       run: () => store.applyTool(selectContour(editor, segment.contourId)),
     },
+    ...orderItems(store, editor, segment.contourId),
     { kind: "separator" },
   );
 
@@ -548,6 +576,44 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     },
   );
   return items;
+}
+
+/**
+ * Moving a contour up or down the glyph's list.
+ *
+ * The order is nothing at all until a font has two masters, when it is the
+ * order the contours are paired in: the second contour here is interpolated
+ * with the second contour there, so a bowl drawn before its stem in one master
+ * and after it in the other makes a mess of every weight between. Where a
+ * contour sits is said in the label, since the numbers on the canvas are the
+ * only other way to know and they are off by default.
+ *
+ * Nothing at all for a glyph with one contour, which has no order to argue
+ * about.
+ */
+function orderItems(store: EditorStore, editor: EditorState, contourId: ContourId): Item[] {
+  const place = contourPlace(editor, contourId);
+  if (place === null || place.of < 2) return [];
+
+  const said = `${String(place.at + 1)} of ${String(place.of)}`;
+  return [
+    { kind: "separator" },
+    {
+      kind: "item",
+      label: `Bring forward (${said})`,
+      icon: ChevronUpIcon,
+      disabled: place.at === 0,
+      run: () => store.applyTool(moveContour(editor, contourId, -1)),
+    },
+    {
+      kind: "item",
+      label: `Send back (${said})`,
+      icon: ChevronDownIcon,
+      disabled: place.at === place.of - 1,
+      run: () => store.applyTool(moveContour(editor, contourId, 1)),
+    },
+    { kind: "separator" },
+  ];
 }
 
 /**

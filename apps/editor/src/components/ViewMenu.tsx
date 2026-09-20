@@ -33,6 +33,7 @@ export function ViewMenu(): React.JSX.Element {
   const neighbours = useStoreValue((s) => viewOf(s, pane).showNeighbours);
   const anchors = useStoreValue((s) => viewOf(s, pane).showAnchors);
   const curvature = useStoreValue((s) => viewOf(s, pane).showCurvature);
+  const numbers = useStoreValue((s) => viewOf(s, pane).showPointNumbers);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -114,6 +115,12 @@ export function ViewMenu(): React.JSX.Element {
             hint="How tightly the outline turns · a step at a join is a break"
             on={curvature}
             onChange={() => store.toggleCurvature(pane)}
+          />
+          <Switch
+            label="Point numbers"
+            hint="Which point is which · what a master is read against another with"
+            on={numbers}
+            onChange={() => store.togglePointNumbers(pane)}
           />
 
           <div className={styles.footer}>

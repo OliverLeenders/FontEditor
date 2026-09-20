@@ -7,6 +7,7 @@ import {
   orderedInstances,
   orderedMasters,
 } from "@typewright/font-model";
+import { selectContour } from "@typewright/tools";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -28,7 +29,12 @@ import { BlendIcon, CopyPlusIcon, LayersIcon, TrashIcon } from "./icons.js";
  * between. So the way to compare two masters is here, next to the way to make
  * one.
  */
-export function Masters(): React.JSX.Element {
+export function Masters({
+  onOpen,
+}: {
+  /** Opens a glyph for drawing, where the workspace around this can do that. */
+  readonly onOpen?: (name: string) => void;
+} = {}): React.JSX.Element {
   const store = useEditorStore();
   const project = useStoreValue((s) => s.project);
   const reading = useStoreValue((s) => s.ownership === "reading");
@@ -202,7 +208,9 @@ export function Masters(): React.JSX.Element {
         </p>
       ) : null}
 
-      {checked === null ? null : <Report name={checked.name} found={checked.found} store={store} />}
+      {checked === null ? null : (
+        <Report name={checked.name} found={checked.found} store={store} onOpen={onOpen} />
+      )}
 
       {failed !== null ? (
         <p className={styles.error} role="alert">
@@ -429,19 +437,32 @@ function Preview(): React.JSX.Element {
 /**
  * What cannot be worked out between here and there.
  *
- * Each line names a glyph and says what differs, and opens that glyph — which
- * is the only useful thing to do about it, since every one of these is fixed by
- * drawing rather than by pressing anything.
+ * Each line names a glyph, says what differs, and takes you to it: the glyph is
+ * opened and the contour the line is about is selected, so the disagreement is
+ * under the eye rather than described to it. Every one of these is fixed by
+ * drawing — or, for the two that are about order rather than shape, from the
+ * menu on the contour now selected.
  */
 function Report({
   name,
   found,
   store,
+  onOpen,
 }: {
   name: string;
   found: readonly Incompatibility[];
   store: ReturnType<typeof useEditorStore>;
+  onOpen?: ((name: string) => void) | undefined;
 }): React.JSX.Element {
+  /** Open the glyph, and pick out the contour the line is about. */
+  const goTo = (one: Incompatibility): void => {
+    store.setCurrentGlyph(one.glyph);
+    if (one.contour !== null) {
+      const contour = store.editor.document.glyphs[one.glyph]?.contours[one.contour];
+      if (contour !== undefined) store.applyTool(selectContour(store.editor, contour.id));
+    }
+    onOpen?.(one.glyph);
+  };
   if (found.length === 0) {
     return (
       <p className={styles.said}>Every glyph can be worked out between this master and {name}.</p>
@@ -459,8 +480,12 @@ function Report({
             <button
               type="button"
               className={styles.foundGlyph}
-              title={`Open ${one.glyph}`}
-              onClick={() => store.setCurrentGlyph(one.glyph)}
+              title={
+                one.contour === null
+                  ? `Open ${one.glyph}`
+                  : `Open ${one.glyph} and select contour ${String(one.contour + 1)}`
+              }
+              onClick={() => goTo(one)}
             >
               {one.glyph}
             </button>

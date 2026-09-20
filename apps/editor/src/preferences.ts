@@ -121,6 +121,15 @@ export type ViewSettings = {
    * join and never while judging a shape.
    */
   readonly showCurvature: boolean;
+  /**
+   * Number every on-curve point, as contour and place within it.
+   *
+   * Off by default, and an instrument like the comb. Which point is paired with
+   * which is what interpolation runs on, so these are what a master is read
+   * against another master with — and they are numbers over a drawing, which is
+   * the last thing wanted while drawing it.
+   */
+  readonly showPointNumbers: boolean;
 };
 
 export const DEFAULT_VIEW: ViewSettings = {
@@ -130,6 +139,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   showNeighbours: true,
   showAnchors: true,
   showCurvature: false,
+  showPointNumbers: false,
 };
 
 /** One for each pane, in pane order, whether or not the window is split. */
@@ -370,6 +380,7 @@ function view(raw: Record<string, unknown>, fallback: ViewSettings): ViewSetting
     showNeighbours: boolean(raw["showNeighbours"], fallback.showNeighbours),
     showAnchors: boolean(raw["showAnchors"], fallback.showAnchors),
     showCurvature: boolean(raw["showCurvature"], fallback.showCurvature),
+    showPointNumbers: boolean(raw["showPointNumbers"], fallback.showPointNumbers),
   };
 }
 

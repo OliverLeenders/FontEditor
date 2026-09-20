@@ -672,7 +672,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           <div className={styles.group}>
             <FontInfoPanel />
             <Designspace />
-            <Masters />
+            <Masters onOpen={onOpen} />
             <Tracing />
             <Sheet />
             <Preflight />
