@@ -30,7 +30,9 @@ import { SPACING_SPECIMENS, specimenNamed } from "../specimens.js";
 import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
 import { MAX_SPACING_SIZE, MIN_SPACING_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
+import { instanceDocument } from "../instance.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { LocationBar } from "./LocationBar.js";
 import { TextSettingsControls } from "./TextSettingsControls.js";
 import styles from "./SpacingView.module.css";
 
@@ -87,7 +89,13 @@ export function SpacingView({
   onOpenGlyph: (name: string) => void;
 }): React.JSX.Element {
   const store = useEditorStore();
-  const document = useStoreValue((s) => s.session.editor.document);
+  // What is set: the font at the place being previewed, or the master being
+  // edited when none is. Spacing is judged between the weights as much as in
+  // one of them — a sidebearing that drifts across the designspace shows in a
+  // line and nowhere else.
+  const instance = useStoreValue((s) => instanceDocument(s));
+  const master = useStoreValue((s) => s.session.editor.document);
+  const document = instance ?? master;
   const text = useStoreValue((s) => s.spacingText);
   const size = useStoreValue((s) => s.spacingSize);
   const mode = useStoreValue((s) => s.spacingMode);
@@ -274,8 +282,18 @@ export function SpacingView({
     return glyphAtX(run, (point.x - view.tx) / view.scale)?.index ?? null;
   };
 
+  /**
+   * Whether what is on screen is a master.
+   *
+   * An instance is worked out from the masters and is not a thing to edit: a
+   * nudge here would change the master being edited while the line showed
+   * something else moving by some fraction of it. The line is for judging at
+   * that point, and the judgement is carried out in a master.
+   */
+  const editable = instance === null;
+
   const nudge = (side: "left" | "right", delta: number): void => {
-    if (selectedName === null) return;
+    if (selectedName === null || !editable) return;
     // A side taken from a key is not nudged, and says so rather than seeming to
     // ignore the key press.
     if ((document.glyphs[selectedName]?.metricKeys[side] ?? "") !== "") {
@@ -296,12 +314,12 @@ export function SpacingView({
    * the line of text that showed why the spacing was wrong in the first place.
    */
   const commitMeasurement = (which: keyof MetricKeys, text: string): void => {
-    if (selectedName === null) return;
+    if (selectedName === null || !editable) return;
     store.applyTool(spaceFromText(store.editor, selectedName, which, text));
   };
 
   const unlink = (which: keyof MetricKeys): void => {
-    if (selectedName === null) return;
+    if (selectedName === null || !editable) return;
     store.applyTool(unlinkMetricKey(store.editor, selectedName, which));
   };
 
@@ -315,7 +333,7 @@ export function SpacingView({
       : kerningFor(store.editor, previousName, selectedName);
 
   const kern = (delta: number): void => {
-    if (previousName === null || selectedName === null) return;
+    if (previousName === null || selectedName === null || !editable) return;
     store.applyTool(nudgeKern(store.editor, previousName, selectedName, delta));
   };
 
@@ -370,6 +388,7 @@ export function SpacingView({
           document={document}
           onChange={(next) => store.setSpacingTextSettings(next)}
         />
+        <LocationBar />
 
         {/* Two exclusive modes rather than a modifier key: adjusting a letter's
             own space and adjusting the gap before it are different jobs, and
@@ -592,6 +611,11 @@ export function SpacingView({
               <span className={styles.hint} role="status">
                 {refused === "left" ? "Left" : "Right"} is taken from {keys[refused]}: drop the key
                 to nudge it
+              </span>
+            )}
+            {editable ? null : (
+              <span className={styles.hint} role="status">
+                An instance between the masters: spacing is edited in a master
               </span>
             )}
           </>

@@ -8,7 +8,9 @@ import { PROOF_SPECIMENS, specimenNamed } from "../specimens.js";
 import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
+import { instanceDocument } from "../instance.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { LocationBar } from "./LocationBar.js";
 import { TextSettingsControls } from "./TextSettingsControls.js";
 import styles from "./ProofView.module.css";
 
@@ -31,7 +33,11 @@ const MARGIN = 56;
  */
 export function ProofView(): React.JSX.Element {
   const store = useEditorStore();
-  const document = useStoreValue((s) => s.session.editor.document);
+  // The font at the place being previewed, when one is, and the master being
+  // edited otherwise. A paragraph is where a weight nobody drew shows what it
+  // is worth: a stem that thickens faster than its neighbours is plain in a
+  // line of them and invisible in one letter.
+  const document = useStoreValue((s) => instanceDocument(s) ?? s.session.editor.document);
   const text = useStoreValue((s) => s.proofText);
   const size = useStoreValue((s) => s.proofSize);
   const leading = useStoreValue((s) => s.proofLeading);
@@ -215,6 +221,7 @@ export function ProofView(): React.JSX.Element {
   return (
     <div className={styles.proof}>
       <div className={styles.bar}>
+        <LocationBar />
         <label className={styles.sizeLabel}>
           Size
           <input

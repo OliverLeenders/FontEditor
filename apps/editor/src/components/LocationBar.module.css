@@ -1,0 +1,82 @@
+/* The place in the designspace, in the bar of a workspace that sets text.
+   Small enough to sit among the other controls, since it is off most of the
+   time and is one of several things the bar carries. */
+.location {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.on {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+.on:hover {
+  color: var(--ink);
+}
+.on input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* The checkbox itself is hidden and this mark stands for it, as the preview
+   switch in Masters does: a box beside an icon is two things saying one. */
+.mark {
+  display: grid;
+  place-items: center;
+  width: 1.3rem;
+  height: 1.3rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--ink-3);
+}
+.mark svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.on input:checked + .mark {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.on input:focus-visible + .mark {
+  border-color: var(--accent);
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.axis {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--ink-2);
+  font-size: 0.72rem;
+}
+
+.axisName {
+  white-space: nowrap;
+}
+
+.slider {
+  width: 7rem;
+  accent-color: var(--accent);
+}
+
+.axisValue {
+  min-width: 2.4rem;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
