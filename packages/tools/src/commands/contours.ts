@@ -10,12 +10,15 @@ import {
   type Contour,
   type ContourId,
   type IdFactory,
+  type NodeId,
   balanceSegment,
   contourById,
+  contourIndex,
   insertNodeOnSegment,
   insertNodesOnSegment,
   makeSegmentCurve,
   makeSegmentLine,
+  moveContourTo,
   reverseContour,
   segmentAt,
   segmentCount,
@@ -23,6 +26,7 @@ import {
   segmentLambdas,
   segmentTunniStatus,
   setSegmentLambdas,
+  setStartNode,
   updateContour,
 } from "@typewright/font-model";
 import { type SegmentRef } from "@typewright/view";
@@ -53,6 +57,77 @@ export function reverseSelectedContour(state: EditorState): ToolResult {
   const contourId = state.selection[0]?.contourId ?? state.focusedSegment?.contourId ?? null;
   if (contourId === null) return result(state);
   return reverseContourAt(state, contourId);
+}
+
+// ---------------------------------------------------------------------------
+// what two masters have to agree on
+//
+// Interpolation is arithmetic on corresponding points: the first node of the
+// second contour here is averaged with the first node of the second contour
+// there. Which node is first, and which contour is second, are therefore not
+// drawing decisions once a font has two masters — and neither of them could be
+// changed here until now. Both are repairs rather than edits: the shape does
+// not move, only the order it is written in.
+// ---------------------------------------------------------------------------
+
+/**
+ * Begin the contour at the selected point.
+ *
+ * Named rather than taken from the selection, because it is reached from the
+ * menu on a point and the menu says which point it is about.
+ */
+export function startContourAt(
+  state: EditorState,
+  contourId: ContourId,
+  nodeId: NodeId,
+): ToolResult {
+  const document = editCurrentGlyph(state, (g) =>
+    updateContour(g, contourId, (c) => setStartNode(c, nodeId)),
+  );
+  return done(state, document === null ? null : { ...state, document }, "Start the contour here");
+}
+
+/** Whether beginning the contour here would change anything, for the menu. */
+export function canStartContourAt(
+  state: EditorState,
+  contourId: ContourId,
+  nodeId: NodeId,
+): boolean {
+  const glyph = currentGlyph(state);
+  const c = glyph === null ? null : contourById(glyph, contourId);
+  return c !== null && setStartNode(c, nodeId) !== null;
+}
+
+/**
+ * Move a contour one place forward or back in the glyph's list.
+ *
+ * One place at a time, from the menu on the contour: a glyph has two or three
+ * contours and nudging one of them past another is the whole of what anybody
+ * needs. Where it lands is visible in the point numbers, which is why they are
+ * worth turning on while doing this.
+ */
+export function moveContour(state: EditorState, contourId: ContourId, by: 1 | -1): ToolResult {
+  const glyph = currentGlyph(state);
+  const at = glyph === null ? -1 : contourIndex(glyph, contourId);
+  if (glyph === null || at < 0) return result(state);
+
+  const document = editCurrentGlyph(state, (g) => moveContourTo(g, contourId, at + by));
+  return done(
+    state,
+    document === null ? null : { ...state, document },
+    by > 0 ? "Send the contour back" : "Bring the contour forward",
+  );
+}
+
+/** Where a contour sits, and how many there are, for the menu to say so. */
+export function contourPlace(
+  state: EditorState,
+  contourId: ContourId,
+): { at: number; of: number } | null {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return null;
+  const at = contourIndex(glyph, contourId);
+  return at < 0 ? null : { at, of: glyph.contours.length };
 }
 
 export function insertPointOnSegment(

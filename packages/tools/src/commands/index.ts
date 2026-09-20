@@ -73,6 +73,10 @@ export {
 export type { Turn } from "./contours.js";
 export {
   addPointsAtTurns,
+  canStartContourAt,
+  contourPlace,
+  moveContour,
+  startContourAt,
   balanceSegmentAt,
   convertSegment,
   focusedSegmentScales,

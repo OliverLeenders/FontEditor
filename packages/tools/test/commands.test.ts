@@ -76,7 +76,11 @@ import {
   renameKernGroupTo,
   takeGlyphFromKernGroup,
   addPointsAtTurns,
+  canStartContourAt,
   clearSelection,
+  contourPlace,
+  moveContour,
+  startContourAt,
   convertSegment,
   deleteSelectedPoints,
   turnsMissing,
@@ -633,6 +637,59 @@ describe("nudgeSidebearing", () => {
  * text — which is the whole reason these exist beside the inspector's, and the
  * first thing worth asserting.
  */
+/**
+ * The two things two masters have to agree on that are not the shape.
+ *
+ * Which point a contour begins at, and which contour comes first, are what
+ * interpolation pairs by. Neither changes the drawing, and until now neither
+ * could be changed at all.
+ */
+describe("the order a glyph is written in", () => {
+  it("begins the contour at the point asked for", () => {
+    const { s, c } = start();
+    const third = c.nodes[2]!.id;
+    expect(canStartContourAt(s, c.id, third)).toBe(true);
+
+    const next = startContourAt(s, c.id, third).state;
+    expect(only(next).nodes[0]!.id).toBe(third);
+    // The same ring, walked from somewhere else.
+    expect(only(next).nodes).toHaveLength(c.nodes.length);
+  });
+
+  it("offers nothing where the point is first already", () => {
+    const { s, c } = start();
+    expect(canStartContourAt(s, c.id, c.nodes[0]!.id)).toBe(false);
+    expect(startContourAt(s, c.id, c.nodes[0]!.id).state).toBe(s);
+  });
+
+  it("moves a contour one place, and says where it sits", () => {
+    const first = ring();
+    const second = triangle();
+    const document = fontDocument([
+      addContour(addContour(glyph("o", { advance: 600 }), first), second),
+    ]);
+    const s = editorState({ document, view: VIEW });
+
+    expect(contourPlace(s, second.id)).toEqual({ at: 1, of: 2 });
+
+    const moved = moveContour(s, second.id, -1).state;
+    const contours = firstGlyph(moved.document).contours;
+    expect(contours.map((each) => each.id)).toEqual([second.id, first.id]);
+    expect(contourPlace(moved, second.id)).toEqual({ at: 0, of: 2 });
+  });
+
+  it("declines a move off either end", () => {
+    const { s, c } = start();
+    expect(moveContour(s, c.id, -1).state).toBe(s);
+    expect(moveContour(s, c.id, 1).state).toBe(s);
+  });
+
+  it("knows nothing of a contour that is not there", () => {
+    const { s } = start();
+    expect(contourPlace(s, "nobody")).toBeNull();
+  });
+});
+
 describe("setSidebearing and setGlyphAdvance", () => {
   const named = () => {
     const ids = counterIds();
