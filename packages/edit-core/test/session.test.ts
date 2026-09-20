@@ -22,6 +22,7 @@ import {
   editorState,
   keyDown,
   keyInput,
+  nudgeSidebearing,
   pointerDown,
   pointerInput,
   pointerMove,
@@ -153,6 +154,18 @@ describe("spacing keys", () => {
 
     const up = apply(moved, pointerUp(moved.editor));
     expect(sidesOf(up, "m")?.left).toBe(sidesOf(up, "n")?.left);
+  });
+
+  it("leaves the keyed glyph's own side to the key", () => {
+    // Refused rather than moved and put back: a number that springs back says
+    // nothing, where a field that is grey says where the number comes from.
+    const s = keyed();
+    expect(apply(s, setSidebearing(s.editor, "m", "left", 300)).editor.document).toBe(
+      s.editor.document,
+    );
+    expect(apply(s, nudgeSidebearing(s.editor, "m", "left", 10)).editor.document).toBe(
+      s.editor.document,
+    );
   });
 });
 

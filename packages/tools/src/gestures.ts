@@ -61,6 +61,7 @@ import {
 import { type ToolResult, begin, result } from "./effects.js";
 import type { PointerInput } from "./input.js";
 import { movedGuideIn } from "./commands/guides.js";
+import { keyHolds } from "./commands/spacing.js";
 import { type EditorState, type Gesture, currentGlyph, glyphIn } from "./state.js";
 import { transformedDocument } from "./transform.js";
 
@@ -362,6 +363,12 @@ export function startMarginDrag(
 ): ToolResult {
   const glyph = currentGlyph(state);
   if (glyph === null) return result(state);
+  // A measurement a key speaks for is put back by the settle at the end of the
+  // step, so the drag would be a drag that springs back. The line simply does
+  // not take hold, the way the field for it is grey.
+  if (keyHolds(state.document, state.currentGlyph, side === "origin" ? "left" : "advance")) {
+    return result(state);
+  }
 
   return result(
     {

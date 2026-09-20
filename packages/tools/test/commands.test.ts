@@ -34,6 +34,7 @@ import {
   segmentCount,
   sidebearings,
   component,
+  updateGlyph,
 } from "@typewright/font-model";
 import { type ViewTransform, boxHandlePoint } from "@typewright/view";
 import { describe, expect, it } from "vitest";
@@ -703,6 +704,34 @@ describe("setSidebearing and setGlyphAdvance", () => {
   it("never lets an advance go negative", () => {
     const state = named();
     expect(setGlyphAdvance(state, "space", -50).state.document.glyphs["space"]!.advance).toBe(0);
+  });
+
+  it("leaves a measurement a key speaks for to the key", () => {
+    // The step that follows would settle the keys and put the number straight
+    // back, so the edit is refused where it is asked for rather than undone
+    // behind the back of whoever asked.
+    const state = named();
+    const keyed = (keys: Partial<Record<"left" | "right" | "width", string>>): EditorState => ({
+      ...state,
+      document: updateGlyph(state.document, "n", (g) => ({
+        ...g,
+        metricKeys: { left: "", right: "", width: "", ...keys },
+      }))!,
+    });
+
+    const left = keyed({ left: "o" });
+    expect(setSidebearing(left, "n", "left", 40).state).toBe(left);
+    // The other side is still its own.
+    expect(setSidebearing(left, "n", "right", 40).state).not.toBe(left);
+
+    // A width key speaks for the right side too, since the right side is the
+    // advance less where the drawing ends.
+    const width = keyed({ width: "o" });
+    expect(setSidebearing(width, "n", "right", 40).state).toBe(width);
+    expect(setGlyphAdvance(width, "n", 800).state).toBe(width);
+    // And a left side can still be set inside a width somebody else fixes,
+    // which is what centring a glyph does.
+    expect(setSidebearing(width, "n", "left", 40).state).not.toBe(width);
   });
 
   it("is one undo step rather than a coalescing one: a typed number is a decision", () => {

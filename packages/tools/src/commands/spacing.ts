@@ -20,6 +20,33 @@ import { done } from "./shared.js";
  */
 
 /**
+ * Whether a key owns one of a glyph's three measurements, so an edit to it would
+ * be an edit that does not last.
+ *
+ * Every committed step settles the keys, so a measurement a key speaks for is
+ * put straight back. Refusing is what makes that visible: a field that is grey
+ * and a drag that does not start say "this comes from somewhere else", where a
+ * number that moved and sprang back says nothing at all.
+ *
+ * Which key speaks for what is the arithmetic of the three: the right
+ * sidebearing is the advance less where the drawing ends, so a width key holds
+ * the right side as surely as a right key does, and an advance keyed by either
+ * cannot be dragged. A left side is its own: moving a glyph inside an advance
+ * the width key fixes is a real thing to want, and centring does exactly that.
+ */
+export function keyHolds(
+  document: FontDocument,
+  glyphName: GlyphName,
+  what: "left" | "right" | "advance",
+): boolean {
+  const keys = document.glyphs[glyphName]?.metricKeys;
+  if (keys === undefined) return false;
+  if (what === "left") return keys.left !== "";
+  if (what === "right") return keys.right !== "" || keys.width !== "";
+  return keys.width !== "" || keys.right !== "";
+}
+
+/**
  * Move one sidebearing of a named glyph by a step.
  *
  * Named rather than current, because the spacing view edits whichever letter is
@@ -66,6 +93,11 @@ export function nudgeSidebearing(
  *
  * Not coalescing, unlike the nudge: a typed number is a decision, and one undo
  * step should put it back.
+ *
+ * Refused where a key speaks for that side — see `keyHolds`. The field showing
+ * it is grey for the same reason, and the spacing view's own field takes the key
+ * off first when a plain number is typed into it, which is what typing a number
+ * over a key means there.
  */
 export function setSidebearing(
   state: EditorState,
@@ -74,6 +106,7 @@ export function setSidebearing(
   value: number,
 ): ToolResult {
   if (!Number.isFinite(value)) return result(state);
+  if (keyHolds(state.document, glyphName, side)) return result(state);
   const wanted = Math.round(value);
 
   const document = updateGlyph(state.document, glyphName, (g) => {
@@ -102,6 +135,7 @@ export function setGlyphAdvance(
   value: number,
 ): ToolResult {
   if (!Number.isFinite(value)) return result(state);
+  if (keyHolds(state.document, glyphName, "advance")) return result(state);
   // Never negative: an advance is how far the pen moves on, and a font with a
   // letter that moves it backwards is not a font anybody meant to make.
   const wanted = Math.max(0, Math.round(value));

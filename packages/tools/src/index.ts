@@ -140,6 +140,7 @@ export {
   selectedNode,
   setSegmentTension,
   unroundedCount,
+  keyHolds,
   nudgeSidebearing,
   setGlyphAdvance,
   setKernValue,

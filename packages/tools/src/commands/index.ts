@@ -159,6 +159,7 @@ export {
 
 export {
   centreCurrentGlyph,
+  keyHolds,
   nudgeSidebearing,
   setGlyphAdvance,
   setMetricKey,

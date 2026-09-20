@@ -17,6 +17,7 @@ import {
   orderedGlyphs,
   segmentTunniPoint,
   sidebearings,
+  updateGlyph,
 } from "@typewright/font-model";
 import { type Selection, type ViewTransform, boxHandlePoint, boxPivot } from "@typewright/view";
 import { describe, expect, it } from "vitest";
@@ -646,6 +647,40 @@ describe("margin lines", () => {
     const { state } = start();
     const s = pointerDown(state, pointerInput(vec(0, 400)), { margins: false }).state;
     expect(s.gesture?.kind).toBe("marquee");
+  });
+
+  it("does not take hold where a key speaks for the measurement", () => {
+    // Every committed step settles the keys, so the drag would spring back. The
+    // line not taking hold is what the grey field says in the inspector.
+    const { state } = start();
+    const keyed: EditorState = {
+      ...state,
+      document: updateGlyph(state.document, "n", (g) => ({
+        ...g,
+        metricKeys: { left: "o", right: "", width: "" },
+      }))!,
+    };
+
+    expect(pointerDown(keyed, pointerInput(vec(0, 400))).state.gesture?.kind).not.toBe(
+      "dragMargin",
+    );
+    // The advance is that glyph's own, so that line still drags.
+    expect(pointerDown(keyed, pointerInput(vec(640, 300))).state.gesture?.kind).toBe("dragMargin");
+  });
+
+  it("holds the advance line where a width key speaks for it", () => {
+    const { state } = start();
+    const keyed: EditorState = {
+      ...state,
+      document: updateGlyph(state.document, "n", (g) => ({
+        ...g,
+        metricKeys: { left: "", right: "", width: "o" },
+      }))!,
+    };
+
+    expect(pointerDown(keyed, pointerInput(vec(640, 300))).state.gesture?.kind).not.toBe(
+      "dragMargin",
+    );
   });
 });
 

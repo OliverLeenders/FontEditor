@@ -112,7 +112,10 @@ whole advance, each the name of another glyph. Set one and the number beside it 
 and shows what the rule works out to, following the chain — `ü` from `u` from `n` — and
 following it again the moment `n` moves: every edit that finishes leaves the glyphs that
 follow it re-spaced, inside the same step, so one undo takes back the change and
-everything that came of it. The rule is kept in the source and resolved where the font is compiled, so what comes out is an
+everything that came of it. A side or a width a rule speaks for is not yours to set — the
+field is grey, and the line on the canvas does not take hold — and typing a plain number
+into the spacing line's field is how you take the rule off and keep the number. The rule
+is kept in the source and resolved where the font is compiled, so what comes out is an
 ordinary font. A rule that cannot be followed leaves the glyph as drawn and is reported,
 in the export warnings and in the preflight check.
 
