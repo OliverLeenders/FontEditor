@@ -79,6 +79,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
   },
   {
     title: "Select",
+    note: "With the select tool in hand.",
     items: [
       { keys: "Arrows", what: "Nudge the selection" },
       { keys: "Shift-arrows", what: "Nudge it further" },
@@ -96,6 +97,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
   },
   {
     title: "Pen",
+    note: "With the pen in hand.",
     items: [
       { keys: "click", what: "A corner point" },
       { keys: "drag", what: "A smooth point, with its handles" },
