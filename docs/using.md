@@ -79,6 +79,13 @@ segment on one side and a curve on the other can be made **tangent**, from the i
 or the right-click menu: the curve then leaves along the line, and stays that way when
 either end of the line moves.
 
+**Locking a handle to an axis** snaps it to north, south, east or west — whichever it is
+nearer — and holds it there while it is dragged. A smooth node's two handles are one
+straight line, so they go to the same axis and not to one each. On a tangent node the
+curved handle runs along the straight side, which is a direction the node does not get to
+choose: locking it makes the node a corner, unless the straight side is already on an axis,
+in which case nothing is given up and the node stays tangent.
+
 The glyphs either side are drawn from the strip text, dimmed, for judging spacing —
 **double-click one to open it**. Everything about the glyph being edited comes first:
 anything pickable, and the whole box round its drawing, so a shape that overshoots well

@@ -6,6 +6,7 @@ import {
   type Vec2,
   balance,
   addScaled,
+  coincident,
   curvature,
   harmonisedJoin,
   bounds,
@@ -426,6 +427,14 @@ export function setNodeType(c: Contour, id: NodeId, type: Node["type"]): Contour
  * this one — see `setHandle` — and the switch would be a switch that changes
  * nothing. Freeing the handle is what unlocking it means, and a node whose
  * handles are free to point in different directions is a corner.
+ *
+ * A tangent node's curved handle runs along the straight side, which is a
+ * direction the node does not get to choose — so locking that handle to an axis
+ * makes the node a corner, the way unlocking one side of a smooth node does.
+ * Otherwise the handle would be snapped and then swung straight back by the
+ * tangent pass every edit ends with, and the lock would read as broken. Where
+ * the straight side already lies on an axis there is nothing to give up: the
+ * handle is on the axis, and the node stays tangent.
  */
 export function setHvLock(
   c: Contour,
@@ -440,11 +449,22 @@ export function setHvLock(
   const hvLock =
     which === "both" ? { in: locked, out: locked } : { ...base.hvLock, [which]: locked };
 
-  const next: Node = { ...base, hvLock };
+  let next: Node = { ...base, hvLock };
   if (!locked) {
     const other = which === "in" ? "out" : "in";
     const stillHeld = which !== "both" && base.type === "smooth" && hvLock[other];
     return settled(replaceNode(c, i, stillHeld ? { ...next, type: "corner" } : next));
+  }
+
+  // The tangent line is what the curved handle would have to leave to reach an
+  // axis. Asked to leave it, the node stops being a tangent node.
+  if (base.type === "tangent") {
+    const sides = tangentSides(c, i);
+    const handle = sides === null ? null : handleOf(base, sides.curved);
+    if (sides !== null && handle !== null && hvLock[sides.curved]) {
+      const snapped = snapToAxis(base.pt, handle);
+      if (!coincident(snapped, handle)) next = { ...next, type: "corner" };
+    }
   }
 
   const smooth = base.type === "smooth" && base.in !== null && base.out !== null;
@@ -460,7 +480,7 @@ export function setHvLock(
     return settled(replaceNode(c, i, enforceSmooth(swung, leading)));
   }
 
-  let snapped = next;
+  let snapped: Node = next;
   for (const side of ["in", "out"] as const) {
     if (!hvLock[side]) continue;
     const handle = side === "in" ? snapped.in : snapped.out;

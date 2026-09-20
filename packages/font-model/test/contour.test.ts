@@ -711,12 +711,92 @@ describe("locking one handle at a time", () => {
     expect(freed.nodes[0]!.type).toBe("smooth");
   });
 
+  it("puts each handle of a corner node on the axis it is nearer", () => {
+    // The plain case, and the one the other two are exceptions to.
+    const c = corner();
+    const locked = setHvLock(c, c.nodes[0]!.id, "both", true)!;
+    const n = locked.nodes[0]!;
+
+    // In was 90 left and 20 up, so it goes flat; out was 15 right and 80 up, so
+    // it goes upright. Each keeps the length it had.
+    expect(n.in!.y).toBeCloseTo(0, 9);
+    expect(n.in!.x).toBeLessThan(0);
+    expect(n.out!.x).toBeCloseTo(0, 9);
+    expect(n.out!.y).toBeGreaterThan(0);
+  });
+
+  it("sends both handles of a smooth node to one axis, which they agree on", () => {
+    // They are one straight line through the node, so "the axis each is nearer"
+    // is one question and not two — and the answer has to hold for both, or
+    // smooth would be a word the geometry contradicts.
+    const c = smooth();
+    const locked = setHvLock(c, c.nodes[0]!.id, "both", true)!;
+    const n = locked.nodes[0]!;
+
+    expect(n.type).toBe("smooth");
+    expect(n.in!.y).toBeCloseTo(0, 9);
+    expect(n.out!.y).toBeCloseTo(0, 9);
+    expect(n.in!.x).toBeLessThan(0);
+    expect(n.out!.x).toBeGreaterThan(0);
+  });
+
   it("leaves a corner node a corner, since it was never holding anything", () => {
     const c = corner();
     const both = setHvLock(c, c.nodes[0]!.id, "both", true)!;
     const freed = setHvLock(both, c.nodes[0]!.id, "in", false)!;
 
     expect(freed.nodes[0]!.type).toBe("corner");
+  });
+});
+
+describe("the axis lock on a tangent node", () => {
+  /** A stem leaning away from upright, so its tangent line is on no axis. */
+  const leaning = () =>
+    contour(
+      "t",
+      [
+        node("a", vec(60, 0)),
+        node("b", vec(100, 500), { type: "tangent", out: vec(112, 650) }),
+        node("c", vec(300, 700), { in: vec(200, 700) }),
+        node("d", vec(300, 0)),
+      ],
+      true,
+    );
+
+  it("makes the node a corner, rather than snapping a handle and swinging it back", () => {
+    // The curved handle of a tangent node runs along the straight side, and the
+    // pass every edit ends with puts it back there. Locking it to an axis is
+    // asking for a direction the node does not get to choose, so the node stops
+    // being a tangent node — the way freeing one side of a smooth node stops it
+    // being smooth.
+    const locked = setHvLock(leaning(), "b", "out", true)!;
+    const n = nodeById(locked, "b")!;
+
+    expect(n.type).toBe("corner");
+    expect(n.hvLock).toEqual({ in: false, out: true });
+    // Upright, which is the axis it was nearer, and still the length it was.
+    expect(n.out!.x).toBeCloseTo(100, 9);
+    expect(distance(vec(100, 500), n.out!)).toBeCloseTo(distance(vec(100, 500), vec(112, 650)), 9);
+  });
+
+  it("leaves it tangent where the straight side is already on an axis", () => {
+    // Nothing is given up, because the handle is already where the lock wants
+    // it: an upright stem, which is most of them.
+    const upright = contour(
+      "t",
+      [
+        node("a", vec(100, 0)),
+        node("b", vec(100, 500), { type: "tangent", out: vec(100, 620) }),
+        node("c", vec(300, 700), { in: vec(200, 700) }),
+        node("d", vec(300, 0)),
+      ],
+      true,
+    );
+    const locked = setHvLock(upright, "b", "out", true)!;
+    const n = nodeById(locked, "b")!;
+
+    expect(n.type).toBe("tangent");
+    expect(n.out).toEqual(vec(100, 620));
   });
 });
 
