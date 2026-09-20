@@ -8,6 +8,7 @@ import {
   contourById,
   glyph,
   glyphBounds,
+  moveContourTo,
   nodeCount,
   removeContour,
   setAdvance,
@@ -68,6 +69,55 @@ describe("updateContour", () => {
     const ring = ringContour();
     const g = addContour(glyph("o"), ring);
     expect(updateContour(g, ring.id, (c) => setNodePoint(c, "nope", vec(0, 0)))).toBeNull();
+  });
+});
+
+/**
+ * Where a contour sits in the glyph.
+ *
+ * Nothing at all until a font has two masters, when it is the order the
+ * contours are paired in: the second contour here is interpolated with the
+ * second contour there, and a bowl drawn before its stem in one master and
+ * after it in the other makes a mess of every weight between.
+ */
+describe("moveContourTo", () => {
+  const three = () =>
+    addContour(addContour(addContour(glyph("x"), ringContour()), openContour()), triangleContour());
+
+  it("moves a contour where it was asked for, keeping the rest in order", () => {
+    const g = three();
+    const ids = g.contours.map((c) => c.id);
+    const moved = moveContourTo(g, ids[2]!, 0)!;
+
+    expect(moved.contours.map((c) => c.id)).toEqual([ids[2], ids[0], ids[1]]);
+  });
+
+  it("holds the place inside the list rather than losing the contour off an end", () => {
+    const g = three();
+    const ids = g.contours.map((c) => c.id);
+
+    expect(moveContourTo(g, ids[0]!, 9)!.contours.map((c) => c.id)).toEqual([
+      ids[1],
+      ids[2],
+      ids[0],
+    ]);
+    expect(moveContourTo(g, ids[2]!, -3)!.contours.map((c) => c.id)).toEqual([
+      ids[2],
+      ids[0],
+      ids[1],
+    ]);
+  });
+
+  it("declines a move that changes nothing, and a contour that is not there", () => {
+    const g = three();
+    expect(moveContourTo(g, g.contours[1]!.id, 1)).toBeNull();
+    expect(moveContourTo(g, "nobody", 0)).toBeNull();
+  });
+
+  it("draws the same glyph, since the order is not the shape", () => {
+    const g = three();
+    const moved = moveContourTo(g, g.contours[0]!.id, 2)!;
+    expect(glyphBounds(moved)).toEqual(glyphBounds(g));
   });
 });
 

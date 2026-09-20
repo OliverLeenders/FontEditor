@@ -29,6 +29,7 @@ import {
   setHvLock,
   setNodePoint,
   setNodeType,
+  setStartNode,
   setSegmentCubic,
   setSegmentLambdas,
   setSegmentTunniPoint,
@@ -748,6 +749,52 @@ describe("locking one handle at a time", () => {
     const freed = setHvLock(both, c.nodes[0]!.id, "in", false)!;
 
     expect(freed.nodes[0]!.type).toBe("corner");
+  });
+});
+
+/**
+ * Where a closed contour begins.
+ *
+ * Nothing at all in one master: a ring is the same ring whichever of its points
+ * is written first. With two masters it is what interpolation pairs the points
+ * by, so an o begun at the top in one and at the left in the other is
+ * compatible by every count and interpolates into a twist.
+ */
+describe("the start of a contour", () => {
+  const ring = () =>
+    contour(
+      "r",
+      [
+        node("a", vec(0, 250)),
+        node("b", vec(250, 0)),
+        node("c", vec(0, -250)),
+        node("d", vec(-250, 0)),
+      ],
+      true,
+    );
+
+  it("rotates the nodes until the one asked for is first", () => {
+    const turned = setStartNode(ring(), "c")!;
+    expect(turned.nodes.map((n) => n.id)).toEqual(["c", "d", "a", "b"]);
+  });
+
+  it("draws the same shape, walked from somewhere else", () => {
+    const turned = setStartNode(ring(), "c")!;
+    const places = (c: typeof turned) =>
+      new Set(c.nodes.map((n) => `${String(n.pt.x)},${String(n.pt.y)}`));
+
+    expect(places(turned)).toEqual(places(ring()));
+    expect(segmentCount(turned)).toBe(segmentCount(ring()));
+  });
+
+  it("refuses the node that is first already, and one that is not there", () => {
+    expect(setStartNode(ring(), "a")).toBeNull();
+    expect(setStartNode(ring(), "nobody")).toBeNull();
+  });
+
+  it("refuses an open contour, which begins where the drawing began", () => {
+    const open = contour("o", [node("a", vec(0, 0)), node("b", vec(100, 0))], false);
+    expect(setStartNode(open, "b")).toBeNull();
   });
 });
 

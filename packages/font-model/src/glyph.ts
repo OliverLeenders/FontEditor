@@ -327,6 +327,34 @@ export function updateContour(
   return replaceContour(g, next);
 }
 
+/**
+ * Move a contour to another place in the glyph's list.
+ *
+ * The order is not a drawing decision — a filled shape is the same filled shape
+ * whichever piece of it is written first — until there are two masters, when it
+ * is the order the points are paired in: the second contour of one is
+ * interpolated with the second contour of the other. A bowl drawn before its
+ * stem in one master and after it in the other is compatible by every count and
+ * interpolates into a mess, and this is the repair.
+ *
+ * `to` is where the contour ends up in the list as it stands, counted from
+ * zero and held inside it. `null` for a contour that is not there, or a move
+ * that changes nothing.
+ */
+export function moveContourTo(g: Glyph, id: ContourId, to: number): Glyph | null {
+  const from = contourIndex(g, id);
+  if (from < 0) return null;
+
+  const at = Math.max(0, Math.min(g.contours.length - 1, to));
+  if (at === from) return null;
+
+  const contours = g.contours.slice();
+  const [moved] = contours.splice(from, 1);
+  if (moved === undefined) return null;
+  contours.splice(at, 0, moved);
+  return { ...g, contours };
+}
+
 export function removeContour(g: Glyph, id: ContourId): Glyph | null {
   const i = contourIndex(g, id);
   if (i < 0) return null;

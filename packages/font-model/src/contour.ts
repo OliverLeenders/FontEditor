@@ -732,6 +732,29 @@ export function removeNode(c: Contour, id: NodeId): Contour | null {
   return settled({ ...c, nodes });
 }
 
+/**
+ * Begin a closed contour at one of its own nodes.
+ *
+ * Interpolation is arithmetic on corresponding points: the first node of a
+ * contour is averaged with the first node of the same contour in the other
+ * master, and so on around. Two masters that draw the same `o` but begin it at
+ * different points are compatible by every count — same nodes, same handles,
+ * same direction — and interpolate into a shape with a twist through it. This
+ * is the repair, and there is no other way to make it: the nodes are rotated
+ * until the one asked for is first.
+ *
+ * Only a closed contour has a start point to choose. An open one begins where
+ * the drawing began and ends where it ended, and rotating it would be drawing
+ * something else; `null` says so, as it does for a node that is not there or is
+ * first already.
+ */
+export function setStartNode(c: Contour, id: NodeId): Contour | null {
+  if (!c.closed) return null;
+  const i = nodeIndex(c, id);
+  if (i <= 0) return null;
+  return { ...c, nodes: [...c.nodes.slice(i), ...c.nodes.slice(0, i)] };
+}
+
 export function appendNode(c: Contour, n: Node): Contour {
   return { ...c, nodes: [...c.nodes, n] };
 }
