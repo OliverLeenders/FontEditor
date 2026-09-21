@@ -91,6 +91,10 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "Shift-click", what: "Add to the selection" },
       { keys: "double-click", what: "Take the whole contour" },
       { keys: "Alt-drag a handle", what: "Break a smooth node's handles apart" },
+      {
+        keys: "Shift-drag a point",
+        what: "Hold it to a direction: upright, level, the italic angle, or the line it is on",
+      },
       { keys: "Shift-drag", what: "Hold the shape on a scale, or the angle on a turn" },
       { keys: "Alt-drag a corner", what: "Scale about the middle rather than the far corner" },
     ],

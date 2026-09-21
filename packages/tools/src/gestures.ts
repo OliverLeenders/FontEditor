@@ -18,6 +18,7 @@ import {
   NO_METRIC_KEYS,
   nodeById,
   segmentAt,
+  segments,
   segmentIndexForHandle,
   setHandle,
   setLeftSidebearing,
@@ -710,6 +711,94 @@ type Continuations = {
 /** Whether the pointer has actually gone anywhere since the press. */
 const budged = (delta: Vec2): boolean => delta.x !== 0 || delta.y !== 0;
 
+/**
+ * The directions a held drag may be projected onto.
+ *
+ * Upright and level always, because they are what a drawing is measured
+ * against. The font's italic angle and its perpendicular, because on a slanted
+ * design those *are* upright and level: a stem runs along one and its ends are
+ * cut along the other, and holding a drag to the page's axes is no help at all.
+ * And the straight segment under the drag, both along it and across it, which
+ * is what a stem asks for: slide the point along the line it is on, or move the
+ * whole line sideways by its own thickness.
+ *
+ * Each direction is a line rather than an arrow: the projection keeps the sign
+ * the cursor gave it, so one entry serves both ways along it.
+ */
+function heldDirections(state: EditorState, started: Glyph, moving: Selection): Vec2[] {
+  const out: Vec2[] = [
+    { x: 1, y: 0 },
+    { x: 0, y: 1 },
+  ];
+
+  const lean = state.document.info.italicAngle;
+  if (lean !== 0) {
+    // Counter-clockwise from upright, so an italic's stems lean the way the
+    // angle says and the cut across them is perpendicular to that.
+    const radians = (lean * Math.PI) / 180;
+    const along = { x: -Math.sin(radians), y: Math.cos(radians) };
+    out.push(along, { x: along.y, y: -along.x });
+  }
+
+  for (const line of straightSides(started, moving)) {
+    const reach = Math.hypot(line.x, line.y);
+    if (reach === 0) continue;
+    const unit = { x: line.x / reach, y: line.y / reach };
+    out.push(unit, { x: -unit.y, y: unit.x });
+  }
+
+  return out;
+}
+
+/**
+ * The straight segments the drag is holding on to, as directions.
+ *
+ * A whole segment being moved — both its ends — gives the segment itself; a
+ * single point gives every straight side it has, so a stem's corner can be slid
+ * along either of the lines meeting there. A curve gives nothing: "along the
+ * curve" is not a direction, it is a path.
+ */
+function straightSides(g: Glyph, moving: Selection): Vec2[] {
+  const points = moving.filter((item) => item.part === "point");
+  if (points.length === 0 || points.length > 2) return [];
+
+  const out: Vec2[] = [];
+  for (const c of g.contours) {
+    const here = points.filter((item) => item.contourId === c.id);
+    if (here.length === 0) continue;
+
+    for (const segment of segments(c)) {
+      if (segment.kind !== "line") continue;
+      const ends = [segment.fromId, segment.toId];
+      const held = here.filter((item) => ends.includes(item.nodeId)).length;
+      // One end held: the point slides along the line. Both: the line moves as
+      // a body, and along itself is as useful as across it.
+      if (held === 0) continue;
+      if (points.length === 2 && held === 1) continue;
+      out.push({ x: segment.b.x - segment.a.x, y: segment.b.y - segment.a.y });
+    }
+  }
+  return out;
+}
+
+/** The offset, held to whichever of `directions` keeps most of it. */
+function heldTo(delta: Vec2, directions: readonly Vec2[], grid: number): Vec2 {
+  let best: Vec2 | null = null;
+  let kept = -1;
+
+  for (const d of directions) {
+    const along = delta.x * d.x + delta.y * d.y;
+    if (Math.abs(along) <= kept) continue;
+    kept = Math.abs(along);
+    // Quantised along the direction rather than per axis: a diagonal held to
+    // whole units in x and y is not whole units along itself.
+    const length = grid > 0 ? Math.round(along / grid) * grid : along;
+    best = { x: d.x * length, y: d.y * length };
+  }
+
+  return best ?? { x: 0, y: 0 };
+}
+
 const CONTINUE: Continuations = {
   dragSelection: (state, gesture, input, delta, options) => {
     // Measured against the glyph as it was when the drag began: the offsets are
@@ -719,12 +808,16 @@ const CONTINUE: Continuations = {
     const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const snapping = snappingFor(state, input, options, started, gesture.items);
 
-    const snapped = snapDelta(
-      selectionPoints(started, gesture.items),
-      delta,
-      snapping,
-      gesture.snapped,
-    );
+    // Shift holds the drag to a direction, and the direction wins: a point held
+    // along a stem must stay on it, and a line it happened to pass near is not
+    // a better answer than the one being asked for. The grid still applies,
+    // measured along the direction rather than per axis.
+    const snapped = input.modifiers.shift
+      ? {
+          delta: heldTo(delta, heldDirections(state, started, gesture.items), snapping.grid),
+          hold: NO_HOLD,
+        }
+      : snapDelta(selectionPoints(started, gesture.items), delta, snapping, gesture.snapped);
 
     const document = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
       translateSelection(g, gesture.items, snapped.delta),

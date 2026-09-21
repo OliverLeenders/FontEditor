@@ -583,6 +583,190 @@ describe("purity", () => {
   });
 });
 
+/**
+ * A drag held to a direction.
+ *
+ * Shift projects the offset onto whichever direction keeps most of it: the two
+ * axes, the font's italic angle and its perpendicular, and the straight segment
+ * under the drag — along it and across it. The last is what a stem asks for:
+ * slide a corner along the line it sits on, or move the whole line sideways by
+ * its own thickness, neither of which the page's axes can express on a slant.
+ */
+/**
+ * Catching on a line that is at an angle.
+ *
+ * Everything worth aligning to used to be upright or level, and on a slanted
+ * design neither exists: a stem runs at the italic angle and is cut across it,
+ * and a right angle in that frame is at no axis at all.
+ */
+describe("angled lines a drag can catch on", () => {
+  /** Three points: a slanted stem, and a third to be squared off against it. */
+  function corner() {
+    const ids = counterIds("sq");
+    const c = contour(
+      ids.contour(),
+      [
+        // The stem: 100 across and 400 up, so square to it is 400 across and
+        // 100 down.
+        node(ids.node(), vec(100, 0)),
+        node(ids.node(), vec(200, 400)),
+        node(ids.node(), vec(600, 300)),
+      ],
+      false,
+    );
+    const document = fontDocument([addContour(glyph("n", { advance: 700 }), c)]);
+    return { state: editorState({ document, view: VIEW }), c };
+  }
+
+  const nodeAt = (s: EditorState, c: Contour, i: number) =>
+    nodeById(firstGlyph(s.document).contours[0]!, c.nodes[i]!.id)!;
+
+  const drag = (
+    state: EditorState,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    options: Parameters<typeof pointerMove>[2] = {},
+  ): EditorState => {
+    const down = pointerDown(state, pointerInput(vec(from.x, from.y)), options).state;
+    return pointerUp(pointerMove(down, pointerInput(vec(to.x, to.y)), options).state).state;
+  };
+
+  it("squares a corner off against the segment beyond it", () => {
+    // Dragging the third point near the perpendicular through the second: the
+    // line square to the stem, which no axis can express.
+    const { state, c } = corner();
+    const moved = drag(state, { x: 600, y: 300 }, { x: 604, y: 298 }, { snapPoints: true });
+    const p = nodeAt(moved, c, 2).pt;
+
+    // Square to the stem: the vector from the corner has no component along it.
+    const along = { x: 100, y: 400 };
+    expect((p.x - 200) * along.x + (p.y - 400) * along.y).toBeCloseTo(0, 6);
+  });
+
+  it("leaves it alone where the drag is nowhere near", () => {
+    const { state, c } = corner();
+    const moved = drag(state, { x: 600, y: 300 }, { x: 600, y: 200 }, { snapPoints: true });
+    expect(nodeAt(moved, c, 2).pt).toEqual(vec(600, 200));
+  });
+
+  it("offers nothing angled unless point snapping is on", () => {
+    const { state, c } = corner();
+    const moved = drag(state, { x: 600, y: 300 }, { x: 604, y: 298 });
+    expect(nodeAt(moved, c, 2).pt).toEqual(vec(604, 298));
+  });
+
+  it("catches on a guide that is neither upright nor level", () => {
+    // An italic guide used to be drawn and measured against by eye.
+    const { state, c } = corner();
+    const leaning: EditorState = {
+      ...state,
+      document: {
+        ...state.document,
+        guides: [{ id: "g1", name: "italic", pt: vec(0, 0), angle: 80, color: null }],
+      },
+    };
+    const moved = drag(leaning, { x: 600, y: 300 }, { x: 56, y: 300 }, { snapPoints: true });
+    const p = nodeAt(moved, c, 2).pt;
+
+    // On the guide: 80 degrees through the origin.
+    expect(p.x / p.y).toBeCloseTo(
+      Math.cos((80 * Math.PI) / 180) / Math.sin((80 * Math.PI) / 180),
+      3,
+    );
+  });
+});
+
+describe("holding a drag to a direction", () => {
+  /** A slanted line of two points, and a third well away from it. */
+  function slanted() {
+    const ids = counterIds("slant");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(100, 0)),
+        node(ids.node(), vec(200, 400)),
+        node(ids.node(), vec(600, 400)),
+      ],
+      false,
+    );
+    const document = fontDocument([addContour(glyph("n", { advance: 700 }), c)]);
+    return { state: editorState({ document, view: VIEW }), c };
+  }
+
+  const drag = (
+    state: EditorState,
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+    mods: Parameters<typeof pointerInput>[1] = {},
+  ): EditorState => {
+    const down = pointerDown(state, pointerInput(vec(from.x, from.y), mods)).state;
+    const moved = pointerMove(down, pointerInput(vec(to.x, to.y), mods)).state;
+    return pointerUp(moved).state;
+  };
+
+  const held = { shift: true };
+  const nodeAt = (s: EditorState, c: Contour, i: number) =>
+    nodeById(firstGlyph(s.document).contours[0]!, c.nodes[i]!.id)!;
+
+  it("leaves an unheld drag free", () => {
+    const { state, c } = slanted();
+    expect(nodeAt(drag(state, { x: 100, y: 0 }, { x: 137, y: 46 }), c, 0).pt).toEqual(vec(137, 46));
+  });
+
+  it("slides a point along the straight segment it sits on", () => {
+    // The line runs 100 across and 400 up. A drag mostly along it lands on it,
+    // wherever the cursor wandered to.
+    const { state, c } = slanted();
+    const p = nodeAt(drag(state, { x: 100, y: 0 }, { x: 118, y: 92 }, held), c, 0).pt;
+
+    expect((p.x - 100) * 400 - p.y * 100).toBeCloseTo(0, 6);
+    expect(p.y).toBeGreaterThan(0);
+  });
+
+  it("moves a whole straight segment across itself", () => {
+    // Both ends held: the line keeps its angle and moves by its own normal,
+    // which is how a stem is made thicker or thinner.
+    const { state, c } = slanted();
+    // Pressing the segment itself takes both of its ends, which is what makes
+    // this a drag of a line rather than of a point.
+    let s = pointerUp(pointerDown(state, pointerInput(vec(150, 200))).state).state;
+
+    const before = [nodeAt(s, c, 0).pt, nodeAt(s, c, 1).pt];
+    s = drag(s, { x: 150, y: 200 }, { x: 190, y: 192 }, held);
+    const after = [nodeAt(s, c, 0).pt, nodeAt(s, c, 1).pt];
+
+    const dx = after[0]!.x - before[0]!.x;
+    const dy = after[0]!.y - before[0]!.y;
+    // Both ends moved by the same offset, and that offset is across the line.
+    expect(after[1]!.x - before[1]!.x).toBeCloseTo(dx, 6);
+    expect(after[1]!.y - before[1]!.y).toBeCloseTo(dy, 6);
+    expect(dx * 100 + dy * 400).toBeCloseTo(0, 6);
+    expect(Math.hypot(dx, dy)).toBeGreaterThan(0);
+  });
+
+  it("holds an upright drag upright", () => {
+    const { state, c } = slanted();
+    expect(nodeAt(drag(state, { x: 600, y: 400 }, { x: 603, y: 500 }, held), c, 2).pt).toEqual(
+      vec(600, 500),
+    );
+  });
+
+  it("follows the italic angle where the font leans", () => {
+    const { state, c } = slanted();
+    const leaning: EditorState = {
+      ...state,
+      document: {
+        ...state.document,
+        info: { ...state.document.info, italicAngle: -12 },
+      },
+    };
+    // Up and a little to the right: nearer the lean than to upright.
+    const p = nodeAt(drag(leaning, { x: 600, y: 400 }, { x: 625, y: 500 }, held), c, 2).pt;
+
+    expect((p.x - 600) / (p.y - 400)).toBeCloseTo(Math.tan((12 * Math.PI) / 180), 2);
+  });
+});
+
 describe("margin lines", () => {
   it("starts a margin drag when pressed on, not a marquee", () => {
     const { state } = start();

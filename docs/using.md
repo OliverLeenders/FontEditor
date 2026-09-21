@@ -109,6 +109,14 @@ also catches on the line **square to** the segment beyond the point next to it, 
 eye. The line it caught is drawn dashed while it holds, through the point it was taken
 from, so what happened is visible rather than mysterious.
 
+**Holding a drag to a direction.** Shift projects a drag onto whichever direction keeps
+most of it: upright, level, the font's italic angle and its perpendicular, and — when what
+you are dragging is a straight segment or a point on one — that segment's own direction and
+its normal. So a corner slides along the line it sits on, a whole straight segment moves
+sideways by its own thickness without changing angle, and a right angle on a slant is
+exact rather than aimed at. The direction wins while it is held: a line that happens to be
+near is not a better answer than the one you asked for.
+
 **What two masters have to agree on.** Interpolation is arithmetic on
 corresponding points: the third point of the second contour here is averaged with the third
 point of the second contour there. So which point a contour begins at, and which contour
