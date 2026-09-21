@@ -7,35 +7,30 @@ import type { SnapLine } from "./snap.js";
 /**
  * Which points in a glyph a drag may align itself with.
  *
- * Not all of them. Every point in a glyph is a couple of hundred coordinates per
- * axis on anything complex, and at that density something is always within reach:
- * the drag turns sticky, catches jitter between rivals, and the pull becomes
- * inexplicable. Tightening the radius does not fix that — it only makes the
- * stickiness harder to trigger deliberately.
+ * All of them, on both axes. This module used to offer a curated few — the
+ * places the outline turns, and the dragged point's own neighbours — on the
+ * argument that a couple of hundred coordinates per axis makes something always
+ * within reach and the drag sticky. The stickiness was real; the cure was worse.
+ * Which points would catch could not be told by looking, so the pull felt
+ * arbitrary: a stem edge caught and the point beside it did not, for a reason
+ * about local curvature that nobody can see.
  *
- * So the answer is fewer and better candidates rather than a smaller radius, and
- * that is what this module is for.
+ * "The nearest point on this axis, if it is near enough" is a rule a person can
+ * hold in their head and aim with. What keeps it from being sticky is the catch
+ * radius — small, and measured in screen pixels, so it is a fixed distance for
+ * the eye at every zoom — and the hysteresis in `catchLine`, which holds one
+ * line until the drag is clearly done with it rather than flickering between
+ * rivals.
+ *
+ * What the old rules are still good for is *ranking*. Two points at the same
+ * coordinate make one line, and which of them it says it came from decides what
+ * is drawn and what wins a tie: a neighbour first, then a turn in the outline,
+ * then any point at all.
  */
 
 export type AlignmentOptions = {
-  /**
-   * The points where the outline turns.
-   *
-   * Stem edges, overshoot tops, the point across a counter — the structurally
-   * meaningful ones, and few: a handful per glyph rather than every node.
-   *
-   * A turn is offered on the axis it turns about, and — to a drag in another
-   * contour — on both. See {@link alignmentLines}.
-   */
-  readonly extremes?: boolean;
-  /**
-   * The nodes either side of what is being dragged, along its own contour.
-   *
-   * A different intent from an extreme, and worth having separately: aligning a
-   * point with its own neighbour is how a segment is made exactly vertical or
-   * exactly horizontal, and the neighbour is often nothing like an extreme.
-   */
-  readonly neighbours?: boolean;
+  /** Offer the glyph's own points, each on both axes. */
+  readonly points?: boolean;
 };
 
 export type AlignmentLines = {
@@ -151,16 +146,11 @@ export function alignmentLines(
   moving: Selection,
   options: AlignmentOptions = {},
 ): AlignmentLines {
-  if (options.extremes !== true && options.neighbours !== true) return NONE;
+  if (options.points !== true) return NONE;
 
   // Keyed by node rather than by selected part: a node's handles travel with it,
   // so neither the node nor either handle is standing still to be caught.
   const movingNodes = new Set(moving.map((item) => `${item.contourId} ${item.nodeId}`));
-  // Which contours the drag is in, so the others can offer both of their axes to
-  // it. Empty when nothing is moving, and then nothing is another contour's
-  // drag to offer to.
-  const movingContours = new Set(moving.map((item) => item.contourId));
-
   const xs: SnapLine[] = [];
   const ys: SnapLine[] = [];
   const seenX = new Set<number>();
@@ -177,34 +167,34 @@ export function alignmentLines(
     }
   };
 
-  // Neighbours first, so a coordinate that is both wins the more specific
-  // account of itself: `catchLine` breaks a tie by the order it was given.
-  if (options.neighbours === true) {
-    for (const item of moving) {
-      for (const p of neighbourPoints(g, item, movingNodes)) {
-        add(p, "neighbour", BOTH);
-      }
+  // Three passes, in the order a coordinate would rather be explained. The
+  // first line at a coordinate keeps it — see `add` — so a point that is both a
+  // neighbour and a turn is offered as the neighbour, and `catchLine` breaks a
+  // tie between equal corrections by the order it was given.
+  for (const item of moving) {
+    for (const p of neighbourPoints(g, item, movingNodes)) add(p, "neighbour", BOTH);
+  }
+
+  for (const c of g.contours) {
+    for (const [i, n] of c.nodes.entries()) {
+      if (movingNodes.has(`${c.id} ${n.id}`)) continue;
+
+      // An open contour's ends have nothing beyond them, and a node with a
+      // straight side and no node past it has no direction to be judged by.
+      // Treating it as a landmark is the right answer there: it really is where
+      // the outline stops.
+      const previous = around(c, i, -1) ?? n.pt;
+      const next = around(c, i, 1) ?? n.pt;
+
+      const axes = extremeAxes(n, previous, next);
+      if (axes.x || axes.y) add(n.pt, "extreme", BOTH);
     }
   }
 
-  if (options.extremes === true) {
-    for (const c of g.contours) {
-      for (const [i, n] of c.nodes.entries()) {
-        if (movingNodes.has(`${c.id} ${n.id}`)) continue;
-
-        // An open contour's ends have nothing beyond them, and a node with a
-        // straight side and no node past it has no direction to be judged by.
-        // Treating it as a landmark is the right answer there: it really is
-        // where the outline stops.
-        const previous = around(c, i, -1) ?? n.pt;
-        const next = around(c, i, 1) ?? n.pt;
-
-        const axes = extremeAxes(n, previous, next);
-        if (!axes.x && !axes.y) continue;
-
-        const elsewhere = movingContours.size > 0 && !movingContours.has(c.id);
-        add(n.pt, "extreme", elsewhere ? BOTH : axes);
-      }
+  for (const c of g.contours) {
+    for (const n of c.nodes) {
+      if (movingNodes.has(`${c.id} ${n.id}`)) continue;
+      add(n.pt, "point", BOTH);
     }
   }
 

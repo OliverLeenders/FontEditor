@@ -70,8 +70,7 @@ function selectOptions(store: EditorStore, pane: PaneIndex): ToolOptions {
   const shows = viewOf(state, pane);
   return {
     autoHideHandles: handlesAutoHidden(state, pane),
-    snapExtremes: shows.snapPoints,
-    snapNeighbours: shows.snapPoints,
+    snapPoints: shows.snapPoints,
     // Only what is drawn may be grabbed, which is the rule the margins and the
     // Tunni controls already follow.
     anchors: shows.showAnchors,

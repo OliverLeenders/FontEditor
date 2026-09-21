@@ -8,7 +8,14 @@ import type { Vec2 } from "@typewright/geometry";
  * holding across frames — the lines are rebuilt every move, so identity has to
  * be a value rather than a reference.
  */
-export type SnapSource = "metric" | "origin" | "advance" | "extreme" | "neighbour" | "guide";
+export type SnapSource =
+  | "metric"
+  | "origin"
+  | "advance"
+  | "extreme"
+  | "neighbour"
+  | "point"
+  | "guide";
 
 export type SnapLine = {
   /** The coordinate, on whichever axis this line belongs to. */
@@ -74,8 +81,14 @@ export const NO_SNAPPING: Snapping = {
   grid: 0,
 };
 
-/** How near a line has to come to catch, in screen pixels. */
-export const SNAP_PIXELS = 6;
+/**
+ * How near a line has to come to catch, in screen pixels.
+ *
+ * Four rather than six, since every point in the glyph is a candidate now and
+ * not a curated few: what stops that being sticky is a radius small enough that
+ * aiming between two points a few pixels apart is possible.
+ */
+export const SNAP_PIXELS = 4;
 /**
  * How far it may then stray before letting go.
  *
@@ -83,7 +96,7 @@ export const SNAP_PIXELS = 6;
  * lets go the instant the pointer leaves the radius that caught it, and a drag
  * along a boundary flickers in and out of the snap several times a second.
  */
-export const SNAP_STAY_PIXELS = 10;
+export const SNAP_STAY_PIXELS = 7;
 /** How much nearer a rival must be to steal a caught line's place. */
 export const SNAP_STICKINESS = 1.6;
 

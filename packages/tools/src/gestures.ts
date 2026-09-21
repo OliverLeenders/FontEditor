@@ -537,10 +537,7 @@ export function snappingFor(
   if (options.snap === false || input.modifiers.ctrl) return NO_SNAPPING;
 
   const glyph = currentGlyph(state);
-  const alignment = alignmentLines(started, moving, {
-    extremes: options.snapExtremes ?? false,
-    neighbours: options.snapNeighbours ?? false,
-  });
+  const alignment = alignmentLines(started, moving, { points: options.snapPoints ?? false });
 
   // The lines the designer put there, font's and glyph's together. Only the
   // level and upright ones: the snapping machinery below catches a coordinate
@@ -598,19 +595,12 @@ export type GestureOptions = {
   /** How much nearer a rival line must be to take a caught one's place. */
   readonly snapStickiness?: number;
   /**
-   * Also catch on the points where the outline turns — stem edges, overshoot
-   * tops, the point across a counter.
+   * Also catch on the glyph's own points, each on both of its axes: the nearest
+   * coordinate wins, whichever point it belongs to.
    *
    * Off until these lines are drawn. See {@link snappingFor}.
    */
-  readonly snapExtremes?: boolean;
-  /**
-   * Also catch on the nodes either side of what is being dragged, which is how a
-   * segment is made exactly upright or exactly level.
-   *
-   * Off until these lines are drawn, for the same reason.
-   */
-  readonly snapNeighbours?: boolean;
+  readonly snapPoints?: boolean;
 };
 
 /**

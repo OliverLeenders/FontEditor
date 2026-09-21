@@ -583,6 +583,15 @@ describe("purity", () => {
   });
 });
 
+/**
+ * A drag held to a direction.
+ *
+ * Shift projects the offset onto whichever direction keeps most of it: the two
+ * axes, the font's italic angle and its perpendicular, and the straight segment
+ * under the drag — along it and across it. The last is what a stem asks for:
+ * slide a corner along the line it sits on, or move the whole line sideways by
+ * its own thickness, neither of which the page's axes can express on a slant.
+ */
 describe("margin lines", () => {
   it("starts a margin drag when pressed on, not a marquee", () => {
     const { state } = start();
@@ -723,7 +732,8 @@ describe("snapping", () => {
 
   it("catches the origin, which is a line the canvas draws", () => {
     const { state, contour: c } = loneNode();
-    const moved = dragBy(state, { x: 100, y: 300 }, { x: -96, y: 0 });
+    // Three units short of the origin, which is inside the four-pixel catch.
+    const moved = dragBy(state, { x: 100, y: 300 }, { x: -97, y: 0 });
 
     const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[0]!.id)!;
     expect(n.pt.x).toBe(0);
@@ -832,7 +842,7 @@ describe("point-to-point snapping", () => {
 
   it("lines up with a stem edge across the glyph when asked", () => {
     const { state, loose } = stems();
-    const moved = dragTo(state, { x: 300, y: 300 }, { x: 104, y: 300 }, { snapExtremes: true });
+    const moved = dragTo(state, { x: 300, y: 300 }, { x: 103, y: 300 }, { snapPoints: true });
     const n = nodeById(firstGlyph(moved.document).contours[1]!, loose.nodes[0]!.id)!;
     expect(n.pt.x).toBe(100);
   });
@@ -855,7 +865,7 @@ describe("point-to-point snapping", () => {
       view: VIEW,
     });
 
-    const moved = dragTo(state, { x: 300, y: 350 }, { x: 203, y: 350 }, { snapNeighbours: true });
+    const moved = dragTo(state, { x: 300, y: 350 }, { x: 203, y: 350 }, { snapPoints: true });
     const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[1]!.id)!;
     expect(n.pt.x).toBe(200);
   });
@@ -864,18 +874,18 @@ describe("point-to-point snapping", () => {
     const { state, loose } = stems();
     // Dragging by two units. Its own coordinate is the nearest of all, and
     // catching it would pin the point where it started.
-    const moved = dragTo(state, { x: 300, y: 300 }, { x: 302, y: 300 }, { snapExtremes: true });
+    const moved = dragTo(state, { x: 300, y: 300 }, { x: 302, y: 300 }, { snapPoints: true });
     const n = nodeById(firstGlyph(moved.document).contours[1]!, loose.nodes[0]!.id)!;
     expect(n.pt.x).toBe(302);
   });
 
   it("holds a line it has caught past the radius that caught it", () => {
     const { state, loose } = stems();
-    let s = pointerDown(state, pointerInput(vec(300, 300)), { snapExtremes: true }).state;
+    let s = pointerDown(state, pointerInput(vec(300, 300)), { snapPoints: true }).state;
     // In, to catch the stem at 100 …
-    s = pointerMove(s, pointerInput(vec(102, 300)), { snapExtremes: true }).state;
-    // … then out to 108, which is too far to catch afresh but not to hold.
-    s = pointerMove(s, pointerInput(vec(108, 300)), { snapExtremes: true }).state;
+    s = pointerMove(s, pointerInput(vec(102, 300)), { snapPoints: true }).state;
+    // … then out to 106, which is too far to catch afresh but not to hold.
+    s = pointerMove(s, pointerInput(vec(106, 300)), { snapPoints: true }).state;
 
     const n = nodeById(firstGlyph(s.document).contours[1]!, loose.nodes[0]!.id)!;
     expect(n.pt.x).toBe(100);
@@ -883,9 +893,9 @@ describe("point-to-point snapping", () => {
 
   it("lets go once the pointer is clearly done with it", () => {
     const { state, loose } = stems();
-    let s = pointerDown(state, pointerInput(vec(300, 300)), { snapExtremes: true }).state;
-    s = pointerMove(s, pointerInput(vec(102, 300)), { snapExtremes: true }).state;
-    s = pointerMove(s, pointerInput(vec(140, 300)), { snapExtremes: true }).state;
+    let s = pointerDown(state, pointerInput(vec(300, 300)), { snapPoints: true }).state;
+    s = pointerMove(s, pointerInput(vec(102, 300)), { snapPoints: true }).state;
+    s = pointerMove(s, pointerInput(vec(140, 300)), { snapPoints: true }).state;
 
     const n = nodeById(firstGlyph(s.document).contours[1]!, loose.nodes[0]!.id)!;
     expect(n.pt.x).toBe(140);
@@ -893,8 +903,8 @@ describe("point-to-point snapping", () => {
 
   it("forgets what it was holding when the drag ends", () => {
     const { state } = stems();
-    let s = pointerDown(state, pointerInput(vec(300, 300)), { snapExtremes: true }).state;
-    s = pointerMove(s, pointerInput(vec(102, 300)), { snapExtremes: true }).state;
+    let s = pointerDown(state, pointerInput(vec(300, 300)), { snapPoints: true }).state;
+    s = pointerMove(s, pointerInput(vec(102, 300)), { snapPoints: true }).state;
     s = pointerUp(s).state;
     // The hold lives on the gesture, so there is nowhere for a stale one to sit.
     expect(s.gesture).toBeNull();
@@ -904,7 +914,7 @@ describe("point-to-point snapping", () => {
     const { state, loose } = stems();
     // The stem's corners sit on the baseline too. Landing at y = 3 catches the
     // baseline rather than the corner, and the guide would say "baseline".
-    const moved = dragTo(state, { x: 300, y: 300 }, { x: 300, y: 3 }, { snapExtremes: true });
+    const moved = dragTo(state, { x: 300, y: 300 }, { x: 300, y: 3 }, { snapPoints: true });
     const n = nodeById(firstGlyph(moved.document).contours[1]!, loose.nodes[0]!.id)!;
     expect(n.pt.y).toBe(0);
   });

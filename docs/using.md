@@ -94,6 +94,14 @@ points and a shape with nothing at its own top rounds into a flat. Each button s
 many it would add and is dead when there are none; right-clicking one curve does that
 curve, and the buttons do the whole of whatever is selected.
 
+**Snapping.** A drag catches on the nearest coordinate within a few pixels of it — every
+point in the glyph is a candidate, on both of its axes, along with the font's lines, the
+sidebearings and your guides. It is the _nearest_ that catches, so aiming is a matter of
+being closer to one point than to another; a line that catches holds until you pull clearly
+away from it, which is what stops it flickering between two candidates a unit apart. Hold
+Ctrl to switch it off for a drag, and turn **Snap to points** off in the View menu to leave
+only the font's own lines.
+
 **What two masters have to agree on.** Interpolation is arithmetic on
 corresponding points: the third point of the second contour here is averaged with the third
 point of the second contour there. So which point a contour begins at, and which contour

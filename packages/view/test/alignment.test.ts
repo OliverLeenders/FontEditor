@@ -42,133 +42,35 @@ function throughContour() {
 const values = (lines: readonly { at: number }[]): number[] =>
   lines.map((l) => l.at).sort((a, b) => a - b);
 
-describe("extremes", () => {
+const sourceAt = (lines: readonly { at: number; source: string }[], value: number) =>
+  lines.find((l) => l.at === value)?.source;
+
+/**
+ * Every point, on both of its axes.
+ *
+ * The rule used to be cleverer — the places the outline turns, and the dragged
+ * point's own neighbours — and the cleverness could not be seen. Which points
+ * would catch was a fact about local curvature, so a stem edge caught and the
+ * point beside it did not, for no reason a person could read off the drawing.
+ */
+describe("what a drag can catch on", () => {
   const c = ring();
   const g = glyph("o", { advance: 600, contours: [c] });
 
-  it("offers each turning point on the axis it turns about", () => {
-    const lines = alignmentLines(g, [], { extremes: true });
-    // Top and bottom turn in y; left and right turn in x.
-    expect(values(lines.ys)).toEqual([0, 700]);
-    expect(values(lines.xs)).toEqual([60, 540]);
+  it("offers every point, on both of its axes", () => {
+    const lines = alignmentLines(g, [], { points: true });
+
+    expect(values(lines.xs)).toEqual([60, 300, 540]);
+    expect(values(lines.ys)).toEqual([0, 350, 700]);
   });
 
-  it("passes over a node the outline runs straight through", () => {
+  it("offers a node the outline runs straight through", () => {
+    // It used to be passed over for having no turn in it. A point is a point.
     const through = glyph("s", { contours: [throughContour()] });
-    const lines = alignmentLines(through, [], { extremes: true });
-    // The two ends are corners and count; the middle node does not.
-    expect(values(lines.xs)).toEqual([0, 400]);
-    expect(values(lines.ys)).toEqual([0, 400]);
-  });
+    const lines = alignmentLines(through, [], { points: true });
 
-  it("counts a corner as a landmark on both axes", () => {
-    const square = contour(
-      ids.contour(),
-      [node(ids.node(), at(10, 20)), node(ids.node(), at(90, 20)), node(ids.node(), at(90, 80))],
-      true,
-    );
-    const lines = alignmentLines(glyph("box", { contours: [square] }), [], { extremes: true });
-    // A polygon has no curve extremes, and its corners are all there is to
-    // align to — offering nothing would make the option useless on one.
-    expect(values(lines.xs)).toEqual([10, 90]);
-    expect(values(lines.ys)).toEqual([20, 80]);
-  });
-
-  it("passes over a node partway along a straight run", () => {
-    // The rule that matters most in practice. A real drawn letter is mostly
-    // straight segments, and calling every node on one a landmark buries the
-    // few that are in a crowd no drag can aim between.
-    const run = contour(
-      ids.contour(),
-      [
-        node(ids.node(), at(0, 0)),
-        node(ids.node(), at(50, 100)),
-        node(ids.node(), at(100, 200)),
-        node(ids.node(), at(0, 200)),
-      ],
-      true,
-    );
-    const lines = alignmentLines(glyph("z", { contours: [run] }), [], { extremes: true });
-    // The middle of the diagonal is not offered on either axis; the corners are.
-    expect(values(lines.xs)).toEqual([0, 100]);
-    expect(values(lines.ys)).toEqual([0, 200]);
-  });
-
-  it("keeps a node level with its neighbour as a landmark on that axis", () => {
-    const flat = contour(
-      ids.contour(),
-      [node(ids.node(), at(0, 0)), node(ids.node(), at(50, 0)), node(ids.node(), at(100, 90))],
-      false,
-    );
-    const lines = alignmentLines(glyph("f", { contours: [flat] }), [], { extremes: true });
-    // The middle node runs straight through in x and is not offered there, but
-    // it sits on a level run and its y is worth aligning to.
-    expect(values(lines.xs)).toEqual([0, 100]);
-    expect(values(lines.ys)).toContain(0);
-  });
-
-  it("treats the end of an open contour as a landmark", () => {
-    // Nothing lies beyond it, so there is no direction to judge it by — and it
-    // really is where the outline stops.
-    const open = contour(
-      ids.contour(),
-      [node(ids.node(), at(10, 10)), node(ids.node(), at(60, 60)), node(ids.node(), at(110, 110))],
-      false,
-    );
-    const lines = alignmentLines(glyph("j", { contours: [open] }), [], { extremes: true });
-    expect(values(lines.xs)).toEqual([10, 110]);
-  });
-
-  it("offers a turn that is very nearly, but not exactly, level", () => {
-    // Taken from a real drawn `a`. Its counter's lowest node had handles exactly
-    // level and was offered; the stem's lowest node, one unit and 1.4 degrees
-    // off, was not — so a drag snapped the stem onto the counter but never the
-    // counter onto the stem. On a smooth node the sign test alone is a
-    // knife-edge: the two handles are collinear through it, so they straddle the
-    // axis unless the tangent is exactly level, and a drawn outline never is.
-    const bottoms = contour(
-      ids.contour(),
-      [
-        node(ids.node(), at(175, -13), { type: "smooth", in: at(241, -13), out: at(86, -13) }),
-        node(ids.node(), at(390, -12), { type: "smooth", in: at(430, -13), out: at(349, -11) }),
-        node(ids.node(), at(300, 500), { type: "smooth", in: at(240, 500), out: at(360, 500) }),
-      ],
-      true,
-    );
-    const lines = alignmentLines(glyph("a", { contours: [bottoms] }), [], { extremes: true });
-    expect(values(lines.ys)).toContain(-13);
-    expect(values(lines.ys)).toContain(-12);
-  });
-
-  it("still refuses a turn that is genuinely a slope", () => {
-    // The tolerance is five degrees, not a licence for anything vaguely flat.
-    const sloped = contour(
-      ids.contour(),
-      [
-        node(ids.node(), at(0, 0), { type: "smooth", in: at(-50, -30), out: at(50, 30) }),
-        node(ids.node(), at(200, 400)),
-      ],
-      true,
-    );
-    const lines = alignmentLines(glyph("k", { contours: [sloped] }), [], { extremes: true });
-    // Thirty degrees off level, so the first node is no landmark in y.
-    expect(values(lines.ys)).not.toContain(0);
-  });
-
-  it("leaves out whatever is being dragged", () => {
-    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" }];
-    expect(values(alignmentLines(g, moving, { extremes: true }).xs)).toEqual([60]);
-  });
-
-  it("leaves out a node whose handle is being dragged", () => {
-    // The handle moves and the node stays, but the node is what the handle is
-    // measured from, so catching on it would be catching on the drag itself.
-    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "out" }];
-    expect(values(alignmentLines(g, moving, { extremes: true }).xs)).toEqual([60]);
-  });
-
-  it("says nothing at all unless asked", () => {
-    expect(alignmentLines(g, [], {})).toEqual({ xs: [], ys: [] });
+    expect(values(lines.xs)).toEqual([0, 200, 400]);
+    expect(values(lines.ys)).toEqual([0, 200, 400]);
   });
 
   it("offers one line per coordinate, however many points share it", () => {
@@ -177,9 +79,94 @@ describe("extremes", () => {
       [node(ids.node(), at(100, 0)), node(ids.node(), at(100, 500))],
       false,
     );
-    expect(
-      alignmentLines(glyph("t", { contours: [twin] }), [], { extremes: true }).xs,
-    ).toHaveLength(1);
+    expect(alignmentLines(glyph("t", { contours: [twin] }), [], { points: true }).xs).toHaveLength(
+      1,
+    );
+  });
+
+  it("offers every contour's points, the drag's own included", () => {
+    const inner = counter();
+    const o = glyph("o", { advance: 600, contours: [c, inner] });
+    const lines = alignmentLines(o, [], { points: true });
+
+    expect(values(lines.xs)).toEqual([60, 180, 300, 420, 540]);
+    expect(values(lines.ys)).toEqual([0, 170, 350, 360, 530, 700]);
+  });
+
+  it("leaves out whatever is being dragged", () => {
+    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" }];
+    expect(values(alignmentLines(g, moving, { points: true }).xs)).toEqual([60, 300]);
+  });
+
+  it("keeps the node under a dragged handle, which is what it is aimed at", () => {
+    // The handle moves and its node stays, and lining the two up is how a
+    // handle is made exactly upright or exactly level — so the node is offered,
+    // where a dragged *point* is not.
+    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "out" }];
+    expect(values(alignmentLines(g, moving, { points: true }).xs)).toEqual([60, 300, 540]);
+  });
+
+  it("says nothing at all unless asked", () => {
+    expect(alignmentLines(g, [], {})).toEqual({ xs: [], ys: [] });
+  });
+});
+
+/**
+ * Which point a line says it came from.
+ *
+ * Two points at one coordinate make one line, and the account it gives of
+ * itself is the most particular one available: it decides what a guide says and
+ * breaks a tie between equal corrections.
+ */
+describe("what a line says it is", () => {
+  const c = ring();
+  const g = glyph("o", { advance: 600, contours: [c] });
+  const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }];
+
+  it("names a dragged point's own neighbour as one", () => {
+    const lines = alignmentLines(g, moving, { points: true });
+    expect(sourceAt(lines.xs, 540)).toBe("neighbour");
+    expect(sourceAt(lines.xs, 60)).toBe("neighbour");
+  });
+
+  it("names a turn in the outline an extreme", () => {
+    const lines = alignmentLines(g, moving, { points: true });
+    // The bottom node is nobody's neighbour here, and it is where the outline
+    // turns in y.
+    expect(sourceAt(lines.ys, 0)).toBe("extreme");
+  });
+
+  it("names anything else a point", () => {
+    const flat = contour(
+      ids.contour(),
+      [node(ids.node(), at(0, 0)), node(ids.node(), at(50, 100)), node(ids.node(), at(100, 200))],
+      false,
+    );
+    const lines = alignmentLines(glyph("z", { contours: [flat] }), [], { points: true });
+    // Midway along a straight run: no turn, and nobody is dragging.
+    expect(sourceAt(lines.xs, 50)).toBe("point");
+  });
+
+  it("gives a handle's drag the node it belongs to as a neighbour", () => {
+    // Lining the two up is how a handle is made exactly upright or exactly level.
+    const held: Selection = [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" }];
+    const lines = alignmentLines(g, held, { points: true });
+
+    expect(sourceAt(lines.xs, 300)).toBe("neighbour");
+    expect(sourceAt(lines.ys, 700)).toBe("neighbour");
+  });
+
+  it("skips a neighbour that is moving too", () => {
+    const pair: Selection = [
+      { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" },
+      { contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" },
+    ];
+    const lines = alignmentLines(g, pair, { points: true });
+
+    // Neither of the two moving nodes is offered at all, as a neighbour or
+    // otherwise; what is left is the two standing still.
+    expect(values(lines.xs)).toEqual([60, 300]);
+    expect(sourceAt(lines.xs, 60)).toBe("neighbour");
   });
 });
 
@@ -201,123 +188,12 @@ function counter() {
   );
 }
 
-describe("extremes across contours", () => {
-  const outer = ring();
-  const inner = counter();
-  const o = glyph("o", { advance: 600, contours: [outer, inner] });
-
-  const dragging = (c: { id: string; nodes: readonly { id: string }[] }, i: number): Selection => [
-    { contourId: c.id, nodeId: c.nodes[i]!.id, part: "point" },
-  ];
-
-  it("offers another contour's turns on both of their axes", () => {
-    // Dragging the counter's top. The bowl's sides turn in x, and their height
-    // is what the counter's sides are drawn level with — so it has to be
-    // offered, or a counter can never be aligned to the shape holding it.
-    const lines = alignmentLines(o, dragging(inner, 0), { extremes: true });
-    expect(values(lines.ys)).toContain(350);
-    expect(values(lines.xs)).toContain(300);
-  });
-
-  it("keeps a contour's own turns to the axis they turn about", () => {
-    // The counter's own sides are in the drag's contour, so their height stays
-    // out: within one shape the other coordinate means much less, and offering
-    // it everywhere doubles the candidates.
-    const lines = alignmentLines(o, dragging(inner, 0), { extremes: true });
-    expect(values(lines.ys)).not.toContain(360);
-
-    // And the other way round, which is the same rule seen from the bowl.
-    const other = alignmentLines(o, dragging(outer, 0), { extremes: true });
-    expect(values(other.ys)).toContain(360);
-    expect(values(other.ys)).not.toContain(350);
-  });
-
-  it("offers nothing across contours when nothing is being dragged", () => {
-    // No drag, so there is nobody for the other coordinate to be a landmark to.
-    const lines = alignmentLines(o, [], { extremes: true });
-    expect(values(lines.ys)).toEqual([0, 170, 530, 700]);
-    expect(values(lines.xs)).toEqual([60, 180, 420, 540]);
-  });
-});
-
-describe("neighbours", () => {
-  const c = ring();
-  const g = glyph("o", { advance: 600, contours: [c] });
-
-  it("offers the nodes either side along the contour", () => {
-    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }];
-    const lines = alignmentLines(g, moving, { neighbours: true });
-
-    // Either side of the top node: the right node and the left one.
-    expect(values(lines.xs)).toEqual([60, 540]);
-    expect(values(lines.ys)).toEqual([350]);
-  });
-
-  it("wraps around a closed contour", () => {
-    // The first node's previous neighbour is the last, which only a closed
-    // contour has.
-    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }];
-    const lines = alignmentLines(g, moving, { neighbours: true });
-    expect(values(lines.xs)).toContain(60);
-  });
-
-  it("gives an open contour's end only the neighbour it has", () => {
-    const open = throughContour();
-    const moving: Selection = [{ contourId: open.id, nodeId: open.nodes[0]!.id, part: "point" }];
-    const lines = alignmentLines(glyph("s", { contours: [open] }), moving, { neighbours: true });
-    expect(values(lines.xs)).toEqual([200]);
-  });
-
-  it("offers a dragged handle the node it belongs to", () => {
-    // Lining the two up is how a handle is made exactly upright or exactly level.
-    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" }];
-    const lines = alignmentLines(g, moving, { neighbours: true });
-    expect(values(lines.xs)).toEqual([300]);
-    expect(values(lines.ys)).toEqual([700]);
-  });
-
-  it("skips a neighbour that is moving too", () => {
-    const moving: Selection = [
-      { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" },
-      { contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" },
-    ];
-    const lines = alignmentLines(g, moving, { neighbours: true });
-    // Each moving node contributes the neighbours it has that are standing
-    // still, and neither contributes the other: the left node beside the top
-    // one, and the bottom node beside the right one.
-    expect(values(lines.xs)).toEqual([60, 300]);
-  });
-
-  it("says nothing at all unless asked", () => {
-    const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }];
-    expect(alignmentLines(g, moving, {})).toEqual({ xs: [], ys: [] });
-  });
-});
-
-describe("both together", () => {
-  const c = ring();
-  const g = glyph("o", { advance: 600, contours: [c] });
-  const moving: Selection = [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }];
-
-  it("names a shared coordinate as the neighbour, not the extreme", () => {
-    // The right node is both, and "neighbour" is the more specific account of
-    // why it is being offered — which is what a guide would say.
-    const lines = alignmentLines(g, moving, { extremes: true, neighbours: true });
-    expect(lines.xs.find((l) => l.at === 540)?.source).toBe("neighbour");
-  });
-
-  it("keeps an extreme that is nobody's neighbour", () => {
-    const lines = alignmentLines(g, moving, { extremes: true, neighbours: true });
-    // The bottom node is not adjacent to the top one, and is still an extreme.
-    expect(values(lines.ys)).toEqual([0, 350]);
-  });
-});
-
 /**
- * The `o` this rule was written for, coordinates and all, from a real drawing.
+ * The `o` this was reported on, coordinates and all, from a real drawing.
  *
- * Kept as it was reported: the counter's left node one unit above the bowl's,
- * with no horizontal line to catch on because the bowl's side turns in x.
+ * The counter's left node sits one unit above the bowl's, and under the old
+ * rule there was no horizontal line to catch on: the bowl's sides turn in x, so
+ * the height they shared was offered by nothing.
  */
 function reportedBowl() {
   return contour(
@@ -348,15 +224,11 @@ function reportedCounter() {
 describe("a drag across a real counter", () => {
   it("lands the counter's side on the height of the bowl's", () => {
     const bowl = reportedBowl();
-    const counter = reportedCounter();
-    const o = glyph("o", { advance: 500, contours: [bowl, counter] });
+    const inner = reportedCounter();
+    const o = glyph("o", { advance: 500, contours: [bowl, inner] });
 
-    const moving: Selection = [
-      { contourId: counter.id, nodeId: counter.nodes[2]!.id, part: "point" },
-    ];
-    const lines = alignmentLines(o, moving, { extremes: true, neighbours: true });
-    // Before the cross-axis rule these were [-12, 67, 421, 511]: the two sides
-    // of the bowl turn in x, so the height they share was offered by nothing.
+    const moving: Selection = [{ contourId: inner.id, nodeId: inner.nodes[2]!.id, part: "point" }];
+    const lines = alignmentLines(o, moving, { points: true });
     expect(values(lines.ys)).toContain(249);
 
     const landed = snapDelta([at(116, 250)], at(0, -0.6), {
