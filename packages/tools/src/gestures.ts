@@ -610,6 +610,13 @@ function alongDegrees(degrees: number): Vec2 {
  * at the angle the first side has. And **the italic angle** through the same
  * points, which is upright for a design that leans.
  *
+ * The direction of that segment is the direction it *leaves the neighbour by* —
+ * its handle where it has one, and the chord to the next node where it is
+ * straight. Not the chord in both cases, which is what this did at first: on a
+ * curve the chord is a line between two points the outline only touches, so
+ * squaring to it squares to nothing the drawing contains. What a right angle at
+ * a corner means is a right angle with the tangent there.
+ *
  * Only through neighbours of what is moving, and only the segments beyond them:
  * every point in the glyph offering two rays would be hundreds of lines at every
  * angle, and something would always be within reach.
@@ -635,7 +642,7 @@ function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapR
       // holding, and so the one worth being square or parallel to.
       const beyond = stepAround(c, c.nodes.indexOf(neighbour), step);
       if (beyond !== null) {
-        const along = { x: beyond.pt.x - neighbour.pt.x, y: beyond.pt.y - neighbour.pt.y };
+        const along = leavingBy(neighbour, beyond, step);
         const reach = Math.hypot(along.x, along.y);
         if (reach > 0) {
           const unit = { x: along.x / reach, y: along.y / reach };
@@ -659,6 +666,24 @@ function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapR
   }
 
   return out;
+}
+
+/**
+ * The direction a segment leaves `from` by, on its way to `to`.
+ *
+ * The handle that shapes it, where there is one: a curve leaves its node along
+ * its handle, and that is the direction a right angle at that node is a right
+ * angle to. The chord otherwise, which is exactly the direction of a straight
+ * segment and the best available guess for a curve whose handle is retracted
+ * onto its own node.
+ *
+ * Which handle depends on which way round the contour the segment runs: going
+ * forwards it leaves by `out`, and backwards by `in`.
+ */
+function leavingBy(from: Node, to: Node, step: -1 | 1): Vec2 {
+  const handle = step === 1 ? from.out : from.in;
+  const at = handle ?? to.pt;
+  return { x: at.x - from.pt.x, y: at.y - from.pt.y };
 }
 
 /** The node one step around a contour, or `null` past the end of an open one. */

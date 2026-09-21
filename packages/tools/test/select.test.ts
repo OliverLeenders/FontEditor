@@ -643,6 +643,38 @@ describe("angled lines a drag can catch on", () => {
     expect((p.x - 200) * along.x + (p.y - 400) * along.y).toBeCloseTo(0, 6);
   });
 
+  it("squares to the curve's own direction, not to the chord across it", () => {
+    // The segment beyond the corner is a curve whose handle leaves at 45
+    // degrees while the chord to the next node runs flat. A right angle at that
+    // corner is a right angle with the *tangent*: the chord is a line between
+    // two points the outline only touches, and squaring to it squares to
+    // nothing the drawing contains.
+    const ids = counterIds("curve");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0)),
+        // The corner: the curve leaves it along (100, 100).
+        node(ids.node(), vec(200, 200), { type: "corner", out: vec(300, 300) }),
+        node(ids.node(), vec(600, 200), { type: "corner", in: vec(500, 200) }),
+      ],
+      false,
+    );
+    const document = fontDocument([addContour(glyph("s", { advance: 700 }), c)]);
+    const state = editorState({ document, view: VIEW });
+
+    // Dragging the first node to somewhere near the line square to that handle
+    // through the corner: the line x + y = 400.
+    const down = pointerDown(state, pointerInput(vec(0, 0)), { snapPoints: true }).state;
+    const moved = pointerMove(down, pointerInput(vec(100, 303)), { snapPoints: true }).state;
+    const p = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[0]!.id)!.pt;
+
+    // Square to the handle: the vector from the corner has no component along it.
+    expect((p.x - 200) * 100 + (p.y - 200) * 100).toBeCloseTo(0, 6);
+    // And not square to the chord, which would have held y at 200.
+    expect(p.y).toBeGreaterThan(250);
+  });
+
   it("leaves it alone where the drag is nowhere near", () => {
     const { state, c } = corner();
     const moved = drag(state, { x: 600, y: 300 }, { x: 600, y: 200 }, { snapPoints: true });
