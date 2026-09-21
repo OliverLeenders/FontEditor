@@ -291,6 +291,44 @@ describe("context menu", () => {
     expect(items).not.toContain("Add point at extreme");
   });
 
+  it("puts a point halfway along a straight segment", () => {
+    // A place with a name, rather than wherever the pointer happened to be.
+    const ids = counterIds("mid");
+    const drawn = contour(
+      ids.contour(),
+      [newNode(ids.node(), { x: 0, y: 0 }), newNode(ids.node(), { x: 200, y: 100 })],
+      false,
+    );
+    const name = store.editor.currentGlyph;
+    store.setEditor({
+      ...store.editor,
+      document: updateGlyph(store.editor.document, name, (g) => addContour(g, drawn))!,
+    });
+
+    const target = {
+      kind: "segment",
+      contourId: drawn.id,
+      segmentIndex: 0,
+      cubic: segmentCubic(
+        segmentAt(contourById(store.editor.document.glyphs[name]!, drawn.id)!, 0)!,
+      ),
+      status: "flat",
+    };
+    expect(labels(store, target)).toContain("Insert point at the middle");
+
+    run(store, target, "Insert point at the middle");
+    const after = contourById(store.editor.document.glyphs[name]!, drawn.id)!;
+
+    expect(after.nodes).toHaveLength(3);
+    expect(after.nodes[1]!.pt).toEqual({ x: 100, y: 50 });
+  });
+
+  it("does not offer it on a curve, whose middle is not the middle", () => {
+    // The parameter halfway along a cubic is not the halfway point of the shape
+    // it draws, so the word would be a lie.
+    expect(labels(store, segment())).not.toContain("Insert point at the middle");
+  });
+
   it("flips between Make line and Make curve with the segment's kind", () => {
     expect(labels(store, segment())).toContain("Make line");
     run(store, segment(), "Make line");

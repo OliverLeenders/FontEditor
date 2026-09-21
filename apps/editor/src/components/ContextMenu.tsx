@@ -517,6 +517,20 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     }
   }
 
+  // Halfway along a straight segment, which is a place with a name rather than
+  // wherever the pointer happened to be: the middle of a stem's end, the point a
+  // cross-bar is hung from. A curve's middle is not this — the parameter halfway
+  // along a cubic is not the halfway point of the shape it draws — so it is
+  // offered on lines, where the two are the same thing.
+  if (isLine) {
+    items.push({
+      kind: "item",
+      label: "Insert point at the middle",
+      icon: DistributeCentreIcon,
+      run: () => store.applyTool(insertPointOnSegment(editor, segment, 0.5, ids)),
+    });
+  }
+
   // Where the curve turns, on this segment. Offered only where there is a turn
   // with no point on it already: an item that would do nothing is worse than no
   // item, since the only way to find that out is to try it.

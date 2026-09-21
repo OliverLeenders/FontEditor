@@ -300,8 +300,9 @@ one of those offers to draw it there. Whatever else the file said is kept and wr
 
 **Right-click anything on the canvas.** A point offers corner/smooth, an axis lock,
 reverse contour and delete. A handle offers the axis lock, its node's type, retract,
-and reverse. A segment offers insert-point-here, a point at each extreme or inflection it
-has none on, line/curve conversion, balance and reverse. Which items appear depends on
+and reverse. A segment offers insert-point-here, a point halfway along it where it is
+straight, a point at each extreme or inflection it has none on, line/curve conversion,
+balance and reverse. Which items appear depends on
 what is under the pointer, using the same hit
 index the tools use — the menu can never offer an action for something the canvas is
 not showing. Space previews without controls, the wheel pans, Ctrl-wheel zooms at the
