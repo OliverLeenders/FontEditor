@@ -112,6 +112,13 @@ corner is a right angle with the curve there and not with the chord across it. T
 caught is drawn dashed while it holds, through the point it was taken from, so what
 happened is visible rather than mysterious.
 
+**A handle has its own angles.** Dragging one offers lines through the node it belongs to:
+square to whatever the node’s other side does, along it, and the italic angle with its
+perpendicular. A handle is a direction rather than a place, so landing on one of these sets
+the angle exactly however far out the handle is pulled — which is how a bowl is made to
+leave a stem at a right angle. Upright and level it could always manage, by catching the
+node’s own x and y; these are the angles in between.
+
 **Holding a drag to a direction.** Shift projects a drag onto whichever direction keeps
 most of it: upright, level, the font's italic angle and its perpendicular, and — when what
 you are dragging is a straight segment or a point on one — that segment's own direction and

@@ -675,6 +675,65 @@ describe("angled lines a drag can catch on", () => {
     expect(p.y).toBeGreaterThan(250);
   });
 
+  /**
+   * A corner whose incoming side runs at 45 degrees, and an outgoing handle to
+   * be set against it.
+   */
+  function corneredHandle() {
+    const ids = counterIds("hr");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0)),
+        // The incoming side leaves this node along (-100, -100): a 45-degree
+        // line. Square to it is the other diagonal.
+        node(ids.node(), vec(200, 200), { type: "corner", in: vec(100, 100), out: vec(300, 220) }),
+        node(ids.node(), vec(500, 200)),
+      ],
+      false,
+    );
+    const document = fontDocument([addContour(glyph("s", { advance: 700 }), c)]);
+    return { state: editorState({ document, view: VIEW }), c };
+  }
+
+  it("sets a handle square to the node's other side", () => {
+    // A handle is a direction rather than a place: landing on the line square to
+    // the other side sets the angle, however far out it is pulled.
+    const { state, c } = corneredHandle();
+    const down = pointerDown(state, pointerInput(vec(300, 220)), { snapPoints: true }).state;
+    // Out and up, near the perpendicular to the incoming 45-degree side.
+    const moved = pointerMove(down, pointerInput(vec(290, 106)), { snapPoints: true }).state;
+    const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[1]!.id)!;
+
+    const handle = { x: n.out!.x - 200, y: n.out!.y - 200 };
+    // Square to (100, 100): no component along it.
+    expect(handle.x * 100 + handle.y * 100).toBeCloseTo(0, 6);
+  });
+
+  it("offers a handle nothing angled unless point snapping is on", () => {
+    const { state, c } = corneredHandle();
+    const down = pointerDown(state, pointerInput(vec(300, 220))).state;
+    const moved = pointerMove(down, pointerInput(vec(290, 106))).state;
+    const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[1]!.id)!;
+
+    expect(n.out).toEqual(vec(290, 106));
+  });
+
+  it("sets a handle to the italic angle where the font leans", () => {
+    const { state, c } = corneredHandle();
+    const leaning: EditorState = {
+      ...state,
+      document: { ...state.document, info: { ...state.document.info, italicAngle: -12 } },
+    };
+    const down = pointerDown(leaning, pointerInput(vec(300, 220)), { snapPoints: true }).state;
+    // Up and to the right, within a few units of the lean through the node.
+    const moved = pointerMove(down, pointerInput(vec(266, 493)), { snapPoints: true }).state;
+    const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[1]!.id)!;
+
+    const handle = { x: n.out!.x - 200, y: n.out!.y - 200 };
+    expect(handle.x / handle.y).toBeCloseTo(Math.tan((12 * Math.PI) / 180), 3);
+  });
+
   it("leaves it alone where the drag is nowhere near", () => {
     const { state, c } = corner();
     const moved = drag(state, { x: 600, y: 300 }, { x: 600, y: 200 }, { snapPoints: true });

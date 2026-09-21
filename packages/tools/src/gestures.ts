@@ -620,6 +620,10 @@ function alongDegrees(degrees: number): Vec2 {
  * Only through neighbours of what is moving, and only the segments beyond them:
  * every point in the glyph offering two rays would be hundreds of lines at every
  * angle, and something would always be within reach.
+ *
+ * A dragged *handle* is offered lines of its own, through the node it belongs
+ * to — see {@link handleRays}. A handle is a direction rather than a place, and
+ * the directions worth having are about the node it leaves.
  */
 function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapRay[] {
   const out: SnapRay[] = [];
@@ -627,12 +631,16 @@ function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapR
   const lean = state.document.info.italicAngle;
 
   for (const item of moving) {
-    if (item.part !== "point") continue;
     const c = contourById(glyph, item.contourId);
     if (c === null) continue;
 
     const index = c.nodes.findIndex((n) => n.id === item.nodeId);
     if (index < 0) continue;
+
+    if (item.part !== "point") {
+      out.push(...handleRays(c, index, item.part, lean));
+      continue;
+    }
 
     for (const step of [-1, 1] as const) {
       const neighbour = stepAround(c, index, step);
@@ -663,6 +671,56 @@ function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapR
         });
       }
     }
+  }
+
+  return out;
+}
+
+/**
+ * The lines a dragged handle is offered, through the node it belongs to.
+ *
+ * A handle is a direction: where it lands says how the curve leaves the node,
+ * and the questions worth asking are about that angle rather than about where
+ * the point sits. So the lines all pass through the node itself, and landing on
+ * one sets the angle exactly however far out the handle is pulled.
+ *
+ * **Square to the other side** is the right angle a corner is built from: the
+ * curve leaves at ninety degrees to whatever the node's other segment does,
+ * which is how a bowl meets a stem. **Along it** is the same line turned, which
+ * is what makes a corner smooth by hand. And the **italic angle** with its
+ * perpendicular, which on a leaning design are what upright and level are on an
+ * upright one.
+ *
+ * The node's own x and y are already offered as a neighbour line, so a handle
+ * has always been able to land exactly upright or exactly level. These are the
+ * angles between.
+ */
+function handleRays(c: Contour, index: number, part: "in" | "out", lean: number): SnapRay[] {
+  const n = c.nodes[index];
+  if (n === undefined) return [];
+
+  const out: SnapRay[] = [];
+  // The segment on the node's *other* side: the one the drag is not holding.
+  const step = part === "out" ? -1 : 1;
+  const beyond = stepAround(c, index, step);
+  if (beyond !== null) {
+    const along = leavingBy(n, beyond, step);
+    const reach = Math.hypot(along.x, along.y);
+    if (reach > 0) {
+      const unit = { x: along.x / reach, y: along.y / reach };
+      out.push({ through: n.pt, direction: { x: -unit.y, y: unit.x }, source: "extreme" });
+      out.push({ through: n.pt, direction: unit, source: "extreme" });
+    }
+  }
+
+  if (lean !== 0) {
+    const leaning = alongDegrees(90 + lean);
+    out.push({ through: n.pt, direction: leaning, source: "neighbour" });
+    out.push({
+      through: n.pt,
+      direction: { x: -leaning.y, y: leaning.x },
+      source: "neighbour",
+    });
   }
 
   return out;
