@@ -102,6 +102,13 @@ away from it, which is what stops it flickering between two candidates a unit ap
 Ctrl to switch it off for a drag, and turn **Snap to points** off in the View menu to leave
 only the font's own lines.
 
+**Lines at an angle.** A slanted design has nothing upright or level to align to, so a drag
+also catches on the line **square to** the segment beyond the point next to it, on the line
+**parallel** to that segment, on the **italic angle** through that point, and on any
+**guide you have drawn at an angle** — which until now was drawn and measured against by
+eye. The line it caught is drawn dashed while it holds, through the point it was taken
+from, so what happened is visible rather than mysterious.
+
 **What two masters have to agree on.** Interpolation is arithmetic on
 corresponding points: the third point of the second contour here is averaged with the third
 point of the second contour there. So which point a contour begins at, and which contour

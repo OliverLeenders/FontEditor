@@ -5,9 +5,11 @@ import {
   NO_SNAPPING,
   type SnapHold,
   type SnapLine,
+  type SnapRay,
   type Snapping,
   metricLine,
   sameLine,
+  sameRay,
   snapDelta,
   snapPoint,
   toGrid,
@@ -183,6 +185,93 @@ describe("sameLine", () => {
   it("treats nothing held as no match", () => {
     expect(sameLine(null, metricLine(0))).toBe(false);
     expect(sameLine(null, null)).toBe(true);
+  });
+});
+
+/**
+ * Lines at an angle.
+ *
+ * The axis lines are coordinates, which is all a drag needed while everything
+ * worth aligning to was upright or level. A slanted design has neither, and a
+ * right angle in that frame is at no axis at all.
+ */
+describe("a line at an angle", () => {
+  /** A line through the origin at 45 degrees, and the same rotated a quarter turn. */
+  const up: SnapRay = {
+    through: at(0, 0),
+    direction: { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+    source: "guide",
+  };
+  const across: SnapRay = {
+    through: at(0, 0),
+    direction: { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
+    source: "guide",
+  };
+
+  const angled: Snapping = { ...NO_SNAPPING, rays: [up], enter: 10, stay: 16, stickiness: 1.6 };
+
+  it("pulls a point onto it, square to the line", () => {
+    // Three units off a 45-degree line through the origin.
+    const landed = snapPoint(at(100, 104), angled);
+    expect(landed.point.x).toBeCloseTo(102, 6);
+    expect(landed.point.y).toBeCloseTo(102, 6);
+    expect(landed.hold.ray).toEqual(up);
+  });
+
+  it("leaves a point that is clearly off it alone", () => {
+    const landed = snapPoint(at(100, 140), angled);
+    expect(landed.point).toEqual(at(100, 140));
+    expect(landed.hold.ray ?? null).toBeNull();
+  });
+
+  it("moves a whole drag onto it, by the nearest point in the body", () => {
+    const landed = snapDelta([at(100, 104), at(300, 200)], at(0, 0), angled);
+    // The first point is two units off the line, the second seventy.
+    expect(landed.delta.x).toBeCloseTo(2, 6);
+    expect(landed.delta.y).toBeCloseTo(-2, 6);
+    expect(landed.hold.ray).toEqual(up);
+  });
+
+  it("takes the nearer of two angled lines", () => {
+    const both: Snapping = { ...angled, rays: [up, across] };
+    // Nearer the one going up: five units off it, and fifty off the other.
+    expect(snapDelta([at(100, 95)], at(0, 0), both).hold.ray).toEqual(up);
+  });
+
+  it("holds the line it caught past the radius that caught it", () => {
+    const held: SnapHold = { x: null, y: null, ray: up };
+    // Twelve units off: too far to catch afresh, not too far to hold.
+    const landed = snapPoint(at(100, 117), angled, held);
+    expect(landed.hold.ray).toEqual(up);
+  });
+
+  it("lets go once the pointer is clearly done with it", () => {
+    const held: SnapHold = { x: null, y: null, ray: up };
+    expect(snapPoint(at(100, 160), angled, held).hold.ray ?? null).toBeNull();
+  });
+
+  it("gives way to an axis line that is nearer", () => {
+    // One unit under the x-height and four off the angled line: the axis wins,
+    // and takes only its own coordinate.
+    const mixed: Snapping = { ...snapping, rays: [up] };
+    const landed = snapPoint(at(508, 511.4), mixed);
+    expect(landed.point.y).toBe(512.4);
+    expect(landed.hold.ray ?? null).toBeNull();
+  });
+
+  it("wins where it is nearer than either axis line", () => {
+    const mixed: Snapping = { ...snapping, rays: [up] };
+    // Two units off the angled line, nine from the x-height.
+    const landed = snapPoint(at(300, 303), mixed);
+    expect(landed.point.x).toBeCloseTo(301.5, 6);
+    expect(landed.point.y).toBeCloseTo(301.5, 6);
+  });
+
+  it("knows one line from another", () => {
+    expect(sameRay(up, { ...up })).toBe(true);
+    expect(sameRay(up, across)).toBe(false);
+    expect(sameRay(null, up)).toBe(false);
+    expect(sameRay(null, null)).toBe(true);
   });
 });
 

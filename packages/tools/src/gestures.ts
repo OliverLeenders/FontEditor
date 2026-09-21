@@ -5,7 +5,9 @@ import {
   isVertical,
   type AnchorId,
   type ComponentId,
+  type Contour,
   type ContourId,
+  type Node,
   type Glyph,
   type NodeId,
   contourById,
@@ -34,6 +36,7 @@ import {
   type Selection,
   type SelectionItem,
   type SnapLine,
+  type SnapRay,
   type Snapping,
   NO_HOLD,
   NO_SNAPPING,
@@ -539,12 +542,13 @@ export function snappingFor(
   const glyph = currentGlyph(state);
   const alignment = alignmentLines(started, moving, { points: options.snapPoints ?? false });
 
-  // The lines the designer put there, font's and glyph's together. Only the
-  // level and upright ones: the snapping machinery below catches a coordinate
-  // on an axis, and an angled guide is not one. An italic guide is drawn and
-  // measured against by eye until that machinery understands a line.
+  // The lines the designer put there, font's and glyph's together. The upright
+  // and level ones are coordinates on an axis; the rest are rays, which the
+  // machinery understands now — an italic guide used to be drawn and measured
+  // against by eye.
   const upright: SnapLine[] = [];
   const level: SnapLine[] = [];
+  const rays: SnapRay[] = [];
   for (const g of [...state.document.guides, ...(glyph?.guides ?? [])]) {
     // Never the one being dragged. These lines are rebuilt from the document
     // every frame, so a dragged guide's own line sits exactly under the pointer
@@ -556,6 +560,11 @@ export function snappingFor(
     if (g.id === exceptGuide) continue;
     if (isVertical(g)) upright.push(metricLine(g.pt.x, "guide"));
     else if (isHorizontal(g)) level.push(metricLine(g.pt.y, "guide"));
+    else rays.push({ through: g.pt, direction: alongDegrees(g.angle), source: "guide" });
+  }
+
+  if (options.snapPoints === true && glyph !== null) {
+    rays.push(...outlineRays(state, glyph, moving));
   }
 
   const pixels = options.snapPixels ?? SNAP_PIXELS;
@@ -574,11 +583,89 @@ export function snappingFor(
       ...level,
       ...alignment.ys,
     ],
+    rays,
     enter: screenTolerance(state.view, pixels),
     stay: screenTolerance(state.view, options.snapStayPixels ?? SNAP_STAY_PIXELS),
     stickiness: options.snapStickiness ?? SNAP_STICKINESS,
     grid: 1,
   };
+}
+
+/** A unit vector at an angle, counter-clockwise from the x axis. */
+function alongDegrees(degrees: number): Vec2 {
+  const radians = (degrees * Math.PI) / 180;
+  return { x: Math.cos(radians), y: Math.sin(radians) };
+}
+
+/**
+ * The angled lines a drawing offers a drag, through the points that are
+ * standing still.
+ *
+ * Three kinds, and each answers something the axes cannot on a slanted design.
+ * **Square to a segment**: through a neighbour that is staying put, at a right
+ * angle to the segment on its far side — which is how a stem is cut square to
+ * the one it meets, whatever angle they are at. **Parallel to it**: the same
+ * line turned to run alongside, which is how the other side of a stem is kept
+ * at the angle the first side has. And **the italic angle** through the same
+ * points, which is upright for a design that leans.
+ *
+ * Only through neighbours of what is moving, and only the segments beyond them:
+ * every point in the glyph offering two rays would be hundreds of lines at every
+ * angle, and something would always be within reach.
+ */
+function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapRay[] {
+  const out: SnapRay[] = [];
+  const held = new Set(moving.map((item) => `${item.contourId} ${item.nodeId}`));
+  const lean = state.document.info.italicAngle;
+
+  for (const item of moving) {
+    if (item.part !== "point") continue;
+    const c = contourById(glyph, item.contourId);
+    if (c === null) continue;
+
+    const index = c.nodes.findIndex((n) => n.id === item.nodeId);
+    if (index < 0) continue;
+
+    for (const step of [-1, 1] as const) {
+      const neighbour = stepAround(c, index, step);
+      if (neighbour === null || held.has(`${c.id} ${neighbour.id}`)) continue;
+
+      // The segment on the far side of the neighbour: the one the drag is not
+      // holding, and so the one worth being square or parallel to.
+      const beyond = stepAround(c, c.nodes.indexOf(neighbour), step);
+      if (beyond !== null) {
+        const along = { x: beyond.pt.x - neighbour.pt.x, y: beyond.pt.y - neighbour.pt.y };
+        const reach = Math.hypot(along.x, along.y);
+        if (reach > 0) {
+          const unit = { x: along.x / reach, y: along.y / reach };
+          out.push({
+            through: neighbour.pt,
+            direction: { x: -unit.y, y: unit.x },
+            source: "extreme",
+          });
+          out.push({ through: neighbour.pt, direction: unit, source: "extreme" });
+        }
+      }
+
+      if (lean !== 0) {
+        out.push({
+          through: neighbour.pt,
+          direction: alongDegrees(90 + lean),
+          source: "neighbour",
+        });
+      }
+    }
+  }
+
+  return out;
+}
+
+/** The node one step around a contour, or `null` past the end of an open one. */
+function stepAround(c: Contour, index: number, step: -1 | 1): Node | null {
+  const next = index + step;
+  if (next >= 0 && next < c.nodes.length) return c.nodes[next] ?? null;
+  if (!c.closed) return null;
+  return (step === 1 ? c.nodes[0] : c.nodes[c.nodes.length - 1]) ?? null;
 }
 
 export type GestureOptions = {
@@ -631,6 +718,7 @@ const CONTINUE: Continuations = {
     // where they started too, or the drag would tow its own candidates along.
     const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const snapping = snappingFor(state, input, options, started, gesture.items);
+
     const snapped = snapDelta(
       selectionPoints(started, gesture.items),
       delta,

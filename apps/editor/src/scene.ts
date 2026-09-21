@@ -416,6 +416,16 @@ function snapGuidesFor(editor: EditorState): SnapGuide[] {
   const guides: SnapGuide[] = [];
   if (hold.x !== null) guides.push({ axis: "x", at: hold.x.at, from: hold.x.from });
   if (hold.y !== null) guides.push({ axis: "y", at: hold.y.at, from: hold.y.from });
+  // An angled line — a guide at an angle, or the square or the parallel of the
+  // segment beside the drag — drawn through the point it was taken from.
+  if (hold.ray != null) {
+    guides.push({
+      axis: "ray",
+      through: hold.ray.through,
+      direction: hold.ray.direction,
+      from: hold.ray.through,
+    });
+  }
   return guides;
 }
 

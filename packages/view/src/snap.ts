@@ -9,13 +9,7 @@ import type { Vec2 } from "@typewright/geometry";
  * be a value rather than a reference.
  */
 export type SnapSource =
-  | "metric"
-  | "origin"
-  | "advance"
-  | "extreme"
-  | "neighbour"
-  | "point"
-  | "guide";
+  "metric" | "origin" | "advance" | "extreme" | "neighbour" | "point" | "guide";
 
 export type SnapLine = {
   /** The coordinate, on whichever axis this line belongs to. */
@@ -26,6 +20,22 @@ export type SnapLine = {
    * for a line the font itself defines and which therefore spans the canvas.
    */
   readonly from: Vec2 | null;
+};
+
+/**
+ * A line at any angle a drag can catch on.
+ *
+ * The lines above are coordinates on an axis, which is all a drag needed while
+ * everything worth aligning to was upright or level. A slanted design has
+ * neither: an italic's stems run at the italic angle and are cut across it, and
+ * a right angle in that frame is at no axis at all. So a ray is a point and a
+ * direction, and what it catches is the perpendicular distance to it.
+ */
+export type SnapRay = {
+  readonly through: Vec2;
+  /** A unit vector along the line. Its sign does not matter: a line has no end. */
+  readonly direction: Vec2;
+  readonly source: SnapSource;
 };
 
 /**
@@ -61,20 +71,32 @@ export type Snapping = {
    * alone, which is how snapping is switched off.
    */
   readonly grid: number;
+  /**
+   * Lines at an angle: angled guides, and the perpendiculars and parallels of
+   * the segment beside what is being dragged.
+   *
+   * Judged against the axis lines by plain distance, and the nearest wins. A
+   * ray corrects in two dimensions at once — it is one line rather than a
+   * coordinate — so when one catches it takes the whole offset and the axes sit
+   * that frame out.
+   */
+  readonly rays?: readonly SnapRay[];
 };
 
-/** What a drag is currently caught on, one line per axis. */
+/** What a drag is currently caught on: one line per axis, or one ray. */
 export type SnapHold = {
   readonly x: SnapLine | null;
   readonly y: SnapLine | null;
+  readonly ray?: SnapRay | null;
 };
 
-export const NO_HOLD: SnapHold = { x: null, y: null };
+export const NO_HOLD: SnapHold = { x: null, y: null, ray: null };
 
 /** Snapping that does nothing at all. */
 export const NO_SNAPPING: Snapping = {
   xs: [],
   ys: [],
+  rays: [],
   enter: 0,
   stay: 0,
   stickiness: 1,
@@ -104,6 +126,79 @@ export const SNAP_STICKINESS = 1.6;
 export function sameLine(a: SnapLine | null, b: SnapLine | null): boolean {
   if (a === null || b === null) return a === b;
   return a.at === b.at && a.source === b.source;
+}
+
+/** And two rays, which are rebuilt every frame and so compared by value. */
+export function sameRay(a: SnapRay | null | undefined, b: SnapRay | null | undefined): boolean {
+  if (a == null || b == null) return (a ?? null) === (b ?? null);
+  return (
+    a.source === b.source &&
+    a.through.x === b.through.x &&
+    a.through.y === b.through.y &&
+    a.direction.x === b.direction.x &&
+    a.direction.y === b.direction.y
+  );
+}
+
+/** How far `p` sits off the line, and which way it would have to move. */
+function offRay(p: Vec2, ray: SnapRay): { readonly away: number; readonly onto: Vec2 } {
+  const dx = p.x - ray.through.x;
+  const dy = p.y - ray.through.y;
+  // The component across the line, which is what has to go.
+  const across = dx * -ray.direction.y + dy * ray.direction.x;
+  // The offset itself, which is that component along the normal.
+  return { away: across, onto: { x: -ray.direction.y * across, y: ray.direction.x * across } };
+}
+
+/**
+ * The ray a drag catches on, with the offset that lands it.
+ *
+ * The same hysteresis the axis lines take, measured perpendicular to the line
+ * rather than along an axis: a caught ray keeps its place until the drag is
+ * clearly done with it, and a rival has to be clearly nearer to take over.
+ */
+function catchRay(
+  landed: readonly Vec2[],
+  snapping: Snapping,
+  held: SnapRay | null | undefined,
+): { readonly ray: SnapRay; readonly correction: Vec2 } | null {
+  const nearest = (ray: SnapRay): { away: number; onto: Vec2 } | null => {
+    let best: { away: number; onto: Vec2 } | null = null;
+    for (const p of landed) {
+      const found = offRay(p, ray);
+      if (best === null || Math.abs(found.away) < Math.abs(best.away)) best = found;
+    }
+    return best;
+  };
+
+  let best: SnapRay | null = null;
+  let bestOff: { away: number; onto: Vec2 } | null = null;
+  for (const ray of snapping.rays ?? []) {
+    const found = nearest(ray);
+    if (found === null) continue;
+    if (bestOff === null || Math.abs(found.away) < Math.abs(bestOff.away)) {
+      best = ray;
+      bestOff = found;
+    }
+  }
+
+  if (held != null && !sameRay(held, best)) {
+    const holding = nearest(held);
+    if (
+      holding !== null &&
+      Math.abs(holding.away) < snapping.stay &&
+      (bestOff === null || Math.abs(holding.away) < Math.abs(bestOff.away) * snapping.stickiness)
+    ) {
+      return { ray: held, correction: { x: -holding.onto.x, y: -holding.onto.y } };
+    }
+  }
+
+  if (best === null || bestOff === null) return null;
+
+  const threshold = sameRay(held, best) ? snapping.stay : snapping.enter;
+  return Math.abs(bestOff.away) < threshold
+    ? { ray: best, correction: { x: -bestOff.onto.x, y: -bestOff.onto.y } }
+    : null;
 }
 
 /** The smallest correction that would land any of `positions` on `at`. */
@@ -176,12 +271,26 @@ export function snapPoint(
   const x = catchLine([p.x], snapping.xs, held.x, snapping);
   const y = catchLine([p.y], snapping.ys, held.y, snapping);
 
+  const ray = catchRay([p], snapping, held.ray);
+  const across = ray === null ? Infinity : Math.hypot(ray.correction.x, ray.correction.y);
+  const nearestAxis = Math.min(
+    x === null ? Infinity : Math.abs(x.correction),
+    y === null ? Infinity : Math.abs(y.correction),
+  );
+
+  if (ray !== null && across < nearestAxis) {
+    return {
+      point: { x: p.x + ray.correction.x, y: p.y + ray.correction.y },
+      hold: { x: null, y: null, ray: ray.ray },
+    };
+  }
+
   return {
     point: {
       x: x === null ? quantise(p.x, snapping.grid) : p.x + x.correction,
       y: y === null ? quantise(p.y, snapping.grid) : p.y + y.correction,
     },
-    hold: { x: x?.line ?? null, y: y?.line ?? null },
+    hold: { x: x?.line ?? null, y: y?.line ?? null, ray: null },
   };
 }
 
@@ -211,12 +320,33 @@ export function snapDelta(
   const x = catchLine(landedX, snapping.xs, held.x, snapping);
   const y = catchLine(landedY, snapping.ys, held.y, snapping);
 
+  // An angled line, judged against the axis lines by plain distance. It wins
+  // only by being nearer than both of them, because an axis line is the commoner
+  // intent and a ray takes the whole offset rather than one coordinate of it.
+  const ray = catchRay(
+    moving.map((p) => ({ x: p.x + delta.x, y: p.y + delta.y })),
+    snapping,
+    held.ray,
+  );
+  const across = ray === null ? Infinity : Math.hypot(ray.correction.x, ray.correction.y);
+  const nearestAxis = Math.min(
+    x === null ? Infinity : Math.abs(x.correction),
+    y === null ? Infinity : Math.abs(y.correction),
+  );
+
+  if (ray !== null && across < nearestAxis) {
+    return {
+      delta: { x: delta.x + ray.correction.x, y: delta.y + ray.correction.y },
+      hold: { x: null, y: null, ray: ray.ray },
+    };
+  }
+
   return {
     delta: {
       x: x === null ? quantise(delta.x, snapping.grid) : delta.x + x.correction,
       y: y === null ? quantise(delta.y, snapping.grid) : delta.y + y.correction,
     },
-    hold: { x: x?.line ?? null, y: y?.line ?? null },
+    hold: { x: x?.line ?? null, y: y?.line ?? null, ray: null },
   };
 }
 

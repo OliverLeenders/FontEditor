@@ -333,7 +333,17 @@ export function drawSnapGuides(ctx: Canvas2D, s: Scene): void {
 
   for (const guide of s.snapGuides) {
     ctx.beginPath();
-    if (guide.axis === "x") {
+    if (guide.axis === "ray") {
+      // An angled line has no axis to be quantised against, so it is drawn from
+      // the point it passes through, far enough each way to leave the viewport
+      // whatever the angle and the zoom. Screen y grows downward, which is the
+      // minus.
+      const middle = toScreen(s.view, guide.through);
+      const reach = s.viewport.width + s.viewport.height;
+      const along = { x: guide.direction.x, y: -guide.direction.y };
+      ctx.moveTo(middle.x - along.x * reach, middle.y - along.y * reach);
+      ctx.lineTo(middle.x + along.x * reach, middle.y + along.y * reach);
+    } else if (guide.axis === "x") {
       // Half-pixel offset, as the metric lines take, so a one-pixel line lands
       // on a pixel instead of smearing across two.
       const x = Math.round(toScreen(s.view, { x: guide.at, y: 0 }).x) + 0.5;

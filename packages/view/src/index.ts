@@ -98,7 +98,7 @@ export {
   pickOf,
 } from "./hit.js";
 
-export type { SnapHold, SnapLine, SnapSource, Snapping } from "./snap.js";
+export type { SnapHold, SnapLine, SnapRay, SnapSource, Snapping } from "./snap.js";
 export {
   NO_HOLD,
   NO_SNAPPING,
@@ -107,6 +107,7 @@ export {
   SNAP_STICKINESS,
   metricLine,
   sameLine,
+  sameRay,
   snapDelta,
   snapPoint,
   toGrid,

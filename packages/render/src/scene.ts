@@ -59,12 +59,26 @@ export type MetricLine = {
  * already drawn, so there is nothing to point at: the guide over them says
  * "this one is live" and that is all it needs to say.
  */
-export type SnapGuide = {
-  readonly axis: "x" | "y";
-  /** Position in design units, on that axis. */
-  readonly at: number;
-  readonly from: Vec2 | null;
-};
+/**
+ * A line a drag is caught on, drawn while it holds.
+ *
+ * Either a coordinate on an axis, which spans the canvas, or a line at an angle
+ * — an italic guide, or the square and the parallel of the segment beside the
+ * drag — which is given as a point and a direction.
+ */
+export type SnapGuide =
+  | {
+      readonly axis: "x" | "y";
+      /** Position in design units, on that axis. */
+      readonly at: number;
+      readonly from: Vec2 | null;
+    }
+  | {
+      readonly axis: "ray";
+      readonly through: Vec2;
+      readonly direction: Vec2;
+      readonly from: Vec2 | null;
+    };
 
 /**
  * Sizes in *screen* pixels, so a control stays the same size on screen however

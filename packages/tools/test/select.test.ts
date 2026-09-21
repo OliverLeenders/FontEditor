@@ -583,15 +583,6 @@ describe("purity", () => {
   });
 });
 
-/**
- * A drag held to a direction.
- *
- * Shift projects the offset onto whichever direction keeps most of it: the two
- * axes, the font's italic angle and its perpendicular, and the straight segment
- * under the drag — along it and across it. The last is what a stem asks for:
- * slide a corner along the line it sits on, or move the whole line sideways by
- * its own thickness, neither of which the page's axes can express on a slant.
- */
 describe("margin lines", () => {
   it("starts a margin drag when pressed on, not a marquee", () => {
     const { state } = start();
