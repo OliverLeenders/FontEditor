@@ -81,16 +81,124 @@ function samples(poly: readonly Vec2[]): Vec2[] {
   return out;
 }
 
+/** How many bands a contour's outline is filed into, to compare two of them. */
+const BANDS = 64;
+
+/**
+ * A flattened outline with its segments filed by height.
+ *
+ * Asking whether two outlines cross means asking it of every pair of their
+ * segments, and an `o` flattened finely enough to measure is several hundred of
+ * them — a few hundred thousand pairs for one question asked while a grid of
+ * glyphs is being drawn. Filing the segments by which horizontal band they
+ * occupy means each segment of one outline is only compared with the handful of
+ * the other's that could possibly reach it.
+ */
+type Boundary = {
+  readonly points: readonly Vec2[];
+  readonly bands: readonly (readonly number[])[];
+  readonly minY: number;
+  readonly bandHeight: number;
+};
+
+function boundaryOf(points: readonly Vec2[]): Boundary {
+  const bands: number[][] = Array.from({ length: BANDS }, () => []);
+  if (points.length < 2) return { points, bands, minY: 0, bandHeight: 0 };
+
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const p of points) {
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const bandHeight = (maxY - minY) / BANDS;
+
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i]!;
+    const b = points[(i + 1) % points.length]!;
+    const [first, last] = bandsFor(Math.min(a.y, b.y), Math.max(a.y, b.y), minY, bandHeight);
+    for (let band = first; band <= last; band++) bands[band]!.push(i);
+  }
+
+  return { points, bands, minY, bandHeight };
+}
+
+/** The bands a height range falls in, clamped to the ones that exist. */
+function bandsFor(low: number, high: number, minY: number, bandHeight: number): [number, number] {
+  if (!(bandHeight > 0)) return [0, BANDS - 1];
+  const first = Math.floor((low - minY) / bandHeight);
+  const last = Math.floor((high - minY) / bandHeight);
+  return [Math.min(Math.max(first, 0), BANDS - 1), Math.min(Math.max(last, 0), BANDS - 1)];
+}
+
+/** Which side of the line through `a` and `b` the point `c` falls. */
+function side(a: Vec2, b: Vec2, c: Vec2): number {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+/**
+ * Whether two segments properly cross: each has an end on either side of the
+ * other.
+ *
+ * Touching — an end exactly on the other segment, or the two lying along each
+ * other — is deliberately not crossing. Contours that meet without passing
+ * through one another are how a counter is drawn against the stroke holding it,
+ * and reading that as a crossing would undo the containment it is meant to
+ * establish.
+ */
+function segmentsCross(a1: Vec2, a2: Vec2, b1: Vec2, b2: Vec2): boolean {
+  const d1 = side(b1, b2, a1);
+  const d2 = side(b1, b2, a2);
+  if (d1 === 0 || d2 === 0 || d1 > 0 === d2 > 0) return false;
+
+  const d3 = side(a1, a2, b1);
+  const d4 = side(a1, a2, b2);
+  return d3 !== 0 && d4 !== 0 && d3 > 0 !== d4 > 0;
+}
+
+/** Whether the two outlines pass through one another anywhere. */
+function boundariesCross(poly: readonly Vec2[], holder: Boundary): boolean {
+  if (poly.length < 2 || holder.points.length < 2) return false;
+
+  for (let i = 0; i < poly.length; i++) {
+    const a1 = poly[i]!;
+    const a2 = poly[(i + 1) % poly.length]!;
+    const [first, last] = bandsFor(
+      Math.min(a1.y, a2.y),
+      Math.max(a1.y, a2.y),
+      holder.minY,
+      holder.bandHeight,
+    );
+    for (let band = first; band <= last; band++) {
+      for (const j of holder.bands[band]!) {
+        const b1 = holder.points[j]!;
+        const b2 = holder.points[(j + 1) % holder.points.length]!;
+        if (segmentsCross(a1, a2, b1, b2)) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
  * Whether `poly` lies within `holder`.
  *
- * Every sample must be inside, not merely one. A contour that *overlaps*
- * another has points on both sides of it, and calling that containment is
- * exactly the mistake that would turn a stem crossing a shoulder into a hole —
- * which is the bug this whole pass exists to prevent rather than cause.
+ * Two questions, because either alone is answered wrongly by a shape that is
+ * partly inside. Every sample point must be inside — a contour that plainly
+ * overlaps another has points on both sides of it — and the two outlines must
+ * not cross anywhere, which is what settles the case the samples get wrong.
+ *
+ * The case they get wrong is a real drawing: the stem of a dollar sign crossing
+ * an `S`, or any bar laid across two strokes with a gap between them. Its
+ * corners all land in ink, so every sample says "inside", while the middle of
+ * it passes through the gap and out of the letter entirely. Turning it into a
+ * hole punches a notch out of the letter exactly where the two should have
+ * joined — which is the bug this whole pass exists to prevent rather than
+ * cause.
  */
-function within(poly: readonly Vec2[], holder: readonly Vec2[]): boolean {
-  return samples(poly).every((p) => inside(p, holder));
+function within(poly: readonly Vec2[], holder: Boundary): boolean {
+  if (!samples(poly).every((p) => inside(p, holder.points))) return false;
+  return !boundariesCross(poly, holder);
 }
 
 /**
@@ -112,6 +220,8 @@ export function correctDirections(contours: readonly Contour[]): readonly Contou
 
   const polygons = contours.map((c) => (c.closed ? polygon(c) : []));
   const windings = contours.map((c) => (c.closed ? contourWinding(c) : 0));
+  // Filed by height once each, because every contour is asked about every other.
+  const boundaries = polygons.map(boundaryOf);
 
   const out = contours.map((c, i) => {
     if (!c.closed || windings[i] === 0) return c;
@@ -122,7 +232,7 @@ export function correctDirections(contours: readonly Contour[]): readonly Contou
       // Only a larger contour can hold a smaller one, which also settles the
       // case of two identical contours drawn on top of each other.
       if (Math.abs(windings[j]!) < Math.abs(windings[i]!)) continue;
-      if (within(polygons[i]!, polygons[j]!)) depth += 1;
+      if (within(polygons[i]!, boundaries[j]!)) depth += 1;
     }
 
     const wanted = depth % 2 === 0 ? 1 : -1;

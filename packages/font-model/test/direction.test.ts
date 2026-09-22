@@ -29,6 +29,14 @@ function box(minX: number, minY: number, maxX: number, maxY: number) {
   );
 }
 
+function poly(points: readonly (readonly [number, number])[]) {
+  return contour(
+    ids.contour(),
+    points.map(([x, y]) => node(ids.node(), vec(x, y))),
+    true,
+  );
+}
+
 const anticlockwise = (c: ReturnType<typeof box>) => contourWinding(c) > 0;
 
 describe("which way a contour runs", () => {
@@ -93,6 +101,36 @@ describe("correcting a set of contours", () => {
     );
     expect(correctDirections([open])[0]).toBe(open);
     expect(correctDirections([])).toEqual([]);
+  });
+
+  it("does not read a bar laid across two strokes as held by them", () => {
+    // The dollar sign: a stem crossing an `S`. Every corner of the stem lands
+    // in ink, so sampling its points says "inside" while the middle of it
+    // passes through the gap between the strokes and out of the letter. Read as
+    // containment, the stem becomes a hole and notches the letter exactly where
+    // the two were meant to join.
+    const strokes = poly([
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [70, 100],
+      [70, 30],
+      [30, 30],
+      [30, 100],
+      [0, 100],
+    ]);
+    const bar = box(10, 60, 90, 70);
+
+    expect(correctDirections([strokes, bar]).map((c) => anticlockwise(c))).toEqual([true, true]);
+  });
+
+  it("still holds a counter that touches the stroke around it", () => {
+    // Touching is not crossing: a counter drawn hard against the left of what
+    // holds it is still a counter, and still has to run the other way.
+    const outer = box(0, 0, 600, 600);
+    const counter = box(0, 200, 400, 400);
+
+    expect(correctDirections([outer, counter]).map((c) => anticlockwise(c))).toEqual([true, false]);
   });
 
   it("does not read an overlap as containment", () => {
