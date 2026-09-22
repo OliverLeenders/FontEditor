@@ -4,9 +4,11 @@ import { session as newSession } from "@typewright/edit-core";
 import {
   type ExtraLayer,
   type FamilyImport,
+  importMacFont,
   importUfo,
   looksLikeArchive,
   looksLikeFamily,
+  looksLikeMacFontFile,
   looksLikeUfo,
   fromWoff,
   isWoff,
@@ -97,7 +99,7 @@ export async function importFont(
     if (family !== null) return await adoptFamilyFrom(host, family);
   }
 
-  const read = looksLikeUfo(fileName) ? await readUfo(bytes) : await readBinary(bytes);
+  const read = await readSomething(bytes, fileName);
 
   await adoptDocument(host, read.document);
   await adoptImages(host, read.images);
@@ -108,6 +110,56 @@ export async function importFont(
     glyphs: glyphOrder.length,
     warnings: read.warnings,
   };
+}
+
+/**
+ * Which reader the file gets.
+ *
+ * A StuffIt archive is asked for by its bytes rather than its name: it has an
+ * eighty-character magic string at the front that nothing else has, and a font
+ * from 1997 has been renamed by whoever passed it along at least once. The
+ * other two go by name, for the reason `importFont` gives.
+ */
+async function readSomething(bytes: ArrayBuffer, fileName: string): Promise<Read> {
+  if (looksLikeMacFontFile(new Uint8Array(bytes))) return await readMacFont(bytes, fileName);
+  if (looksLikeUfo(fileName)) return await readUfo(bytes);
+  return await readBinary(bytes);
+}
+
+/** What a reader hands back: the font, its pictures, and what it had to say. */
+type Read = {
+  document: FontDocument;
+  warnings: string[];
+  images: ReadonlyMap<string, Uint8Array>;
+  layers: readonly ExtraLayer[];
+};
+
+/**
+ * A Macintosh font out of a StuffIt archive: a bitmap suitcase converted to
+ * outlines, or — when the suitcase holds a TrueType font rather than a bitmap
+ * one — that font, read by the binary reader like any other.
+ */
+async function readMacFont(bytes: ArrayBuffer, fileName: string): Promise<Read> {
+  const named = nameOf(fileName);
+  const found = importMacFont(
+    new Uint8Array(bytes),
+    randomIds(),
+    named === null ? {} : { familyName: named },
+  );
+  if (found.kind === "sfnt") return await readBinary(found.bytes.slice().buffer);
+
+  return {
+    document: found.document,
+    images: new Map<string, Uint8Array>(),
+    layers: [],
+    warnings: [...found.warnings],
+  };
+}
+
+/** A file's name without its suffix, or `null` when it was not offered one. */
+function nameOf(fileName: string): string | null {
+  const name = fileName.replace(/\.[^.]*$/, "").trim();
+  return name === "" ? null : name;
 }
 
 /**

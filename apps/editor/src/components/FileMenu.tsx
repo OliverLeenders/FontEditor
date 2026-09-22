@@ -284,14 +284,15 @@ export function FileMenu(): React.JSX.Element {
 }
 
 /**
- * What the picker offers: the binary formats, a zipped UFO, and a family.
+ * What the picker offers: the binary formats, a zipped UFO, a family, and a
+ * Macintosh font in a StuffIt archive.
  *
- * `.zip` has to be in the list for either of the last two to be selectable at
- * all, which does mean the picker will show archives that are not fonts. The
+ * `.zip` has to be in the list for the middle two to be selectable at all,
+ * which does mean the picker will show archives that are not fonts. The
  * alternative is a button per format, and a wrong file is answered immediately
  * by the reader rather than being a state anyone gets stuck in.
  */
-const ACCEPT = ".ttf,.otf,.woff,.ufoz,.zip,font/ttf,font/otf,font/woff";
+const ACCEPT = ".ttf,.otf,.woff,.ufoz,.zip,.sit,font/ttf,font/otf,font/woff";
 
 /** What opening a folder found, said in one line. */
 function reportOf(done: {

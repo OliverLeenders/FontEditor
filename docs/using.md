@@ -265,6 +265,15 @@ and every substitution and positioning rule as feature source in the Features wo
 What this editor cannot compile yet — cursive attachment, marks on ligatures — is kept in
 the source and named in the import report.
 
+**Old Macintosh fonts.** A `.sit` file — a StuffIt archive, which is how a font from the
+1990s was passed around — opens like any other font. The archive is unpacked, the font
+suitcase found inside it, and its bitmap strike turned into outlines: one square per lit
+pixel, the widths from the font's own tables, and the em set by the strike's ascent and
+descent, so a ten pixel font arrives on a 1000-unit em with every point on a round number.
+The staircase edges are the design and are left exactly as they were drawn. A suitcase
+holding several sizes opens the largest, which is the one with the most in it; a suitcase
+holding a TrueType font rather than a bitmap one opens as that font.
+
 **What comes out.** OTF and TTF to install, WOFF and WOFF2 for a web page, a UFO as
 source, and — once a font has more than one master — a family as a designspace with a
 UFO each, one variable font, and every named style as an ordinary static font. The web
