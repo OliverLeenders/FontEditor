@@ -113,6 +113,7 @@ packages/
   preflight/    What is findable about a font before it is exported. Reports; never repairs.
   font-io/      OTF and UFO, read and written by hand. Zip, plist, XML, GPOS, GSUB, .fea.
   catalog/      Unicode blocks and the glyph browser's query layer.
+  stuffit/      StuffIt archives and Macintosh resource forks. Knows nothing about fonts.
 ```
 
 Packages are consumed directly from TypeScript source — there is no build step until

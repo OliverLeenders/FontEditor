@@ -132,6 +132,18 @@ const copied = [
     bundled("Unicode-3.0.txt"),
   ),
   entry(
+    "StuffIt and Macintosh resource forks",
+    "packages/stuffit reads StuffIt 5 archives and the resource forks inside them,\n" +
+      "so that a Macintosh bitmap font can be opened. Its two decompressors - method\n" +
+      "13, and the block-sorting coder Aladdin called Arsenic - were written from\n" +
+      "XADMaster's implementations, and method 13's built-in code tables are\n" +
+      "transcribed from it. XADMaster is under the GNU Lesser General Public License\n" +
+      "version 2.1 or later, and is used here under version 3 of the GNU General\n" +
+      "Public License, as section 3 of the LGPL allows.",
+    "https://github.com/MacPaw/XADMaster",
+    bundled("LGPL-2.1.txt"),
+  ),
+  entry(
     "Tunni lines",
     "The Tunni lines concept was devised by Eduardo Tunni and Fontlab Ltd., and is\n" +
       "used in the FontLab font editor.",
