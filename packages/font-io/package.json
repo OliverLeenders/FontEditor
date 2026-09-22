@@ -20,6 +20,7 @@
   "dependencies": {
     "@typewright/font-model": "workspace:*",
     "@typewright/geometry": "workspace:*",
+    "@typewright/stuffit": "workspace:*",
     "opentype.js": "^2.0.0",
     "woff2-encoder": "^2.0.0"
   },

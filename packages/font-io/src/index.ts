@@ -144,3 +144,23 @@ export { exportVariableFont } from "./variable.js";
 export type { GlyfResult } from "./glyf.js";
 export { glyfTable } from "./glyf.js";
 export { exportTrueType } from "./truetype.js";
+
+export type {
+  MacFamily,
+  MacFontFile,
+  MacGlyph,
+  MacImportOptions,
+  MacImportResult,
+  MacStrike,
+  Suitcase,
+} from "./mac-font.js";
+export {
+  documentFromSuitcase,
+  importMacFont,
+  largestStrike,
+  looksLikeMacFontFile,
+  readMacFamily,
+  readStrike,
+  readSuitcase,
+} from "./mac-font.js";
+export { macRomanCodePoint } from "./mac-roman.js";
