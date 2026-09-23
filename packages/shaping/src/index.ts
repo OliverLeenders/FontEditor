@@ -2,7 +2,7 @@ import { type FontDocument, type TextToken, glyphForToken } from "@typewright/fo
 import { NAMED_GLYPH_BASE, exportShapingFont } from "@typewright/font-io/binary";
 import { type Engine, type EngineGlyph, type TextSettings, READ_FROM_TEXT } from "@typewright/view";
 import bidiFactory from "bidi-js";
-import { Blob, Buffer, Direction, Face, Font, shape } from "harfbuzzjs";
+import { Blob, Buffer, Direction, Face, Feature, Font, shape } from "harfbuzzjs";
 
 /**
  * Setting text with HarfBuzz.
@@ -58,7 +58,16 @@ type Run = { readonly start: number; readonly end: number; readonly level: numbe
 const engines = new WeakMap<FontDocument, Map<string, Engine>>();
 
 const keyOf = (settings: TextSettings): string =>
-  `${settings.direction}|${settings.script ?? ""}|${settings.language ?? ""}`;
+  `${settings.direction}|${settings.script ?? ""}|${settings.language ?? ""}|${featuresKey(
+    settings,
+  )}`;
+
+/** The switched features, in a settled order, so one engine is kept per set. */
+const featuresKey = (settings: TextSettings): string =>
+  Object.entries(settings.features)
+    .map(([tag, on]) => `${tag}=${on ? "1" : "0"}`)
+    .sort()
+    .join(",");
 
 /**
  * The engine that sets a document's text.
@@ -152,7 +161,10 @@ function setText(
     buffer.setDirection(run.level % 2 === 1 ? Direction.RTL : Direction.LTR);
     if (settings.script !== null) buffer.setScript(settings.script);
     if (settings.language !== null) buffer.setLanguage(settings.language);
-    shape(compiled.font, buffer);
+    // Only what has been switched by hand. HarfBuzz turns the usual features on
+    // for itself, and a list that repeated them would be saying the same thing
+    // twice — while a tag with a value of zero is the only way to say no to one.
+    shape(compiled.font, buffer, chosenFeatures(settings));
 
     for (const placed of buffer.getGlyphInfosAndPositions()) {
       if (placed.codepoint === 0) continue;
@@ -167,6 +179,11 @@ function setText(
     }
   }
   return out;
+}
+
+/** The features switched by hand, as HarfBuzz wants them. */
+function chosenFeatures(settings: TextSettings): Feature[] {
+  return Object.entries(settings.features).map(([tag, on]) => new Feature(tag, on ? 1 : 0));
 }
 
 /** The line cut where its embedding level changes, in the order it was written. */

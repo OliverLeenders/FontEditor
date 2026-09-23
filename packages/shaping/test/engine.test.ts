@@ -151,10 +151,53 @@ describe("a line that is not all one direction", () => {
 
   it("keeps one engine per settings, and the same one for the same settings", () => {
     const document = font();
-    const rtl: TextSettings = { direction: "rtl", script: "arab", language: null };
+    const rtl: TextSettings = { direction: "rtl", script: "arab", language: null, features: {} };
 
     expect(harfBuzzEngine(document, rtl)).toBe(harfBuzzEngine(document, { ...rtl }));
     expect(harfBuzzEngine(document, rtl)).not.toBe(harfBuzzEngine(document));
     expect(harfBuzzEngine(document)).toBe(harfBuzzEngine(document, READ_FROM_TEXT));
+  });
+
+  it("keeps a separate engine for a line set with a feature switched", () => {
+    const document = font();
+    const withSet: TextSettings = { ...READ_FROM_TEXT, features: { ss01: true } };
+
+    expect(harfBuzzEngine(document, withSet)).not.toBe(harfBuzzEngine(document));
+    expect(harfBuzzEngine(document, withSet)).toBe(
+      harfBuzzEngine(document, { ...READ_FROM_TEXT, features: { ss01: true } }),
+    );
+  });
+});
+
+/**
+ * The features a line is set with, which is the whole reason the bars have
+ * switches: a stylistic set is off until something asks for it, and nothing in
+ * this editor could ask until these were passed through.
+ */
+describe("the features a line is set with", () => {
+  /** The same font, with a stylistic set that swaps `A` for `V`. */
+  function withStylisticSet(): FontDocument {
+    const base = font();
+    return {
+      ...base,
+      features: `${base.features}feature ss01 {\n  sub A by V;\n} ss01;\n`,
+    };
+  }
+
+  const names = (document: FontDocument, text: string, settings: TextSettings) =>
+    (harfBuzzEngine(document, settings)(textTokens(text)) ?? []).map((g) => g.name);
+
+  it("leaves a stylistic set alone until it is asked for", () => {
+    expect(names(withStylisticSet(), "A", READ_FROM_TEXT)).toEqual(["A"]);
+  });
+
+  it("applies one that is switched on", () => {
+    const on: TextSettings = { ...READ_FROM_TEXT, features: { ss01: true } };
+    expect(names(withStylisticSet(), "A", on)).toEqual(["V"]);
+  });
+
+  it("silences one a renderer would have applied", () => {
+    const off: TextSettings = { ...READ_FROM_TEXT, features: { liga: false } };
+    expect(names(font(), "fi", off)).toEqual(["f", "i"]);
   });
 });

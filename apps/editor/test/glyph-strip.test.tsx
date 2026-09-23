@@ -97,7 +97,7 @@ describe("a strip for text that runs the other way", () => {
     // way to move about — but laid out the way the line beside it reads.
     const store = freshStore();
     store.setStripText("hello");
-    store.setSpacingTextSettings({ direction: "rtl", script: null, language: null });
+    store.setSpacingTextSettings({ direction: "rtl", script: null, language: null, features: {} });
     render(<GlyphStrip />, store);
 
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([
@@ -112,7 +112,7 @@ describe("a strip for text that runs the other way", () => {
   it("is left to right for a line whose direction was never chosen", () => {
     const store = freshStore();
     store.setStripText("hello");
-    store.setSpacingTextSettings({ direction: "auto", script: null, language: null });
+    store.setSpacingTextSettings({ direction: "auto", script: null, language: null, features: {} });
     render(<GlyphStrip />, store);
 
     expect(screen.getAllByRole("button").map((button) => button.textContent)).toEqual([

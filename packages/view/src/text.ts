@@ -20,11 +20,52 @@ export type TextSettings = {
   readonly script: string | null;
   /** An OpenType language tag — `ARA`, `TRK` — or `null` to read it from the text. */
   readonly language: string | null;
+  /**
+   * Features switched by hand, against what the font does by itself.
+   *
+   * Only the differences. A shaper turns some features on unasked — ligatures,
+   * contextual alternates — and leaves the rest for a document to ask for, so
+   * an empty record means "however this font would be set by a text renderer",
+   * which is what a proof should show until somebody says otherwise. A tag in
+   * here is a deliberate departure from that: `ss01` on to see the alternates,
+   * `liga` off to see what a ligature stands in for.
+   */
+  readonly features: Readonly<Record<string, boolean>>;
 };
 
 /** Everything read from the text, which is how every line was set before phase 23. */
-export const READ_FROM_TEXT: TextSettings = { direction: "auto", script: null, language: null };
+export const READ_FROM_TEXT: TextSettings = {
+  direction: "auto",
+  script: null,
+  language: null,
+  features: {},
+};
 
 /** Whether two settings say the same thing, so a view can keep one engine. */
 export const sameTextSettings = (a: TextSettings, b: TextSettings): boolean =>
-  a.direction === b.direction && a.script === b.script && a.language === b.language;
+  a.direction === b.direction &&
+  a.script === b.script &&
+  a.language === b.language &&
+  sameFeatures(a.features, b.features);
+
+function sameFeatures(
+  a: Readonly<Record<string, boolean>>,
+  b: Readonly<Record<string, boolean>>,
+): boolean {
+  const tags = Object.keys(a);
+  if (tags.length !== Object.keys(b).length) return false;
+  return tags.every((tag) => a[tag] === b[tag]);
+}
+
+/** The tags a line is set with: what a renderer turns on, plus and minus by hand. */
+export function featureTagsFor(
+  defaults: readonly string[],
+  chosen: Readonly<Record<string, boolean>>,
+): string[] {
+  const tags = new Set(defaults);
+  for (const [tag, on] of Object.entries(chosen)) {
+    if (on) tags.add(tag);
+    else tags.delete(tag);
+  }
+  return [...tags];
+}

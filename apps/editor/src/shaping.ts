@@ -1,4 +1,10 @@
-import { NO_POSITIONING, NO_SHAPING, positionerFor, shaperFor } from "@typewright/font-io";
+import {
+  DEFAULT_FEATURES,
+  NO_POSITIONING,
+  NO_SHAPING,
+  positionerFor,
+  shaperFor,
+} from "@typewright/font-io";
 import type { FontDocument } from "@typewright/font-model";
 import type * as ShapingModule from "@typewright/shaping";
 import {
@@ -6,6 +12,7 @@ import {
   type Positioner,
   type Shaper,
   type TextSettings,
+  featureTagsFor,
   READ_FROM_TEXT,
 } from "@typewright/view";
 import { useEffect, useMemo, useState } from "react";
@@ -84,10 +91,20 @@ export function useShapingEngine(
  * keystroke in the Features workspace. That is cheap: the source is a few
  * hundred characters and the parse is a tokenizer over it, where the alternative
  * is a stale preview of the rule you are in the middle of writing.
+ *
+ * Which features run comes from the line's own settings: what a text renderer
+ * turns on by itself, plus and minus whatever has been switched in the bar. This
+ * shaper knows nothing of alternate indices, so a rule offering a choice of
+ * several takes the first of them; HarfBuzz, a moment later, sets the same line
+ * the way the exported font would.
  */
-export function shaperFrom(features: string, applyFeatures: boolean): Shaper {
+export function shaperFrom(
+  features: string,
+  applyFeatures: boolean,
+  settings: TextSettings = READ_FROM_TEXT,
+): Shaper {
   if (!applyFeatures || features.trim() === "") return NO_SHAPING;
-  return shaperFor(features);
+  return shaperFor(features, featureTagsFor(DEFAULT_FEATURES, settings.features));
 }
 
 /**
@@ -99,7 +116,11 @@ export function shaperFrom(features: string, applyFeatures: boolean): Shaper {
  * that moved a letter while its substitutions were switched off would be half a
  * font.
  */
-export function positionerFrom(features: string, applyFeatures: boolean): Positioner {
+export function positionerFrom(
+  features: string,
+  applyFeatures: boolean,
+  settings: TextSettings = READ_FROM_TEXT,
+): Positioner {
   if (!applyFeatures || features.trim() === "") return NO_POSITIONING;
-  return positionerFor(features);
+  return positionerFor(features, featureTagsFor(DEFAULT_FEATURES, settings.features));
 }

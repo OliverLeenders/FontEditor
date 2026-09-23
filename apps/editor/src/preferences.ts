@@ -336,7 +336,26 @@ function textSettingsOf(raw: unknown): TextSettings {
     direction: direction === "ltr" || direction === "rtl" ? direction : "auto",
     script: tagOf(held["script"]),
     language: tagOf(held["language"]),
+    features: featuresOf(held["features"]),
   };
+}
+
+/**
+ * The features switched by hand, from a file this editor may not have written.
+ *
+ * Kept by tag rather than checked against the font: the preferences are read
+ * before a font is open, and a tag belonging to a font that is not the one in
+ * hand costs nothing — the panel only lists what the open font defines, and a
+ * shaper ignores a feature the font has no rules for.
+ */
+function featuresOf(raw: unknown): Record<string, boolean> {
+  if (typeof raw !== "object" || raw === null) return {};
+
+  const out: Record<string, boolean> = {};
+  for (const [tag, on] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof on === "boolean" && tag.length > 0 && tag.length <= 4) out[tag] = on;
+  }
+  return out;
 }
 
 /** An OpenType tag is four characters at most; anything else is not one. */

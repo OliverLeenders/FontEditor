@@ -61,6 +61,26 @@ describe("reading preferences", () => {
     expect(read.views[0].snapPoints).toBe(false);
   });
 
+  it("keeps the features a line was last set with", () => {
+    savePreferences({
+      ...DEFAULT_PREFERENCES,
+      proofTextSettings: { ...DEFAULT_PREFERENCES.proofTextSettings, features: { ss01: true } },
+    });
+    expect(loadPreferences().proofTextSettings.features).toEqual({ ss01: true });
+  });
+
+  it("drops a switched feature that is not one", () => {
+    // A hand-edited entry, or one from a version that wrote something else
+    // here. A tag is four characters and a switch is on or off.
+    localStorage.setItem(
+      "typewright.preferences",
+      JSON.stringify({
+        proofTextSettings: { features: { ss01: true, toolong: true, calt: "off" } },
+      }),
+    );
+    expect(loadPreferences().proofTextSettings.features).toEqual({ ss01: true });
+  });
+
   it("hands what one window was set to to both panes", () => {
     // Written before the canvas settings were per pane, when there was one set
     // of them for the window. Somebody who chose a heavier outline meant it,
