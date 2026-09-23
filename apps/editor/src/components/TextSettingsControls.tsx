@@ -3,6 +3,7 @@ import type { TextDirection, TextSettings } from "@typewright/view";
 import { useMemo } from "react";
 
 import { languagesOf, scriptsOf } from "../text-settings.js";
+import { FeatureSwitches } from "./FeatureSwitches.js";
 import styles from "./TextSettingsControls.module.css";
 
 /**
@@ -19,16 +20,27 @@ import styles from "./TextSettingsControls.module.css";
  * Arabic, or a Turkish `locl` rule that only applies when the language says so.
  *
  * What the pickers offer is about this font: the scripts are the ones its
- * characters belong to, and the languages are the ones its feature file names.
+ * characters belong to, the languages are the ones its feature file names, and
+ * the features are the ones it defines — see {@link FeatureSwitches}, which is
+ * the fourth of them and the only one with anything to say about a stylistic
+ * set.
  */
 export function TextSettingsControls({
   value,
   document,
+  applyFeatures,
+  canShape,
   onChange,
+  onApplyFeaturesChange,
 }: {
   readonly value: TextSettings;
   readonly document: FontDocument;
+  /** Whether the font's own rules are applied at all. */
+  readonly applyFeatures: boolean;
+  /** Whether it has anything to apply: features, kerning or anchors. */
+  readonly canShape: boolean;
   readonly onChange: (next: TextSettings) => void;
+  readonly onApplyFeaturesChange: (next: boolean) => void;
 }): React.JSX.Element {
   const scripts = useMemo(() => scriptsOf(document), [document]);
   const languages = useMemo(() => languagesOf(document), [document]);
@@ -87,6 +99,15 @@ export function TextSettingsControls({
           </option>
         ))}
       </select>
+
+      <FeatureSwitches
+        value={value}
+        document={document}
+        applyFeatures={applyFeatures}
+        canShape={canShape}
+        onChange={onChange}
+        onApplyFeaturesChange={onApplyFeaturesChange}
+      />
     </span>
   );
 }

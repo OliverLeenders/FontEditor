@@ -135,7 +135,7 @@ describe("the features switch", () => {
     );
   });
 
-  it("turns the font's features off and on again", () => {
+  it("turns the font's features off and on again, from the panel", () => {
     const store = freshStore();
     act(() => {
       store.setEditor({
@@ -147,9 +147,25 @@ describe("the features switch", () => {
     const before = store.getState().applyFeatures;
 
     fireEvent.click(screen.getByRole("button", { name: "Features" }));
+    fireEvent.click(screen.getByLabelText("Apply the font's features"));
     expect(store.getState().applyFeatures).toBe(!before);
-    expect(screen.getByRole("button", { name: "Features" }).getAttribute("aria-pressed")).toBe(
-      String(!before),
-    );
+  });
+
+  it("remembers a feature switched on in the bar", () => {
+    const store = freshStore();
+    act(() => {
+      store.setEditor({
+        ...store.editor,
+        document: {
+          ...store.editor.document,
+          features: "feature ss01 {\n  sub a by b;\n} ss01;\n",
+        },
+      });
+    });
+    render(<ProofView />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Features" }));
+    fireEvent.click(screen.getByLabelText("ss01"));
+    expect(store.getState().proofTextSettings.features).toEqual({ ss01: true });
   });
 });

@@ -73,12 +73,12 @@ export function ProofView(): React.JSX.Element {
   const applyFeatures = useStoreValue((s) => s.applyFeatures);
   const settings = useStoreValue((s) => s.proofTextSettings);
   const shape = useMemo(
-    () => shaperFrom(document.features, applyFeatures),
-    [document.features, applyFeatures],
+    () => shaperFrom(document.features, applyFeatures, settings),
+    [document.features, applyFeatures, settings],
   );
   const position = useMemo(
-    () => positionerFrom(document.features, applyFeatures),
-    [document.features, applyFeatures],
+    () => positionerFrom(document.features, applyFeatures, settings),
+    [document.features, applyFeatures, settings],
   );
   // HarfBuzz once it has loaded, which then sets the page on its own.
   const engine = useShapingEngine(document, applyFeatures, settings);
@@ -252,29 +252,9 @@ export function ProofView(): React.JSX.Element {
           <span className={styles.value}>{leading.toFixed(2)}</span>
         </label>
 
-        {/* Off is not "plain text": it is the letters the substitutions stand
-            in for, which is what you want the moment a ligature looks wrong and
-            you need to see what went into it. */}
-        <button
-          type="button"
-          className={styles.features}
-          aria-pressed={applyFeatures}
-          disabled={!hasFeatures}
-          title={
-            hasFeatures
-              ? applyFeatures
-                ? "Set with the font's features — click to see the letters behind them"
-                : "Set without the font's features"
-              : "This font has no features, kerning or anchors to set yet"
-          }
-          onClick={() => store.toggleApplyFeatures()}
-        >
-          Features
-        </button>
-
-        {/* Beside the features button rather than by the text, which is at the
-            other end of the view: this chooses what is set, and everything in
-            this bar is about how it is set. */}
+        {/* Beside the way the line is set rather than by the text, which is at
+            the other end of the view: this chooses what is set, and everything
+            in this bar is about how it is set. */}
         <select
           className={styles.specimens}
           aria-label="Specimen"
@@ -295,7 +275,10 @@ export function ProofView(): React.JSX.Element {
         <TextSettingsControls
           value={settings}
           document={document}
+          applyFeatures={applyFeatures}
+          canShape={hasFeatures}
           onChange={(next) => store.setProofTextSettings(next)}
+          onApplyFeaturesChange={() => store.toggleApplyFeatures()}
         />
 
         <span className={styles.count}>

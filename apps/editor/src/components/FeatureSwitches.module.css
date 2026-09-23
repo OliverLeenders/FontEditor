@@ -1,0 +1,110 @@
+/*
+ * The panel of feature switches, hung off the bar's Features button.
+ *
+ * Wider than the default panel because every row is a tag and a name — `ss01`
+ * and "Stylistic set 1" — and a name that wrapped onto a second line would turn
+ * a list read down its left edge into a list read a fragment at a time. Tall
+ * enough for a font with a few features, and scrolling for one with many rather
+ * than a panel that runs off the bottom of the window.
+ */
+.panel {
+  min-width: 17rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  padding: 0.7rem 0.8rem;
+}
+
+.rows {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.row:has(input:disabled) {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+/* The tag itself is the thing being switched — it is what the feature file says
+   and what another tool will show — so it is set in the code face and kept
+   first, with the name after it as the gloss it is. */
+.tag {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--ink);
+}
+
+.name {
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+.check {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+}
+
+.separator {
+  height: 1px;
+  background: var(--rule);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
+
+.reset {
+  padding: 0.12rem 0.45rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.reset:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* A dot on the button, for the one thing that must not hide behind the fold:
+   that this line is not being set the way a reader's would be. */
+.badge {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: var(--accent);
+}

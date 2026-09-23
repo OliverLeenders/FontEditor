@@ -265,6 +265,18 @@ and every substitution and positioning rule as feature source in the Features wo
 What this editor cannot compile yet — cursive attachment, marks on ligatures — is kept in
 the source and named in the import report.
 
+**Setting a line with the features on.** The Spacing bar and the Proof bar each have a
+**Features** panel: the first row applies the font's own rules or silences them, and under it
+is a switch for every feature the feature file defines. Each starts where a text renderer
+would leave it — `liga` on, `ss01` off — so a proof shows what somebody gets by typing until
+you say otherwise, and a stylistic set can be seen substituted without exporting the font.
+Switching the master row off greys the rest out with it: off means the letters the
+substitutions stand in for, kerning and mark attachment included. The switches are kept per
+view and in this browser, not in the font, and a dot on the button says the line is not being
+set the way a reader's would be. A moment after a line is set, HarfBuzz takes it over and
+sets it exactly as the exported font would; until then the editor's own shaper stands in, and
+it takes the first of a rule offering several alternates rather than choosing between them.
+
 **Old Macintosh fonts.** A `.sit` file — a StuffIt archive, which is how a font from the
 1990s was passed around — opens like any other font. The archive is unpacked, the font
 suitcase found inside it, and its bitmap strike turned into outlines: one square per lit

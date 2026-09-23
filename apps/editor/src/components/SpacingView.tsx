@@ -115,12 +115,12 @@ export function SpacingView({
   const applyFeatures = useStoreValue((s) => s.applyFeatures);
   const settings = useStoreValue((s) => s.spacingTextSettings);
   const shape = useMemo(
-    () => shaperFrom(document.features, applyFeatures),
-    [document.features, applyFeatures],
+    () => shaperFrom(document.features, applyFeatures, settings),
+    [document.features, applyFeatures, settings],
   );
   const position = useMemo(
-    () => positionerFrom(document.features, applyFeatures),
-    [document.features, applyFeatures],
+    () => positionerFrom(document.features, applyFeatures, settings),
+    [document.features, applyFeatures, settings],
   );
   // HarfBuzz once it has loaded, which then sets the line on its own.
   const engine = useShapingEngine(document, applyFeatures, settings);
@@ -386,7 +386,10 @@ export function SpacingView({
         <TextSettingsControls
           value={settings}
           document={document}
+          applyFeatures={applyFeatures}
+          canShape={hasFeatures}
           onChange={(next) => store.setSpacingTextSettings(next)}
+          onApplyFeaturesChange={() => store.toggleApplyFeatures()}
         />
         <LocationBar />
 
@@ -409,25 +412,6 @@ export function SpacingView({
             Kern
           </button>
         </div>
-        {/* Off is not "plain text": it is the letters the substitutions stand
-            in for, which is what you want the moment a ligature looks wrong and
-            you need to see what went into it. */}
-        <button
-          type="button"
-          className={styles.features}
-          aria-pressed={applyFeatures}
-          disabled={!hasFeatures}
-          title={
-            hasFeatures
-              ? applyFeatures
-                ? "Set with the font's features — click to see the letters behind them"
-                : "Set without the font's features"
-              : "This font has no features, kerning or anchors to set yet"
-          }
-          onClick={() => store.toggleApplyFeatures()}
-        >
-          Features
-        </button>
         {/* Groups belong beside the line rather than in a workspace of their
             own: which class a letter is in is a question that arrives while
             looking at a gap, not before. */}

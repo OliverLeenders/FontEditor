@@ -1,4 +1,5 @@
 import { parseFea } from "@typewright/font-io";
+import { DEFAULT_FEATURES, featureTags } from "@typewright/font-io";
 import type { FontDocument } from "@typewright/font-model";
 
 /**
@@ -184,4 +185,87 @@ const LANGUAGES: Readonly<Record<string, string>> = {
   TRK: "Turkish",
   URD: "Urdu",
   VIT: "Vietnamese",
+};
+
+/** A feature the font defines, as the bar offers it. */
+export type FeatureChoice = {
+  readonly tag: string;
+  /** What it is called, where anyone has a name for it, or the tag again. */
+  readonly label: string;
+  /** Whether a text renderer turns it on without being asked. */
+  readonly byDefault: boolean;
+};
+
+/**
+ * The features this font's own feature file defines, in the order it defines
+ * them.
+ *
+ * The font's rather than OpenType's, for the same reason the scripts are: a
+ * list of every registered tag is a list nobody reads, and a tag the font has no
+ * rules for would switch on nothing. A font with no feature file offers none,
+ * and the switches say so rather than showing an empty list.
+ *
+ * Whether a feature is on to begin with is not this editor's choice — it is
+ * what a text renderer does, which is why the state of a switch is worth
+ * showing next to its name: `liga` starts on and `ss01` starts off, and the
+ * whole point of the panel is to be able to say otherwise.
+ */
+export function featureChoices(document: FontDocument): FeatureChoice[] {
+  const defaults = new Set(DEFAULT_FEATURES);
+  return featureTags(document.features).map((tag) => ({
+    tag,
+    label: featureLabel(tag),
+    byDefault: defaults.has(tag),
+  }));
+}
+
+function featureLabel(tag: string): string {
+  const known = FEATURES[tag];
+  if (known !== undefined) return known;
+  // A stylistic set or a character variant is one of twenty or ninety-nine, and
+  // naming them all would be a table of nothing but numbers. The font can give
+  // them names of its own, which this editor does not compile yet.
+  const numbered = /^(ss|cv)(\d\d)$/.exec(tag);
+  if (numbered === null) return tag;
+  const kind = numbered[1] === "ss" ? "Stylistic set" : "Character variant";
+  return `${kind} ${String(Number(numbered[2]))}`;
+}
+
+/**
+ * Names for the feature tags a Latin font is most likely to define.
+ *
+ * Not the registry, which runs to hundreds and most of which belong to scripts
+ * this editor cannot yet shape. A tag with no name here is shown as itself.
+ */
+const FEATURES: Readonly<Record<string, string>> = {
+  aalt: "All alternates",
+  c2sc: "Small capitals from capitals",
+  calt: "Contextual alternates",
+  case: "Case-sensitive forms",
+  ccmp: "Glyph composition",
+  clig: "Contextual ligatures",
+  dlig: "Discretionary ligatures",
+  dnom: "Denominators",
+  frac: "Fractions",
+  hlig: "Historical ligatures",
+  kern: "Kerning",
+  liga: "Standard ligatures",
+  lnum: "Lining figures",
+  locl: "Localised forms",
+  mark: "Mark positioning",
+  mkmk: "Mark to mark positioning",
+  numr: "Numerators",
+  onum: "Old-style figures",
+  ordn: "Ordinals",
+  pnum: "Proportional figures",
+  rlig: "Required ligatures",
+  salt: "Stylistic alternates",
+  sinf: "Scientific inferiors",
+  smcp: "Small capitals",
+  subs: "Subscript",
+  sups: "Superscript",
+  swsh: "Swashes",
+  titl: "Titling",
+  tnum: "Tabular figures",
+  zero: "Slashed zero",
 };
