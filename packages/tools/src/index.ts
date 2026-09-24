@@ -78,6 +78,7 @@ export {
   setMarkColors,
   extractHandles,
   extractSegmentHandles,
+  extractSelectedHandles,
   addAnchorAt,
   addGuideAt,
   deleteSelectedGuide,
@@ -170,8 +171,13 @@ export {
   turnsMissing,
   segmentParameterAt,
   selectAllPoints,
+  selectedNodeCount,
+  selectionCanHarmonise,
+  selectionHasMissingHandle,
+  selectionHvLocked,
   setNodeHvLock,
   setPointType,
+  setSelectedHvLock,
 } from "./commands/index.js";
 
 export {

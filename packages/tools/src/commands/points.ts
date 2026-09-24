@@ -145,6 +145,19 @@ export function harmoniseSelection(state: EditorState): ToolResult {
   return done(state, editor === state ? null : editor, "Harmonise");
 }
 
+/**
+ * Whether harmonising would move anything in the selection.
+ *
+ * Any rather than every: the command harmonises the joins that have two
+ * curvatures to reconcile and leaves the rest alone, so offering it whenever it
+ * would do *something* says the truth about what pressing it does.
+ */
+export function selectionCanHarmonise(state: EditorState): boolean {
+  return state.selection.some(
+    (item) => item.part === "point" && nodeCanHarmonise(state, item.contourId, item.nodeId),
+  );
+}
+
 /** Whether a node is one harmonising would move, for the menu to offer it. */
 export function nodeCanHarmonise(
   state: EditorState,
@@ -194,6 +207,70 @@ export function nodeHvLocked(state: EditorState, contourId: ContourId, nodeId: N
   const glyph = currentGlyph(state);
   const c = glyph === null ? null : contourById(glyph, contourId);
   return (c === null ? null : nodeById(c, nodeId))?.hvLock ?? NO_LOCK;
+}
+
+/**
+ * The nodes a selection names, each once.
+ *
+ * A node is in the selection whether it was the point or one of its handles
+ * that was picked, and a selection holding a point and its own handle names one
+ * node twice. What acts on nodes wants each of them once.
+ */
+function selectedNodes(state: EditorState): { contourId: ContourId; nodeId: NodeId }[] {
+  const seen = new Set<string>();
+  const out: { contourId: ContourId; nodeId: NodeId }[] = [];
+  for (const item of state.selection) {
+    const key = `${item.contourId}:${item.nodeId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ contourId: item.contourId, nodeId: item.nodeId });
+  }
+  return out;
+}
+
+/** How many nodes a menu item would act on, for it to say so. */
+export function selectedNodeCount(state: EditorState): number {
+  return selectedNodes(state).length;
+}
+
+/**
+ * Lock or free the handles of every node in the selection.
+ *
+ * The same edit the single-node version makes, made to each of them in one
+ * step, so that one undo takes back what one press did. Which nodes those are
+ * is settled by the canvas: a right-click on something outside the selection
+ * selects it first, so a menu acting on the selection acts on what was clicked
+ * when nothing else was picked, and on the lot when something was.
+ */
+export function setSelectedHvLock(
+  state: EditorState,
+  which: "in" | "out" | "both",
+  locked: boolean,
+): ToolResult {
+  const targets = selectedNodes(state);
+  if (targets.length === 0) return result(state);
+
+  let editor = state;
+  for (const target of targets) {
+    const document = editCurrentGlyph(editor, (g) =>
+      updateContour(g, target.contourId, (c) => setHvLock(c, target.nodeId, which, locked)),
+    );
+    if (document !== null) editor = { ...editor, document };
+  }
+
+  const side =
+    which === "both" ? "handles" : which === "in" ? "incoming handle" : "outgoing handle";
+  return done(state, editor === state ? null : editor, `${locked ? "Lock" : "Free"} ${side}`);
+}
+
+/** Whether every node in the selection is already locked that way, for the tick. */
+export function selectionHvLocked(state: EditorState, which: "in" | "out" | "both"): boolean {
+  const targets = selectedNodes(state);
+  if (targets.length === 0) return false;
+  return targets.every((target) => {
+    const lock = nodeHvLocked(state, target.contourId, target.nodeId);
+    return which === "both" ? lock.in && lock.out : lock[which];
+  });
 }
 
 /**
@@ -257,6 +334,36 @@ export function extractSegmentHandles(state: EditorState, segment: SegmentRef): 
   );
   if (document === null || document === state.document) return result(state);
   return done(state, { ...state, document }, "Extract handles");
+}
+
+/**
+ * Pull out the handles every selected node is missing.
+ *
+ * One step for the lot, like the rest of these: a person who selected a run of
+ * points and asked for their handles wants one thing to undo, not eleven.
+ */
+export function extractSelectedHandles(state: EditorState): ToolResult {
+  const targets = selectedNodes(state);
+  if (targets.length === 0) return result(state);
+
+  let editor = state;
+  for (const target of targets) {
+    const document = editCurrentGlyph(editor, (g) =>
+      updateContour(g, target.contourId, (c) => {
+        const withIn = extendHandle(c, target.nodeId, "in") ?? c;
+        return extendHandle(withIn, target.nodeId, "out") ?? withIn;
+      }),
+    );
+    if (document !== null) editor = { ...editor, document };
+  }
+  return done(state, editor === state ? null : editor, "Extract handles");
+}
+
+/** Whether anything in the selection has a handle worth pulling out. */
+export function selectionHasMissingHandle(state: EditorState): boolean {
+  return selectedNodes(state).some((target) =>
+    nodeHasMissingHandle(state, target.contourId, target.nodeId),
+  );
 }
 
 /** Whether a node has a handle missing that could be pulled out. */

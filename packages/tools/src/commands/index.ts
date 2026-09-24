@@ -129,6 +129,7 @@ export {
   deleteSelectedPoints,
   extractHandles,
   extractSegmentHandles,
+  extractSelectedHandles,
   harmoniseSelection,
   nodeCanBeTangent,
   nodeCanHarmonise,
@@ -139,8 +140,13 @@ export {
   selectedCanBeTangent,
   selectedCurvature,
   selectedNode,
+  selectedNodeCount,
+  selectionCanHarmonise,
+  selectionHasMissingHandle,
+  selectionHvLocked,
   setNodeHvLock,
   setPointType,
+  setSelectedHvLock,
 } from "./points.js";
 
 export {

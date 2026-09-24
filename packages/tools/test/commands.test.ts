@@ -108,8 +108,11 @@ import {
   segmentParameterAt,
   selectAllPoints,
   selectedCoordinate,
+  selectedNodeCount,
+  selectionHvLocked,
   setNodeHvLock,
   setPointType,
+  setSelectedHvLock,
   transformOriginPoint,
   transformSelection,
   unroundedCount,
@@ -226,6 +229,78 @@ describe("point type", () => {
   it("does nothing with nothing selected", () => {
     const { s } = start();
     expect(setPointType(s, "corner").state).toBe(s);
+  });
+});
+
+describe("locking the handles of a whole selection", () => {
+  /** The ring, with its first three points picked. */
+  function threePicked(): EditorState {
+    const { s, c } = start();
+    return {
+      ...s,
+      selection: c.nodes.slice(0, 3).map((n) => ({
+        contourId: c.id,
+        nodeId: n.id,
+        part: "point" as const,
+      })),
+    };
+  }
+
+  it("locks every one of them in a single step", () => {
+    const picked = threePicked();
+    const next = setSelectedHvLock(picked, "both", true).state;
+
+    for (let i = 0; i < 3; i++) {
+      const lock = nodeAt(next, i).hvLock;
+      expect(lock.in && lock.out).toBe(true);
+    }
+    // And nothing beyond what was picked.
+    expect(nodeAt(next, 3).hvLock.in).toBe(false);
+  });
+
+  it("frees them again", () => {
+    const locked = setSelectedHvLock(threePicked(), "both", true).state;
+    const freed = setSelectedHvLock(
+      { ...locked, selection: threePicked().selection },
+      "both",
+      false,
+    ).state;
+
+    for (let i = 0; i < 3; i++) {
+      const lock = nodeAt(freed, i).hvLock;
+      expect(lock.in || lock.out).toBe(false);
+    }
+  });
+
+  it("is locked only when every one of them is", () => {
+    const picked = threePicked();
+    expect(selectionHvLocked(picked, "both")).toBe(false);
+
+    const one = setNodeHvLock(picked, only(picked).id, nodeAt(picked, 0).id, "both", true).state;
+    expect(selectionHvLocked({ ...one, selection: picked.selection }, "both")).toBe(false);
+
+    const all = setSelectedHvLock(picked, "both", true).state;
+    expect(selectionHvLocked({ ...all, selection: picked.selection }, "both")).toBe(true);
+  });
+
+  it("counts a node once, however much of it is picked", () => {
+    // A point and its own handle are two things in the selection and one node
+    // to act on; a menu saying "2 points" of one point would be lying.
+    const { s, c } = start();
+    const picked: EditorState = {
+      ...s,
+      selection: [
+        { contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" },
+        { contourId: c.id, nodeId: c.nodes[0]!.id, part: "out" },
+      ],
+    };
+    expect(selectedNodeCount(picked)).toBe(1);
+  });
+
+  it("does nothing with nothing selected", () => {
+    const { s } = start();
+    expect(setSelectedHvLock(s, "both", true).state).toBe(s);
+    expect(selectionHvLocked(s, "both")).toBe(false);
   });
 });
 
