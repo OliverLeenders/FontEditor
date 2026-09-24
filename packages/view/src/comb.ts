@@ -72,10 +72,30 @@ export type CombOptions = {
   readonly spacingPixels?: number;
   /** How long an ordinary hair may grow, in screen pixels. */
   readonly depthPixels?: number;
+  /** How long it may grow as a share of the letter's own size. */
+  readonly depthShare?: number;
 };
 
 const SPACING = 7;
 const DEPTH = 44;
+
+/**
+ * How long an ordinary hair may grow as a share of the letter's own diagonal.
+ *
+ * The other limit is in screen pixels, and on its own it is wrong in one
+ * direction: a comb a fixed number of pixels deep keeps its size while the
+ * letter shrinks under it, so zooming out grows the comb *relative to the
+ * letter* until the hairs are longer than the drawing they are measuring and
+ * the envelope is all anyone can see. A share of the letter cannot do that —
+ * zoomed out, comb and letter shrink together.
+ *
+ * Both limits apply, whichever is the shorter. Close in, the pixels win and the
+ * comb stays a comb rather than filling the window; far out, the share wins and
+ * the letter stays the thing on screen. At a working zoom, where a letter fills
+ * most of the canvas, the two are about equal — which is why this looks like
+ * nothing has changed until you zoom out.
+ */
+const DEPTH_SHARE = 0.07;
 
 /** How finely each segment is walked while measuring arc length along it. */
 const STEPS = 96;
@@ -113,7 +133,9 @@ const STRAIGHT = 10;
  *
  * The zoom is not decoration here: the spacing is in pixels, so a letter zoomed
  * in gets more hairs rather than the same hairs further apart, which is what
- * makes the envelope readable at both sizes.
+ * makes the envelope readable at both sizes. How long a hair grows is measured
+ * both ways — see {@link DEPTH_SHARE} — so that zooming out shrinks the comb
+ * with the letter instead of leaving it standing over it.
  *
  * The contours must be the *filled* ones — `filledContours` in the model — since
  * the hairs point out of the ink and only the corrected winding says which side
@@ -125,9 +147,13 @@ export function combFor(
   options: CombOptions = {},
 ): Comb[] {
   const spacing = (options.spacingPixels ?? SPACING) / Math.max(view.scale, 1e-6);
-  const depth = (options.depthPixels ?? DEPTH) / Math.max(view.scale, 1e-6);
+  const size = sizeOf(contours);
+  const depth = Math.min(
+    (options.depthPixels ?? DEPTH) / Math.max(view.scale, 1e-6),
+    (options.depthShare ?? DEPTH_SHARE) * size,
+  );
 
-  const flat = 1 / (STRAIGHT * sizeOf(contours));
+  const flat = 1 / (STRAIGHT * size);
 
   const raw: { id: string; runs: Omit<CombHair, "reach">[][] }[] = [];
   for (const c of contours) {

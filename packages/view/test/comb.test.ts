@@ -103,6 +103,35 @@ describe("the comb", () => {
     expect(near[0]!.runs.flat().length).toBeGreaterThan(far[0]!.runs.flat().length * 3);
   });
 
+  it("keeps the hairs in proportion to the letter as it is zoomed out", () => {
+    // The complaint this answers: a comb measured only in screen pixels keeps
+    // its length while the letter shrinks under it, so zooming out grows the
+    // comb relative to the drawing until the hairs are longer than the letter.
+    const options = { spacingPixels: 20, depthPixels: 400, depthShare: 0.1 };
+    const near = combFor([circle(100)], { scale: 4, tx: 0, ty: 0 }, options);
+    const far = combFor([circle(100)], { scale: 0.1, tx: 0, ty: 0 }, options);
+
+    // The same length in design units at both zooms — a tenth of the circle's
+    // own diagonal, give or take the ripple a Bézier circle's curvature has.
+    const share = 0.1 * Math.hypot(200, 200);
+    const reach = near[0]!.runs[0]![0]!.reach;
+    expect(far[0]!.runs[0]![0]!.reach).toBeCloseTo(reach, 1);
+    expect(reach).toBeLessThanOrEqual(share);
+    expect(reach).toBeGreaterThan(share * 0.95);
+  });
+
+  it("still holds a hair to a few pixels when it is zoomed right in", () => {
+    // The other limit, and the reason both are kept: a share of the letter is
+    // a long way across the screen once the letter is bigger than the window.
+    const options = { spacingPixels: 20, depthPixels: 40, depthShare: 1 };
+    const near = combFor([circle(100)], { scale: 4, tx: 0, ty: 0 }, options);
+
+    // Forty pixels at four pixels to the unit.
+    const reach = near[0]!.runs[0]![0]!.reach;
+    expect(reach).toBeLessThanOrEqual(10);
+    expect(reach).toBeGreaterThan(9.5);
+  });
+
   it("draws the tighter turn longer, in proportion", () => {
     const combs = combFor([circle(50), circle(200)], VIEW, {
       spacingPixels: 20,

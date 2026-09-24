@@ -98,6 +98,12 @@ export type RenderPalette = {
    * The hairs are faint and the envelope is not. What is read is the envelope —
    * a step in it is a curvature break — and a hundred hairs at the same weight
    * would be a hedge with a line hidden in it.
+   *
+   * Both are drawn lightly. The comb is an instrument laid over the drawing and
+   * the drawing is the thing being judged: hairs solid enough to read as ink
+   * put a second shape on the canvas, and at a hundred hairs a letter their
+   * overlaps darken into one. Light enough to be looked past, dark enough to be
+   * looked at.
    */
   readonly comb: string;
   readonly combEdge: string;
@@ -140,8 +146,8 @@ export const LIGHT_PALETTE: RenderPalette = {
   componentSelected: "#A96F22",
   section: "#7C8896",
   sectionInk: "#A96F22",
-  comb: "rgba(44,109,175,0.30)",
-  combEdge: "#2C6DAF",
+  comb: "rgba(44,109,175,0.16)",
+  combEdge: "rgba(44,109,175,0.72)",
 };
 
 export const DARK_PALETTE: RenderPalette = {
@@ -181,6 +187,6 @@ export const DARK_PALETTE: RenderPalette = {
   componentSelected: "#D6A05A",
   section: "#8B99A8",
   sectionInk: "#D6A05A",
-  comb: "rgba(116,174,226,0.30)",
-  combEdge: "#74AEE2",
+  comb: "rgba(116,174,226,0.16)",
+  combEdge: "rgba(116,174,226,0.72)",
 };
