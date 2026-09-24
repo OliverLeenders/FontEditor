@@ -122,15 +122,9 @@ export { translateSelection };
 /** How near a box handle counts as on it, in screen pixels. */
 export const BOX_HANDLE_PIXELS = 6;
 
-/**
- * How far outside the selection the box is drawn, in screen pixels.
- *
- * Not decoration. A selection's corner point sits exactly on the corner of its
- * own bounding box, so a box drawn tight against it would put a handle on top of
- * a point and there would be no way to drag that point again. Standing the box
- * off by more than the handles' own reach keeps the two apart at every zoom.
- */
-export const BOX_OUTSET_PIXELS = 10;
+/** How far outside the selection the box is drawn — defined where it is undone. */
+export { BOX_OUTSET_PIXELS } from "./gestures.js";
+import { BOX_OUTSET_PIXELS } from "./gestures.js";
 
 /**
  * The box round the selection, or `null` when there is nothing to draw one on.

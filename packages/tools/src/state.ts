@@ -109,7 +109,18 @@ export type Gesture =
       readonly kind: "transformBox";
       readonly origin: Vec2;
       readonly handle: BoxHandle;
+      /** The box as drawn, standing off the selection: what was grabbed. */
       readonly box: BoxFrame;
+      /**
+       * The selection's own bounds, which is what the drag scales.
+       *
+       * The drawn box stands off the selection so that a handle is not on top
+       * of the point it would cover, and scaling about *that* box holds a line
+       * ten screen pixels outside the drawing still — so the far side of the
+       * shape creeps as the near side is pulled. The margin is for the hand;
+       * the arithmetic belongs to the shape.
+       */
+      readonly tight: BoxFrame;
       readonly items: Selection;
       readonly before: FontDocument;
       readonly moved: boolean;

@@ -1245,15 +1245,68 @@ describe("the box round a selection", () => {
     const grabbed = pointerDown(start, pointerInput(vec(box.maxX, box.maxY)));
     expect(grabbed.state.gesture?.kind).toBe("transformBox");
 
-    // Twice as far from the opposite corner in both directions.
-    const span = { x: box.maxX - box.minX, y: box.maxY - box.minY };
-    const moved = pointerMove(
-      grabbed.state,
-      pointerInput(vec(box.minX + span.x * 2, box.minY + span.y * 2)),
-    );
+    // Half the square's size back towards the corner it is held by: a hundred
+    // units square becomes fifty.
+    const moved = pointerMove(grabbed.state, pointerInput(vec(box.maxX - 50, box.maxY - 50)));
 
-    expect(where(moved.state, "p0").x).toBeCloseTo(box.minX + (0 - box.minX) * 2, 6);
-    expect(where(moved.state, "p2").x).toBeCloseTo(box.minX + (100 - box.minX) * 2, 6);
+    expect(where(moved.state, "p0")).toEqual(vec(0, 0));
+    expect(where(moved.state, "p2").x).toBeCloseTo(50, 6);
+    expect(where(moved.state, "p2").y).toBeCloseTo(50, 6);
+  });
+
+  it("holds the far side still when an edge is pulled", () => {
+    // The complaint this answers: a square scaled by its bottom edge had its
+    // top edge creep as well. The box is drawn standing off the selection so a
+    // handle is not on top of a point, and the scale was measured against that
+    // box — so what stayed still was a line ten screen pixels outside the
+    // drawing rather than the side of the square.
+    const start = chosen();
+    const box = selectionBox(start)!.rect;
+    const bottom = vec((box.minX + box.maxX) / 2, box.minY);
+
+    const grabbed = pointerDown(start, pointerInput(bottom)).state;
+    expect(grabbed.gesture).toMatchObject({ handle: { at: "bottom", action: "scale" } });
+
+    // Down by half the square's height, which should make it half again as tall
+    // downwards and leave the top exactly where it was.
+    const moved = pointerMove(grabbed, pointerInput(vec(bottom.x, bottom.y - 50))).state;
+
+    const ys = ["p0", "p1", "p2", "p3"].map((id) => where(moved, id).y);
+    expect(Math.max(...ys)).toBeCloseTo(100, 6);
+    expect(Math.min(...ys)).toBeCloseTo(-50, 6);
+    // And nothing moved sideways, since an edge handle carries one axis.
+    expect(where(moved, "p0").x).toBeCloseTo(0, 6);
+    expect(where(moved, "p2").x).toBeCloseTo(100, 6);
+  });
+
+  it("follows the pointer from the moment it moves, rather than jumping", () => {
+    // The handle sits outside the selection, so a drag that asked the edge to
+    // go *where the pointer is* would start by leaping out to meet it.
+    const start = chosen();
+    const box = selectionBox(start)!.rect;
+    const right = vec(box.maxX, (box.minY + box.maxY) / 2);
+
+    const grabbed = pointerDown(start, pointerInput(right)).state;
+    const nudged = pointerMove(grabbed, pointerInput(vec(right.x + 10, right.y))).state;
+
+    // Ten units of pointer is ten units of edge: 100 wide becomes 110.
+    expect(where(nudged, "p2").x).toBeCloseTo(110, 6);
+    expect(where(nudged, "p0").x).toBeCloseTo(0, 6);
+  });
+
+  it("holds the far corner still when a corner is pulled", () => {
+    const start = chosen();
+    const box = selectionBox(start)!.rect;
+    const corner = vec(box.maxX, box.maxY);
+
+    const grabbed = pointerDown(start, pointerInput(corner)).state;
+    // Out by the square's own size: twice as wide and twice as tall, from the
+    // corner at the origin.
+    const moved = pointerMove(grabbed, pointerInput(vec(corner.x + 100, corner.y + 100))).state;
+
+    expect(where(moved, "p0")).toEqual(vec(0, 0));
+    expect(where(moved, "p2").x).toBeCloseTo(200, 6);
+    expect(where(moved, "p2").y).toBeCloseTo(200, 6);
   });
 
   it("measures from where the drag began, not from where it has got to", () => {
@@ -1345,8 +1398,11 @@ describe("the box round a selection", () => {
     const handle = { at: "top", action: "scale" } as const;
     const top = boxHandlePoint(box, handle.at);
     const pivot = boxPivot(box, handle, false);
-    // Twice as far from the opposite edge, along the box's own up.
-    const pulled = vec(pivot.x + (top.x - pivot.x) * 2, pivot.y + (top.y - pivot.y) * 2);
+    // The box's own up, as a direction in the plane, pulled by the square's
+    // hundred units: twice as far from the opposite edge.
+    const along = { x: top.x - pivot.x, y: top.y - pivot.y };
+    const reach = Math.hypot(along.x, along.y);
+    const pulled = vec(top.x + (along.x / reach) * 100, top.y + (along.y / reach) * 100);
     const scaled = pointerMove(
       pointerDown(up, pointerInput(top)).state,
       pointerInput(pulled),

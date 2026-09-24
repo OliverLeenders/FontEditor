@@ -56,6 +56,7 @@ import {
   snapPoint,
   toGrid,
   toggleItem,
+  boxHandlePoint,
   boxPivot,
   boxScale,
   boxScaleTransform,
@@ -235,6 +236,7 @@ export function startBoxTransform(
         origin: input.point,
         handle,
         box,
+        tight: withoutOutset(box, screenTolerance(state.view, BOX_OUTSET_PIXELS)),
         items: state.selection,
         before: state.document,
         moved: false,
@@ -242,6 +244,30 @@ export function startBoxTransform(
     },
     [begin(handle.action === "rotate" ? "Rotate" : "Scale", false)],
   );
+}
+
+/**
+ * How far the box stands off what it holds, in screen pixels.
+ *
+ * Not decoration. A selection's corner point sits exactly on the corner of its
+ * own bounding box, so a box drawn tight against it would put a handle on top
+ * of a point and there would be no way to drag that point again. Standing the
+ * box off by more than the handles' own reach keeps the two apart at every
+ * zoom.
+ */
+export const BOX_OUTSET_PIXELS = 10;
+
+/** The drawn box with that margin taken back off: the selection's own bounds. */
+function withoutOutset(box: BoxFrame, out: number): BoxFrame {
+  return {
+    rect: {
+      minX: box.rect.minX + out,
+      minY: box.rect.minY + out,
+      maxX: box.rect.maxX - out,
+      maxY: box.rect.maxY - out,
+    },
+    angle: box.angle,
+  };
 }
 
 /**
@@ -1038,7 +1064,13 @@ const CONTINUE: Continuations = {
 
   transformBox: (state, gesture, input, delta) => {
     const { shift, alt } = input.modifiers;
-    const pivot = boxPivot(gesture.box, gesture.handle, alt);
+    // A turn is measured on the box as drawn, since that is the handle in hand
+    // and the middle is the same either way; a scale is measured on what the
+    // box holds, so that the side opposite the one being pulled stays put.
+    const pivot =
+      gesture.handle.action === "rotate"
+        ? boxPivot(gesture.box, gesture.handle, alt)
+        : boxPivot(gesture.tight, gesture.handle, alt);
 
     // Shift means "hold the shape" on a scale and "hold the angle" on a turn,
     // which are the same instruction read against what is being changed.
@@ -1051,11 +1083,20 @@ const CONTINUE: Continuations = {
       // reason the points are: a running total would drift over a long turn.
       boxFrame = { angle: gesture.box.angle + turned, of: gesture.items };
     } else {
-      const by = boxScale(gesture.box, gesture.handle, pivot, input.point, shift);
+      // What the pointer says is how far it has moved, not where it is: the
+      // handle it grabbed is drawn a little outside the selection, so an edge
+      // asked to go where the pointer *is* would jump out to meet it the moment
+      // the drag began. Moved by the same amount, it follows the hand.
+      const grabbed = boxHandlePoint(gesture.tight, gesture.handle.at);
+      const to = {
+        x: grabbed.x + input.point.x - gesture.origin.x,
+        y: grabbed.y + input.point.y - gesture.origin.y,
+      };
+      const by = boxScale(gesture.tight, gesture.handle, pivot, to, shift);
       if (!Number.isFinite(by.x) || !Number.isFinite(by.y)) return state;
       // Along the box's own axes rather than the plane's, so a handle on a
       // turned box pulls the way it points.
-      transform = boxScaleTransform(gesture.box, by);
+      transform = boxScaleTransform(gesture.tight, by);
     }
 
     // From the document as it was when the drag began, so the answer depends on
