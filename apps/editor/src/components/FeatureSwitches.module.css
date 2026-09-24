@@ -1,6 +1,16 @@
 /*
  * The panel of feature switches, hung off the bar's Features button.
  *
+ * A panel given its own class replaces the default one entirely, so the box it
+ * floats in is written out here as every other panel in the bar writes it: over
+ * the canvas, under its own button. Without it the switches land in the bar's
+ * own flow and push it taller, which is a bar that changes height when a menu
+ * opens.
+ *
+ * Anchored to the right edge of the button, unlike the panels at the left end
+ * of a bar: this sits near the end of a long row of controls, and one growing
+ * rightwards from there would go off the window.
+ *
  * Wider than the default panel because every row is a tag and a name — `ss01`
  * and "Stylistic set 1" — and a name that wrapped onto a second line would turn
  * a list read down its left edge into a list read a fragment at a time. Tall
@@ -8,10 +18,18 @@
  * than a panel that runs off the bottom of the window.
  */
 .panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 20;
   min-width: 17rem;
-  max-height: 22rem;
+  max-height: min(22rem, 70vh);
   overflow-y: auto;
   padding: 0.7rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .rows {
