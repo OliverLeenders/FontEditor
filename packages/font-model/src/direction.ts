@@ -202,6 +202,135 @@ function within(poly: readonly Vec2[], holder: Boundary): boolean {
 }
 
 /**
+ * Which contours hold which.
+ *
+ * `depth` is how many others each one is inside, which says whether it is ink
+ * or a hole; `parent` is the innermost of them, which says *whose* hole it is.
+ * Both fall out of the same containment test, and that test is the expensive
+ * part — every contour against every other — so the two callers that want it
+ * ask for it once here rather than each running their own pass.
+ */
+type Nesting = {
+  readonly depth: readonly number[];
+  readonly parent: readonly (number | null)[];
+};
+
+function nestingOf(contours: readonly Contour[]): Nesting {
+  const polygons = contours.map((c) => (c.closed ? polygon(c) : []));
+  const windings = contours.map((c) => (c.closed ? contourWinding(c) : 0));
+  // Filed by height once each, because every contour is asked about every other.
+  const boundaries = polygons.map(boundaryOf);
+
+  const depth: number[] = [];
+  const parent: (number | null)[] = [];
+
+  for (let i = 0; i < contours.length; i++) {
+    if (!contours[i]!.closed || windings[i] === 0) {
+      depth.push(0);
+      parent.push(null);
+      continue;
+    }
+
+    let held = 0;
+    let innermost: number | null = null;
+    let smallest = Infinity;
+
+    for (let j = 0; j < contours.length; j++) {
+      if (j === i || windings[j] === 0) continue;
+      // Only a larger contour can hold a smaller one, which also settles the
+      // case of two identical contours drawn on top of each other.
+      const area = Math.abs(windings[j]!);
+      if (area < Math.abs(windings[i]!)) continue;
+      if (!within(polygons[i]!, boundaries[j]!)) continue;
+
+      held += 1;
+      // The smallest thing holding it is the one it is a hole *of*: a counter
+      // inside a bowl inside nothing belongs to the bowl.
+      if (area < smallest) {
+        smallest = area;
+        innermost = j;
+      }
+    }
+
+    depth.push(held);
+    parent.push(innermost);
+  }
+
+  return { depth, parent };
+}
+
+/** One filled shape: the contour bounding it, and the holes punched in it. */
+export type ContourShape = {
+  readonly outer: number;
+  readonly holes: readonly number[];
+};
+
+/**
+ * The contours grouped into the shapes they draw.
+ *
+ * A contour inside an even number of others bounds ink and begins a shape;
+ * inside an odd number it is a hole, and belongs to the shape of the contour
+ * immediately around it. An island drawn inside a counter is two deep and so
+ * begins a shape of its own, which is what it looks like.
+ *
+ * This is the difference between a hole and a neighbour, and the knife needs it:
+ * a cut across an `o` has to close from the outer contour to the counter,
+ * because they bound one piece of ink, while a cut across two overlapping
+ * shapes has to cut each of them and leave them two.
+ *
+ * Open contours draw no ink and are in no shape.
+ */
+export function shapesOf(contours: readonly Contour[]): ContourShape[] {
+  const { depth, parent } = nestingOf(contours);
+
+  const holes = new Map<number, number[]>();
+  const outers: number[] = [];
+
+  for (let i = 0; i < contours.length; i++) {
+    if (!contours[i]!.closed) continue;
+    if (depth[i]! % 2 === 0) {
+      outers.push(i);
+      continue;
+    }
+    const owner = parent[i];
+    if (owner === null || owner === undefined) continue;
+    const list = holes.get(owner);
+    if (list === undefined) holes.set(owner, [i]);
+    else list.push(i);
+  }
+
+  return outers.map((outer) => ({ outer, holes: holes.get(outer) ?? [] }));
+}
+
+/** A closed contour as a flat polygon, for asking what is inside it. */
+export function contourPolygon(c: Contour): Vec2[] {
+  return polygon(c);
+}
+
+/** Whether a point is inside these polygons, by the non-zero winding rule. */
+export function insidePolygons(polygons: readonly (readonly Vec2[])[], p: Vec2): boolean {
+  let winding = 0;
+  for (const poly of polygons) winding += windingAt(poly, p);
+  return winding !== 0;
+}
+
+/** How many times a polygon winds about a point, with its sign. */
+function windingAt(poly: readonly Vec2[], p: Vec2): number {
+  let winding = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
+    const side = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
+    if (a.y <= p.y) {
+      if (b.y > p.y && side > 0) winding += 1;
+    } else if (b.y <= p.y && side < 0) {
+      winding -= 1;
+    }
+  }
+  return winding;
+}
+
+/**
  * The same contours, each running the way its nesting says it should.
  *
  * A contour inside an even number of others is an outer one and runs
@@ -218,24 +347,12 @@ function within(poly: readonly Vec2[], holder: Boundary): boolean {
 export function correctDirections(contours: readonly Contour[]): readonly Contour[] {
   if (contours.length === 0) return contours;
 
-  const polygons = contours.map((c) => (c.closed ? polygon(c) : []));
   const windings = contours.map((c) => (c.closed ? contourWinding(c) : 0));
-  // Filed by height once each, because every contour is asked about every other.
-  const boundaries = polygons.map(boundaryOf);
+  const { depth } = nestingOf(contours);
 
   const out = contours.map((c, i) => {
     if (!c.closed || windings[i] === 0) return c;
-
-    let depth = 0;
-    for (let j = 0; j < contours.length; j++) {
-      if (j === i || windings[j] === 0) continue;
-      // Only a larger contour can hold a smaller one, which also settles the
-      // case of two identical contours drawn on top of each other.
-      if (Math.abs(windings[j]!) < Math.abs(windings[i]!)) continue;
-      if (within(polygons[i]!, boundaries[j]!)) depth += 1;
-    }
-
-    const wanted = depth % 2 === 0 ? 1 : -1;
+    const wanted = depth[i]! % 2 === 0 ? 1 : -1;
     return Math.sign(windings[i]!) === wanted ? c : reverseContour(c);
   });
 
@@ -289,18 +406,5 @@ export function glyphPolygons(g: Glyph): readonly (readonly Vec2[])[] {
  * hole, which is what the compiled font will draw.
  */
 export function insideGlyph(g: Glyph, p: Vec2): boolean {
-  let winding = 0;
-  for (const poly of glyphPolygons(g)) {
-    for (let i = 0; i < poly.length; i++) {
-      const a = poly[i]!;
-      const b = poly[(i + 1) % poly.length]!;
-      const side = (b.x - a.x) * (p.y - a.y) - (p.x - a.x) * (b.y - a.y);
-      if (a.y <= p.y) {
-        if (b.y > p.y && side > 0) winding += 1;
-      } else if (b.y <= p.y && side < 0) {
-        winding -= 1;
-      }
-    }
-  }
-  return winding !== 0;
+  return insidePolygons(glyphPolygons(g), p);
 }
