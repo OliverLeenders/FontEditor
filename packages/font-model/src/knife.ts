@@ -2,7 +2,7 @@ import { type Cubic, type Vec2, subcurve } from "@typewright/geometry";
 
 import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { type StrokeCrossing, byContour, samePoint, strokeCrossings } from "./crossings.js";
-import { insideGlyph } from "./direction.js";
+import { contourPolygon, insidePolygons, shapesOf } from "./direction.js";
 import type { Glyph } from "./glyph.js";
 import type { IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
@@ -33,6 +33,17 @@ import { type Node, node } from "./node.js";
  * a ring with a slit in it, and is simply connected the way a `c` is where the
  * `o` was not. One shape where there were two, and the hole is gone: the slit
  * has no width yet, and pulling it open is drawing rather than cutting.
+ *
+ * Pairing happens inside one *shape* — a contour and the holes in it — rather
+ * than across the glyph. The two look the same from the stroke: between an
+ * outer contour and its counter is ink, and so is the stretch between two
+ * overlapping shapes. They are not the same thing to cut. A counter is part of
+ * the boundary of the ink the outer contour holds, so a chord across it belongs
+ * to that one shape; two shapes that happen to overlap are two things, and a
+ * knife through both should leave each of them cut rather than weave one out of
+ * the two. Paired along the whole glyph, two overlapping squares came out as a
+ * pair of pinwheels — the bottom of one stitched to the top of the other — and
+ * pulling a piece away tore both.
  *
  * A crossing whose stretch of ink runs to an end of the stroke has no partner.
  * The stroke came in and did not come out, so there is no chord to close there —
@@ -118,28 +129,61 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
   for (const entry of split.values()) meetings.push(...entry.meetings);
   meetings.sort((l, r) => l.u - r.u);
 
-  // Pairs along the stroke, but only where the stretch between two crossings is
-  // ink. Counting pairs off by parity assumes the stroke began outside the
-  // letter; one that begins inside a stem pairs the wrong way round, and the
-  // stretch it closes across is the white between two stems — a `v` cut from
-  // stem to stem grew a bar across its mouth. Asking the midpoint, as the section
-  // ruler does, is right wherever the stroke starts.
+  // Pairs along the stroke, within one shape, and only where the stretch
+  // between two crossings is that shape's ink. Counting pairs off by parity
+  // assumes the stroke began outside the letter; one that begins inside a stem
+  // pairs the wrong way round, and the stretch it closes across is the white
+  // between two stems — a `v` cut from stem to stem grew a bar across its
+  // mouth. Asking the midpoint, as the section ruler does, is right wherever
+  // the stroke starts.
   const partner = new Map<string, Meeting>();
   const key = (m: Meeting): string => `${String(m.contour)}:${String(m.index)}`;
   const pointOf = (m: Meeting): Vec2 | null =>
     split.get(m.contour)?.contour.nodes[m.index]?.pt ?? null;
 
-  for (let i = 0; i + 1 < meetings.length;) {
-    const first = meetings[i]!;
-    const second = meetings[i + 1]!;
-    const a = pointOf(first);
-    const b = pointOf(second);
-    if (a !== null && b !== null && insideGlyph(g, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })) {
-      partner.set(key(first), second);
-      partner.set(key(second), first);
-      i += 2;
-    } else {
-      i += 1;
+  const shapes = shapesOf(g.contours);
+  const shapeOf = new Map<number, number>();
+  shapes.forEach((shape, id) => {
+    shapeOf.set(shape.outer, id);
+    for (const hole of shape.holes) shapeOf.set(hole, id);
+  });
+  // The ink of each shape on its own, worked out once for the pairs to be
+  // measured against: what matters is whether the stroke is inside *this*
+  // shape, not whether it is inside the letter somewhere.
+  const ink = shapes.map((shape) =>
+    [shape.outer, ...shape.holes].flatMap((index) => {
+      const c = g.contours[index];
+      return c === undefined ? [] : [contourPolygon(c)];
+    }),
+  );
+
+  const perShape = new Map<number, Meeting[]>();
+  for (const meeting of meetings) {
+    const id = shapeOf.get(meeting.contour);
+    if (id === undefined) continue;
+    const list = perShape.get(id);
+    if (list === undefined) perShape.set(id, [meeting]);
+    else list.push(meeting);
+  }
+
+  for (const [id, list] of perShape) {
+    const polygons = ink[id] ?? [];
+    for (let i = 0; i + 1 < list.length;) {
+      const first = list[i]!;
+      const second = list[i + 1]!;
+      const a = pointOf(first);
+      const b = pointOf(second);
+      if (
+        a !== null &&
+        b !== null &&
+        insidePolygons(polygons, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+      ) {
+        partner.set(key(first), second);
+        partner.set(key(second), first);
+        i += 2;
+      } else {
+        i += 1;
+      }
     }
   }
 

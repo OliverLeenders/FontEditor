@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { reverseContour, segmentCount } from "../src/contour.js";
+import { correctDirections } from "../src/direction.js";
 import { glyph, glyphBounds } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
 import { cutGlyph } from "../src/knife.js";
@@ -182,6 +183,135 @@ describe("what a cut refuses", () => {
  * the outside, along the stroke inwards, round the counter, back along the
  * stroke. A ring with a slit in it, simply connected the way a `c` is.
  */
+/**
+ * Shapes that overlap are still two shapes.
+ *
+ * Between an outer contour and its counter is ink, and so is the stretch
+ * between two overlapping shapes — the stroke cannot tell them apart, and the
+ * knife used not to. Paired across the glyph, two overlapping squares came back
+ * as two pinwheels, each the bottom of one square stitched to the top of the
+ * other. A counter belongs to the shape around it; a neighbour does not.
+ */
+describe("cutting shapes that overlap", () => {
+  /** Two 200-unit squares, the second starting halfway across the first. */
+  const pair = () =>
+    glyph("x", {
+      advance: 600,
+      contours: correctDirections([
+        rectContour(ids, { minX: 0, minY: 0, maxX: 200, maxY: 200 }),
+        rectContour(ids, { minX: 100, minY: 0, maxX: 300, maxY: 200 }),
+      ]),
+    });
+
+  const across = () => cutGlyph(pair(), at(-50, 100), at(350, 100), ids)!;
+
+  it("cuts each of them, rather than weaving one out of the two", () => {
+    const cut = across();
+
+    expect(cut.crossings).toBe(4);
+    expect(cut.chords).toBe(2);
+    expect(cut.glyph.contours).toHaveLength(4);
+  });
+
+  it("leaves every piece the rectangle it should be", () => {
+    // A piece that mixed the two squares would have eight corners and a step in
+    // it; each of these is a half of one square and nothing else.
+    for (const c of across().glyph.contours) expect(c.nodes).toHaveLength(4);
+  });
+
+  it("keeps each piece to the square it came from", () => {
+    const boxes = across().glyph.contours.map((c) => ({
+      minX: Math.min(...c.nodes.map((n) => n.pt.x)),
+      maxX: Math.max(...c.nodes.map((n) => n.pt.x)),
+      minY: Math.min(...c.nodes.map((n) => n.pt.y)),
+      maxY: Math.max(...c.nodes.map((n) => n.pt.y)),
+    }));
+
+    // Two pieces of the left square and two of the right, each half as tall.
+    const widths = boxes.map((b) => `${String(b.minX)}..${String(b.maxX)}`).sort();
+    expect(widths).toEqual(["0..200", "0..200", "100..300", "100..300"]);
+    // Half as tall to within arithmetic: a crossing is the root of a cubic.
+    for (const b of boxes) expect(b.maxY - b.minY).toBeCloseTo(100, 6);
+  });
+
+  it("covers the same ground the two squares did", () => {
+    expect(glyphBounds(across().glyph)).toEqual({ minX: 0, minY: 0, maxX: 300, maxY: 200 });
+  });
+
+  it("cuts three of them as three", () => {
+    const three = glyph("y", {
+      advance: 900,
+      contours: correctDirections([
+        rectContour(ids, { minX: 0, minY: 0, maxX: 200, maxY: 200 }),
+        rectContour(ids, { minX: 100, minY: 0, maxX: 300, maxY: 200 }),
+        rectContour(ids, { minX: 250, minY: 0, maxX: 400, maxY: 200 }),
+      ]),
+    });
+    const cut = cutGlyph(three, at(-50, 100), at(450, 100), ids)!;
+
+    expect(cut.chords).toBe(3);
+    expect(cut.glyph.contours).toHaveLength(6);
+    for (const c of cut.glyph.contours) expect(c.nodes).toHaveLength(4);
+  });
+
+  it("cuts the one it crossed twice and marks the one it crossed once", () => {
+    // Stopping inside the second square: the first is cut in two, and the
+    // second keeps its shape with a point where the stroke met it.
+    const cut = cutGlyph(pair(), at(-50, 100), at(250, 100), ids)!;
+
+    expect(cut.chords).toBe(1);
+    expect(cut.marked).toBe(1);
+    expect(cut.glyph.contours).toHaveLength(3);
+  });
+
+  it("joins nothing when the stroke enters both and leaves neither", () => {
+    // Into the first square, on into the overlap, and stop. Each shape has one
+    // crossing and one crossing closes nothing, so both keep their shape — where
+    // pairing across the glyph would have closed a chord from one to the other
+    // and welded the two squares into one.
+    const cut = cutGlyph(pair(), at(-50, 100), at(150, 100), ids)!;
+
+    expect(cut.chords).toBe(0);
+    expect(cut.marked).toBe(2);
+    expect(cut.glyph.contours).toHaveLength(2);
+  });
+
+  it("still cuts two shapes that do not overlap at all", () => {
+    // The case that worked before and has to go on working: the stretch between
+    // them is white, so nothing pairs across the gap.
+    const apart = glyph("z", {
+      advance: 900,
+      contours: correctDirections([
+        rectContour(ids, { minX: 0, minY: 0, maxX: 200, maxY: 200 }),
+        rectContour(ids, { minX: 400, minY: 0, maxX: 600, maxY: 200 }),
+      ]),
+    });
+    const cut = cutGlyph(apart, at(-50, 100), at(650, 100), ids)!;
+
+    expect(cut.chords).toBe(2);
+    expect(cut.glyph.contours).toHaveLength(4);
+  });
+
+  it("treats an island in a counter as the shape it looks like", () => {
+    // Three deep: a ring with something drawn inside its counter. The island is
+    // its own shape, so the cut across all three closes ring-to-counter and
+    // island-to-island rather than joining the island to the ring.
+    const withIsland = glyph("8", {
+      advance: 600,
+      contours: correctDirections([
+        rectContour(ids, { minX: 0, minY: 0, maxX: 600, maxY: 600 }),
+        rectContour(ids, { minX: 100, minY: 100, maxX: 500, maxY: 500 }),
+        rectContour(ids, { minX: 200, minY: 200, maxX: 400, maxY: 400 }),
+      ]),
+    });
+    const cut = cutGlyph(withIsland, at(-50, 300), at(650, 300), ids)!;
+
+    // Two halves of the ring, and two halves of the island.
+    expect(cut.chords).toBe(3);
+    expect(cut.glyph.contours).toHaveLength(4);
+  });
+});
+
 describe("cutting a ring open", () => {
   const intoTheCounter = () => cutGlyph(ring(), at(-50, 300), at(300, 300), ids)!;
 

@@ -232,7 +232,7 @@ as well as curvature-continuous. It is offered only where it would do something:
 a straight side or an already harmonious join has nothing to reconcile.
 
 **The knife counts crossings along the stroke, not around each contour.** Every pair of
-crossings spans a stretch of the stroke that lies inside the ink, and each of those
+crossings spans a stretch of the stroke that lies inside one shape's ink, and each of those
 stretches becomes an edge of the result — which is what makes the interesting case fall
 out rather than needing a rule of its own. Drawn all the way across a shape, the pair
 divides it in two. Drawn into an `o` from outside and stopped in the counter, the pair has
@@ -241,6 +241,13 @@ a single closed contour running round the outside, along the stroke inwards, rou
 counter and back along the stroke — a ring with a slit in it, simply connected the way a
 `c` is where the `o` was not. The slit has no width yet; pulling it open is drawing rather
 than cutting.
+
+**A shape is a contour and the holes in it**, and the pairing happens inside one. A counter
+belongs to the shape around it, so a cut across an `o` closes from the outer contour to the
+counter and gives two clean halves of the ring. Two shapes that merely overlap are two
+things: a stroke through both cuts each of them and leaves them two, rather than weaving one
+outline out of the pair. Merging them is what Remove overlap is for, and it stays a thing you
+ask for.
 
 An odd number of crossings is the case with no pairing at all: the stroke came in and did
 not come out, so nothing is divided and a point goes in at each crossing instead. That is
