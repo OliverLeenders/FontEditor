@@ -18,6 +18,7 @@ import { useEffect, useRef } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
 import { Stepper } from "../Stepper.js";
 import { SplineIcon } from "../icons.js";
 import { Section } from "./Section.js";
@@ -192,14 +193,13 @@ export function CurveSection(): React.JSX.Element {
           disabled={!curveReady}
           onStep={(next) => commitTension(next)}
         >
-          <input
+          <NumberField
             className={styles.input}
-            type="number"
-            aria-label="Tension of the segment"
+            label="Tension of the segment"
             title={curveHint}
             disabled={!curveReady}
-            value={tension === null ? "" : shown(tension * 100)}
-            onChange={(event) => commitTension(Number(event.target.value))}
+            value={tension === null ? null : shown(tension * 100)}
+            onCommit={commitTension}
           />
         </Stepper>
       </Field>
@@ -309,16 +309,14 @@ export function CurveSection(): React.JSX.Element {
             disabled={!curveReady}
             onStep={(next) => commitPan(next)}
           >
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              min={-PAN_REACH * 100}
-              max={PAN_REACH * 100}
-              aria-label="Pan as a percentage"
+              bounds={{ min: -PAN_REACH * 100, max: PAN_REACH * 100 }}
+              label="Pan as a percentage"
               title="Which way the reach leans, as a percentage of it: 0 is balanced, 100 is all at the start"
               disabled={!curveReady}
-              value={curveReady ? shown(panValue * 100) : ""}
-              onChange={(event) => commitPan(Number(event.target.value))}
+              value={curveReady ? shown(panValue * 100) : null}
+              onCommit={commitPan}
             />
           </Stepper>
         </div>

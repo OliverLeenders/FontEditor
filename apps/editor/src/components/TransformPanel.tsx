@@ -231,7 +231,9 @@ export function TransformPanel(): React.JSX.Element {
  * A number that does something once and goes back to meaning nothing.
  *
  * Held as text rather than as a number so a half-typed "-" or "1." can sit in
- * the box without being read as a value and applied.
+ * the box without being read as a value and applied — and a text box rather
+ * than a number one, since the browser's own value sanitising throws that "-"
+ * away before anything here can hold on to it.
  */
 function Action({
   label,
@@ -266,7 +268,10 @@ function Action({
       </span>
       <input
         className={styles.input}
-        type="number"
+        type="text"
+        inputMode="decimal"
+        autoComplete="off"
+        spellCheck={false}
         value={draft}
         disabled={disabled}
         aria-label={label}

@@ -11,6 +11,7 @@ import { useMemo } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
 import { FrameIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
@@ -82,29 +83,24 @@ export function GuidesSection(): React.JSX.Element {
                 store.applyTool(renameGuideTo(store.editor, g.id, event.target.value))
               }
             />
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label={`X of the guide ${g.name}`}
+              label={`X of the guide ${g.name}`}
               value={shown(g.pt.x)}
-              onChange={(event) => commitGuide(g.id, "x", Number(event.target.value))}
+              onCommit={(next) => commitGuide(g.id, "x", next)}
             />
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label={`Y of the guide ${g.name}`}
+              label={`Y of the guide ${g.name}`}
               value={shown(g.pt.y)}
-              onChange={(event) => commitGuide(g.id, "y", Number(event.target.value))}
+              onCommit={(next) => commitGuide(g.id, "y", next)}
             />
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label={`Angle of the guide ${g.name}`}
+              label={`Angle of the guide ${g.name}`}
               title="Degrees counter-clockwise: 0 lies flat, 90 stands up"
               value={shown(g.angle)}
-              onChange={(event) =>
-                store.applyTool(turnGuideTo(store.editor, g.id, Number(event.target.value)))
-              }
+              onCommit={(next) => store.applyTool(turnGuideTo(store.editor, g.id, next))}
             />
             {/* Which scope it is in, and the way to change it. A line drawn
                     while working on one letter often turns out to be about the

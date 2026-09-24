@@ -2,6 +2,7 @@ import { currentGlyph, fitImageToGlyph, moveImageTo, scaleImageTo } from "@typew
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
 import { ImageIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field, shown } from "./fields.js";
@@ -38,31 +39,26 @@ export function TracingSection(): React.JSX.Element | null {
           <span className={styles.imageName} title={image.name}>
             {image.name}
           </span>
-          <input
+          <NumberField
             className={styles.input}
-            type="number"
-            aria-label="X of the picture"
+            label="X of the picture"
             title="Where its lower-left corner sits"
             value={shown(image.transform.xOffset)}
-            onChange={(event) => commitImage("x", Number(event.target.value))}
+            onCommit={(next) => commitImage("x", next)}
           />
-          <input
+          <NumberField
             className={styles.input}
-            type="number"
-            aria-label="Y of the picture"
+            label="Y of the picture"
             value={shown(image.transform.yOffset)}
-            onChange={(event) => commitImage("y", Number(event.target.value))}
+            onCommit={(next) => commitImage("y", next)}
           />
-          <input
+          <NumberField
             className={styles.input}
-            type="number"
             step={0.01}
-            aria-label="Scale of the picture"
+            label="Scale of the picture"
             title="How many design units to a pixel"
             value={shown(image.transform.xScale)}
-            onChange={(event) =>
-              store.applyTool(scaleImageTo(store.editor, Number(event.target.value)))
-            }
+            onCommit={(next) => store.applyTool(scaleImageTo(store.editor, next))}
           />
           <button
             type="button"

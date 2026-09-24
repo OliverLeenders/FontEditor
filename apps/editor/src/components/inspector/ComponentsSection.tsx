@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
 import { ComponentIcon, FlipHorizontalIcon, FlipVerticalIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
@@ -80,21 +81,19 @@ export function ComponentsSection(): React.JSX.Element {
             >
               {c.base}
             </button>
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label={`X offset of ${c.base}`}
+              label={`X offset of ${c.base}`}
               title="How far right the placed glyph sits"
               value={shown(c.transform.xOffset)}
-              onChange={(event) => commitComponent(c.id, "x", Number(event.target.value))}
+              onCommit={(next) => commitComponent(c.id, "x", next)}
             />
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label={`Y offset of ${c.base}`}
+              label={`Y offset of ${c.base}`}
               title="How far up the placed glyph sits"
               value={shown(c.transform.yOffset)}
-              onChange={(event) => commitComponent(c.id, "y", Number(event.target.value))}
+              onCommit={(next) => commitComponent(c.id, "y", next)}
             />
             <button
               type="button"

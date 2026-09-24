@@ -433,24 +433,33 @@ function Field({
           } as Partial<FontInfo>),
         });
 
+  /** What an arrow key moves this field by, big and small. */
+  const stepBy = (big: boolean): number => (big ? (field.key === "unitsPerEm" ? 64 : 10) : 1);
+
+  /** The number the arrows work from: the draft, or what an empty override would be. */
+  const stepping = (): number | null =>
+    cleared ? derived : Number.isFinite(Number(draft)) ? Number(draft) : null;
+
+  const step = (next: number): void => {
+    setDraft(String(next));
+    const patch = { [field.key]: next } as Partial<FontInfo>;
+    if (infoProblem({ ...info, ...patch }) === null) {
+      store.applyTool(setInfo(store.editor, patch));
+    }
+  };
+
   const stepped = (input: React.JSX.Element): React.JSX.Element =>
     numeric ? (
       <Stepper
         // An empty override steps from what it would come out as, so the first
         // press moves the number shown in the box rather than jumping from zero.
-        value={cleared ? derived : Number.isFinite(Number(draft)) ? Number(draft) : null}
+        value={stepping()}
         label={field.label}
         // The em is a grid people speak of in round hundreds; the rest are
         // units, and a unit is the smallest thing there is.
         step={1}
-        bigStep={field.key === "unitsPerEm" ? 64 : 10}
-        onStep={(next) => {
-          setDraft(String(next));
-          const patch = { [field.key]: next } as Partial<FontInfo>;
-          if (infoProblem({ ...info, ...patch }) === null) {
-            store.applyTool(setInfo(store.editor, patch));
-          }
-        }}
+        bigStep={stepBy(true)}
+        onStep={step}
       >
         {input}
       </Stepper>
@@ -544,7 +553,15 @@ function Field({
       {stepped(
         <input
           className={styles.input}
-          type={numeric ? "number" : "text"}
+          // A text box even for a number: the browser's own value sanitising
+          // throws away a lone "-" on the way to a negative, and a box that
+          // cannot hold what a half-typed number looks like is a box you cannot
+          // type a negative into. The arrows a number input would have given are
+          // handled below, and are the ones the stepper beside it presses.
+          type="text"
+          {...(numeric ? { inputMode: "decimal" as const } : {})}
+          autoComplete="off"
+          spellCheck={false}
           value={draft}
           placeholder={field.kind === "override" && derived !== null ? String(derived) : undefined}
           title={field.hint}
@@ -555,6 +572,13 @@ function Field({
           onChange={(event) => setDraft(event.target.value)}
           onBlur={commit}
           onKeyDown={(event) => {
+            if (numeric && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+              const from = stepping();
+              if (from === null) return;
+              event.preventDefault();
+              step(from + stepBy(event.shiftKey) * (event.key === "ArrowUp" ? 1 : -1));
+              return;
+            }
             if (event.key === "Enter") {
               event.preventDefault();
               commit();

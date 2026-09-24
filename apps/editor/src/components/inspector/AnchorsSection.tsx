@@ -2,6 +2,7 @@ import { currentGlyph, moveAnchorToPoint, removeAnchorAt, renameAnchorTo } from 
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
 import { AnchorIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
@@ -68,19 +69,17 @@ export function AnchorsSection(): React.JSX.Element {
                 store.applyTool(renameAnchorTo(store.editor, a.id, event.target.value))
               }
             />
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label={`X of the anchor ${a.name}`}
+              label={`X of the anchor ${a.name}`}
               value={shown(a.pt.x)}
-              onChange={(event) => commitAnchor(a.id, "x", Number(event.target.value))}
+              onCommit={(next) => commitAnchor(a.id, "x", next)}
             />
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label={`Y of the anchor ${a.name}`}
+              label={`Y of the anchor ${a.name}`}
               value={shown(a.pt.y)}
-              onChange={(event) => commitAnchor(a.id, "y", Number(event.target.value))}
+              onCommit={(next) => commitAnchor(a.id, "y", next)}
             />
             <button
               type="button"

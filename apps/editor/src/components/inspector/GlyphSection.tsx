@@ -11,6 +11,7 @@ import { begin, commit, editCurrentGlyph, result, setMetricKey } from "@typewrig
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
 import { Stepper } from "../Stepper.js";
 import { TypeIcon } from "../icons.js";
 import { Section } from "./Section.js";
@@ -134,13 +135,13 @@ export function GlyphSection(): React.JSX.Element {
           disabled={widthKey !== ""}
           onStep={(next) => commitAdvance(next)}
         >
-          <input
+          <NumberField
             className={styles.input}
-            type="number"
+            label="Advance"
             disabled={widthKey !== ""}
             title={widthKey === "" ? undefined : `Taken from ${widthKey}`}
             value={Math.round(shownAdvance)}
-            onChange={(event) => commitAdvance(Number(event.target.value))}
+            onCommit={commitAdvance}
           />
         </Stepper>
       </Field>
@@ -156,14 +157,13 @@ export function GlyphSection(): React.JSX.Element {
             disabled={shownLeft === null || leftKey !== ""}
             onStep={(next) => commitBearing("left", next)}
           >
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label="Left sidebearing"
+              label="Left sidebearing"
               title={leftKey === "" ? "Left sidebearing" : `Taken from ${leftKey}`}
               disabled={shownLeft === null || leftKey !== ""}
-              value={shownLeft === null ? "" : Math.round(shownLeft)}
-              onChange={(event) => commitBearing("left", Number(event.target.value))}
+              value={shownLeft === null ? null : Math.round(shownLeft)}
+              onCommit={(next) => commitBearing("left", next)}
             />
           </Stepper>
           <Stepper
@@ -172,14 +172,13 @@ export function GlyphSection(): React.JSX.Element {
             disabled={shownRight === null || rightKey !== ""}
             onStep={(next) => commitBearing("right", next)}
           >
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label="Right sidebearing"
+              label="Right sidebearing"
               title={rightKey === "" ? "Right sidebearing" : `Taken from ${rightKey}`}
               disabled={shownRight === null || rightKey !== ""}
-              value={shownRight === null ? "" : Math.round(shownRight)}
-              onChange={(event) => commitBearing("right", Number(event.target.value))}
+              value={shownRight === null ? null : Math.round(shownRight)}
+              onCommit={(next) => commitBearing("right", next)}
             />
           </Stepper>
         </div>

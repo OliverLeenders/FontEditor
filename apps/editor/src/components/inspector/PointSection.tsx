@@ -14,6 +14,7 @@ import {
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
 import { Stepper } from "../Stepper.js";
 import { PointIcon } from "../icons.js";
 import { Section } from "./Section.js";
@@ -178,14 +179,13 @@ export function PointSection(): React.JSX.Element {
             disabled={coordX === null}
             onStep={(next) => commitCoordinate("x", next)}
           >
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label="X position"
+              label="X position"
               title="X position"
               disabled={coordX === null}
-              value={coordX === null ? "" : shown(coordX)}
-              onChange={(event) => commitCoordinate("x", Number(event.target.value))}
+              value={coordX === null ? null : shown(coordX)}
+              onCommit={(next) => commitCoordinate("x", next)}
             />
           </Stepper>
           <Stepper
@@ -194,14 +194,13 @@ export function PointSection(): React.JSX.Element {
             disabled={coordY === null}
             onStep={(next) => commitCoordinate("y", next)}
           >
-            <input
+            <NumberField
               className={styles.input}
-              type="number"
-              aria-label="Y position"
+              label="Y position"
               title="Y position"
               disabled={coordY === null}
-              value={coordY === null ? "" : shown(coordY)}
-              onChange={(event) => commitCoordinate("y", Number(event.target.value))}
+              value={coordY === null ? null : shown(coordY)}
+              onCommit={(next) => commitCoordinate("y", next)}
             />
           </Stepper>
         </div>
@@ -279,14 +278,14 @@ function HandleRow({
         disabled={missing}
         onStep={onLength}
       >
-        <input
+        <NumberField
           className={styles.input}
-          type="number"
-          aria-label={"Length of the " + named + " handle"}
+          label={"Length of the " + named + " handle"}
           title={missing ? absent : "How far the handle reaches from its point"}
           disabled={missing}
-          value={length === null ? "" : shown(length)}
-          onChange={(event) => onLength(Number(event.target.value))}
+          bounds={{ min: 0 }}
+          value={length === null ? null : shown(length)}
+          onCommit={onLength}
         />
       </Stepper>
       <Stepper
@@ -295,14 +294,13 @@ function HandleRow({
         disabled={missing}
         onStep={onAngle}
       >
-        <input
+        <NumberField
           className={styles.input}
-          type="number"
-          aria-label={"Angle of the " + named + " handle"}
+          label={"Angle of the " + named + " handle"}
           title={missing ? absent : "Degrees, anticlockwise from east"}
           disabled={missing}
-          value={angle === null ? "" : shown(angle)}
-          onChange={(event) => onAngle(Number(event.target.value))}
+          value={angle === null ? null : shown(angle)}
+          onCommit={onAngle}
         />
       </Stepper>
     </div>

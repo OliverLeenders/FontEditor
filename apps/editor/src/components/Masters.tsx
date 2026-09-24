@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import styles from "./Masters.module.css";
+import { NumberField } from "./NumberField.js";
 import { BlendIcon, CopyPlusIcon, LayersIcon, TrashIcon } from "./icons.js";
 
 /**
@@ -353,18 +354,14 @@ function Instances({
               {project.axes.map((a) => (
                 <label key={a.tag} className={styles.instanceAxis}>
                   {a.name}
-                  <input
+                  <NumberField
                     className={styles.instanceValue}
-                    type="number"
-                    min={a.min}
-                    max={a.max}
+                    bounds={{ min: a.min, max: a.max }}
                     value={it.location[a.tag] ?? a.default}
-                    aria-label={`${a.name} of the instance ${it.name}`}
+                    label={`${a.name} of the instance ${it.name}`}
                     disabled={reading}
-                    onChange={(event) => {
-                      const value = Number(event.target.value);
-                      if (!Number.isFinite(value)) return;
-                      void store.moveInstance(it.id, { ...it.location, [a.tag]: value });
+                    onCommit={(next) => {
+                      void store.moveInstance(it.id, { ...it.location, [a.tag]: next });
                     }}
                   />
                 </label>
