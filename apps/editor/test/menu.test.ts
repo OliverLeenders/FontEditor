@@ -361,6 +361,113 @@ describe("context menu", () => {
     expect(segmentCount(contourById(glyph(), contourId)!)).toBe(before + 1);
   });
 
+  describe("acting on a selection", () => {
+    /** The first three points of the contour, picked as a person would pick them. */
+    function pickThree(): string[] {
+      const glyph = store.editor.document.glyphs[store.editor.currentGlyph]!;
+      const ids = contourById(glyph, contourId)!
+        .nodes.slice(0, 3)
+        .map((n) => n.id);
+      store.setEditor({
+        ...store.editor,
+        selection: ids.map((id) => ({ contourId, nodeId: id, part: "point" as const })),
+      });
+      return ids;
+    }
+
+    const typesOf = (ids: readonly string[]): (string | undefined)[] => {
+      const glyph = store.editor.document.glyphs[store.editor.currentGlyph]!;
+      const c = contourById(glyph, contourId)!;
+      return ids.map((id) => c.nodes.find((n) => n.id === id)?.type);
+    };
+
+    const item = (label: string): Extract<Item, { kind: "item" }> | undefined =>
+      itemsFor(store, { x: 0, y: 0, target: node() as never, point: { x: 0, y: 0 } }).find(
+        (i): i is Extract<Item, { kind: "item" }> => i.kind === "item" && i.label === label,
+      );
+
+    it("makes every selected point smooth, not only the one clicked", () => {
+      // The complaint this answers: gathering a run of points and asking for
+      // smooth changed the one under the pointer and left the rest as they were.
+      const ids = pickThree();
+      run(store, node(), "Smooth");
+      expect(typesOf(ids)).toEqual(["smooth", "smooth", "smooth"]);
+    });
+
+    it("says how many it will touch, and says nothing for one", () => {
+      pickThree();
+      expect(item("Smooth")?.note).toBe("3 points");
+
+      store.setEditor({
+        ...store.editor,
+        selection: [{ contourId, nodeId, part: "point" }],
+      });
+      expect(item("Smooth")?.note).toBeUndefined();
+    });
+
+    it("locks every selected node's handles, and ticks when they all are", () => {
+      const ids = pickThree();
+      expect(item("Lock handles to axis")?.checked).toBeFalsy();
+
+      run(store, node(), "Lock handles to axis");
+      const glyph = store.editor.document.glyphs[store.editor.currentGlyph]!;
+      const c = contourById(glyph, contourId)!;
+      for (const id of ids) {
+        const lock = c.nodes.find((n) => n.id === id)!.hvLock;
+        expect(lock.in && lock.out).toBe(true);
+      }
+      expect(item("Lock handles to axis")?.checked).toBe(true);
+    });
+
+    it("is one step to undo, however many points it touched", () => {
+      // Eleven edits would be eleven presses of Ctrl-Z to take back one press
+      // of one menu item.
+      const ids = pickThree();
+      const before = typesOf(ids);
+      run(store, node(), "Corner");
+      expect(typesOf(ids)).toEqual(["corner", "corner", "corner"]);
+
+      store.undo();
+      expect(typesOf(ids)).toEqual(before);
+    });
+
+    it("deletes every selected point, and says so", () => {
+      const ids = pickThree();
+      const before = contourById(
+        store.editor.document.glyphs[store.editor.currentGlyph]!,
+        contourId,
+      )!.nodes.length;
+
+      expect(item("Delete points")?.note).toBe("3 points");
+      run(store, node(), "Delete points");
+
+      const after = contourById(
+        store.editor.document.glyphs[store.editor.currentGlyph]!,
+        contourId,
+      )!.nodes.length;
+      expect(after).toBe(before - ids.length);
+    });
+
+    it("acts on the point clicked when the selection is somewhere else", () => {
+      // The canvas puts what a right-click lands on into the selection before
+      // the menu is built; this is the same rule written down, so a menu asked
+      // for any other way still does what it says.
+      const glyph = store.editor.document.glyphs[store.editor.currentGlyph]!;
+      const nodes = contourById(glyph, contourId)!.nodes;
+      const other = nodes[nodes.length - 1]!.id;
+      expect(other).not.toBe(nodeId);
+
+      store.setEditor({
+        ...store.editor,
+        selection: [{ contourId, nodeId: other, part: "point" }],
+      });
+      const untouched = typesOf([other])[0];
+
+      run(store, node(), "Smooth");
+      expect(typesOf([nodeId, other])).toEqual(["smooth", untouched]);
+    });
+  });
+
   it("shows the axis lock as checked once it is on", () => {
     // Narrowed by a predicate rather than by a comparison, so the separator
     // variant is gone from the type and `checked` can be read from what is left.

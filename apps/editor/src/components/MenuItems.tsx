@@ -31,8 +31,14 @@ export type Item =
       readonly checked?: boolean;
       /** Shown but not usable, for an action that is real here and not now. */
       readonly disabled?: boolean;
-      /** A word after the label: a count, a key, a state. */
-      readonly note?: string;
+      /**
+       * A word after the label: a count, a key, a state.
+       *
+       * Explicitly allowed to be `undefined` as well as absent, so a caller can
+       * write `note: counted(n)` where the count is a word for several and
+       * nothing at all for one.
+       */
+      readonly note?: string | undefined;
       /**
        * A sentence about the item, shown on hover rather than in the row.
        *

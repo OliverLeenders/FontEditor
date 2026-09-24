@@ -79,6 +79,14 @@ segment on one side and a curve on the other can be made **tangent**, from the i
 or the right-click menu: the curve then leaves along the line, and stays that way when
 either end of the line moves.
 
+**The right-click menu acts on what is selected.** Gather a run of points and the menu's
+point items — corner, smooth, tangent, harmonise, lock handles to axis, extract handles,
+delete — do the lot in one step, and say how many they will touch. Right-clicking something
+that is not in the selection selects it first, so the same menu on a single point reads as
+it always did: the items act on the thing you clicked. What is about a contour rather than
+about a point — reverse, start the contour here, the ordering — stays with the contour under
+the pointer.
+
 **Deleting a point keeps the shape.** The two segments it joined become one, and the
 neighbours' handles are fitted to what the pair drew — the same directions, since those
 are the joins either side, and the lengths the one curve needs. A point taken off a curve

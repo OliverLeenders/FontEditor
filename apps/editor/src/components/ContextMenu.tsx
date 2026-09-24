@@ -19,7 +19,11 @@ import {
   addAnchorAt,
   attachComponent,
   harmoniseSelection,
-  nodeCanHarmonise,
+  selectedCanBeTangent,
+  selectedNodeCount,
+  selectionCanHarmonise,
+  selectionHasMissingHandle,
+  selectionHvLocked,
   attachmentFor,
   balanceSegmentAt,
   centreCurrentGlyph,
@@ -27,15 +31,12 @@ import {
   freeAnchorName,
   removeAnchorAt,
   removeComponent,
-  extractHandles,
   extractSegmentHandles,
+  extractSelectedHandles,
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
-  nodeCanBeTangent,
   selectContour,
-  nodeHasMissingHandle,
-  nodeHvLocked,
   retractHandle,
   reverseContourAt,
   segmentHasMissingHandle,
@@ -45,12 +46,12 @@ import {
   roundGlyphAt,
   roundSelection,
   selectAllPoints,
-  setNodeHvLock,
   setPointType,
+  setSelectedHvLock,
   unroundedSelected,
   currentGlyph,
 } from "@typewright/tools";
-import type { HitTarget } from "@typewright/view";
+import type { HitTarget, SelectionItem } from "@typewright/view";
 import { useEffect, useRef } from "react";
 
 import type { EditorStore } from "../store/index.js";
@@ -210,8 +211,16 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
 
   if (target.kind === "node") {
     const { contourId, nodeId } = target;
-    const harmonises = nodeCanHarmonise(editor, contourId, nodeId);
-    const locked = nodeHvLocked(editor, contourId, nodeId);
+    // Everything about the points acts on the selection rather than on the one
+    // under the pointer, and the two are the same thing when nothing else is
+    // picked: right-clicking something outside the selection selects it first —
+    // see the canvas — so this reads as "the node I clicked" until a person has
+    // gathered several, and then as "the ones I gathered".
+    const acting = actingOn(editor, { contourId, nodeId, part: "point" });
+    const many = selectedNodeCount(acting);
+    const harmonises = selectionCanHarmonise(acting);
+    const lockedBoth = selectionHvLocked(acting, "both");
+
     items.push(
       {
         kind: "item",
@@ -224,23 +233,27 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: "Corner",
         icon: PointIcon,
-        run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
+        note: counted(many),
+        run: () => store.applyTool(setPointType(acting, "corner")),
       },
       {
         kind: "item",
         label: "Smooth",
         icon: PointIcon,
-        run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
+        note: counted(many),
+        run: () => store.applyTool(setPointType(acting, "smooth")),
       },
-      // Offered only where it would be true, which is the same rule the model
-      // refuses on. A menu item that did nothing would teach nothing.
-      ...(nodeCanBeTangent(editor, contourId, nodeId)
+      // Offered only where it would be true of every one of them, which is the
+      // rule the model refuses on and the one the inspector's button uses. A
+      // menu item that did nothing to half of what it named would teach nothing.
+      ...(selectedCanBeTangent(acting)
         ? [
             {
               kind: "item" as const,
               label: "Tangent",
               icon: PointIcon,
-              run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
+              note: counted(many),
+              run: () => store.applyTool(setPointType(acting, "tangent")),
             },
           ]
         : []),
@@ -253,13 +266,8 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
               kind: "item" as const,
               label: "Harmonise",
               icon: WavesIcon,
-              run: () =>
-                store.applyTool(
-                  harmoniseSelection({
-                    ...editor,
-                    selection: [{ contourId, nodeId, part: "point" }],
-                  }),
-                ),
+              note: counted(many),
+              run: () => store.applyTool(harmoniseSelection(acting)),
             },
           ]
         : []),
@@ -268,12 +276,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
 
     // Only where there is something to pull out. A control point that sits on
     // its anchor cannot be seen or clicked, so this is the only way back to it.
-    if (nodeHasMissingHandle(editor, contourId, nodeId)) {
+    if (selectionHasMissingHandle(acting)) {
       items.push({
         kind: "item",
         label: "Extract handles",
         icon: MaximizeIcon,
-        run: () => store.applyTool(extractHandles(editor, contourId, nodeId)),
+        note: counted(many),
+        run: () => store.applyTool(extractSelectedHandles(acting)),
       });
     }
 
@@ -282,13 +291,12 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: "Lock handles to axis",
         icon: LockIcon,
-        // Checked only when both are, since that is what this item sets. A node
-        // with one handle locked shows unchecked, and using it locks the pair.
-        checked: locked.in && locked.out,
-        run: () =>
-          store.applyTool(
-            setNodeHvLock(editor, contourId, nodeId, "both", !(locked.in && locked.out)),
-          ),
+        note: counted(many),
+        // Checked only when both handles of every one of them are, since that is
+        // what this item sets. A node with one handle locked shows unchecked,
+        // and using it locks the pair.
+        checked: lockedBoth,
+        run: () => store.applyTool(setSelectedHvLock(acting, "both", !lockedBoth)),
       },
       { kind: "separator" },
       // Where a closed contour begins is where interpolation begins pairing its
@@ -312,9 +320,10 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       },
       {
         kind: "item",
-        label: "Delete point",
+        label: many > 1 ? "Delete points" : "Delete point",
         icon: TrashIcon,
-        run: () => store.applyTool(deleteSelectedPoints(editor)),
+        note: counted(many),
+        run: () => store.applyTool(deleteSelectedPoints(acting)),
       },
       { kind: "separator" },
       ...rounding,
@@ -325,24 +334,29 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
   if (target.kind === "handleIn" || target.kind === "handleOut") {
     const { contourId, nodeId } = target;
     const part = target.kind === "handleIn" ? "in" : "out";
-    const locked = nodeHvLocked(editor, contourId, nodeId);
+    // The same rule as the points: this is about the selection, which is the
+    // handle under the pointer until several have been gathered. "This handle"
+    // means the side that was clicked, on every node the selection names.
+    const acting = actingOn(editor, { contourId, nodeId, part });
+    const many = selectedNodeCount(acting);
+    const lockedSide = selectionHvLocked(acting, part);
+    const lockedBoth = selectionHvLocked(acting, "both");
     items.push(
       {
         kind: "item",
         label: "Lock this handle to axis",
         icon: LockIcon,
-        checked: locked[part],
-        run: () => store.applyTool(setNodeHvLock(editor, contourId, nodeId, part, !locked[part])),
+        note: counted(many),
+        checked: lockedSide,
+        run: () => store.applyTool(setSelectedHvLock(acting, part, !lockedSide)),
       },
       {
         kind: "item",
         label: "Lock both handles to axis",
         icon: LockIcon,
-        checked: locked.in && locked.out,
-        run: () =>
-          store.applyTool(
-            setNodeHvLock(editor, contourId, nodeId, "both", !(locked.in && locked.out)),
-          ),
+        note: counted(many),
+        checked: lockedBoth,
+        run: () => store.applyTool(setSelectedHvLock(acting, "both", !lockedBoth)),
       },
       { kind: "separator" },
       {
@@ -356,25 +370,31 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: "Corner",
         icon: PointIcon,
-        run: () => store.applyTool(setPointType(editor, "corner", { contourId, nodeId })),
+        note: counted(many),
+        run: () => store.applyTool(setPointType(acting, "corner")),
       },
       {
         kind: "item",
         label: "Smooth",
         icon: PointIcon,
-        run: () => store.applyTool(setPointType(editor, "smooth", { contourId, nodeId })),
+        note: counted(many),
+        run: () => store.applyTool(setPointType(acting, "smooth")),
       },
-      ...(nodeCanBeTangent(editor, contourId, nodeId)
+      ...(selectedCanBeTangent(acting)
         ? [
             {
               kind: "item" as const,
               label: "Tangent",
               icon: PointIcon,
-              run: () => store.applyTool(setPointType(editor, "tangent", { contourId, nodeId })),
+              note: counted(many),
+              run: () => store.applyTool(setPointType(acting, "tangent")),
             },
           ]
         : []),
       { kind: "separator" },
+      // One handle, on the node that was clicked: retracting is about the one
+      // control point under the pointer, and a selection of handles is usually
+      // a selection of *both* sides of several nodes, which this would flatten.
       {
         kind: "item",
         label: "Retract handle",
@@ -382,12 +402,13 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         run: () => store.applyTool(retractHandle(editor, contourId, nodeId, part)),
       },
     );
-    if (nodeHasMissingHandle(editor, contourId, nodeId)) {
+    if (selectionHasMissingHandle(acting)) {
       items.push({
         kind: "item",
         label: "Extract handles",
         icon: MaximizeIcon,
-        run: () => store.applyTool(extractHandles(editor, contourId, nodeId)),
+        note: counted(many),
+        run: () => store.applyTool(extractSelectedHandles(acting)),
       });
     }
     items.push({
@@ -605,6 +626,33 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
  * Nothing at all for a glyph with one contour, which has no order to argue
  * about.
  */
+/**
+ * The state these items act on: the selection, or the thing that was clicked.
+ *
+ * The canvas puts what a right-click lands on into the selection before the
+ * menu is built, so in the editor these are always the same and this returns
+ * the state it was given. It matters for the menu asked for some other way —
+ * and it is the rule written down rather than assumed, which is what keeps an
+ * item from quietly doing nothing when the selection is empty.
+ */
+function actingOn(editor: EditorState, item: SelectionItem): EditorState {
+  const has = editor.selection.some(
+    (picked) => picked.contourId === item.contourId && picked.nodeId === item.nodeId,
+  );
+  return has ? editor : { ...editor, selection: [item] };
+}
+
+/**
+ * What a menu row says about how much it will do.
+ *
+ * Nothing at all for one node, which is the ordinary case and needs no saying;
+ * a count for several, because "Smooth" over eleven points is an edit worth
+ * knowing the size of before pressing it.
+ */
+function counted(nodes: number): string | undefined {
+  return nodes > 1 ? `${String(nodes)} points` : undefined;
+}
+
 function orderItems(store: EditorStore, editor: EditorState, contourId: ContourId): Item[] {
   const place = contourPlace(editor, contourId);
   if (place === null || place.of < 2) return [];
