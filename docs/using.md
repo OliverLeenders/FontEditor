@@ -79,6 +79,33 @@ segment on one side and a curve on the other can be made **tangent**, from the i
 or the right-click menu: the curve then leaves along the line, and stays that way when
 either end of the line moves.
 
+**How big the controls are drawn.** The View menu has three sizes for the points, handles
+and Tunni knobs — small, normal and big — beside the outline weight, and like everything in
+that menu it is per canvas, so a split window can show one letter with the controls out of
+the way and the other with them easy to hit. What is drawn and what can be grabbed move
+together: small points take a smaller catch, big ones a larger, so a control never looks
+like a target it is not. Normal is what the editor has always drawn.
+
+**Which version this is.** The preferences, under Ctrl-comma, name it: _Typewright_ and the
+number, which is the first thing a bug report needs.
+
+**The Curve section speaks for every curve that is selected.** Click one and it is about
+that one, as before; select the points either side of several — a whole bowl, or the whole
+glyph — and the fields are about all of them. A field shows the number when they all have
+it and stands empty with a dash behind it when they differ, since showing one of them would
+be picking a winner and an average would be a number none of them has. Typing gives every
+one of them that number in a single step, and each keeps the other dimension it had: a
+tension typed across four curves leaves each one's lean alone. A set holding a straight
+segment has no tension to type, and says so.
+
+**Walking the contour.** Alt with the left and right arrows steps the selection one place
+along the contour it is on: a point moves to the next point, a focused segment to the next
+segment with its two ends picked out. Right is the way the contour runs and left is against
+it; a closed contour comes round, an open one stops at its end. It is for what the pointer
+is worst at — points a few units apart, a handle lying on top of its own point, a segment
+behind its Tunni controls — and with nothing selected it starts at the first point of the
+first contour.
+
 **The right-click menu acts on what is selected.** Gather a run of points and the menu's
 point items — corner, smooth, tangent, harmonise, lock handles to axis, extract handles,
 delete — do the lot in one step, and say how many they will touch. Right-clicking something

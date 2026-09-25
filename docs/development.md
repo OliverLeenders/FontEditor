@@ -99,6 +99,13 @@ that folder over HTTPS. It is published to [Cloudflare Pages](https://pages.clou
 when a version is tagged, by `.github/workflows/web.yml`, from the same bundle the desktop
 installers embed.
 
+The site is [typewright.io](https://typewright.io): a custom domain attached to the Pages
+project `typewright-app`, which also answers on `typewright-app.pages.dev`. The project is
+not called `typewright` because a `pages.dev` name belongs to whichever account claimed it
+first, and that one is not this one. Only the project name is in the workflow — the domain
+is a setting on the project, so moving the site to another domain later changes nothing
+here.
+
 Two things travel with the build rather than living in a dashboard, both written by the
 `hostFiles` plugin in the editor's Vite config:
 

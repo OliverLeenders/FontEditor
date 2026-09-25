@@ -19,8 +19,10 @@ picture to trace from sit behind the drawing; before it goes out, nineteen check
 is wrong with it. Several fonts are kept at once, each in a working copy of its own; the
 window splits into two panes — the drawing may fill both, each canvas showing what it is
 asked to — and a second font opens in a window of its own. The grid lists what the font has
-not got as well as what it has, and a glyph is made from the hole where it belongs. The
-desktop application installs from a release and updates itself.
+not got as well as what it has, and a glyph is made from the hole where it belongs. A line
+can be set with any of the font's own features switched on, so a stylistic set is judged
+where it is drawn. A Macintosh bitmap font in a StuffIt archive opens as outlines. The
+desktop application installs from a release, updates itself, and says which version it is.
 
 | Phase |                                     | Status                                                                                     |
 | ----- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -55,8 +57,9 @@ desktop application installs from a release and updates itself.
 | 28    | Binary import keeps its layout      | done: GSUB and GPOS as source, marks as anchors, kerning into the model, fontTools-checked |
 | 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph     |
 | 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
-| 31    | A proof for judging features        | next                                                                                       |
-| 32    | More outline operations             | planned                                                                                    |
+| 31    | A proof for judging features        | half done: a feature is switched on in the bar; the waterfall is what is left              |
+| 32    | More outline operations             | next                                                                                       |
+| —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
 
 ### What the table missed
 
@@ -863,11 +866,102 @@ right — and two of the things it reports could not be changed at all. Now:
 - **The compatibility report takes you to the trouble**: a line names a glyph and a contour,
   and opens the glyph with that contour selected, rather than describing where to look.
 
-#### Phase 31 — A proof for judging features
+#### Old Macintosh fonts — done
 
-The Proof turns every feature on or off together, and sets text at one size. A designer
-judging a stylistic set or small caps wants that one feature on and the rest as they are, and a
-waterfall of sizes to see where the text stops reading.
+Not planned: it came of being handed a `.sit` file. A bitmap font from that era lives
+entirely in a resource fork, which no copy off a Macintosh keeps, so what survives is a
+StuffIt archive with the whole file wrapped inside it — and opening the font means opening
+the archive first.
+
+`@typewright/stuffit` reads both, and knows nothing about fonts: a StuffIt 5 archive with
+its two compressors — LZ77 with Huffman codes, and the block-sorting arithmetic coder
+Aladdin called Arsenic — and the resource fork's own little database of numbered blobs.
+`font-io` reads the `FOND` family and `NFNT` strike out of it and turns the strike into
+outlines: a square per lit pixel, the widths from the font's own tables, the em from the
+strike's ascent and descent, so a ten pixel font arrives on a 1000-unit em with every point
+on a round number. The staircase is the design and is left exactly as it was drawn. A
+suitcase holding a TrueType font instead is handed to the binary reader.
+
+Fixtures are written rather than checked in — every archive in the wild was made by
+software that no longer runs, and a real one would be somebody's font — so the builders in
+`testing.ts` write the headers at the offsets the format specifies, and a test that passes
+says the reader and the written-down layout agree.
+
+#### After phase 30 — What the releases carried — done
+
+Not a phase: what was found by using the editor between 0.1.19 and 0.1.29, in the order it
+was found, because the commits were again the only record of it.
+
+- **The bar of the Font workspace could not be read.** The search field and the new-glyph
+  field looked alike, the sort was a word where everything else was a control, and three
+  kinds of thing pointed down at you with two drawings of "there is more here". A search
+  icon, a sort icon, one chevron everywhere, and the grid ordered by code point to begin
+  with, which is the order somebody looking for a character expects.
+- **Snapping that catches what you are aiming at.** Every point in the glyph is now
+  something a drag can catch on, on both axes, ranked neighbour before extreme before
+  point; the radius came down from six pixels to four, since the old one caught things
+  nobody was aiming at. Lines at an angle came with it — the italic angle, and the
+  direction a straight segment runs — so a right angle on a slanted design is a place a
+  drag lands rather than arithmetic done by hand. Shift holds a drag to a direction: the
+  axes, the italic angle, and for a point on a straight segment the line itself and the
+  normal to it, which is how a whole side is moved without bending it.
+- **Square to the curve, not to the chord across it.** The right angle a drag squares to is
+  the one the outline actually leaves by, which on a curve is its handle rather than the
+  straight line between its ends. A dragged _handle_ got lines of its own with it — square
+  to the node's other side, along it, and the italic angle with its perpendicular.
+- **A point halfway along a straight segment**, from the segment's own menu: the one place
+  on a line worth a point that was arithmetic to find.
+- **A bar laid across two strokes is not a counter.** Direction correction decided a
+  contour was a hole by sampling its points, and a stem crossing an `S` has every corner in
+  ink while its middle passes through the gap — so a dollar sign came out with notches
+  taken from it, in the grid, in the proof and in an exported font. A contour counts as held
+  now only when its samples are inside _and_ the two outlines never cross.
+- **The knife cuts each shape rather than across them.** Crossings were paired along the
+  stroke and across the whole glyph, which is right for a counter — a cut across an `o`
+  closes from the outer contour to it — and wrong for a neighbour: two overlapping squares
+  came back as two pinwheels. Pairing happens inside one shape now, `shapesOf` naming what
+  a shape is, and the containment pass it shares with direction correction is done once.
+- **A scale handle holds the far side of the selection still.** The box round a selection
+  stands ten screen pixels outside what it holds, and the scale was measured against the box
+  — so pulling one edge crept the other, by more the further out you zoomed. The margin is
+  for the hand; the arithmetic belongs to the shape.
+- **The curvature comb keeps to the letter it measures.** Hairs measured in screen pixels
+  alone kept their size while the letter shrank, so zooming out grew the comb relative to the
+  drawing until it was all anyone could see. Two limits now, the shorter winning, and the
+  weight came down with it: an instrument laid over a drawing should be looked past as
+  easily as looked at.
+- **Every number in a panel can be cleared, and can take a minus.** The fields were the
+  model's number in and `Number(text)` out on every keystroke, so clearing one read as zero
+  and wrote it back, and a lone `-` was eaten by the re-render. They keep the text being
+  typed now and commit only a text that is a number — and are text boxes, since a number
+  input throws a half-typed minus away before any code can see it.
+- **The canvas menu acts on what is selected.** Corner, smooth, tangent, harmonise, the
+  axis lock, extracting handles and deleting: each acted on the one node under the pointer,
+  which is the opposite of why somebody gathers a run of points. Each says how many it will
+  touch, and one press is one undo.
+- **Walking the contour from the keyboard.** Alt with the left and right arrows steps the
+  selection one place along the contour it is on — a point to the next point, a focused
+  segment to the next segment — for what the pointer is worst at: points a few units apart,
+  a handle lying on its own point, a segment behind its Tunni controls.
+- **The Curve section speaks for every curve selected**, not only the one clicked: a field
+  shows the number where they all have it and stands empty where they differ, and typing
+  gives them all that number in one step, each keeping its own lean.
+- **How big the controls are drawn**, in the View menu beside the outline weight: small,
+  normal and big, per canvas. What is drawn and what can be grabbed scale together, so a
+  control never looks like a target it is not.
+- **Which version this is**, in the preferences: the number the release was tagged with,
+  written into the build from the same manifest, because a bug report begins with it.
+
+#### Phase 31 — A proof for judging features — half done
+
+The Proof turned every feature on or off together and set text at one size. The first half
+shipped in 0.1.24: each bar has a **Features** panel with a switch per feature the font
+defines, each starting where a text renderer would leave it, so a stylistic set can be seen
+substituted without exporting the font — see below.
+
+What is left is the waterfall: the same text down a ladder of sizes, to see where it stops
+reading, and a size and a feature set per block so two settings can be judged against each
+other on one page.
 
 #### Phase 32 — More outline operations
 
@@ -888,3 +982,11 @@ from the curve's own menu.
   on them.
 - **Vertical metrics** (`vhea` and `vmtx`), which vertical CJK setting needs, and which
   wait for a font that is set vertically.
+- **The other containers a Macintosh font arrives in** — `.dfont`, MacBinary, BinHex, and
+  the pre-5 `SIT!` archives with their own five compressors. The resource fork reader
+  handles all of them once something unwraps them; nothing has asked yet.
+- **Names for a stylistic set** (`featureNames`, `cvXX` parameters) and gathering `aalt`,
+  which is what would make the alternates this editor can now draw and preview findable by
+  name in somebody else's application.
+- **Overlap removal that sees components**, for a glyph drawn as a letter plus a shape —
+  the dollar sign — which can only be unioned today by decomposing it first.

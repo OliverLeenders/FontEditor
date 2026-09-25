@@ -1,8 +1,9 @@
 # Publishes the browser build to Cloudflare Pages when a version is tagged.
 #
 # The same bundle the desktop installers embed, served as a page anyone can
-# open: https://typewright-app.pages.dev. The bare name was taken on pages.dev,
-# which is one namespace for everybody.
+# open: https://typewright.io, which is the Pages project `typewright-app` with
+# a domain in front of it. The project is not called `typewright` because
+# pages.dev is one namespace for everybody and that name is somebody else's.
 # Tagged rather than on every push to master, so what is public is a release
 # somebody decided to make — and run by hand from the Actions tab when a fix
 # wants to be up before the next tag.

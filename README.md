@@ -11,6 +11,12 @@ The Tunni lines concept was devised by Eduardo Tunni and Fontlab Ltd., and is us
 FontLab font editor. The maths in this repository derives from the reverse-engineering
 write-up in [Tunni-Lines](https://github.com/OliverLeenders/Tunni-Lines).
 
+## Try it
+
+The browser build is at **[typewright.io](https://typewright.io)**. Nothing
+is uploaded: a font drawn there is kept in the browser's own storage on your machine, and
+leaves it only when you export or save it to a folder yourself.
+
 ## Download
 
 Installers for Windows and Linux are on the
