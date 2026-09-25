@@ -92,6 +92,30 @@ pnpm typecheck
 The same checks run on every push, with fontTools and FreeType reading and drawing what the
 exporter writes; see `.github/workflows/ci.yml`.
 
+## The browser build, hosted
+
+The editor is a folder of static files with no server behind it, so hosting it is serving
+that folder over HTTPS. It is published to [Cloudflare Pages](https://pages.cloudflare.com)
+when a version is tagged, by `.github/workflows/web.yml`, from the same bundle the desktop
+installers embed.
+
+Two things travel with the build rather than living in a dashboard, both written by the
+`hostFiles` plugin in the editor's Vite config:
+
+- **`_headers`** — the content security policy, taken from the desktop window's own policy
+  in `tauri.conf.json` with the parts only Tauri can use removed, plus `nosniff`, a
+  referrer policy, and caching: the page itself is checked every time, and everything under
+  `/assets` is kept for a year because its name holds a hash of its contents.
+- **`_redirects`** — everything to `index.html`, for a stray deep link.
+
+Netlify reads the same two files, and any other host wants the same headers said its own
+way. What matters is that `.wasm` is served as `application/wasm`: HarfBuzz will not
+instantiate otherwise.
+
+Publishing needs two repository secrets, both from Cloudflare — `CLOUDFLARE_API_TOKEN`,
+scoped to Pages, and `CLOUDFLARE_ACCOUNT_ID`. Without them the workflow says so and does
+nothing, so a fork is not red for a site it does not publish.
+
 ## Layout
 
 ```

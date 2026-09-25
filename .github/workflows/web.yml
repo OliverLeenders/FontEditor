@@ -1,0 +1,85 @@
+# Publishes the browser build to Cloudflare Pages when a version is tagged.
+#
+# The same bundle the desktop installers embed, served as a page anyone can
+# open: https://typewright.pages.dev, or whatever the Pages project is called.
+# Tagged rather than on every push to master, so what is public is a release
+# somebody decided to make — and run by hand from the Actions tab when a fix
+# wants to be up before the next tag.
+#
+# Two secrets, both from Cloudflare: CLOUDFLARE_API_TOKEN, scoped to Pages, and
+# CLOUDFLARE_ACCOUNT_ID. Without them this does nothing at all rather than
+# failing every tag — a fork, or this repository before the project exists,
+# should not have a red cross against it for a site it does not publish.
+#
+# The headers and the redirect the site is served with are written into the
+# build itself, out of the same policy the desktop window uses — see
+# `hostFiles` in the editor's Vite config — so there is nothing to keep in step
+# in a dashboard.
+
+name: Web
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish the browser build
+    runs-on: ubuntu-latest
+    env:
+      # Secrets cannot be read in a job's own `if`, so the question is asked
+      # once here and answered by each step that needs the answer.
+      CONFIGURED: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Say why nothing will be published
+        if: env.CONFIGURED != 'true'
+        run: |
+          echo "No Cloudflare credentials are set, so there is nowhere to publish to."
+          echo "See docs/development.md — 'The browser build, hosted'."
+
+      - uses: pnpm/action-setup@v6
+        if: env.CONFIGURED == 'true'
+      - uses: actions/setup-node@v7
+        if: env.CONFIGURED == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+        if: env.CONFIGURED == 'true'
+
+      # A tag that disagrees with the version in the files would put a page up
+      # calling itself something the release is not.
+      - name: Check the version agrees with the tag
+        if: env.CONFIGURED == 'true' && github.event_name == 'push'
+        run: node apps/editor/scripts/set-version.mjs --check "${GITHUB_REF_NAME}"
+
+      - name: Build the editor for production
+        if: env.CONFIGURED == 'true'
+        run: pnpm --filter @typewright/editor build
+
+      # `_headers` and `_redirects` come out of the build; without them the site
+      # would be served with no policy and a 404 on every deep link.
+      - name: Check the host files came out
+        if: env.CONFIGURED == 'true'
+        run: |
+          test -f apps/editor/dist/index.html
+          test -f apps/editor/dist/_headers
+          test -f apps/editor/dist/_redirects
+
+      - name: Publish to Cloudflare Pages
+        if: env.CONFIGURED == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # `--branch=main` marks it the production deployment whatever the tag
+          # is called; every other branch would be a preview nobody asked for.
+          command: pages deploy apps/editor/dist --project-name=typewright --branch=main
