@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { ThemeChoice } from "../preferences.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { VERSION } from "../version.js";
 import styles from "./WindowBar.module.css";
 import { SettingsIcon } from "./icons.js";
 
@@ -100,6 +101,14 @@ export function WindowBar(): React.JSX.Element {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Which editor this is. Not decoration: a bug report begins with
+                the version, and until now the only way to know it was to look
+                at where the installer came from. */}
+            <div className={styles.row}>
+              <span className={styles.label}>Version</span>
+              <span className={styles.version}>Typewright {VERSION}</span>
             </div>
 
             <div className={styles.footer}>

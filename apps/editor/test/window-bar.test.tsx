@@ -35,6 +35,18 @@ describe("what the bar says", () => {
   });
 });
 
+describe("which editor this is", () => {
+  it("says the version, which a bug report begins with", () => {
+    const store = freshStore();
+    render(<WindowBar />, store);
+    fireEvent.click(screen.getByRole("button", { name: "Preferences" }));
+
+    // The number itself is written in by the build; what is asked here is that
+    // the row is there and says what it is about.
+    expect(screen.getByText(/^Typewright \d+\.\d+\.\d+/)).toBeTruthy();
+  });
+});
+
 describe("the preferences", () => {
   const open = (store = freshStore()) => {
     const shown = render(<WindowBar />, store);

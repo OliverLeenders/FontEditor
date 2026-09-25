@@ -106,6 +106,14 @@
   color: var(--accent-ink);
 }
 
+/* The version, in the face numbers are read in here. */
+.version {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--ink-2);
+  user-select: text;
+}
+
 .footer {
   display: flex;
   align-items: flex-start;
