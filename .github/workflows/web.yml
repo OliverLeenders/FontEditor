@@ -74,12 +74,23 @@ jobs:
           test -f apps/editor/dist/_headers
           test -f apps/editor/dist/_redirects
 
+      # Wrangler is run directly rather than through cloudflare/wrangler-action,
+      # which installs its own copy with `pnpm add` — and pnpm refuses to add
+      # anything to the root of a workspace without being told to mean it. A
+      # one-line command needs no action wrapped round it, and the version is
+      # then ours to pick rather than the action's to pin.
+      #
+      # `--branch=main` marks it the production deployment whatever the tag is
+      # called; every other branch would be a preview nobody asked for.
+      # `--commit-dirty` keeps wrangler from asking about a working tree it
+      # cannot see the point of: this is a build of a tag.
       - name: Publish to Cloudflare Pages
         if: env.CONFIGURED == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # `--branch=main` marks it the production deployment whatever the tag
-          # is called; every other branch would be a preview nobody asked for.
-          command: pages deploy apps/editor/dist --project-name=typewright --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: >
+          pnpm dlx wrangler@4 pages deploy apps/editor/dist
+          --project-name=typewright
+          --branch=main
+          --commit-dirty=true
