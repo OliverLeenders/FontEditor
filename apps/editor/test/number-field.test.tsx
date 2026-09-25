@@ -61,7 +61,12 @@ function field(props: Partial<Parameters<typeof NumberField>[0]> = {}) {
   return {
     onCommit,
     box,
-    type: (text: string) => fireEvent.change(box, { target: { value: text } }),
+    // Focused first, as typing in a box always is: the field holds a
+    // half-typed number only while somebody is in it.
+    type: (text: string) => {
+      fireEvent.focus(box);
+      fireEvent.change(box, { target: { value: text } });
+    },
     again: (value: number | null) => act(() => moveTo?.(value)),
   };
 }
@@ -145,6 +150,29 @@ describe("typing a number", () => {
 
   it("shows nothing for a value the model has not got", () => {
     expect(field({ value: null }).box.value).toBe("");
+  });
+
+  it("fills in as soon as the model has a number to show", () => {
+    // The bug this answers: a new glyph has no sidebearings until something is
+    // drawn in it, and the boxes stayed empty after it was — an empty box is
+    // not a number, and "not a number" was being read as "somebody is typing".
+    const { box, again } = field({ value: null });
+    expect(box.value).toBe("");
+
+    again(40);
+    expect(box.value).toBe("40");
+  });
+
+  it("does not fill in under the cursor of somebody typing in it", () => {
+    // The other half of the same rule: while the box has the focus, what is in
+    // it belongs to the person, however little of a number it is so far.
+    const { box, type, again } = field();
+    type("");
+    again(120);
+    expect(box.value).toBe("");
+
+    fireEvent.blur(box);
+    expect(box.value).toBe("120");
   });
 });
 

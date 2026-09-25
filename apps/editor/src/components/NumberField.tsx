@@ -56,6 +56,8 @@ export function NumberField({
   readonly placeholder?: string | undefined;
 }): React.JSX.Element {
   const [draft, setDraft] = useState(() => textOf(value));
+  /** Whether somebody is typing in it, which is the only reason to hold a draft. */
+  const [editing, setEditing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   /**
@@ -63,16 +65,23 @@ export function NumberField({
    *
    * Three cases. A draft that is not a number at all — empty, a lone `-`, a
    * trailing `.` — is somebody midway through typing one, and is left alone
-   * until the field is left. A draft that *is* the model's number is left
+   * *while they are typing it*. A draft that is the model's number is left
    * exactly as typed, so `007` and `12.` and `-0` survive being written.
    * Anything else means the model has moved since — an undo, a drag on the
    * canvas, a rounding — and the box follows it.
+   *
+   * The focus is what tells those apart, and leaving it out was a bug worth
+   * remembering: a field showing nothing because the model had nothing — a new
+   * glyph has no sidebearings until something is drawn in it — then stayed
+   * empty once the model had a number, because an empty box parses to nothing
+   * and "nothing" was being read as "somebody is in the middle of typing".
    */
   useEffect(() => {
     const parsed = parse(draft);
-    if (parsed === null || parsed === value) return;
+    if (parsed === null && editing) return;
+    if (parsed !== null && parsed === value) return;
     setDraft(textOf(value));
-  }, [value, draft]);
+  }, [value, draft, editing]);
 
   const take = (text: string): void => {
     setDraft(text);
@@ -101,10 +110,14 @@ export function NumberField({
       disabled={disabled}
       placeholder={placeholder}
       value={draft}
+      onFocus={() => setEditing(true)}
       // Leaving settles the box to the model's own spelling of what it holds,
       // which is what turns a half-typed `-` or an emptied box back into a
       // number rather than leaving it looking like an edit in progress.
-      onBlur={() => setDraft(textOf(value))}
+      onBlur={() => {
+        setEditing(false);
+        setDraft(textOf(value));
+      }}
       onChange={(event) => take(event.target.value)}
       onKeyDown={(event) => {
         if (event.key === "ArrowUp" || event.key === "ArrowDown") {
