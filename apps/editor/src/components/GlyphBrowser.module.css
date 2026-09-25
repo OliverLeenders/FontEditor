@@ -149,6 +149,9 @@
   color: var(--ink);
   font: inherit;
   font-size: 0.8rem;
+  /* Said rather than inherited, so the field beside it — which is set in the
+     mono face, whose metrics are taller — can be made to match exactly. */
+  line-height: 1.3;
 }
 .search:focus-visible {
   outline: 2px solid var(--accent);
