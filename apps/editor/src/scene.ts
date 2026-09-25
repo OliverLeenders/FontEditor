@@ -23,6 +23,7 @@ import {
   DARK_PALETTE,
   DEFAULT_METRICS,
   LIGHT_PALETTE,
+  type RenderMetrics,
   type RenderPalette,
   type Scene,
   scene as buildScene,
@@ -45,6 +46,7 @@ import { type Comb, combFor } from "@typewright/view";
 
 import type { Decoded } from "./images.js";
 import type { PaneIndex } from "./layout.js";
+import { type ControlSize, CONTROL_SCALES } from "./limits.js";
 import type { ViewSettings } from "./preferences.js";
 import { isDarkNow } from "./scheme.js";
 import type { StoreState } from "./store/index.js";
@@ -183,6 +185,27 @@ export function viewOf(state: StoreState, pane: PaneIndex = 0): ViewSettings {
 }
 
 /**
+ * The renderer's sizes, with the controls scaled and the outline as chosen.
+ *
+ * Every control together — the points, the handles, the Tunni knobs, the halo
+ * that lifts them off the outline — because they are one set of marks and a
+ * pointer sized for one of them is sized for all. The lines between a node and
+ * its handles keep their weight: a thicker one would read as a stroke of the
+ * drawing rather than as a tether.
+ */
+export function controlMetrics(size: ControlSize, outlineWidth: number): RenderMetrics {
+  const scale = CONTROL_SCALES[size];
+  return {
+    ...DEFAULT_METRICS,
+    outlineWidth,
+    nodeRadius: DEFAULT_METRICS.nodeRadius * scale,
+    handleRadius: DEFAULT_METRICS.handleRadius * scale,
+    tunniPointRadius: DEFAULT_METRICS.tunniPointRadius * scale,
+    haloWidth: DEFAULT_METRICS.haloWidth * scale,
+  };
+}
+
+/**
  * Turn the store's state into a frame.
  *
  * A pure function of the state and the canvas size, which is what lets the
@@ -221,9 +244,11 @@ export function sceneFor(
     palette: palette(),
     // The same list a drag snaps to. Drawn and snapped must not part company:
     // a line you can catch on but cannot see is indistinguishable from a bug.
-    // Everything else keeps the renderer's own sizes; only the stroke is a
-    // preference, so only the stroke is overridden.
-    metrics: { ...DEFAULT_METRICS, outlineWidth: shows.outlineWidth },
+    // Two preferences reach the renderer: how heavy the outline is, and how big
+    // the things you grab are drawn. The second scales every control together —
+    // points, handles, Tunni knobs and the halo behind them — because they are
+    // one set of marks and a pointer sized for one is sized for all.
+    metrics: controlMetrics(shows.controlSize, shows.outlineWidth),
     // The names come with the lines; the renderer writes them at the edge.
     metricLines: metricLines(editor.document.info).map((line) => ({
       y: line.y,

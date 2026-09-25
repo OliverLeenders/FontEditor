@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { MAX_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH } from "../limits.js";
+import { type ControlSize, MAX_OUTLINE_WIDTH, MIN_OUTLINE_WIDTH } from "../limits.js";
 import { usePane } from "../pane.js";
 import { viewOf } from "../scene.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -24,6 +24,13 @@ import { PreferencesIcon } from "./icons.js";
  * reached every minute earns a button; the menu is where someone finds out it
  * exists at all.
  */
+/** The three sizes the points and handles are drawn at. */
+const SIZES: readonly { readonly id: ControlSize; readonly label: string }[] = [
+  { id: "small", label: "Small" },
+  { id: "normal", label: "Normal" },
+  { id: "big", label: "Big" },
+];
+
 export function ViewMenu(): React.JSX.Element {
   const store = useEditorStore();
   const pane = usePane();
@@ -34,6 +41,7 @@ export function ViewMenu(): React.JSX.Element {
   const anchors = useStoreValue((s) => viewOf(s, pane).showAnchors);
   const curvature = useStoreValue((s) => viewOf(s, pane).showCurvature);
   const numbers = useStoreValue((s) => viewOf(s, pane).showPointNumbers);
+  const controls = useStoreValue((s) => viewOf(s, pane).controlSize);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -83,6 +91,27 @@ export function ViewMenu(): React.JSX.Element {
                 onChange={(event) => store.setOutlineWidth(Number(event.target.value), pane)}
               />
               <span className={styles.value}>{outlineWidth.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* The points and handles are targets as much as marks, so the
+              choices are the three anybody wants: out of the way of the
+              drawing, the size they have always been, and big enough to hit on
+              a dense screen. */}
+          <div className={styles.row}>
+            <span className={styles.label}>Points</span>
+            <div className={styles.choices} role="group" aria-label="Point size">
+              {SIZES.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className={styles.choice}
+                  aria-pressed={controls === choice.id}
+                  onClick={() => store.setControlSize(choice.id, pane)}
+                >
+                  {choice.label}
+                </button>
+              ))}
             </div>
           </div>
 

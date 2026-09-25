@@ -5,14 +5,45 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
-const { handlesAutoHidden, neighbourAt, neighboursFor, sceneFor, withinGlyph } =
+const { controlMetrics, handlesAutoHidden, neighbourAt, neighboursFor, sceneFor, withinGlyph } =
   await import("../src/scene.js");
+const { DEFAULT_METRICS } = await import("@typewright/render");
 const { setActiveTool } = await import("@typewright/tools");
 const { WEIGHT, glyphBounds, master, updateGlyph } = await import("@typewright/font-model");
 
 type Store = InstanceType<typeof EditorStore>;
 
 const SIZE = { width: 900, height: 700 };
+
+describe("how big the controls are drawn", () => {
+  it("is the renderer's own sizes at normal, so nothing moved by adding this", () => {
+    const normal = controlMetrics("normal", 2);
+
+    expect(normal.nodeRadius).toBe(DEFAULT_METRICS.nodeRadius);
+    expect(normal.handleRadius).toBe(DEFAULT_METRICS.handleRadius);
+    expect(normal.tunniPointRadius).toBe(DEFAULT_METRICS.tunniPointRadius);
+    expect(normal.haloWidth).toBe(DEFAULT_METRICS.haloWidth);
+  });
+
+  it("scales every control together, and only the controls", () => {
+    const big = controlMetrics("big", 2);
+    const small = controlMetrics("small", 2);
+
+    expect(big.nodeRadius).toBeGreaterThan(DEFAULT_METRICS.nodeRadius);
+    expect(big.handleRadius).toBeGreaterThan(DEFAULT_METRICS.handleRadius);
+    expect(small.nodeRadius).toBeLessThan(DEFAULT_METRICS.nodeRadius);
+    expect(small.tunniPointRadius).toBeLessThan(DEFAULT_METRICS.tunniPointRadius);
+
+    // The tether between a node and its handle keeps its weight: heavier, it
+    // would read as a stroke of the drawing.
+    expect(big.handleLineWidth).toBe(DEFAULT_METRICS.handleLineWidth);
+    expect(small.handleLineWidth).toBe(DEFAULT_METRICS.handleLineWidth);
+  });
+
+  it("carries the outline weight through untouched", () => {
+    expect(controlMetrics("big", 3.5).outlineWidth).toBe(3.5);
+  });
+});
 
 describe("neighboursFor", () => {
   let store: Store;

@@ -33,6 +33,7 @@ import {
 } from "@typewright/view";
 import { useEffect, useRef } from "react";
 
+import { type ControlSize, CONTROL_SCALES } from "../limits.js";
 import {
   handlesAutoHidden,
   measurableNeighbours,
@@ -60,6 +61,18 @@ import styles from "./GlyphCanvas.module.css";
  */
 /** The pick radius the select tool uses, which the cursor has to agree with. */
 const HIT_PIXELS = 11;
+
+/**
+ * The same reach, scaled with the controls.
+ *
+ * What is drawn and what can be grabbed are one rule: points drawn small that
+ * kept a large catch would take clicks meant for the curve behind them, and
+ * points drawn big with a small one would look like targets and behave like
+ * pinpricks.
+ */
+function hitPixels(size: ControlSize): number {
+  return HIT_PIXELS * CONTROL_SCALES[size];
+}
 
 /**
  * What the select tool needs from the interface: what it may pick, and where a
@@ -168,7 +181,10 @@ export function GlyphCanvas({
   // under the pointer is exactly how a menu comes to offer something the tool
   // will not do, or a cursor to promise a grab that does not happen.
   const targetAt = (point: { x: number; y: number }) =>
-    pickTarget(store.editor, point, { ...selectOptions(store, pane), hitPixels: HIT_PIXELS });
+    pickTarget(store.editor, point, {
+      ...selectOptions(store, pane),
+      hitPixels: hitPixels(viewOf(store.getState(), pane).controlSize),
+    });
 
   /**
    * Open the glyph beside this one, when the second click landed on it.

@@ -10,6 +10,33 @@
 
 /** The stroke the renderer has always used, and the range the control offers. */
 export const DEFAULT_OUTLINE_WIDTH = 2;
+
+/**
+ * How big the points, handles and Tunni controls are drawn.
+ *
+ * Three sizes rather than a slider, unlike the outline: a control is a target
+ * for the pointer as well as a mark on the screen, and the useful range is
+ * "smaller than the drawing", "the size it has always been" and "big enough on
+ * a dense screen". A slider would offer a hundred answers to a question with
+ * three.
+ */
+export type ControlSize = "small" | "normal" | "big";
+
+export const CONTROL_SIZES: readonly ControlSize[] = ["small", "normal", "big"];
+
+/**
+ * What each one multiplies the renderer's own sizes by.
+ *
+ * Normal is one, so a font opened in an editor that has never had this setting
+ * touched draws exactly as it did. The other two are a quarter down and a third
+ * up: enough to see and to hit, and not so much that a point covers the curve
+ * it is on.
+ */
+export const CONTROL_SCALES: Readonly<Record<ControlSize, number>> = {
+  small: 0.75,
+  normal: 1,
+  big: 1.35,
+};
 export const MIN_OUTLINE_WIDTH = 0.5;
 export const MAX_OUTLINE_WIDTH = 6;
 

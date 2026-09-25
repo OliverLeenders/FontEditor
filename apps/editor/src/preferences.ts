@@ -1,6 +1,8 @@
 import { type TextSettings, READ_FROM_TEXT } from "@typewright/view";
 
 import {
+  type ControlSize,
+  CONTROL_SIZES,
   DEFAULT_FEATURE_SIZE,
   DEFAULT_OUTLINE_WIDTH,
   MAX_FEATURE_SIZE,
@@ -130,6 +132,14 @@ export type ViewSettings = {
    * the last thing wanted while drawing it.
    */
   readonly showPointNumbers: boolean;
+  /**
+   * How big the points, handles and Tunni controls are drawn.
+   *
+   * A preference about eyes and pointers rather than about the font: a dense
+   * screen makes the controls small, and somebody working close in on a join
+   * wants them out of the way of it.
+   */
+  readonly controlSize: ControlSize;
 };
 
 export const DEFAULT_VIEW: ViewSettings = {
@@ -140,6 +150,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   showAnchors: true,
   showCurvature: false,
   showPointNumbers: false,
+  controlSize: "normal",
 };
 
 /** One for each pane, in pane order, whether or not the window is split. */
@@ -324,6 +335,9 @@ export function loadPreferences(): Preferences {
 const isDock = (value: unknown): value is InspectorDock =>
   value === "float" || value === "left" || value === "right";
 
+const isControlSize = (value: unknown): value is ControlSize =>
+  CONTROL_SIZES.includes(value as ControlSize);
+
 const isOrientation = (value: unknown): value is SplitOrientation =>
   value === "row" || value === "column";
 
@@ -400,6 +414,7 @@ function view(raw: Record<string, unknown>, fallback: ViewSettings): ViewSetting
     showAnchors: boolean(raw["showAnchors"], fallback.showAnchors),
     showCurvature: boolean(raw["showCurvature"], fallback.showCurvature),
     showPointNumbers: boolean(raw["showPointNumbers"], fallback.showPointNumbers),
+    controlSize: isControlSize(raw["controlSize"]) ? raw["controlSize"] : fallback.controlSize,
   };
 }
 

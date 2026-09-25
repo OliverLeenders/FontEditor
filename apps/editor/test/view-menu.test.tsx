@@ -90,6 +90,28 @@ describe("what the menu changes", () => {
     expect(store.getState().views[0][setting]).toBe(!before);
   });
 
+  it("sets how big the points and handles are drawn", () => {
+    const { store } = open();
+    expect(store.getState().views[0].controlSize).toBe("normal");
+
+    fireEvent.click(screen.getByRole("button", { name: "Big" }));
+    expect(store.getState().views[0].controlSize).toBe("big");
+
+    fireEvent.click(screen.getByRole("button", { name: "Small" }));
+    expect(store.getState().views[0].controlSize).toBe("small");
+  });
+
+  it("shows which size is in force", () => {
+    const { store } = open();
+    fireEvent.click(screen.getByRole("button", { name: "Small" }));
+
+    expect(screen.getByRole("button", { name: "Small" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("button", { name: "Normal" }).getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+    expect(store.getState().views[1].controlSize).toBe("normal");
+  });
+
   it("leaves the font alone, since none of this is about the font", () => {
     const { store } = open();
     const document = store.editor.document;

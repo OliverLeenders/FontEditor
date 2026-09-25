@@ -61,6 +61,25 @@ describe("reading preferences", () => {
     expect(read.views[0].snapPoints).toBe(false);
   });
 
+  it("keeps how big each canvas draws its points", () => {
+    savePreferences({
+      ...DEFAULT_PREFERENCES,
+      views: [{ ...DEFAULT_VIEW, controlSize: "big" }, DEFAULT_VIEW],
+    });
+    const read = loadPreferences();
+
+    expect(read.views[0].controlSize).toBe("big");
+    expect(read.views[1].controlSize).toBe("normal");
+  });
+
+  it("drops a size that is not one of the three", () => {
+    localStorage.setItem(
+      "typewright.preferences",
+      JSON.stringify({ views: [{ controlSize: "enormous" }, {}] }),
+    );
+    expect(loadPreferences().views[0].controlSize).toBe(DEFAULT_VIEW.controlSize);
+  });
+
   it("keeps the features a line was last set with", () => {
     savePreferences({
       ...DEFAULT_PREFERENCES,

@@ -58,6 +58,7 @@ import { type DiskFolder, FIRST_PROJECT } from "@typewright/disk";
 import { frameGlyph } from "../framing.js";
 import { type Decoded, ImageCache } from "../images.js";
 import {
+  type ControlSize,
   MAX_FEATURE_SIZE,
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
@@ -973,6 +974,11 @@ export class EditorStore {
   setOutlineWidth(outlineWidth: number, pane: PaneIndex = 0): void {
     const held = within(outlineWidth, MIN_OUTLINE_WIDTH, MAX_OUTLINE_WIDTH);
     if (held !== null) this.showInPane(pane, { outlineWidth: held });
+  }
+
+  /** How big this canvas draws its points, handles and Tunni controls. */
+  setControlSize(controlSize: ControlSize, pane: PaneIndex = 0): void {
+    this.showInPane(pane, { controlSize });
   }
 
   setSpacingText(spacingText: string): void {
