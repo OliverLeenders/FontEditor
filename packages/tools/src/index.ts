@@ -171,6 +171,7 @@ export {
   turnsMissing,
   segmentParameterAt,
   selectAllPoints,
+  stepSelection,
   selectedNodeCount,
   selectionCanHarmonise,
   selectionHasMissingHandle,

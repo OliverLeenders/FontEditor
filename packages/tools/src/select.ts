@@ -49,6 +49,7 @@ import {
   translateSelection,
 } from "./gestures.js";
 import type { KeyInput, PointerInput } from "./input.js";
+import { stepSelection } from "./commands/walk.js";
 import {
   type EditorState,
   boxAngle,
@@ -394,6 +395,15 @@ export function keyDown(
   const step = NUDGES[input.key];
   if (step === undefined) return result(state);
   if (state.gesture !== null) return result(state);
+
+  // Alt with the left and right arrows walks the contour instead of nudging.
+  // The pointer is bad at going *along* a shape — points a few units apart, a
+  // handle lying on its own point, a segment behind its Tunni controls — and
+  // this is the keyboard being good at it. Up and down still nudge: there is no
+  // second direction to walk in.
+  if (input.modifiers.alt && (input.key === "ArrowLeft" || input.key === "ArrowRight")) {
+    return stepSelection(state, input.key === "ArrowRight" ? 1 : -1);
+  }
 
   const size = input.modifiers.shift
     ? (options.largeNudge ?? DEFAULT_LARGE_NUDGE)

@@ -84,6 +84,10 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "Arrows", what: "Nudge the selection" },
       { keys: "Shift-arrows", what: "Nudge it further" },
       {
+        keys: "Alt-left · Alt-right",
+        what: "Step to the next point along the contour, or the next segment",
+      },
+      {
         keys: "Backspace · Delete",
         what: "Delete the selected points, anchor, guide or component",
       },

@@ -149,6 +149,9 @@ export {
   setSelectedHvLock,
 } from "./points.js";
 
+export type { WalkDirection } from "./walk.js";
+export { stepSelection } from "./walk.js";
+
 export {
   roundCoordinates,
   roundGlyphAt,
