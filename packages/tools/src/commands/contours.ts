@@ -5,6 +5,8 @@ import {
   derivative,
   extrema,
   inflections,
+  pannedLambdas,
+  panOf,
 } from "@typewright/geometry";
 import {
   type Contour,
@@ -355,6 +357,173 @@ export function focusedSegmentStatus(state: EditorState): TunniStatus | null {
   const c = glyph === null || segment === null ? null : contourById(glyph, segment.contourId);
   if (c === null || segment === null) return null;
   return segmentTunniStatus(c, segment.segmentIndex);
+}
+
+/**
+ * The segments the curve panel is about.
+ *
+ * Every segment the selection covers — both of its ends picked — and the
+ * focused one where it covers none. That is what makes the panel work on a set:
+ * gather a bowl's four curves and the fields speak for all four, while clicking
+ * a single curve goes on meaning that curve, because clicking one focuses it and
+ * selects nothing.
+ *
+ * In contour and segment order, so what the fields say does not depend on the
+ * order things were clicked in.
+ */
+export function workingSegments(state: EditorState): SegmentRef[] {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return [];
+
+  const picked = new Set(
+    state.selection
+      .filter((item) => item.part === "point")
+      .map((item) => `${item.contourId}:${item.nodeId}`),
+  );
+
+  const out: SegmentRef[] = [];
+  for (const c of glyph.contours) {
+    const count = segmentCount(c);
+    for (let i = 0; i < count; i++) {
+      const from = c.nodes[i];
+      const to = c.nodes[(i + 1) % c.nodes.length];
+      if (from === undefined || to === undefined) continue;
+      if (!picked.has(`${c.id}:${from.id}`) || !picked.has(`${c.id}:${to.id}`)) continue;
+      out.push({ contourId: c.id, segmentIndex: i });
+    }
+  }
+
+  if (out.length > 0) return out;
+  return state.focusedSegment === null ? [] : [state.focusedSegment];
+}
+
+/** Each working segment with the λ pair it has, leaving out the ones λ says nothing about. */
+export function workingScales(state: EditorState): { segment: SegmentRef; scales: HandleScales }[] {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return [];
+
+  const out: { segment: SegmentRef; scales: HandleScales }[] = [];
+  for (const segment of workingSegments(state)) {
+    const c = contourById(glyph, segment.contourId);
+    if (c === null) continue;
+    if (segmentTunniStatus(c, segment.segmentIndex) !== "ok") continue;
+    const scales = segmentLambdas(c, segment.segmentIndex);
+    if (scales !== null) out.push({ segment, scales });
+  }
+  return out;
+}
+
+/** How many segments the panel is speaking for, which it says when it is several. */
+export function workingSegmentCount(state: EditorState): number {
+  return workingScales(state).length;
+}
+
+/**
+ * What the panel is looking at, in the terms that decide whether λ means
+ * anything: `ok` when every segment it holds is workable, and the first
+ * complaint otherwise.
+ *
+ * A set with one straight segment in it is not a set anyone can type a tension
+ * into, and saying so is better than silently leaving that one out.
+ */
+export function workingStatus(state: EditorState): TunniStatus | null {
+  const glyph = currentGlyph(state);
+  const segments = workingSegments(state);
+  if (glyph === null || segments.length === 0) return null;
+
+  let worst: TunniStatus | null = null;
+  for (const segment of segments) {
+    const c = contourById(glyph, segment.contourId);
+    const status = c === null ? null : segmentTunniStatus(c, segment.segmentIndex);
+    if (status === null) continue;
+    if (status !== "ok") return status;
+    worst = worst ?? status;
+  }
+  return worst;
+}
+
+/** How close two λs have to be to count as the same number in a field. */
+const SAME = 1e-9;
+
+/**
+ * The tension every working segment has, or `null` where they differ.
+ *
+ * An empty field for a set that disagrees, which is what every panel that edits
+ * several things at once does: showing one of them would be picking a winner,
+ * and showing an average would be a number none of them has.
+ */
+export function workingTension(state: EditorState): number | null {
+  const all = workingScales(state);
+  if (all.length === 0) return null;
+
+  const mean = (scales: HandleScales): number => (scales.lambda1 + scales.lambda2) / 2;
+  const first = mean(all[0]!.scales);
+  return all.every((each) => Math.abs(mean(each.scales) - first) < SAME) ? first : null;
+}
+
+/** The pan every working segment has, or `null` where they differ. */
+export function workingPan(state: EditorState): number | null {
+  const all = workingScales(state);
+  if (all.length === 0) return null;
+
+  const first = panOf(all[0]!.scales);
+  if (first === null) return null;
+  return all.every((each) => {
+    const pan = panOf(each.scales);
+    return pan !== null && Math.abs(pan - first) < SAME;
+  })
+    ? first
+    : null;
+}
+
+/**
+ * Give every working segment the same tension, each keeping its own pan.
+ *
+ * One step for the set: a number typed once is one change, whatever it reaches.
+ * A segment λ says nothing about is left alone rather than being given a
+ * meaningless pair.
+ */
+export function setWorkingTension(state: EditorState, mean: number): ToolResult {
+  let editor = state;
+  for (const { segment, scales } of workingScales(state)) {
+    const balanced = pannedLambdas({ lambda1: mean, lambda2: mean }, panOf(scales) ?? 0);
+    if (balanced === null) continue;
+    editor = tensioned(editor, segment, balanced) ?? editor;
+  }
+  return editor === state ? result(state) : result(editor, [begin("Set tension"), commit]);
+}
+
+/** Give every working segment the same pan, each keeping its own tension. */
+export function setWorkingPan(state: EditorState, pan: number): ToolResult {
+  let editor = state;
+  for (const { segment, scales } of workingScales(state)) {
+    const panned = pannedLambdas(scales, pan);
+    if (panned === null) continue;
+    editor = tensioned(editor, segment, panned) ?? editor;
+  }
+  return editor === state ? result(state) : result(editor, [begin("Pan handles"), commit]);
+}
+
+/**
+ * The same pan, with no step of its own, from the scales each segment had when
+ * the drag began.
+ *
+ * For the slider, for the reason {@link holdSegmentTension} exists: every frame
+ * is worked out from where the drag started, so passing back through the middle
+ * puts the curves back exactly where they were.
+ */
+export function holdWorkingPan(
+  state: EditorState,
+  from: readonly { segment: SegmentRef; scales: HandleScales }[],
+  pan: number,
+): ToolResult {
+  let editor = state;
+  for (const each of from) {
+    const panned = pannedLambdas(each.scales, pan);
+    if (panned === null) continue;
+    editor = tensioned(editor, each.segment, panned) ?? editor;
+  }
+  return result(editor);
 }
 
 function tensioned(

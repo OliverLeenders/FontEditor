@@ -9,7 +9,7 @@ installBrowserGlobals();
 
 const { CurveSection } = await import("../src/components/inspector/CurveSection.js");
 const { focusedSegmentScales, focusedSegmentStatus } = await import("@typewright/tools");
-const { addContour, contour, counterIds, node, updateGlyph } =
+const { addContour, contour, counterIds, node, segmentLambdas, updateGlyph } =
   await import("@typewright/font-model");
 
 /**
@@ -153,6 +153,115 @@ describe("the points a curve turns at", () => {
     });
 
     expect(drawn(store).nodes).toHaveLength(2);
+  });
+});
+
+/**
+ * A store whose current glyph holds two quarter turns with different tensions,
+ * every point of them selected.
+ *
+ * The handle lines have to cross for λ to mean anything, so each leaves flat
+ * and arrives upright. The reach over a hundred is the tension: 0.6 and 0.3.
+ */
+function twoCurves(): Store {
+  const store = freshStore();
+  act(() => {
+    const ids = counterIds("pair");
+    const name = store.editor.document.glyphOrder[0]!;
+    const arc = (reach: number, atY: number) =>
+      contour(
+        ids.contour(),
+        [
+          node(ids.node(), { x: 0, y: atY }, { out: { x: reach, y: atY } }),
+          node(ids.node(), { x: 100, y: atY + 100 }, { in: { x: 100, y: atY + 100 - reach } }),
+        ],
+        false,
+      );
+    const first = arc(60, 0);
+    const second = arc(30, 400);
+
+    store.setCurrentGlyph(name);
+    const document = updateGlyph(store.editor.document, name, (g) =>
+      addContour(addContour(g, first), second),
+    )!;
+    store.setEditor({
+      ...store.editor,
+      document,
+      focusedSegment: null,
+      selection: [first, second].flatMap((c) =>
+        c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+      ),
+    });
+  });
+  return store;
+}
+
+/** The λ pair of the two curves the test drew, in the order they were added. */
+function pairScales(store: Store): { lambda1: number; lambda2: number }[] {
+  const contours = store.editor.document.glyphs[store.editor.currentGlyph]!.contours;
+  return contours.slice(-2).map((c) => {
+    const found = segmentLambdas(c, 0);
+    if (found === null) throw new Error("no scales");
+    return found;
+  });
+}
+
+describe("several curves at once", () => {
+  it("shows nothing where they disagree, rather than picking one", () => {
+    render(<CurveSection />, twoCurves());
+
+    expect(input("Tension of the segment").value).toBe("");
+    expect(input("Tension of the segment").placeholder).toBe("—");
+    expect(input("Tension of the segment").disabled).toBe(false);
+  });
+
+  it("gives them all the tension that is typed", () => {
+    const store = twoCurves();
+    render(<CurveSection />, store);
+
+    fireEvent.change(input("Tension of the segment"), { target: { value: "50" } });
+
+    for (const { lambda1, lambda2 } of pairScales(store)) {
+      expect((lambda1 + lambda2) / 2).toBeCloseTo(0.5, 3);
+    }
+  });
+
+  it("shows the number once they agree", () => {
+    const store = twoCurves();
+    render(<CurveSection />, store);
+    fireEvent.change(input("Tension of the segment"), { target: { value: "50" } });
+    fireEvent.blur(input("Tension of the segment"));
+
+    expect(Number(input("Tension of the segment").value)).toBeCloseTo(50, 0);
+  });
+
+  it("is one step of undo, however many curves it reached", () => {
+    const store = twoCurves();
+    render(<CurveSection />, store);
+    const before = pairScales(store);
+
+    fireEvent.change(input("Tension of the segment"), { target: { value: "50" } });
+    act(() => {
+      store.undo();
+    });
+
+    expect(pairScales(store)).toEqual(before);
+  });
+
+  it("pans them all, each keeping its own tension", () => {
+    const store = twoCurves();
+    render(<CurveSection />, store);
+    const before = pairScales(store).map(({ lambda1, lambda2 }) => (lambda1 + lambda2) / 2);
+
+    const slider = input("Pan the curve between its two handles");
+    fireEvent.change(slider, { target: { value: "0.3" } });
+    fireEvent.blur(slider);
+
+    const after = pairScales(store);
+    for (const [i, { lambda1, lambda2 }] of after.entries()) {
+      expect((lambda1 + lambda2) / 2).toBeCloseTo(before[i]!, 6);
+      expect(lambda1).toBeGreaterThan(lambda2);
+    }
   });
 });
 

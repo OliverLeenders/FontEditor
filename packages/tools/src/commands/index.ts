@@ -149,6 +149,18 @@ export {
   setSelectedHvLock,
 } from "./points.js";
 
+export {
+  holdWorkingPan,
+  setWorkingPan,
+  setWorkingTension,
+  workingPan,
+  workingScales,
+  workingSegmentCount,
+  workingSegments,
+  workingStatus,
+  workingTension,
+} from "./contours.js";
+
 export type { WalkDirection } from "./walk.js";
 export { stepSelection } from "./walk.js";
 

@@ -1,17 +1,21 @@
 import { randomIds } from "@typewright/font-model";
-import { type HandleScales, pannedLambdas, panOf } from "@typewright/geometry";
+import type { HandleScales } from "@typewright/geometry";
 import {
   addPointsAtTurns,
   begin,
   commit,
-  focusedSegmentScales,
-  focusedSegmentStatus,
   harmoniseSelection,
-  holdSegmentTension,
+  holdWorkingPan,
   result,
   selectedCurvature,
-  setSegmentTension,
+  setWorkingPan,
+  setWorkingTension,
   turnsMissing,
+  workingPan,
+  workingScales,
+  workingSegmentCount,
+  workingStatus,
+  workingTension,
 } from "@typewright/tools";
 import type { SegmentRef } from "@typewright/view";
 import { useEffect, useRef } from "react";
@@ -37,12 +41,24 @@ import { Field, shown } from "./fields.js";
  * λs says, and each one on its own is a thing somebody means to change: a
  * number for each handle made every change of tension a change of balance as
  * well, and left the slider saying the same thing twice.
+ *
+ * Several segments at once, where several are selected — a bowl's four curves,
+ * or everything in the glyph. A field shows the number when they all have it and
+ * nothing when they differ, which is what a panel editing a set has to do:
+ * showing one of them would be picking a winner, and an average would be a
+ * number none of them has. Typing gives every one of them that number, in one
+ * step, and each keeps the other dimension it had — a tension typed across four
+ * curves leaves each one's lean alone.
  */
 export function CurveSection(): React.JSX.Element {
   const store = useEditorStore();
-  const tensionIn = useStoreValue((s) => focusedSegmentScales(s.session.editor)?.lambda1 ?? null);
-  const tensionOut = useStoreValue((s) => focusedSegmentScales(s.session.editor)?.lambda2 ?? null);
-  const curveStatus = useStoreValue((s) => focusedSegmentStatus(s.session.editor));
+  // The segments the panel speaks for: everything the selection covers, or the
+  // one that was clicked. Scalars rather than the array, so the panel does not
+  // re-render on every notification through a drag.
+  const tension = useStoreValue((s) => workingTension(s.session.editor));
+  const pan = useStoreValue((s) => workingPan(s.session.editor));
+  const curveStatus = useStoreValue((s) => workingStatus(s.session.editor));
+  const segments = useStoreValue((s) => workingSegmentCount(s.session.editor));
 
   // The curvature either side of the selected node, as radii, and how far apart
   // they are. Three scalars rather than the object, for the reason the
@@ -67,21 +83,21 @@ export function CurveSection(): React.JSX.Element {
   );
 
   /**
-   * The segment being panned and the scales it was panned from.
+   * The segments being panned and the scales each was panned from.
    *
    * A slider is a drag, so it is one undo step from press to release — and every
    * value along the way is computed from the scales the drag began with rather
    * than from the last frame's, so passing back through the middle puts the
-   * curve back exactly where it started instead of drifting.
+   * curves back exactly where they started instead of drifting.
    */
-  const pan = useRef<{ segment: SegmentRef; from: HandleScales } | null>(null);
+  const panning = useRef<readonly { segment: SegmentRef; scales: HandleScales }[] | null>(null);
 
   // A section that is folded — or a panel dismissed — mid-drag must not leave
   // the step open: nothing would close it, and autosave holds off while a
   // transaction is pending.
   useEffect(
     () => () => {
-      if (pan.current !== null) store.applyTool(result(store.editor, [commit]));
+      if (panning.current !== null) store.applyTool(result(store.editor, [commit]));
     },
     [store],
   );
@@ -95,14 +111,7 @@ export function CurveSection(): React.JSX.Element {
    */
   const commitTension = (percent: number): void => {
     if (!Number.isFinite(percent)) return;
-    const segment = store.editor.focusedSegment;
-    const scales = focusedSegmentScales(store.editor);
-    if (segment === null || scales === null) return;
-
-    const mean = percent / 100;
-    const balanced = pannedLambdas({ lambda1: mean, lambda2: mean }, panOf(scales) ?? 0);
-    if (balanced === null) return;
-    store.applyTool(setSegmentTension(store.editor, segment, balanced));
+    store.applyTool(setWorkingTension(store.editor, percent / 100));
   };
 
   /**
@@ -112,23 +121,19 @@ export function CurveSection(): React.JSX.Element {
    * arrow keys, and those never send one.
    */
   const startPan = (): void => {
-    if (pan.current !== null) return;
-    const segment = store.editor.focusedSegment;
-    const scales = focusedSegmentScales(store.editor);
-    if (segment === null || scales === null) return;
+    if (panning.current !== null) return;
+    const from = workingScales(store.editor);
+    if (from.length === 0) return;
 
-    pan.current = { segment, from: scales };
+    panning.current = from;
     store.applyTool(result(store.editor, [begin("Pan handles")]));
   };
 
   const movePan = (to: number): void => {
     startPan();
-    const held = pan.current;
+    const held = panning.current;
     if (held === null) return;
-
-    const scales = pannedLambdas(held.from, to);
-    if (scales === null) return;
-    store.applyTool(holdSegmentTension(store.editor, held.segment, scales));
+    store.applyTool(holdWorkingPan(store.editor, held, to));
   };
 
   /**
@@ -141,40 +146,32 @@ export function CurveSection(): React.JSX.Element {
    */
   const commitPan = (percent: number): void => {
     if (!Number.isFinite(percent)) return;
-    const segment = store.editor.focusedSegment;
-    const scales = focusedSegmentScales(store.editor);
-    if (segment === null || scales === null) return;
-
     const to = Math.max(-PAN_REACH, Math.min(PAN_REACH, percent / 100));
-    const panned = pannedLambdas(scales, to);
-    if (panned === null) return;
-    store.applyTool(setSegmentTension(store.editor, segment, panned));
+    store.applyTool(setWorkingPan(store.editor, to));
   };
 
   const endPan = (): void => {
-    if (pan.current === null) return;
-    pan.current = null;
+    if (panning.current === null) return;
+    panning.current = null;
     store.applyTool(result(store.editor, [commit]));
   };
 
   // λ is only a proportion where the handles are on the same side of the chord
   // and pointing at each other; anywhere else the number exists and means
   // nothing anyone would want to type into. See `TunniStatus`.
-  const curveReady = curveStatus === "ok" && tensionIn !== null && tensionOut !== null;
-  // The mean, since that is the number pan leaves alone: with the handles
-  // balanced it is each handle's own reach, and panned it is what they average.
-  const tension = tensionIn === null || tensionOut === null ? null : (tensionIn + tensionOut) / 2;
-  const panValue =
-    tensionIn === null || tensionOut === null
-      ? 0
-      : (panOf({ lambda1: tensionIn, lambda2: tensionOut }) ?? 0);
+  const curveReady = curveStatus === "ok" && segments > 0;
+  // Nothing where the segments disagree: an empty box is the panel saying they
+  // have no one answer, and typing gives them all the same one.
+  const mixed = curveReady && segments > 1;
+  const panValue = pan ?? 0;
+  const many = segments > 1 ? ` · ${String(segments)} segments` : "";
   const curveHint =
     curveStatus === null
       ? "Click a curve to work on it"
       : curveStatus === "flat"
         ? "A straight segment has no tension"
         : curveStatus === "ok"
-          ? "How far the handles reach towards where the two handle lines cross; pan sets the balance between them"
+          ? `How far the handles reach towards where the two handle lines cross; pan sets the balance between them${many}`
           : "The handles of this segment do not make a proportion that can be typed";
 
   return (
@@ -198,6 +195,10 @@ export function CurveSection(): React.JSX.Element {
             label="Tension of the segment"
             title={curveHint}
             disabled={!curveReady}
+            // An empty box with a dash behind it, where the segments differ:
+            // there is no number to show, and a blank box with no explanation
+            // reads as a bug rather than as an answer.
+            placeholder={mixed && tension === null ? "—" : undefined}
             value={tension === null ? null : shown(tension * 100)}
             onCommit={commitTension}
           />
@@ -304,7 +305,7 @@ export function CurveSection(): React.JSX.Element {
               a lean worth keeping is one worth being able to write down — and
               to give the segment beside it. */}
           <Stepper
-            value={curveReady ? shown(panValue * 100) : null}
+            value={curveReady && pan !== null ? shown(pan * 100) : null}
             label="pan"
             disabled={!curveReady}
             onStep={(next) => commitPan(next)}
@@ -315,7 +316,8 @@ export function CurveSection(): React.JSX.Element {
               label="Pan as a percentage"
               title="Which way the reach leans, as a percentage of it: 0 is balanced, 100 is all at the start"
               disabled={!curveReady}
-              value={curveReady ? shown(panValue * 100) : null}
+              placeholder={mixed && pan === null ? "—" : undefined}
+              value={curveReady && pan !== null ? shown(pan * 100) : null}
               onCommit={commitPan}
             />
           </Stepper>
