@@ -30,6 +30,79 @@ function legalFiles(): Plugin {
 }
 
 /**
+ * The files a static host needs beside the page, written into the build.
+ *
+ * Cloudflare Pages reads `_headers` and `_redirects` from the root of what is
+ * published — Netlify reads the same two — so this is where the editor says how
+ * it wants to be served rather than a setting typed into somebody's dashboard
+ * and forgotten. Nothing else uses them: the desktop application gets its
+ * policy from Tauri, and `vite preview` sends its own.
+ *
+ * The policy is the desktop one with the parts that only mean something inside
+ * Tauri taken out, so the two cannot drift: there is one list of what the
+ * editor is allowed to do, in `tauri.conf.json`, and each place it is served
+ * from states it in its own words.
+ */
+function hostFiles(): Plugin {
+  return {
+    name: "typewright:host-files",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "_headers", source: headers() });
+      // Everything to the page: the editor has no routes of its own, so this is
+      // for a stray deep link rather than for navigation — and a 404 where a
+      // font was expected is a worse answer than the editor.
+      this.emitFile({
+        type: "asset",
+        fileName: "_redirects",
+        source: "/*  /index.html  200\n",
+      });
+    },
+  };
+}
+
+function headers(): string {
+  const policy = webPolicy();
+  return [
+    "/*",
+    `  Content-Security-Policy: ${policy}`,
+    // A file served as the wrong type is a file a browser may run.
+    "  X-Content-Type-Options: nosniff",
+    "  Referrer-Policy: no-referrer",
+    // The page itself is checked every time: it names the hashed files below,
+    // and a stale one would go on naming last week's.
+    "  Cache-Control: no-cache",
+    "",
+    // Everything under /assets carries a hash of its own contents in its name,
+    // so it can be kept for as long as a browser likes: a new build is a new
+    // name rather than a new version of the same one.
+    "/assets/*",
+    "  Cache-Control: public, max-age=31536000, immutable",
+    "",
+  ].join("\n");
+}
+
+/** The desktop policy, minus what only a Tauri window can do. */
+function webPolicy(): string {
+  const config = JSON.parse(
+    readFileSync(new URL("./src-tauri/tauri.conf.json", import.meta.url), "utf8"),
+  ) as { app: { security: { csp: Record<string, string> } } };
+
+  return Object.entries(config.app.security.csp)
+    .map(([directive, sources]) => {
+      if (directive !== "connect-src") return `${directive} ${sources}`;
+      // `ipc:` and the local host Tauri answers on are how the window talks to
+      // the shell. There is no shell here.
+      const web = sources
+        .split(/\s+/)
+        .filter((source) => source !== "ipc:" && source !== "http://ipc.localhost")
+        .join(" ");
+      return `${directive} ${web}`;
+    })
+    .join("; ");
+}
+
+/**
  * The desktop window's content security policy, as a header.
  *
  * `tauri.conf.json` holds it, and Tauri sends it with every page of the built
@@ -48,8 +121,25 @@ function desktopPolicy(): string {
     .join("; ");
 }
 
+/**
+ * The version, out of the manifest and into the built page.
+ *
+ * One number in one place: `set-version.mjs` writes the manifest, the Cargo
+ * files and the tag together, and this carries the same string into the editor
+ * so that what the About row says is what was released. Read at build time
+ * rather than imported, since a JSON import would put the whole manifest in the
+ * bundle to get one field out of it.
+ */
+function version(): string {
+  const manifest = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")) as {
+    version: string;
+  };
+  return manifest.version;
+}
+
 export default defineConfig({
-  plugins: [react(), legalFiles()],
+  define: { __APP_VERSION__: JSON.stringify(version()) },
+  plugins: [react(), legalFiles(), hostFiles()],
   build: {
     /*
      * React in a chunk of its own.
