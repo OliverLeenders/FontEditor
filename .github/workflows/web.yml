@@ -1,7 +1,8 @@
 # Publishes the browser build to Cloudflare Pages when a version is tagged.
 #
 # The same bundle the desktop installers embed, served as a page anyone can
-# open: https://typewright.pages.dev, or whatever the Pages project is called.
+# open: https://typewright-app.pages.dev. The bare name was taken on pages.dev,
+# which is one namespace for everybody.
 # Tagged rather than on every push to master, so what is public is a release
 # somebody decided to make — and run by hand from the Actions tab when a fix
 # wants to be up before the next tag.
@@ -91,6 +92,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: >
           pnpm dlx wrangler@4 pages deploy apps/editor/dist
-          --project-name=typewright
+          --project-name=typewright-app
           --branch=main
           --commit-dirty=true
