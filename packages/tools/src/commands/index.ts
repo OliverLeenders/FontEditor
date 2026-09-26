@@ -122,7 +122,7 @@ export {
   takeGlyphFromKernGroup,
 } from "./kerning.js";
 
-export type { OverlapOutcome } from "./overlap.js";
+export type { OverlapDone, OverlapOutcome } from "./overlap.js";
 export { overlapAt, removeOverlapAt, selectedContourIds } from "./overlap.js";
 
 export {

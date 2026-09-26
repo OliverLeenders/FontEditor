@@ -319,6 +319,21 @@ set the way a reader's would be. A moment after a line is set, HarfBuzz takes it
 sets it exactly as the exported font would; until then the editor's own shaper stands in, and
 it takes the first of a rule offering several alternates rather than choosing between them.
 
+**Joining shapes, and what that does to components.** **Remove overlap** takes the outline of
+what the selected contours cover together, or of the whole glyph where nothing is selected. Two
+shapes that cross are joined, and so are two that share an edge and no area — two squares set
+side by side become one rectangle, because the edge between them is inside the ink and a
+rasteriser would otherwise leave a pale line down it. Shapes that meet at a single point are
+left as they are: one contour through that point would pinch to nothing, which says something
+the drawing does not.
+
+A glyph drawn partly by reference — a dollar sign as an `S` with two bars laid across it — is
+joined too, and the components that take part become outlines to do it, in one undo step. The
+button says so: "Removed overlap at 4 places, 1 component decomposed." A component that meets
+nothing is left as a reference, so joining a letter does not flatten the accent sitting above
+it. Where the edges cannot be resolved the button declines and says so rather than reshaping
+the letter.
+
 **A waterfall, and two settings on one page.** The Proof bar begins with a choice between
 **One size** and **Waterfall**. A waterfall sets the same text as several blocks, each with
 its own size and its own **Features** panel, and choosing it fills in the sizes a specimen

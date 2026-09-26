@@ -25,6 +25,7 @@ import {
   setKernGroup,
   setKerning,
   glyph,
+  glyphBounds,
   node,
   orderedGlyphs,
   segmentAt,
@@ -34,6 +35,7 @@ import {
   segmentCount,
   sidebearings,
   component,
+  placedComponent,
   updateGlyph,
 } from "@typewright/font-model";
 import { type ViewTransform, boxHandlePoint } from "@typewright/view";
@@ -1233,8 +1235,101 @@ describe("removing overlap", () => {
     );
     const { outcome, result } = overlapAt(s, "a", null, ids);
 
-    expect(outcome).toBe(2);
+    expect(outcome).toEqual({ places: 2, decomposed: 0 });
     expect(result.state.document.glyphs["a"]!.contours).toHaveLength(1);
+  });
+
+  /**
+   * The dollar sign: a shape of its own with a bar laid across it by reference.
+   *
+   * `bar` is a glyph in its own right, placed in `a` as a component, and it
+   * crosses the contour `a` draws. Nothing about that is unusual — it is how an
+   * accented letter, a struck-through zero and a dollar sign are all drawn — and
+   * until the union could see a component it was the one arrangement the button
+   * had nothing to say about.
+   */
+  const withComponent = (...offsets: { x: number; y: number }[]) =>
+    editorState({
+      document: fontDocument([
+        glyph("a", {
+          advance: 600,
+          contours: [rectContour(ids, { minX: 100, minY: 0, maxX: 200, maxY: 400 })],
+          components: offsets.map((at) =>
+            placedComponent(component(ids.component(), "bar"), at.x, at.y),
+          ),
+        }),
+        glyph("bar", {
+          advance: 600,
+          contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 60 })],
+        }),
+      ]),
+      view: VIEW,
+      currentGlyph: "a",
+    });
+
+  it("decomposes the component it has to, and joins it to the contour", () => {
+    const s = withComponent({ x: 0, y: 150 });
+    const { outcome, result } = overlapAt(s, "a", null, ids);
+
+    // A bar laid across a stem crosses it four times, twice down each side.
+    expect(outcome).toEqual({ places: 4, decomposed: 1 });
+    const after = result.state.document.glyphs["a"]!;
+    expect(after.contours).toHaveLength(1);
+    // The reference is gone, because a reference cannot be part of an outline it
+    // has been joined into.
+    expect(after.components).toHaveLength(0);
+    // The glyph it referred to is untouched: this joins a copy of what it drew.
+    expect(result.state.document.glyphs["bar"]!.contours).toHaveLength(1);
+  });
+
+  it("covers what the contour and the component covered together", () => {
+    const s = withComponent({ x: 0, y: 150 });
+    const after = overlapAt(s, "a", null, ids).result.state.document.glyphs["a"]!;
+
+    expect(glyphBounds(after)).toEqual({ minX: 0, minY: 0, maxX: 300, maxY: 400 });
+  });
+
+  it("leaves a component that meets nothing as a reference", () => {
+    // An accent clear of the letter. Flattening it would throw away the whole
+    // value of drawing it as a composite, for no gain.
+    const s = withComponent({ x: 0, y: 600 });
+    const { outcome, result } = overlapAt(s, "a", null, ids);
+
+    expect(outcome).toBe("clean");
+    expect(result.state).toBe(s);
+  });
+
+  it("decomposes only the components that take part", () => {
+    // Two bars, one across the shape and one well above it.
+    const s = withComponent({ x: 0, y: 150 }, { x: 0, y: 900 });
+    const { outcome, result } = overlapAt(s, "a", null, ids);
+
+    expect(outcome).toEqual({ places: 4, decomposed: 1 });
+    const after = result.state.document.glyphs["a"]!;
+    expect(after.components).toHaveLength(1);
+    expect(after.components[0]!.transform.yOffset).toBe(900);
+  });
+
+  it("joins two components that cross each other", () => {
+    // Neither meets the contour; they meet each other. Both have to become
+    // outlines, and the contour is left out of it.
+    const s = withComponent({ x: 0, y: 600 }, { x: 100, y: 560 });
+    const { outcome } = overlapAt(s, "a", null, ids);
+
+    expect(outcome).toEqual({ places: 2, decomposed: 2 });
+  });
+
+  it("puts the whole thing back in one undo step", () => {
+    const s = withComponent({ x: 0, y: 150 });
+    const { result } = overlapAt(s, "a", null, ids);
+
+    expect(result.effects).toHaveLength(2);
+    expect(result.effects[0]).toMatchObject({
+      kind: "beginTransaction",
+      label: "Remove overlap",
+      coalesce: false,
+    });
+    expect(result.effects[1]).toEqual({ kind: "commitTransaction" });
   });
 
   it("calls a glyph with nothing overlapping clean, and leaves it be", () => {
@@ -1286,7 +1381,7 @@ describe("removing overlap", () => {
 
     const { outcome, result } = overlapAt(chosen, "a", selectedContourIds(chosen), ids);
 
-    expect(outcome).toBe(2);
+    expect(outcome).toEqual({ places: 2, decomposed: 0 });
     const after = result.state.document.glyphs["a"]!.contours;
     expect(after).toHaveLength(2);
     expect(after).toContain(c);
@@ -1306,7 +1401,10 @@ describe("removing overlap", () => {
       ],
     };
 
-    expect(overlapAt(chosen, "a", selectedContourIds(chosen), ids).outcome).toBe(2);
+    expect(overlapAt(chosen, "a", selectedContourIds(chosen), ids).outcome).toEqual({
+      places: 2,
+      decomposed: 0,
+    });
   });
 
   it("lets go of the selection, whose points the union has replaced", () => {

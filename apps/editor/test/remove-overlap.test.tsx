@@ -8,7 +8,8 @@ import { freshStore, installDomStubs, render } from "./render.js";
 installBrowserGlobals();
 
 const { RemoveOverlap } = await import("../src/components/RemoveOverlap.js");
-const { contour, counterIds, glyph, node, putGlyph } = await import("@typewright/font-model");
+const { component, contour, counterIds, glyph, node, placedComponent, putGlyph } =
+  await import("@typewright/font-model");
 const { selectAllPoints } = await import("@typewright/tools");
 
 /**
@@ -61,6 +62,49 @@ function withSquares(apart: boolean) {
 
 const note = (): string => screen.getByRole("status").textContent;
 
+/** A glyph drawn as a stem with a bar laid across it by reference. */
+function withComponent(clear: boolean) {
+  const store = freshStore();
+  const name = store.editor.currentGlyph;
+  const bar = glyph("bar.overlap", { advance: 600, contours: [square(0, 0, 300)] });
+  const shapes = glyph(name, {
+    advance: 600,
+    contours: [square(100, 0, 400)],
+    components: [placedComponent(component(ids.component(), "bar.overlap"), 0, clear ? 900 : 150)],
+  });
+  act(() => {
+    store.setEditor({
+      ...store.editor,
+      document: putGlyph(putGlyph(store.editor.document, bar), shapes),
+    });
+  });
+  return store;
+}
+
+describe("a glyph drawn with components", () => {
+  it("says what it had to decompose to join", () => {
+    const store = withComponent(false);
+    render(<RemoveOverlap />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove overlap" }));
+
+    expect(note()).toMatch(/^Removed overlap at \d+ places, 1 component decomposed\.$/);
+    const after = store.editor.document.glyphs[store.editor.currentGlyph]!;
+    expect(after.components).toHaveLength(0);
+  });
+
+  it("says nothing about components it did not have to touch", () => {
+    const store = withComponent(true);
+    render(<RemoveOverlap />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove overlap" }));
+
+    expect(note()).toBe("Nothing was overlapping.");
+    const after = store.editor.document.glyphs[store.editor.currentGlyph]!;
+    expect(after.components).toHaveLength(1);
+  });
+});
+
 describe("removing overlap", () => {
   it("unions the contours and says where they crossed", () => {
     const store = withSquares(false);
@@ -68,7 +112,7 @@ describe("removing overlap", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Remove overlap" }));
 
-    expect(note()).toMatch(/^Removed overlap at \d+ crossings?\.$/);
+    expect(note()).toMatch(/^Removed overlap at \d+ places?\.$/);
     expect(store.editor.document.glyphs[store.editor.currentGlyph]?.contours).toHaveLength(1);
   });
 

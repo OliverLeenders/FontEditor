@@ -1,4 +1,4 @@
-import { overlapAt, selectedContourIds } from "@typewright/tools";
+import { type OverlapDone, overlapAt, selectedContourIds } from "@typewright/tools";
 import { useEffect, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -27,6 +27,26 @@ const NOTE_MS = 4000;
  * there would read as a broken button rather than as a shape the tool declines
  * to guess at.
  */
+/**
+ * What was done, as a sentence.
+ *
+ * Two clauses at most: where the overlap was, and what had to be decomposed to
+ * reach it. The second is left out when there was nothing to decompose, which is
+ * every glyph drawn as contours alone.
+ */
+function said(done: OverlapDone): string {
+  const places =
+    done.places === 1
+      ? "Removed overlap at 1 place"
+      : `Removed overlap at ${String(done.places)} places`;
+  if (done.decomposed === 0) return `${places}.`;
+  const parts =
+    done.decomposed === 1
+      ? "1 component decomposed"
+      : `${String(done.decomposed)} components decomposed`;
+  return `${places}, ${parts}.`;
+}
+
 export function RemoveOverlap(): React.JSX.Element {
   const store = useEditorStore();
   const reading = useStoreValue((s) => s.ownership === "reading");
@@ -75,10 +95,12 @@ export function RemoveOverlap(): React.JSX.Element {
 
           store.applyTool(result);
           setNote({
-            text:
-              outcome === 1
-                ? "Removed overlap at 1 crossing."
-                : `Removed overlap at ${String(outcome)} crossings.`,
+            // Places rather than crossings: two shapes set flush against each
+            // other share a stretch of edge that crosses nothing, and it is
+            // resolved along with everything that does. Components that had to
+            // become outlines are said out loud, because that is a thing done to
+            // the glyph beyond joining its edges.
+            text: said(outcome),
             refused: false,
           });
         }}

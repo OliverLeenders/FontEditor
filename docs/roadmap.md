@@ -59,7 +59,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
 | 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each  |
 | 32    | More outline operations             | next                                                                                       |
-| 33    | One answer to what a glyph is       | planned: the resolve seam reaches the canvas and the compilers, and sees components        |
+| 33    | One answer to what a glyph is       | half done: the union sees components and joins what merely touches; the canvas is left     |
 | 34    | Drawing with a pen                  | planned: a skeleton and a nib, broad edge exactly and elliptical by offset                 |
 | 35    | A node that holds its curvature     | planned: harmonising that stays, and the squircle between a curve and a line               |
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
@@ -982,7 +982,7 @@ offsetting a path are the operations reached for when drawing, and each is a men
 every other editor. Points at the extremes were the fifth of these and shipped in 0.1.17,
 from the curve's own menu.
 
-#### Phase 33 — One answer to what a glyph is made of
+#### Phase 33 — One answer to what a glyph is made of — half done
 
 A component is already geometry the document does not store: the outlines belong to the glyph
 referred to, and `drawableGlyph` draws them in where they are wanted. Everything that only
@@ -995,13 +995,28 @@ passes the reference through instead of resolving it.
 Nothing else would survive it. A shape whose outline is worked out rather than stored — a
 stroke, a join that expands into its neighbours — is invisible to every one of those readers,
 and each would have to be taught about it separately. So the seam moves: one function answers
-what a glyph is made of, the editing canvas and the compilers ask it too, and the resolving
-stays in the one place.
+what a glyph is made of, and the resolving stays in the one place.
 
-Overlap removal is the first thing that is wrong today for the want of it. A dollar sign drawn
-as an `S` with two bars across it can only be unioned by decomposing it first, because the
-union sees contours and not components. It is the same fix, and it is why this comes before
-the two phases that follow.
+Two things came out of starting it, and both are done.
+
+The compilers were already right, which the paragraph above got wrong: `flattenedGlyphs`
+resolves every component, corrects the directions and takes the union, in that order, for both
+outline flavours. A dollar sign drawn as an `S` with two bars across it has always _exported_
+correctly. What could not see components was the button — asking the editor to remove overlap
+on that glyph said "nothing was overlapping" while the export quietly joined it. It sees them
+now: the components whose outlines meet what is being joined become outlines, in one undo step
+and said out loud, and the ones that meet nothing stay references, because that is what a
+composite is for.
+
+The union also used to decline two shapes that share a whole edge and no area — two squares set
+side by side. There is nothing to split there: the ends of the shared edge are corners both
+squares already have. What says the drawing is not already its own union is that the shared
+edge has ink on both sides of it, and that is now the question asked. It matters beyond
+tidiness: a rasteriser antialiasing each square against a shared edge separately leaves a pale
+line down the middle of what should be solid.
+
+What is left is the canvas: the edit view, hit-testing and the knife still read the contours as
+stored, so a stroke would be invisible to all three. That is the half phase 34 needs.
 
 #### Phase 34 — Drawing with a pen instead of an outline
 
