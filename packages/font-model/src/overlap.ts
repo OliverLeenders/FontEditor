@@ -36,6 +36,10 @@ import { type Node, node } from "./node.js";
  *  - **Shapes that share an edge** rather than crossing it — a bowl flush
  *    against a stem. There is no crossing point to split at, so the ends of the
  *    shared stretch are used instead: where one piece's end lands on the other.
+ *    Where those ends are nodes of both contours — two squares set side by side,
+ *    sharing a whole edge — there is nothing to cut either, and what says the
+ *    drawing is not already its own union is that the shared stretch has ink on
+ *    both sides of it. See {@link Flush}.
  *  - **Shapes that touch tangentially** — an arch leaving a stem along its edge.
  *    That produces a knot of near-identical crossings, so points that land
  *    within a whisker of each other are treated as one place.
@@ -46,7 +50,14 @@ import { type Node, node } from "./node.js";
 
 export type OverlapResult = {
   readonly glyph: Glyph;
-  /** How many crossings between contours were resolved. Zero means none were. */
+  /**
+   * How many places the contours met and had to be resolved. Zero means none
+   * were, and the glyph comes back as it went in.
+   *
+   * Usually crossings. A stretch two contours share, with ink on both sides of
+   * it, is one place too: it crosses nothing and still has to go, because it is
+   * inside the shape the two of them cover.
+   */
   readonly crossings: number;
 };
 
@@ -117,26 +128,41 @@ export function removeOverlap(
   // the seam that two overlapping shapes do, and the rule for which pieces
   // survive cannot tell them apart either.
   const cuts = new Map<string, number[]>();
+  const flush: Flush[] = [];
   let crossings = 0;
 
   for (const [index, c] of closed.entries()) {
-    crossings += selfMeetings(c, index, cuts, eps);
+    crossings += selfMeetings(c, index, cuts, flush, eps);
   }
 
   for (let i = 0; i < closed.length; i++) {
     for (let j = i + 1; j < closed.length; j++) {
-      crossings += meetings(closed[i]!, closed[j]!, i, j, cuts, eps);
+      crossings += meetings(closed[i]!, closed[j]!, i, j, cuts, flush, eps);
     }
   }
 
-  if (crossings === 0) return { glyph: g, crossings: 0 };
+  // Flattened at most once, and used only to answer whether a point is covered.
+  // Behind a function because a glyph with nothing overlapping is the common
+  // case — the exporter takes this union over every glyph on the way out — and
+  // that case should not pay for flattening it.
+  let flattened: Vec2[][] | null = null;
+  const outlines = (): Vec2[][] => (flattened ??= closed.map(polygon));
+
+  if (crossings === 0) {
+    // Nothing to split, which is not the same as nothing to do: contours set
+    // flush against each other share a stretch that ends on their own nodes. It
+    // has to go if it is buried, and has to stay if it is not — the inside edge
+    // of a counter drawn flush against the outside of the letter is a shared
+    // stretch that is genuinely part of the outline.
+    const buried = flush.filter((f) => insideOnBothSides(f, outlines(), eps)).length;
+    if (buried === 0) return { glyph: g, crossings: 0 };
+    crossings = buried;
+  }
 
   const pieces: Piece[] = [];
   for (const [index, c] of closed.entries()) pieces.push(...split(c, index, cuts, eps));
 
-  // Flattened once, and used only to answer whether a point is covered.
-  const outlines = closed.map(polygon);
-  const kept = onBoundary(pieces, outlines, eps);
+  const kept = onBoundary(pieces, outlines(), eps);
   if (kept.length === 0) return null;
 
   const loops = walk(kept, ids, eps);
@@ -154,6 +180,27 @@ export function removeOverlap(
 }
 
 /**
+ * Whether two contours meet: cross, or run along each other for a stretch.
+ *
+ * The question a caller asks before deciding what to hand the union. A component
+ * cannot be joined to a contour while it is still a reference, so something has
+ * to become outlines first — and that is worth doing only for the components that
+ * take part. Everything else stays a reference, which is what a composite is for.
+ *
+ * The same search the union does, stopped as soon as it finds anything. Whether
+ * the meeting is one the union would *change* is a further question, about ink,
+ * and it is answered where the union answers it: a contour that merely sits flush
+ * against another without being buried is still a contour that meets it.
+ */
+export function contoursMeet(a: Contour, b: Contour): boolean {
+  const eps = tolerance([a, b]);
+  const cuts = new Map<string, number[]>();
+  const flush: Flush[] = [];
+  const crossings = meetings(a, b, 0, 1, cuts, flush, eps);
+  return crossings > 0 || flush.length > 0;
+}
+
+/**
  * A stretch of outline between two crossings.
  *
  * Just the curve and whether it was drawn as a line. Everything else about the
@@ -167,6 +214,23 @@ type Piece = {
   readonly line: boolean;
 };
 
+/**
+ * A stretch of boundary two curves share, rather than cross.
+ *
+ * A point along the middle of it and the direction it runs, which is all that is
+ * needed to ask the question that matters: is there ink on both sides? If there
+ * is, the stretch is inside what the contours cover together and the drawing is
+ * not its own union, however few crossings it has.
+ *
+ * The middle rather than an end. An end of a shared stretch is a place where
+ * several edges meet, and a probe there answers about whichever of them it
+ * happens to land nearest.
+ */
+type Flush = {
+  readonly at: Vec2;
+  readonly along: Vec2;
+};
+
 // ---------------------------------------------------------------------------
 // finding the crossings
 // ---------------------------------------------------------------------------
@@ -178,6 +242,7 @@ function meetings(
   ai: number,
   bi: number,
   cuts: Map<string, number[]>,
+  flush: Flush[],
   eps: number,
 ): number {
   let count = 0;
@@ -198,6 +263,7 @@ function meetings(
         `${String(ai)}:${String(s)}`,
         `${String(bi)}:${String(t)}`,
         cuts,
+        flush,
         eps,
       );
     }
@@ -218,7 +284,13 @@ function meetings(
  * as nothing, which is what keeps every contour in the glyph from reporting a
  * crossing at each of its own corners.
  */
-function selfMeetings(c: Contour, index: number, cuts: Map<string, number[]>, eps: number): number {
+function selfMeetings(
+  c: Contour,
+  index: number,
+  cuts: Map<string, number[]>,
+  flush: Flush[],
+  eps: number,
+): number {
   let count = 0;
 
   for (let s = 0; s < segmentCount(c); s++) {
@@ -243,6 +315,7 @@ function selfMeetings(c: Contour, index: number, cuts: Map<string, number[]>, ep
         `${String(index)}:${String(s)}`,
         `${String(index)}:${String(t)}`,
         cuts,
+        flush,
         eps,
       );
     }
@@ -258,6 +331,13 @@ function selfMeetings(c: Contour, index: number, cuts: Map<string, number[]>, ep
  * crossings — the ends of the shared stretch are used: each curve's ends
  * projected onto the other. Those are the only points where the shared stretch
  * begins and ends, and they are exactly what the boundary walk needs.
+ *
+ * Those ends are not always somewhere to cut. Two squares set side by side share
+ * a whole edge, and the ends of it are corners both of them already have, so
+ * every projection lands on a node and nothing is split. The stretch is noted in
+ * `flush` regardless, because whether it should be there at all is a question
+ * about ink rather than about cuts, and it is asked once the outlines are to
+ * hand.
  */
 function record(
   ca: Cubic,
@@ -265,6 +345,7 @@ function record(
   keyA: string,
   keyB: string,
   cuts: Map<string, number[]>,
+  flush: Flush[],
   eps: number,
 ): number {
   const met = intersectCubics(ca, cb);
@@ -279,17 +360,55 @@ function record(
   }
 
   let count = 0;
+  const landed = new Map<Cubic, number[]>();
   for (const [from, onto, key] of [
     [ca, cb, keyB],
     [cb, ca, keyA],
   ] as const) {
     for (const end of [from.a, from.b]) {
-      const landed = project(onto, end);
-      if (landed.distance > eps) continue;
-      if (add(cuts, key, landed.t, onto, eps)) count += 1;
+      const found = project(onto, end);
+      if (found.distance > eps) continue;
+      landed.set(onto, [...(landed.get(onto) ?? []), found.t]);
+      if (add(cuts, key, found.t, onto, eps)) count += 1;
     }
   }
+
+  // One record for the stretch, from whichever curve has both of its ends: the
+  // two curves describe the same piece of boundary, and probing it twice would
+  // count one shared edge as two.
+  for (const [onto, ts] of landed) {
+    const stretch = shared(onto, ts, eps);
+    if (stretch === null) continue;
+    flush.push(stretch);
+    break;
+  }
+
   return count;
+}
+
+/**
+ * The middle of the stretch two curves share, from where one of them was landed
+ * on, or `null` where there is no stretch.
+ *
+ * Two landings a whisker apart are one place rather than a stretch — which is
+ * what a pair of curves that merely kiss reports, and what the intersector also
+ * gives up on when it cannot separate them. A stretch has to be long enough to
+ * have a middle and two sides.
+ */
+function shared(onto: Cubic, ts: readonly number[], eps: number): Flush | null {
+  if (ts.length < 2) return null;
+
+  const low = Math.min(...ts);
+  const high = Math.max(...ts);
+  const from = evaluate(onto, low);
+  const to = evaluate(onto, high);
+  if (near(from, to, eps)) return null;
+
+  const middle = (low + high) / 2;
+  return {
+    at: evaluate(onto, middle),
+    along: tangent(onto, middle) ?? { x: to.x - from.x, y: to.y - from.y },
+  };
 }
 
 /**
@@ -461,6 +580,31 @@ function onBoundary(pieces: readonly Piece[], outlines: readonly Vec2[][], eps: 
   }
 
   return kept;
+}
+
+/**
+ * Whether a shared stretch has ink on both sides of it.
+ *
+ * The same probe {@link onBoundary} uses to decide whether a piece is boundary
+ * at all, asked of a stretch no crossing was found on. Ink on both sides means
+ * the stretch is inside what the contours cover together, so it is a seam and
+ * the drawing is not its own union; ink on one side means it is part of the
+ * outline and there is nothing to resolve.
+ */
+function insideOnBothSides(stretch: Flush, outlines: readonly Vec2[][], eps: number): boolean {
+  const length = Math.hypot(stretch.along.x, stretch.along.y) || 1;
+  const normal = { x: -stretch.along.y / length, y: stretch.along.x / length };
+  const reach = PROBE * eps;
+
+  const left = filled(
+    { x: stretch.at.x + normal.x * reach, y: stretch.at.y + normal.y * reach },
+    outlines,
+  );
+  const right = filled(
+    { x: stretch.at.x - normal.x * reach, y: stretch.at.y - normal.y * reach },
+    outlines,
+  );
+  return left && right;
 }
 
 /** Whether two pieces run between the same places, through the same middle. */

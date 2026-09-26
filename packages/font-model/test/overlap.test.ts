@@ -4,7 +4,7 @@ import { contour, segmentCount } from "../src/contour.js";
 import { glyph, glyphBounds } from "../src/glyph.js";
 import { counterIds } from "../src/ids.js";
 import { node } from "../src/node.js";
-import { removeOverlap } from "../src/overlap.js";
+import { contoursMeet, removeOverlap } from "../src/overlap.js";
 import { ellipseContour, rectContour } from "../src/shapes.js";
 
 const ids = counterIds("ov");
@@ -169,6 +169,162 @@ const knot = () =>
       ),
     ],
   });
+
+describe("whether two contours meet at all", () => {
+  // What a caller asks before deciding whether a component has to become
+  // outlines: joining is for the shapes that take part, and an accent sitting
+  // clear of a letter stays a reference.
+  const box = (minX: number, minY: number, maxX: number, maxY: number) =>
+    rectContour(ids, { minX, minY, maxX, maxY });
+
+  it("is true where they cross", () => {
+    expect(contoursMeet(box(0, 0, 300, 300), box(200, 200, 500, 500))).toBe(true);
+  });
+
+  it("is true where they share an edge and nothing else", () => {
+    expect(contoursMeet(box(0, 0, 300, 300), box(300, 0, 600, 300))).toBe(true);
+  });
+
+  it("is false where they are apart", () => {
+    expect(contoursMeet(box(0, 0, 100, 100), box(300, 300, 400, 400))).toBe(false);
+  });
+
+  it("is false where one is inside the other without touching it", () => {
+    // Inside is not meeting. What to do about a shape swallowed by another is a
+    // question for the union, which has the winding rule to answer it with.
+    expect(contoursMeet(box(0, 0, 300, 300), box(100, 100, 200, 200))).toBe(false);
+  });
+});
+
+describe("shapes that share an edge and no area", () => {
+  /** Two squares of a size, set side by side, sharing a whole edge. */
+  const sideBySide = () =>
+    glyph("a", {
+      advance: 600,
+      contours: [
+        rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        rectContour(ids, { minX: 300, minY: 0, maxX: 600, maxY: 300 }),
+      ],
+    });
+
+  it("joins them into one contour", () => {
+    // Nothing crosses and nothing is split: the ends of the shared edge are
+    // corners both squares already have. What says the drawing is not its own
+    // union is that the shared edge has ink on both sides of it. This used to
+    // come back untouched.
+    const out = removeOverlap(sideBySide(), ids)!;
+    expect(out.crossings).toBe(1);
+    expect(out.glyph.contours).toHaveLength(1);
+    expect(out.glyph.contours[0]!.closed).toBe(true);
+  });
+
+  it("makes the rectangle the two of them cover", () => {
+    const out = removeOverlap(sideBySide(), ids)!;
+    expect(glyphBounds(out.glyph)).toEqual({ minX: 0, minY: 0, maxX: 600, maxY: 300 });
+  });
+
+  it("leaves four corners, not six", () => {
+    // The two points where the shared edge ended are in the middle of straight
+    // runs now, and a designer would only have to take them out by hand.
+    const out = removeOverlap(sideBySide(), ids)!;
+    expect(segmentCount(out.glyph.contours[0]!)).toBe(4);
+  });
+
+  it("leaves nothing behind to find a second time", () => {
+    const out = removeOverlap(sideBySide(), ids)!;
+    expect(removeOverlap(out.glyph, ids)?.crossings).toBe(0);
+    expect(removeOverlap(out.glyph, ids)?.glyph).toBe(out.glyph);
+  });
+
+  it("joins shapes of different sizes along the stretch they share", () => {
+    // The shared stretch is a whole edge of one and part of an edge of the
+    // other, so one end of it is a node of both and the other is not.
+    const stacked = glyph("a", {
+      advance: 600,
+      contours: [
+        rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        rectContour(ids, { minX: 300, minY: 0, maxX: 500, maxY: 120 }),
+      ],
+    });
+
+    const out = removeOverlap(stacked, ids)!;
+    expect(out.glyph.contours).toHaveLength(1);
+    expect(glyphBounds(out.glyph)).toEqual({ minX: 0, minY: 0, maxX: 500, maxY: 300 });
+    expect(removeOverlap(out.glyph, ids)?.crossings).toBe(0);
+  });
+
+  it("joins a curve set flush against a straight edge", () => {
+    // Not a rectangle, and not a tangency: half a circle with its flat side laid
+    // exactly along a square's edge. The shared stretch is straight, the rest of
+    // the boundary is not, and the handles have to survive.
+    const flat = contour(
+      ids.contour(),
+      [
+        node(ids.node(), { x: 300, y: 0 }, { out: { x: 400, y: 0 } }),
+        node(ids.node(), { x: 300, y: 300 }, { in: { x: 400, y: 300 } }),
+      ],
+      true,
+    );
+    const g = glyph("D", {
+      advance: 600,
+      contours: [rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }), flat],
+    });
+
+    const out = removeOverlap(g, ids)!;
+    expect(out.glyph.contours).toHaveLength(1);
+    const nodes = out.glyph.contours[0]!.nodes;
+    expect(nodes.some((n) => n.in !== null || n.out !== null)).toBe(true);
+    expect(glyphBounds(out.glyph)!.minX).toBeCloseTo(0, 1);
+    expect(glyphBounds(out.glyph)!.maxX).toBeGreaterThan(300);
+  });
+
+  it("leaves two squares meeting at one corner as two", () => {
+    // A single point of contact, not a stretch. One contour through it would
+    // pinch to nothing there, which describes the same ink worse than two
+    // squares do — and says something the drawing does not.
+    const corners = glyph("a", {
+      advance: 600,
+      contours: [
+        rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        rectContour(ids, { minX: 300, minY: 300, maxX: 600, maxY: 600 }),
+      ],
+    });
+
+    const out = removeOverlap(corners, ids)!;
+    expect(out.crossings).toBe(0);
+    expect(out.glyph).toBe(corners);
+  });
+
+  it("leaves two circles touching at a point as two", () => {
+    const kissing = glyph("o", {
+      advance: 600,
+      contours: [
+        ellipseContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        ellipseContour(ids, { minX: 300, minY: 0, maxX: 600, maxY: 300 }),
+      ],
+    });
+
+    expect(removeOverlap(kissing, ids)?.crossings).toBe(0);
+  });
+
+  it("leaves a square drawn twice in the same place alone", () => {
+    // Every edge is shared, and every one of them has ink on one side and none
+    // on the other — so nothing is buried and there is nothing to resolve. This
+    // is the case that stops "they share an edge" from being reason enough to
+    // rebuild a glyph, which would otherwise happen on every export.
+    const twice = glyph("a", {
+      advance: 600,
+      contours: [
+        rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+        rectContour(ids, { minX: 0, minY: 0, maxX: 300, maxY: 300 }),
+      ],
+    });
+
+    const out = removeOverlap(twice, ids)!;
+    expect(out.crossings).toBe(0);
+    expect(out.glyph).toBe(twice);
+  });
+});
 
 describe("shapes that touch rather than cross", () => {
   /** A stem, and a curve that springs from its right edge along it. */

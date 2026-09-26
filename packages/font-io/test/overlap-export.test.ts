@@ -107,15 +107,37 @@ describe("overlapping shapes on the way into a font", () => {
     expect(out.contours[0]!.nodes).toHaveLength(6);
   });
 
-  it("leaves shapes that merely touch alone", () => {
-    // Sharing a boundary line is not an overlap: there is no area in common, so
-    // there is nothing to join and no seam for a rasteriser to find.
+  it("joins shapes that share a whole edge", () => {
+    // Two squares set side by side. There is no area in common and no crossing
+    // to split at, and this used to be left as two contours on the grounds that
+    // the fill is the same either way. It is not: the shared edge is inside the
+    // ink, and a rasteriser antialiasing each square against it separately
+    // leaves a pale line down the middle of what should be solid. One rectangle
+    // is also what the drawing means.
     const touching = glyph("u", {
       advance: 600,
       contours: [box(0, 0, 300, 300), box(300, 0, 600, 300)],
     });
 
+    const { warnings } = exportFont(fontDocument([touching]), counterIds("t"));
+    expect(warnings).toEqual([]);
+
     const out = roundTrip(fontDocument([touching])).glyphs["u"]!;
+    expect(out.contours).toHaveLength(1);
+    // A rectangle, with nothing left where the two used to meet.
+    expect(out.contours[0]!.nodes).toHaveLength(4);
+  });
+
+  it("leaves shapes that meet at a single point as they are", () => {
+    // Corner to corner. Joining them would make one contour that pinches to
+    // nothing in the middle, which is a worse description of the same ink than
+    // two squares touching — and it is what the drawing says.
+    const kissing = glyph("v", {
+      advance: 600,
+      contours: [box(0, 0, 300, 300), box(300, 300, 600, 600)],
+    });
+
+    const out = roundTrip(fontDocument([kissing])).glyphs["v"]!;
     expect(out.contours).toHaveLength(2);
   });
 
