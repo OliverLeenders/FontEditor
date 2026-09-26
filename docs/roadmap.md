@@ -59,6 +59,9 @@ desktop application installs from a release, updates itself, and says which vers
 | 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
 | 31    | A proof for judging features        | half done: a feature is switched on in the bar; the waterfall is what is left              |
 | 32    | More outline operations             | next                                                                                       |
+| 33    | One answer to what a glyph is       | planned: the resolve seam reaches the canvas and the compilers, and sees components        |
+| 34    | Drawing with a pen                  | planned: a skeleton and a nib, broad edge exactly and elliptical by offset                 |
+| 35    | A node that holds its curvature     | planned: harmonising that stays, and the squircle between a curve and a line               |
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
 
 ### What the table missed
@@ -970,6 +973,68 @@ offsetting a path are the operations reached for when drawing, and each is a men
 every other editor. Points at the extremes were the fifth of these and shipped in 0.1.17,
 from the curve's own menu.
 
+#### Phase 33 — One answer to what a glyph is made of
+
+A component is already geometry the document does not store: the outlines belong to the glyph
+referred to, and `drawableGlyph` draws them in where they are wanted. Everything that only
+looks at a glyph asks through it — the browser's cells, the proof, the spacing line, the
+neighbours beside the canvas, a glyph's bounds. Everything that edits or writes a font reads
+the contours as they are stored: the canvas, hit-testing, the knife, overlap removal, and the
+compilers. Components survive that because both outline formats have components, so a compiler
+passes the reference through instead of resolving it.
+
+Nothing else would survive it. A shape whose outline is worked out rather than stored — a
+stroke, a join that expands into its neighbours — is invisible to every one of those readers,
+and each would have to be taught about it separately. So the seam moves: one function answers
+what a glyph is made of, the editing canvas and the compilers ask it too, and the resolving
+stays in the one place.
+
+Overlap removal is the first thing that is wrong today for the want of it. A dollar sign drawn
+as an `S` with two bars across it can only be unioned by decomposing it first, because the
+union sees contours and not components. It is the same fix, and it is why this comes before
+the two phases that follow.
+
+#### Phase 34 — Drawing with a pen instead of an outline
+
+A broad-edged pen is how most letterforms were arrived at before anyone drew them as outlines,
+and an editor that edits only outlines asks for the result without the reason. What is stored
+is a skeleton and a nib; the outline is worked out from them, and phase 33 is what lets
+anything see it.
+
+A nib of fixed angle and width is the exact case, which is why it comes first: the sum of a
+curve and a straight nib is the curve translated to either side of it, and a translated cubic
+is a cubic, so there is nothing to approximate. The two sides are cut where the tangent runs
+along the nib's own angle — where a broad pen dragged along its edge draws nothing and the
+stroke pinches to a point, which is the behaviour and not a defect. Self-crossings on a tight
+turn are what overlap removal is already for.
+
+An elliptical nib is the same problem seen through an affine transform: an ellipse is a
+stretched circle, so the skeleton is unstretched, offset by a circle, and stretched back.
+Offsetting by a circle is a true offset curve, which is not a cubic and has to be fitted to
+one within a stated error — the same kernel as offsetting a path in phase 32, and the reason
+that one is worth having first.
+
+Neither outline format has strokes, so the compilers flatten: resolve, remove the overlaps,
+write outlines. A `.ufo` keeps the skeleton and the nib in a lib key of this editor's own with
+the flattened outline beside them, so another application sees a font and this one still sees
+the pen.
+
+#### Phase 35 — A node that holds its own curvature
+
+Harmonising moves a node to where the curvature either side of it agrees, once, and the next
+drag of a handle undoes it. The arithmetic is closed and already written — the node slides
+along the line between its own two handles — so what is missing is only that it does not stay.
+A node marked as holding its curvature would be solved again after every edit, and that needs
+no iteration to settle: the answer depends on the four handles and never on the points, so no
+one node's answer can disturb another's.
+
+Between a curve and a straight line there is no answer of that kind. A line has no curvature,
+so a curve meeting it continuously has to arrive with none, and the only way there without
+flattening the curve is to spend part of the line on the transition. That makes the drawn path
+carry more pieces than the contour stores — it is phase 33's seam reaching inside a single
+contour rather than around a whole shape — and it is the squircle, the corner every
+application icon has been drawn with for a decade.
+
 #### Parked
 
 - **A second font in a pane of the split window**, until windows per font have shown whether
@@ -988,5 +1053,3 @@ from the curve's own menu.
 - **Names for a stylistic set** (`featureNames`, `cvXX` parameters) and gathering `aalt`,
   which is what would make the alternates this editor can now draw and preview findable by
   name in somebody else's application.
-- **Overlap removal that sees components**, for a glyph drawn as a letter plus a shape —
-  the dollar sign — which can only be unioned today by decomposing it first.
