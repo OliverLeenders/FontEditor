@@ -48,7 +48,7 @@ export {
   sampleText,
 } from "./draw.js";
 
-export type { ProofScene, RunScene } from "./run.js";
+export type { ProofBlockScene, ProofCaption, ProofScene, RunScene } from "./run.js";
 export { drawProof, drawRun } from "./run.js";
 
 export type { FrameCallback } from "./surface.js";

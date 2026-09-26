@@ -1,0 +1,91 @@
+/* A second row under the proof's bar, present only while the page is set as
+   blocks. Wraps rather than scrolls: a ladder is eleven rungs and a bar that
+   scrolled sideways would hide the one being edited. */
+.blocks {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.9rem;
+  padding: 0.4rem 0.7rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--surface);
+}
+
+.heading {
+  flex: none;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.list {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.3rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--ground);
+}
+
+/* Wide enough for three digits, because the sizes are read as a column down the
+   panel and a field that resized with its number would make a ragged one. */
+.size {
+  width: 3.2rem;
+}
+
+.unit {
+  font-size: 0.72rem;
+  color: var(--ink-2);
+}
+
+.remove {
+  padding: 0 0.25rem;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.remove:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.action {
+  padding: 0.28rem 0.5rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--surface-2);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

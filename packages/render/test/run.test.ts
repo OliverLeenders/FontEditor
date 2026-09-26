@@ -168,11 +168,23 @@ describe("drawProof", () => {
       ],
     });
 
-  const scene = (
-    lines: readonly { glyphs: { glyph: ReturnType<typeof box>; x: number }[]; y: number }[],
+  type Lines = readonly { glyphs: { glyph: ReturnType<typeof box>; x: number }[]; y: number }[];
+
+  /** A proof set at one size, which is one block with nothing on its rule. */
+  const scene = (lines: Lines) => blocks([{ lines, scale: 0.5, caption: null }]);
+
+  const blocks = (
+    each: readonly {
+      lines: Lines;
+      scale: number;
+      caption: { text: string; y: number; left: number; right: number } | null;
+    }[],
   ) => ({
-    lines,
-    view: { scale: 0.5, tx: 20, ty: 100 },
+    blocks: each.map((b) => ({
+      lines: b.lines,
+      view: { scale: b.scale, tx: 20, ty: 100 },
+      caption: b.caption,
+    })),
     viewport: { width: 800, height: 600 },
     palette: LIGHT_PALETTE,
   });
@@ -216,6 +228,52 @@ describe("drawProof", () => {
   it("still paints the page when there is nothing set", () => {
     const ctx = render(scene([]));
     expect(ctx.filledIn(LIGHT_PALETTE.background)).toHaveLength(1);
+  });
+
+  it("sets each block at its own size", () => {
+    // The same line in two blocks, one at twice the scale of the other: a
+    // waterfall is one scene, and each rung carries its own transform.
+    const line = [{ glyphs: [{ glyph: box(), x: 0 }], y: 0 }];
+    const ctx = render(
+      blocks([
+        { lines: line, scale: 0.5, caption: null },
+        { lines: line, scale: 1, caption: null },
+      ]),
+    );
+    const widths = ctx
+      .all("lineTo")
+      .map((o) => o.args[0] ?? NaN)
+      .filter((x) => x > 20);
+    // The glyph is 400 units wide, so it reaches 200 pixels at half scale and
+    // 400 at full — from the same tx.
+    expect(Math.max(...widths)).toBeCloseTo(420, 6);
+    expect(Math.min(...widths)).toBeCloseTo(220, 6);
+  });
+
+  it("writes a block's rule beside it, and rules to the right margin", () => {
+    const ctx = render(
+      blocks([
+        {
+          lines: [{ glyphs: [{ glyph: box(), x: 0 }], y: 0 }],
+          scale: 0.5,
+          caption: { text: "18 pt", y: 40, left: 56, right: 744 },
+        },
+      ]),
+    );
+
+    const label = ctx.ops.find((o) => o.op === "fillText");
+    expect(label?.text).toBe("18 pt");
+    expect(label?.fillStyle).toBe(LIGHT_PALETTE.cellLabel);
+
+    const rule = ctx.strokedIn(LIGHT_PALETTE.cellRule);
+    expect(rule).toHaveLength(1);
+    const ends = ctx.all("lineTo").filter((o) => o.args[0] === 744);
+    expect(ends).toHaveLength(1);
+  });
+
+  it("draws no rule where a proof is set at one size", () => {
+    const ctx = render(scene([{ glyphs: [{ glyph: box(), x: 0 }], y: 0 }]));
+    expect(ctx.ops.filter((o) => o.op === "fillText")).toHaveLength(0);
   });
 });
 

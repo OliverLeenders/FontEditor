@@ -54,6 +54,25 @@ export function useShapingEngine(
   applyFeatures: boolean,
   settings: TextSettings = READ_FROM_TEXT,
 ): Engine | undefined {
+  const shaping = useShapingModule(applyFeatures);
+
+  return useMemo(
+    () =>
+      applyFeatures && shaping !== null ? shaping.harfBuzzEngine(document, settings) : undefined,
+    [applyFeatures, shaping, document, settings],
+  );
+}
+
+/**
+ * The package itself, for a view that wants more than one engine out of it.
+ *
+ * The loading is what has to be a hook — it is a download, and a component has to
+ * be told when it has arrived. Asking for an engine is not: it is a memoised
+ * lookup by document and settings. Separating them is what lets the proof's
+ * waterfall have an engine per block, because the number of blocks is whatever
+ * somebody has added and hooks cannot be called in a loop.
+ */
+export function useShapingModule(applyFeatures: boolean): Shaping | null {
   const [shaping, setShaping] = useState<Shaping | null>(null);
 
   useEffect(() => {
@@ -73,11 +92,7 @@ export function useShapingEngine(
     };
   }, [applyFeatures, shaping]);
 
-  return useMemo(
-    () =>
-      applyFeatures && shaping !== null ? shaping.harfBuzzEngine(document, settings) : undefined,
-    [applyFeatures, shaping, document, settings],
-  );
+  return shaping;
 }
 
 /**

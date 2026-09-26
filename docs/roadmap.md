@@ -57,7 +57,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 28    | Binary import keeps its layout      | done: GSUB and GPOS as source, marks as anchors, kerning into the model, fontTools-checked |
 | 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph     |
 | 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
-| 31    | A proof for judging features        | half done: a feature is switched on in the bar; the waterfall is what is left              |
+| 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each  |
 | 32    | More outline operations             | next                                                                                       |
 | 33    | One answer to what a glyph is       | planned: the resolve seam reaches the canvas and the compilers, and sees components        |
 | 34    | Drawing with a pen                  | planned: a skeleton and a nib, broad edge exactly and elliptical by offset                 |
@@ -955,16 +955,25 @@ was found, because the commits were again the only record of it.
 - **Which version this is**, in the preferences: the number the release was tagged with,
   written into the build from the same manifest, because a bug report begins with it.
 
-#### Phase 31 — A proof for judging features — half done
+#### Phase 31 — A proof for judging features — done
 
 The Proof turned every feature on or off together and set text at one size. The first half
 shipped in 0.1.24: each bar has a **Features** panel with a switch per feature the font
 defines, each starting where a text renderer would leave it, so a stylistic set can be seen
 substituted without exporting the font — see below.
 
-What is left is the waterfall: the same text down a ladder of sizes, to see where it stops
-reading, and a size and a feature set per block so two settings can be judged against each
-other on one page.
+The second half is the waterfall. The Proof is set as blocks rather than at one size: each
+block has its own size and its own feature set, and carries a rule above it giving the size
+and naming whatever it has switched by hand. Choosing **Waterfall** fills in the ladder a
+specimen sheet has been set at for a century — every size through the reading range, then
+jumps — and the rows are edited, added to and taken from after that, because the point of a
+ladder is to be argued with.
+
+A ladder and a comparison are the same arrangement seen twice, which is why there is one
+mechanism and not two: down a ladder is where the text stops reading, and two blocks at one
+size with one feature between them is a stylistic set judged against what it stands in for,
+on one page, without exporting anything. The blocks are remembered per browser with the other
+settings, so a page somebody set up is still there after a reload.
 
 #### Phase 32 — More outline operations
 

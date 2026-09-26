@@ -319,6 +319,20 @@ set the way a reader's would be. A moment after a line is set, HarfBuzz takes it
 sets it exactly as the exported font would; until then the editor's own shaper stands in, and
 it takes the first of a rule offering several alternates rather than choosing between them.
 
+**A waterfall, and two settings on one page.** The Proof bar begins with a choice between
+**One size** and **Waterfall**. A waterfall sets the same text as several blocks, each with
+its own size and its own **Features** panel, and choosing it fills in the sizes a specimen
+sheet is set at — 8 through 14, then 18, 24, 36, 48 and 72. Each block's row holds its size
+and its features; **Add block** puts another at the last one's size, and the × takes one away.
+On the page, a rule above each block gives its size, and names the features that block has
+switched where they differ from the bar — so two blocks at one size with a stylistic set on in
+the second are a comparison the page itself labels. Leading stays one number for the whole
+page, because it is a multiple of the em and already means the same proportions at every size,
+and the text, the specimen and the way the line runs are shared for the same reason: a
+comparison needs one thing to be different at a time. Ctrl and the wheel zoom the whole
+ladder, every block by the same factor. Going back to **One size** puts the page back at the
+slider's size and forgets the blocks.
+
 **Old Macintosh fonts.** A `.sit` file — a StuffIt archive, which is how a font from the
 1990s was passed around — opens like any other font. The archive is unpacked, the font
 suitcase found inside it, and its bitmap strike turned into outlines: one square per lit

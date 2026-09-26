@@ -1,14 +1,16 @@
+/* Controls, then the page, then the text. A column rather than fixed rows: the
+   blocks panel is a row that is only sometimes there, and rows counted from the
+   top would give the page's share of the height to whatever followed it. */
 .proof {
-  display: grid;
-  /* Controls, then the page, then the text. The page takes everything left
-     over, because the page is the point. */
-  grid-template-rows: auto 1fr auto;
+  display: flex;
+  flex-direction: column;
   min-height: 0;
   height: 100%;
   background: var(--canvas);
 }
 
 .bar {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 1.2rem;
@@ -46,8 +48,10 @@
   color: var(--ink-2);
 }
 
+/* Everything left over, because the page is the point. */
 .stage {
   position: relative;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
 }
@@ -72,6 +76,7 @@
 /* Beneath the page rather than beside it: the proof is read across the full
    width, and a column of controls down one side would take that away. */
 .text {
+  flex: none;
   padding: 0.5rem 0.7rem;
   border: none;
   border-top: 1px solid var(--rule);
@@ -90,6 +95,17 @@
 
 /* The specimen list, sized to its longest name rather than to what it holds. */
 .specimens {
+  padding: 0.28rem 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+
+/* One size or a ladder of them, in the same clothes as the specimen list beside
+   it: the two are the same kind of choice about what is on the page. */
+.mode {
   padding: 0.28rem 0.4rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);

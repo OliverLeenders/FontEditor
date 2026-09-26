@@ -12,6 +12,7 @@ import {
 import type { AutosaveStatus, ImageEntry, SnapshotEntry } from "@typewright/storage";
 
 import type { InspectorPlacement, PaneViews, Preferences, ThemeChoice } from "../preferences.js";
+import type { ProofBlock } from "../proof-blocks.js";
 import type { Ownership, StorageState } from "../persistence.js";
 import { starterFont } from "../sample.js";
 import { PROOF_TEXT } from "../specimens.js";
@@ -137,6 +138,15 @@ export type StoreState = {
   readonly spacingTextSettings: Preferences["spacingTextSettings"];
   readonly proofTextSettings: Preferences["proofTextSettings"];
   readonly proofSize: number;
+  /**
+   * The proof's blocks, where it is set as more than one.
+   *
+   * Empty is the proof at one size, which is what it has always been and what
+   * `proofSize` sets. A block list is a waterfall — or two settings side by side
+   * down the page — and while there is one, `proofSize` is what the slider holds
+   * for when the list is cleared again.
+   */
+  readonly proofBlocks: readonly ProofBlock[];
   /** The size the feature source is set at, in pixels. */
   readonly featureSize: number;
   /** Line spacing as a multiple of the em, which is how type is set. */
@@ -299,6 +309,7 @@ export function initialState(preferences: Preferences): StoreState {
     spacingTextSettings: preferences.spacingTextSettings,
     proofTextSettings: preferences.proofTextSettings,
     proofSize: preferences.proofSize,
+    proofBlocks: preferences.proofBlocks,
     featureSize: preferences.featureSize,
     proofLeading: preferences.proofLeading,
     previewing: false,

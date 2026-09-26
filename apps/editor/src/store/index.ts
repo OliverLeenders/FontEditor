@@ -80,6 +80,7 @@ import {
   loadPreferences,
 } from "../preferences.js";
 import { Persistence, type PersistenceReport } from "../persistence.js";
+import { type ProofBlock, heldSize } from "../proof-blocks.js";
 import {
   type FolderReport,
   type SaveReport,
@@ -1006,6 +1007,18 @@ export class EditorStore {
   setProofSize(proofSize: number): void {
     const held = within(proofSize, MIN_PROOF_SIZE, MAX_PROOF_SIZE);
     if (held !== null) this.remember({ proofSize: held });
+  }
+
+  /**
+   * The blocks the proof is set as, each already holding its own size.
+   *
+   * One setter for the whole list rather than a verb per operation, because every
+   * one of those operations is a pure function of the list — see
+   * `proof-blocks.ts` — and a store method per function would be a second place
+   * for the same rules to be got wrong.
+   */
+  setProofBlocks(blocks: readonly ProofBlock[]): void {
+    this.remember({ proofBlocks: blocks.map((b) => ({ ...b, size: heldSize(b.size) })) });
   }
 
   setProofLeading(proofLeading: number): void {

@@ -9,6 +9,7 @@ installBrowserGlobals();
 
 const { ProofView } = await import("../src/components/ProofView.js");
 const { PROOF_SPECIMENS } = await import("../src/specimens.js");
+const { PROOF_LADDER } = await import("../src/proof-blocks.js");
 const { EMPTY_KERNING, setKern } = await import("@typewright/font-model");
 
 /**
@@ -167,5 +168,119 @@ describe("the features switch", () => {
     fireEvent.click(screen.getByRole("button", { name: "Features" }));
     fireEvent.click(screen.getByLabelText("ss01"));
     expect(store.getState().proofTextSettings.features).toEqual({ ss01: true });
+  });
+});
+
+describe("the waterfall", () => {
+  /** A font with a stylistic set, so a block has something of its own to switch. */
+  const withSet = () => {
+    const store = freshStore();
+    act(() => {
+      store.setEditor({
+        ...store.editor,
+        document: {
+          ...store.editor.document,
+          features: "feature ss01 {\n  sub a by b;\n} ss01;\n",
+        },
+      });
+    });
+    return store;
+  };
+
+  const chooseWaterfall = (): void => {
+    fireEvent.change(screen.getByLabelText("How the proof is set"), {
+      target: { value: "waterfall" },
+    });
+  };
+
+  it("fills in the ladder when it is chosen, because an empty one is a blank page", () => {
+    const { store } = render(<ProofView />);
+
+    chooseWaterfall();
+
+    expect(store.getState().proofBlocks.map((b) => b.size)).toEqual([...PROOF_LADDER]);
+  });
+
+  it("puts the size slider away, because each block carries its own size", () => {
+    render(<ProofView />);
+    expect(screen.queryByLabelText("Type size")).not.toBeNull();
+
+    chooseWaterfall();
+
+    expect(screen.queryByLabelText("Type size")).toBeNull();
+    expect(screen.getByLabelText("Size of block 1")).toBeTruthy();
+  });
+
+  it("gives the page back its one size, and keeps the slider's", () => {
+    const { store } = render(<ProofView />);
+    fireEvent.change(screen.getByLabelText("Type size"), { target: { value: "48" } });
+
+    chooseWaterfall();
+    fireEvent.change(screen.getByLabelText("How the proof is set"), { target: { value: "one" } });
+
+    expect(store.getState().proofBlocks).toEqual([]);
+    expect(store.getState().proofSize).toBe(48);
+  });
+
+  it("takes a block's size from its own field", () => {
+    const { store } = render(<ProofView />);
+    chooseWaterfall();
+
+    fireEvent.change(screen.getByLabelText("Size of block 2"), { target: { value: "30" } });
+
+    const sizes = store.getState().proofBlocks.map((b) => b.size);
+    expect(sizes[1]).toBe(30);
+    expect(sizes[0]).toBe(PROOF_LADDER[0]);
+  });
+
+  it("holds a size nobody could set the proof at", () => {
+    const { store } = render(<ProofView />);
+    chooseWaterfall();
+
+    fireEvent.change(screen.getByLabelText("Size of block 1"), { target: { value: "4000" } });
+
+    expect(store.getState().proofBlocks[0]?.size).toBe(140);
+  });
+
+  it("takes a block off the page", () => {
+    const { store } = render(<ProofView />);
+    chooseWaterfall();
+    const before = store.getState().proofBlocks.length;
+
+    fireEvent.click(screen.getByLabelText("Remove block 1"));
+
+    const after = store.getState().proofBlocks;
+    expect(after).toHaveLength(before - 1);
+    expect(after[0]?.size).toBe(PROOF_LADDER[1]);
+  });
+
+  it("adds a block at the last one's size, for a comparison at one size", () => {
+    const { store } = render(<ProofView />);
+    chooseWaterfall();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add block" }));
+
+    const sizes = store.getState().proofBlocks.map((b) => b.size);
+    expect(sizes).toHaveLength(PROOF_LADDER.length + 1);
+    expect(sizes[sizes.length - 1]).toBe(PROOF_LADDER[PROOF_LADDER.length - 1]);
+  });
+
+  it("switches a feature in one block and leaves the others as they were", () => {
+    // The whole point of blocks over a plain ladder: two settings on one page.
+    const store = withSet();
+    render(<ProofView />, store);
+    chooseWaterfall();
+
+    // The bar has one of these too, and it comes first; the blocks follow in the
+    // order they are set on the page.
+    const panels = screen.getAllByRole("button", { name: "Features" });
+    fireEvent.click(panels[2]!);
+    fireEvent.click(screen.getByLabelText("ss01"));
+
+    const blocks = store.getState().proofBlocks;
+    expect(blocks[1]?.settings.features).toEqual({ ss01: true });
+    expect(blocks[0]?.settings.features).toEqual({});
+    // The bar is not a block, and switching one block is not switching the page.
+    expect(store.getState().proofTextSettings.features).toEqual({});
   });
 });

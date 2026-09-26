@@ -168,13 +168,43 @@ export function drawGlyphs(ctx: Canvas2D, s: RunScene): void {
  * "does this read", and every line the editor draws to help you work is a line
  * that stops you seeing the answer.
  */
-export type ProofScene = {
-  readonly lines: readonly {
-    readonly glyphs: readonly { readonly glyph: Glyph; readonly x: number }[];
-    /** Design units below the first line's baseline. */
-    readonly y: number;
-  }[];
+export type ProofLines = readonly {
+  readonly glyphs: readonly { readonly glyph: Glyph; readonly x: number }[];
+  /** Design units below the first line's baseline. */
+  readonly y: number;
+}[];
+
+/**
+ * What a block's rule says, and where it is drawn.
+ *
+ * Screen pixels rather than design units, because a rule belongs to the page and
+ * not to the type on it: it runs the width of the measure whatever size the block
+ * is set at, and two blocks an inch apart are an inch apart at 8 pt and at 72.
+ */
+export type ProofCaption = {
+  readonly text: string;
+  readonly y: number;
+  readonly left: number;
+  readonly right: number;
+};
+
+/**
+ * One block of set text: its lines, the transform that puts them on the page, and
+ * the rule that says what it is.
+ *
+ * A block has its own scale because it has its own size, which is the whole of
+ * what a waterfall is. `null` for the caption is a proof set at one size, where a
+ * rule saying "12 pt" would be telling the reader what the size slider already
+ * says.
+ */
+export type ProofBlockScene = {
+  readonly lines: ProofLines;
   readonly view: ViewTransform;
+  readonly caption: ProofCaption | null;
+};
+
+export type ProofScene = {
+  readonly blocks: readonly ProofBlockScene[];
   readonly viewport: { readonly width: number; readonly height: number };
   readonly palette: RenderPalette;
 };
@@ -191,21 +221,63 @@ export function drawProof(ctx: Canvas2D, s: ProofScene): void {
   ctx.rect(0, 0, s.viewport.width, s.viewport.height);
   ctx.fill();
 
-  for (const line of s.lines) {
-    // Each line is the same view moved down its own baseline, which is exactly
-    // what `drawGlyphs` already does per glyph along the other axis. Drawing a
-    // line is then drawing a run, and there is one piece of glyph-drawing code.
-    const view: ViewTransform = { ...s.view, ty: s.view.ty + line.y * s.view.scale };
-    drawGlyphs(ctx, {
-      glyphs: line.glyphs,
-      view,
-      viewport: s.viewport,
-      palette: s.palette,
-      metrics: { unitsPerEm: 1000, ascender: 0, descender: 0 },
-      selected: [],
-      allMargins: false,
-    });
+  for (const block of s.blocks) {
+    if (block.caption !== null) drawCaption(ctx, s, block.caption);
+
+    for (const line of block.lines) {
+      // Each line is the same view moved down its own baseline, which is exactly
+      // what `drawGlyphs` already does per glyph along the other axis. Drawing a
+      // line is then drawing a run, and there is one piece of glyph-drawing code.
+      const view: ViewTransform = { ...block.view, ty: block.view.ty + line.y * block.view.scale };
+      drawGlyphs(ctx, {
+        glyphs: line.glyphs,
+        view,
+        viewport: s.viewport,
+        palette: s.palette,
+        metrics: { unitsPerEm: 1000, ascender: 0, descender: 0 },
+        selected: [],
+        allMargins: false,
+      });
+    }
   }
 
   ctx.restore();
 }
+
+/**
+ * The rule above a block, with its size at the left end of it.
+ *
+ * The one thing drawn on a proof that is not the font, and it earns its place:
+ * a waterfall whose rungs are not labelled is a page somebody has to count down
+ * to read, and two blocks at one size with different features set are
+ * indistinguishable without it. Drawn in the colours the glyph browser labels its
+ * cells with, which is the same job — furniture between specimens, faint enough
+ * to be looked past.
+ *
+ * The rule starts after the text rather than under it, so the label is never
+ * struck through, and stops at the right margin, so the page has a measure.
+ */
+function drawCaption(ctx: Canvas2D, s: ProofScene, caption: ProofCaption): void {
+  ctx.font = CAPTION_FONT;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillStyle = s.palette.cellLabel;
+  ctx.fillText(caption.text, caption.left, caption.y);
+
+  const after = caption.left + ctx.measureText(caption.text).width + CAPTION_GAP;
+  if (after >= caption.right) return;
+
+  ctx.strokeStyle = s.palette.cellRule;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  // Half a pixel, so a one-pixel rule lands on a pixel instead of across two.
+  ctx.moveTo(after, Math.round(caption.y) + 0.5);
+  ctx.lineTo(caption.right, Math.round(caption.y) + 0.5);
+  ctx.stroke();
+}
+
+/** The same as the browser's cell labels, for the same reason. */
+const CAPTION_FONT = "11px ui-sans-serif, system-ui, sans-serif";
+
+/** Space between the label and the rule that carries on from it. */
+const CAPTION_GAP = 8;

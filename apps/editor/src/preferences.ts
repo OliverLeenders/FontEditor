@@ -1,5 +1,6 @@
 import { type TextSettings, READ_FROM_TEXT } from "@typewright/view";
 
+import type { ProofBlock } from "./proof-blocks.js";
 import {
   type ControlSize,
   CONTROL_SIZES,
@@ -186,6 +187,15 @@ export type Preferences = {
   readonly applyFeatures: boolean;
   readonly spacingSize: number;
   readonly proofSize: number;
+  /**
+   * The blocks the proof is set as, empty for a proof at one size.
+   *
+   * A preference by the test this file states: change it and the exported font is
+   * byte for byte the same. It is a way of looking at a font rather than anything
+   * the font says, and a waterfall somebody set up is worth finding again after a
+   * reload.
+   */
+  readonly proofBlocks: readonly ProofBlock[];
   readonly proofLeading: number;
   /** The size the feature source is set at, in pixels. */
   readonly featureSize: number;
@@ -245,6 +255,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   featureSize: DEFAULT_FEATURE_SIZE,
   spacingTextSettings: READ_FROM_TEXT,
   proofTextSettings: READ_FROM_TEXT,
+  proofBlocks: [],
   inspector: DEFAULT_PLACEMENT,
   split: DEFAULT_SPLIT,
 };
@@ -309,6 +320,7 @@ export function loadPreferences(): Preferences {
     }),
     spacingTextSettings: textSettingsOf(raw["spacingTextSettings"]),
     proofTextSettings: textSettingsOf(raw["proofTextSettings"]),
+    proofBlocks: proofBlocksOf(raw["proofBlocks"]),
     inspector: {
       x: number(inspector["x"], DEFAULT_PLACEMENT.x, {}),
       y: number(inspector["y"], DEFAULT_PLACEMENT.y, {}),
@@ -342,6 +354,37 @@ const isOrientation = (value: unknown): value is SplitOrientation =>
   value === "row" || value === "column";
 
 /** How a line was last set, keeping only what this can make sense of. */
+/**
+ * The proof's blocks, from a file this editor may not have written.
+ *
+ * Anything that is not a list of blocks reads as no blocks, which is a proof at
+ * one size — the state this editor was in for its first thirty releases, so it is
+ * never a broken one. A block with no usable size is dropped rather than mended:
+ * the size is the whole of what a rung of a waterfall is, and a ladder with an
+ * invented rung in the middle of it would be a lie about what is on the page.
+ *
+ * The ids are reassigned by position rather than read, because they mean nothing
+ * outside the list and two stored blocks sharing one would make the second
+ * impossible to edit.
+ */
+function proofBlocksOf(raw: unknown): ProofBlock[] {
+  if (!Array.isArray(raw)) return [];
+
+  const blocks: ProofBlock[] = [];
+  for (const entry of raw as unknown[]) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const held = entry as Record<string, unknown>;
+    const size = held["size"];
+    if (typeof size !== "number" || !Number.isFinite(size)) continue;
+    blocks.push({
+      id: `block-${String(blocks.length + 1)}`,
+      size: Math.min(MAX_PROOF_SIZE, Math.max(MIN_PROOF_SIZE, Math.round(size))),
+      settings: textSettingsOf(held["settings"]),
+    });
+  }
+  return blocks;
+}
+
 function textSettingsOf(raw: unknown): TextSettings {
   if (typeof raw !== "object" || raw === null) return READ_FROM_TEXT;
   const held = raw as Record<string, unknown>;
