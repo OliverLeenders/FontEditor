@@ -307,6 +307,24 @@ and every substitution and positioning rule as feature source in the Features wo
 What this editor cannot compile yet — cursive attachment, marks on ligatures — is kept in
 the source and named in the import report.
 
+**Drawing with a pen.** Any contour can be drawn with a pen instead of being the edge of the
+ink. Select it and open the **Pen** section in the inspector, then choose **Stroke**: the contour
+becomes the path the pen is drawn along, and the ink is worked out from it and filled around it.
+The pen has three numbers. The **angle** it is held at, anticlockwise from level in degrees, the
+way a calligrapher states it — thirty for a foundational hand, forty-five or so for an italic. Its
+**width**, along that angle. And its **thickness** across it: nothing is a broad edge, which is
+thick where the path runs across the pen and pinches to nothing where it runs along the pen's own
+edge, as a cut quill does; more than nothing is an oval, whose thin strokes keep some weight and
+whose ends and corners are round; the same as the width is a round pen, the same weight every way. Every point tool works on the path as it does on any contour — drag its points and
+handles, hold its joins, cut an open one in two with the knife and both halves keep the pen.
+Choose **Outline** to make it an ordinary contour again; the path stays where it is.
+
+Selecting several contours sets the pen for all of them at once, and typing one number into a
+selection whose pens differ changes only that number on each. The pen interpolates between
+masters, so a narrow pen in the light master and a wide one in the bold give a stroke that
+thickens between them. What goes into the font and into a `.ufo` is the ink; the stroke itself
+is kept in the project, so a `.ufo` opened again comes back as outlines.
+
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it
 undoes that. **Hold** beside it makes it stay: a held point is put back where the curvatures

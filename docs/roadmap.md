@@ -60,7 +60,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each  |
 | 32    | More outline operations             | done: subtract, intersect, exclude, offset and simplify, beside the union and the extremes |
 | 33    | One answer to what a glyph is       | done: the union, the ruler, the gap measure and the knife see components                   |
-| 34    | Drawing with a pen                  | planned: a skeleton and a nib, broad edge exactly and elliptical by offset                 |
+| 34    | Drawing with a pen                  | done: a broad edge exactly, an oval to within a fiftieth of a unit, on any contour         |
 | 35    | A node that holds its curvature     | half done: harmonising that stays; the squircle between a curve and a line is left         |
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
 
@@ -1069,7 +1069,7 @@ reach stay references, and the undo menu says which happened.
 What a stroke or a squircle will need from this is `drawnGlyph` and the canvas's own resolving,
 which both exist. The rest is theirs to add.
 
-#### Phase 34 — Drawing with a pen instead of an outline
+#### Phase 34 — Drawing with a pen instead of an outline — done
 
 A broad-edged pen is how most letterforms were arrived at before anyone drew them as outlines,
 and an editor that edits only outlines asks for the result without the reason. What is stored
@@ -1090,9 +1090,45 @@ one within a stated error — the same kernel as offsetting a path in phase 32, 
 that one is worth having first.
 
 Neither outline format has strokes, so the compilers flatten: resolve, remove the overlaps,
-write outlines. A `.ufo` keeps the skeleton and the nib in a lib key of this editor's own with
-the flattened outline beside them, so another application sees a font and this one still sees
-the pen.
+write outlines.
+
+The broad nib is in. A stroke is a contour with a pen on it rather than a shape of its own,
+because every tool that edits points already edits contours: a skeleton's points, handles,
+Tunni controls and held joins work the day it is given a pen. The ink is worked out in one
+place, `inkOf`, stretch by stretch — each segment cut where it runs along the nib, each stretch
+bounded exactly by the path moved half the nib each way and the nib at its ends — and the
+stretches are joined by the union. A corner is covered without any join being worked out,
+because both stretches include the pen standing at the corner. It works for closed skeletons
+as well as open ones: a square drawn with a pen is a band with the middle empty.
+
+The question "what does this glyph draw" was already one question after phase 33, so it learned
+one more thing: the fill on the canvas, the glyph browser and the strip, the exporter, a glyph
+placed as a component, the ruler and the measure all see the ink. The operations that edit ink
+— the union, subtract, intersect, exclude, offset — leave a skeleton alone. The pen interpolates
+between masters, width and angle both, so a light master with a narrow pen and a bold one with
+a wide pen is a stroke that thickens along the axis.
+
+Two things were done more simply than this section planned. A `.ufo` is written the ink rather
+than the skeleton with the ink beside it: another application gets the letter it should, and
+the stroke is kept in the project file, as the axis lock and the held join are — but a `.ufo`
+saved and opened again comes back as outlines. And the knife divides an open stroke into two
+strokes with the same pen but leaves a closed one alone, because the way it cuts a closed shape
+— closing across a chord — would give a closed skeleton a new stretch of path.
+
+The oval pen is in too, as a third number on the same pen: a thickness across it. Nothing is
+the broad edge, and anything under half a unit is drawn as one, because the broad edge is exact
+and the oval is not. The path is squashed until the oval is a unit circle, traced with the
+offset of phase 32, and stretched back; a round pen is the case where nothing is squashed.
+
+How the traced pieces are put together took two attempts. The first gave every segment round
+ends of its own, and two round ends at one point are one arc drawn twice — the union has no
+crossing on it to split at, so a stroke round a corner came out as two overlapping shapes. The
+pieces now share only straight lines: each segment is a band closed straight across, the outside
+of a corner is filled by a wedge of two radii and an arc, and only an open path's two ends get
+round caps. Where the path bends more tightly than the pen, the side on the inside of the bend
+folds back over itself and would fill with a hole in it; such a stretch is halved until it does
+not fold, and a stretch too short to matter has that side drawn straight across. For a round pen
+every point of the joined outline is the pen's radius from the path, which is tested.
 
 #### Phase 35 — A node that holds its own curvature — half done
 
