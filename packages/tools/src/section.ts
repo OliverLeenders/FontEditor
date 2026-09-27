@@ -3,7 +3,7 @@ import { type Section, sectionAcross } from "@typewright/font-model";
 
 import { type ToolResult, result } from "./effects.js";
 import type { PointerInput } from "./input.js";
-import { type EditorState, currentGlyph } from "./state.js";
+import { type EditorState, drawnGlyph } from "./state.js";
 
 /**
  * The section ruler: a line laid across the letter, and every width along it.
@@ -78,7 +78,9 @@ export function cancel(state: EditorState): ToolResult {
  * first the moment a point moves.
  */
 export function shownSection(state: EditorState): Section | null {
-  const glyph = currentGlyph(state);
+  // As drawn, so a ruler across a letter built partly by reference reads the whole
+  // of it rather than stopping at the edge of the parts drawn in place.
+  const glyph = drawnGlyph(state);
   const line = state.section;
   if (glyph === null || line === null) return null;
   if (line.from.x === line.to.x && line.from.y === line.to.y) return null;

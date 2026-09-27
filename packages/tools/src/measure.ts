@@ -9,7 +9,7 @@ import { hoveredSegment } from "@typewright/view";
 import { type ToolResult, result } from "./effects.js";
 import { EMPTY_GLYPH } from "./gestures.js";
 import type { PointerInput } from "./input.js";
-import { type EditorState, currentGlyph } from "./state.js";
+import { type EditorState, currentGlyph, drawnGlyph } from "./state.js";
 
 /**
  * The measure tool: point at a stem, read its width.
@@ -105,7 +105,10 @@ export function shownMeasurement(
 }
 
 function liveMeasurement(state: EditorState, options: MeasureOptions): Measurement | null {
-  const glyph = currentGlyph(state);
+  // As drawn: the far side of a stem may be a component's edge, and the gap beside
+  // a letter is to the edge of everything it draws. The segment under the pointer
+  // is still found by its id, and the glyph's own contours keep theirs.
+  const glyph = drawnGlyph(state);
   if (glyph === null || state.cursor === null) return null;
 
   // The stem under the cursor first: pointing at an outline is unambiguous, and

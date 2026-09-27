@@ -9,6 +9,7 @@ import {
   type GlyphName,
   type Measurement,
   type NodeId,
+  drawableGlyph,
   glyphNamed,
   inLayer,
   updateGlyphInLayer,
@@ -399,6 +400,26 @@ export function tunniSegments(state: EditorState): SegmentRef[] {
  */
 export function currentGlyph(state: EditorState): Glyph | null {
   return glyphIn(state.document, state);
+}
+
+/**
+ * The glyph being edited as it looks: its own contours with its components drawn
+ * in after them.
+ *
+ * For the tools that read the shape rather than change it — the ruler laid across
+ * a letter, the gap measured beside it. A dollar sign drawn as an `S` with two bars
+ * laid across it by reference is one shape to anybody looking at it, and a ruler
+ * that read the `S` and passed straight through the bars was measuring something
+ * that is not on the screen. The canvas already draws the bars and the pointer
+ * already finds them; these are the readers that had not been told.
+ *
+ * The glyph's own contours keep their places and their ids, so anything a reader
+ * finds by id — the segment under the pointer — is found here exactly as it is in
+ * the glyph itself.
+ */
+export function drawnGlyph(state: EditorState): Glyph | null {
+  const g = currentGlyph(state);
+  return g === null ? null : drawableGlyph(state.document, g);
 }
 
 /**
