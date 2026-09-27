@@ -664,7 +664,13 @@ function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapR
     if (index < 0) continue;
 
     if (item.part !== "point") {
-      out.push(...handleRays(c, index, item.part, lean));
+      // Alt breaks a smooth node for the length of the drag, which leaves its
+      // other handle where it is — a direction again, and worth aiming at.
+      const loose =
+        state.gesture?.kind === "dragHandle" &&
+        state.gesture.nodeId === item.nodeId &&
+        state.gesture.breakSmooth;
+      out.push(...handleRays(c, index, item.part, lean, loose));
       continue;
     }
 
@@ -720,8 +726,25 @@ function outlineRays(state: EditorState, glyph: Glyph, moving: Selection): SnapR
  * The node's own x and y are already offered as a neighbour line, so a handle
  * has always been able to land exactly upright or exactly level. These are the
  * angles between.
+ *
+ * Not the other side of a smooth node whose other handle is out. That handle is
+ * not a side the drag leaves alone: the smooth constraint swings it round to stay
+ * in line with the one being dragged, so the line along it is the dragged
+ * handle's own line reflected. Offering it meant every move was offered the line
+ * the handle had just been on — caught on it, and turned in jumps, the snap guide
+ * showing all the while. Nor a tangent node's other side: its handle is held to
+ * that side's line by the tangent rule, so the line along it is where the handle
+ * already is — the guide up for the whole drag, saying nothing — and the line
+ * square to it is somewhere the handle cannot go. `loose` is a node broken for
+ * the drag with alt, whose other side stays put and is a direction again.
  */
-function handleRays(c: Contour, index: number, part: "in" | "out", lean: number): SnapRay[] {
+function handleRays(
+  c: Contour,
+  index: number,
+  part: "in" | "out",
+  lean: number,
+  loose = false,
+): SnapRay[] {
   const n = c.nodes[index];
   if (n === undefined) return [];
 
@@ -729,7 +752,12 @@ function handleRays(c: Contour, index: number, part: "in" | "out", lean: number)
   // The segment on the node's *other* side: the one the drag is not holding.
   const step = part === "out" ? -1 : 1;
   const beyond = stepAround(c, index, step);
-  if (beyond !== null) {
+  const other = part === "out" ? n.in : n.out;
+  // Smooth with both handles out: the other one follows this one. Tangent: this
+  // one is held to the straight side's line whatever the drag does, so along that
+  // line is where it already is and square to it is where it can never go.
+  const follows = !loose && ((n.type === "smooth" && other !== null) || n.type === "tangent");
+  if (beyond !== null && !follows) {
     const along = leavingBy(n, beyond, step);
     const reach = Math.hypot(along.x, along.y);
     if (reach > 0) {

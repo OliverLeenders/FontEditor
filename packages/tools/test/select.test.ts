@@ -710,6 +710,97 @@ describe("angled lines a drag can catch on", () => {
     expect(handle.x * 100 + handle.y * 100).toBeCloseTo(0, 6);
   });
 
+  /**
+   * A smooth node on a diagonal, both handles out: the other side is not a side
+   * the drag leaves alone, because the smooth constraint swings it round with the
+   * handle being dragged.
+   */
+  function smoothDiagonal() {
+    const ids = counterIds("sm");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0)),
+        node(ids.node(), vec(200, 200), { type: "smooth", in: vec(100, 150), out: vec(300, 250) }),
+        node(ids.node(), vec(500, 200)),
+      ],
+      false,
+    );
+    const document = fontDocument([addContour(glyph("s", { advance: 700 }), c)]);
+    return { state: editorState({ document, view: VIEW }), c };
+  }
+
+  it("lets a smooth node's handle turn freely, without catching on its own line", () => {
+    // The bug this is for: "along the other side" was read from the other handle,
+    // and on a smooth node the other handle is this one's own line reflected —
+    // so every move was offered the line the handle had just been on, caught on
+    // it, and the handle could only be turned in jumps. The other handle follows
+    // this one; it is not a direction to aim at.
+    const { state, c } = smoothDiagonal();
+    // Four units off the handle's own line: well inside the catch, so the old
+    // behaviour pulled it straight back onto the line it had been on.
+    let s = pointerDown(state, pointerInput(vec(300, 250)), { snapPoints: true }).state;
+    s = pointerMove(s, pointerInput(vec(300, 254)), { snapPoints: true }).state;
+    const n = nodeById(firstGlyph(s.document).contours[0]!, c.nodes[1]!.id)!;
+
+    expect(n.out).toEqual(vec(300, 254));
+    // Still smooth: the other handle swung round to stay in line with it.
+    const out = { x: n.out!.x - 200, y: n.out!.y - 200 };
+    const back = { x: n.in!.x - 200, y: n.in!.y - 200 };
+    expect(out.x * back.y - out.y * back.x).toBeCloseTo(0, 6);
+  });
+
+  it("does not show a tangent node's handle caught on the line it is held to", () => {
+    // A tangent node's handle is held to its straight side's line whatever the
+    // drag does, so offering that line — or the one square to it, which the handle
+    // can never reach — would put the snap guide up for the whole of every drag.
+    const ids = counterIds("tg");
+    // On a diagonal, so that neither the node's own level line nor its upright
+    // one can be what catches.
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0)),
+        node(ids.node(), vec(200, 200), { type: "tangent", out: vec(300, 300) }),
+        node(ids.node(), vec(500, 300), { in: vec(420, 320) }),
+      ],
+      false,
+    );
+    const document = fontDocument([addContour(glyph("t", { advance: 700 }), c)]);
+    const state = editorState({ document, view: VIEW });
+
+    let s = pointerDown(state, pointerInput(vec(300, 300)), { snapPoints: true }).state;
+    s = pointerMove(s, pointerInput(vec(322, 318)), { snapPoints: true }).state;
+
+    const gesture = s.gesture;
+    expect(gesture?.kind).toBe("dragHandle");
+    if (gesture?.kind === "dragHandle") {
+      expect(gesture.snapped).toEqual({ x: null, y: null, ray: null });
+    }
+  });
+
+  it("still sets a smooth node's handle square to the other side when alt breaks it", () => {
+    // Alt holds the other handle where it is, so the other side is a direction
+    // again, and squaring to it is worth offering — from the first move.
+    const { state, c } = smoothDiagonal();
+    const alt = {
+      ...pointerInput(vec(300, 250)),
+      modifiers: { ...pointerInput(vec(0, 0)).modifiers, alt: true },
+    };
+    const down = pointerDown(state, alt, { snapPoints: true }).state;
+    const moved = pointerMove(
+      down,
+      { ...pointerInput(vec(146, 306)), modifiers: alt.modifiers },
+      { snapPoints: true },
+    ).state;
+    const n = nodeById(firstGlyph(moved.document).contours[0]!, c.nodes[1]!.id)!;
+
+    // The in handle is along (-100, -50); square to it is along (50, -100) or its
+    // opposite, which is where the handle lands.
+    const handle = { x: n.out!.x - 200, y: n.out!.y - 200 };
+    expect(handle.x * 100 + handle.y * 50).toBeCloseTo(0, 6);
+  });
+
   it("offers a handle nothing angled unless point snapping is on", () => {
     const { state, c } = corneredHandle();
     const down = pointerDown(state, pointerInput(vec(300, 220))).state;
