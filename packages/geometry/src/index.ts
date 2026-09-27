@@ -120,3 +120,14 @@ export { intersectCubics, intersectSegmentCubic, selfIntersection, unitRoots } f
 export { QUADRATIC_TOLERANCE, toQuadratics, toQuadraticsTogether } from "./quadratic.js";
 
 export { OFFSET_TOLERANCE, arcCubics, leftNormal, offsetCubic } from "./offset.js";
+
+export {
+  halfNib,
+  loopArea,
+  nibStroke,
+  nibTangencies,
+  ovalPathStroke,
+  ovalStroke,
+  reverseLoop,
+  runsAlongNib,
+} from "./nib.js";
