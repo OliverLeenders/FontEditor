@@ -36,6 +36,7 @@ import {
   sidebearings,
   component,
   placedComponent,
+  putGlyph,
   updateGlyph,
 } from "@typewright/font-model";
 import { type ViewTransform, boxHandlePoint } from "@typewright/view";
@@ -1317,6 +1318,55 @@ describe("removing overlap", () => {
     const { outcome } = overlapAt(s, "a", null, ids);
 
     expect(outcome).toEqual({ places: 2, decomposed: 2 });
+  });
+
+  it("leaves a component alone when the selection named contours", () => {
+    // Two contours joined with a bar drawn behind them took the bar with them.
+    // A selection says which shapes to join; a component is not one of the shapes
+    // it can name, and one lying across them is a shape nobody asked about.
+    const s = withComponent({ x: 0, y: 150 });
+    const g = s.document.glyphs["a"]!;
+    const extra = rectContour(ids, { minX: 150, minY: 100, maxX: 400, maxY: 200 });
+    const both = { ...g, contours: [...g.contours, extra] };
+    const chosen = {
+      ...s,
+      document: putGlyph(s.document, both),
+      selection: both.contours.map((c) => ({
+        contourId: c.id,
+        nodeId: c.nodes[0]!.id,
+        part: "point" as const,
+      })),
+    };
+
+    const { outcome, result } = overlapAt(chosen, "a", selectedContourIds(chosen), ids);
+
+    expect(outcome).toMatchObject({ decomposed: 0 });
+    const after = result.state.document.glyphs["a"]!;
+    expect(after.components).toHaveLength(1);
+    expect(after.components[0]!.transform.yOffset).toBe(150);
+  });
+
+  it("leaves two components that meet each other alone when a contour was named", () => {
+    // The clause that pulls in a component meeting another component has to
+    // respect the scope as well, or naming one contour reaches the whole glyph.
+    const s = withComponent({ x: 0, y: 600 }, { x: 100, y: 560 });
+    const g = s.document.glyphs["a"]!;
+    const chosen = {
+      ...s,
+      selection: [
+        {
+          contourId: g.contours[0]!.id,
+          nodeId: g.contours[0]!.nodes[0]!.id,
+          part: "point" as const,
+        },
+      ],
+    };
+
+    const { outcome, result } = overlapAt(chosen, "a", selectedContourIds(chosen), ids);
+
+    // One contour, nothing for it to be joined to.
+    expect(outcome).toBe("clean");
+    expect(result.state).toBe(chosen);
   });
 
   it("puts the whole thing back in one undo step", () => {

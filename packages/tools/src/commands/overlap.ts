@@ -114,11 +114,20 @@ export function overlapAt(
 /**
  * Which of a glyph's components have to become outlines, and what they draw.
  *
- * A component takes part when its outlines meet something else the union is
- * being asked about — a contour it is being joined to, or another component. An
- * accent sitting clear above a letter meets nothing, and stays a reference: that
- * is the whole value of a composite, and a union that flattened every `ä` in the
- * font on its way past would be a worse tool than one that does nothing.
+ * Nothing, when the caller named the contours to work on. A selection says which
+ * shapes to join, a component is not one of the shapes it can name, and a
+ * component that merely happens to lie across them is a shape somebody did not
+ * ask about — joining two contours with a bar drawn behind them took the bar with
+ * them, which is the opposite of what selecting two things means. What `only`
+ * promises is that everything outside it is left exactly as it was drawn, and a
+ * reference turned into outlines is not that.
+ *
+ * For the glyph as a whole it is the other way round: nothing was named, so
+ * everything is in, and a component takes part when its outlines meet a contour
+ * or another component. An accent sitting clear above a letter meets nothing and
+ * stays a reference — that is the whole value of a composite, and a union that
+ * flattened every `ä` in the font on its way past would be a worse tool than one
+ * that does nothing.
  *
  * Resolved one component at a time, because each carries its own transform and
  * the answer is per component. The owner's name seeds the cycle guard, which is
@@ -134,6 +143,7 @@ function takingPart(
   readonly left: readonly Component[];
   readonly decomposed: number;
 } {
+  if (only !== null) return { contours: [], left: g.components, decomposed: 0 };
   if (g.components.length === 0) return { contours: [], left: g.components, decomposed: 0 };
 
   const source = { glyphOf: (name: string) => state.document.glyphs[name] ?? null };
@@ -142,13 +152,12 @@ function takingPart(
     drawn: resolveGlyphComponents(source, g.name, [component], ids),
   }));
 
-  const asked = g.contours.filter((c) => only === null || only.has(c.id));
   const meets = (drawn: readonly Contour[], others: readonly Contour[]): boolean =>
     drawn.some((one) => others.some((other) => contoursMeet(one, other)));
 
   const involved = parts.filter(
     (part) =>
-      meets(part.drawn, asked) ||
+      meets(part.drawn, g.contours) ||
       parts.some((other) => other !== part && meets(part.drawn, other.drawn)),
   );
 
