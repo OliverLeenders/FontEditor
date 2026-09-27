@@ -58,7 +58,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph     |
 | 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
 | 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each  |
-| 32    | More outline operations             | next                                                                                       |
+| 32    | More outline operations             | half done: subtract, intersect and exclude; simplify and offset are what is left           |
 | 33    | One answer to what a glyph is       | half done: the union sees components and joins what merely touches; the canvas is left     |
 | 34    | Drawing with a pen                  | planned: a skeleton and a nib, broad edge exactly and elliptical by offset                 |
 | 35    | A node that holds its curvature     | planned: harmonising that stays, and the squircle between a curve and a line               |
@@ -975,12 +975,25 @@ size with one feature between them is a stylistic set judged against what it sta
 on one page, without exporting anything. The blocks are remembered per browser with the other
 settings, so a page somebody set up is still there after a reload.
 
-#### Phase 32 — More outline operations
+#### Phase 32 — More outline operations — half done
 
-Union is the only boolean. Subtract, intersect and exclude, simplifying a contour, and
-offsetting a path are the operations reached for when drawing, and each is a menu item in
-every other editor. Points at the extremes were the fifth of these and shipped in 0.1.17,
-from the curve's own menu.
+Union was the only boolean. Subtract, intersect and exclude are now beside it in the toolbar,
+and they are the union's own machinery with one thing changed: which region the boundary
+belongs to. Every contour is cut at its crossings either way, and a piece is kept when the
+region is on one side of it and not the other — covered by either, covered by the target and
+not the tool, covered by both, covered by exactly one. The pieces are then pointed so the
+region is on their left, which is what makes a hole a hole without anybody reversing it.
+
+The selection is the tool and the rest is what it is applied to: draw the shape that says
+where the notch goes, select it, take it away. Nothing selected means there is no tool, so the
+three are offered only when there is one — where the union means the whole glyph, as it always
+has. Three endings are worth telling apart and are: shapes that do not overlap have nothing to
+do to each other, an operation that would leave nothing is declined rather than performed, and
+a boundary that will not close is refused as it is for the union.
+
+Points at the extremes were the fifth of these and shipped in 0.1.17, from the curve's own
+menu. What is left is simplifying a contour — a fitting pass with an error bound — and
+offsetting a path, which is the kernel the elliptical nib of phase 34 needs.
 
 #### Phase 33 — One answer to what a glyph is made of — half done
 

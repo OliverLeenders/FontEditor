@@ -81,6 +81,55 @@ function withComponent(clear: boolean) {
   return store;
 }
 
+describe("the set operations", () => {
+  it("are offered only when something is selected to apply", () => {
+    const store = withSquares(false);
+    render(<RemoveOverlap />, store);
+
+    for (const name of ["Subtract", "Intersect", "Exclude"]) {
+      const button = screen.getByRole<HTMLButtonElement>("button", { name });
+      expect(button.disabled).toBe(true);
+      expect(button.title).toMatch(/select the shape first$/);
+    }
+  });
+
+  it("take the selected shape out of the others", () => {
+    const store = withSquares(false);
+    act(() => {
+      const editor = store.editor;
+      const second = editor.document.glyphs[editor.currentGlyph]!.contours[1]!;
+      store.setEditor({
+        ...editor,
+        selection: [{ contourId: second.id, nodeId: second.nodes[0]!.id, part: "point" }],
+      });
+    });
+    render(<RemoveOverlap />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Subtract" }));
+
+    expect(note()).toBe("Subtracted the selected shape.");
+    expect(store.editor.document.glyphs[store.editor.currentGlyph]!.contours).toHaveLength(1);
+  });
+
+  it("say when the shapes do not overlap, and change nothing", () => {
+    const store = withSquares(true);
+    act(() => {
+      const editor = store.editor;
+      const second = editor.document.glyphs[editor.currentGlyph]!.contours[1]!;
+      store.setEditor({
+        ...editor,
+        selection: [{ contourId: second.id, nodeId: second.nodes[0]!.id, part: "point" }],
+      });
+    });
+    render(<RemoveOverlap />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Intersect" }));
+
+    expect(note()).toBe("They do not overlap.");
+    expect(store.editor.document.glyphs[store.editor.currentGlyph]!.contours).toHaveLength(2);
+  });
+});
+
 describe("a glyph drawn with components", () => {
   it("says what it had to decompose to join", () => {
     const store = withComponent(false);

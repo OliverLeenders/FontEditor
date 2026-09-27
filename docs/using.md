@@ -327,12 +327,27 @@ rasteriser would otherwise leave a pale line down it. Shapes that meet at a sing
 left as they are: one contour through that point would pinch to nothing, which says something
 the drawing does not.
 
+**Subtract, intersect and exclude** sit beside it, and they work the other way round: the
+selection is the shape being applied and everything else is what it is applied to. Draw a
+rectangle across a stem, select it, and **Subtract** cuts the notch and takes the rectangle with
+it; **Intersect** keeps only what the two of them both cover; **Exclude** keeps what only one of
+them covers. A tool swallowed whole by the shape under it cuts a hole, which comes out running
+against the outline around it, as a counter must. The three are greyed out until something is
+selected, because without a selection there is nothing to apply. Shapes that do not overlap are
+said to be apart and nothing is done; an operation that would leave nothing at all is declined,
+because that is almost always the wrong shape picked as the tool.
+
 A glyph drawn partly by reference — a dollar sign as an `S` with two bars laid across it — is
 joined too, and the components that take part become outlines to do it, in one undo step. The
 button says so: "Removed overlap at 4 places, 1 component decomposed." A component that meets
 nothing is left as a reference, so joining a letter does not flatten the accent sitting above
 it. Where the edges cannot be resolved the button declines and says so rather than reshaping
 the letter.
+
+Components are only ever drawn in by the whole-glyph union. Joining or cutting a _selection_
+leaves every reference alone — a selection names contours, and turning a reference into outlines
+because something was drawn across it is a decision to take deliberately rather than one to
+have taken for you.
 
 **A waterfall, and two settings on one page.** The Proof bar begins with a choice between
 **One size** and **Waterfall**. A waterfall sets the same text as several blocks, each with

@@ -129,6 +129,8 @@ export {
   removeOverlapAt,
   overlapAt,
   selectedContourIds,
+  type CombineReport,
+  combineAt,
   type OverlapDone,
   type OverlapOutcome,
   renameCurrentGlyph,

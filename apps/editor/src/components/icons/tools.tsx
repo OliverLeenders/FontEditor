@@ -91,6 +91,65 @@ export const OverlapIcon: IconComponent = () => (
   </Glyph>
 );
 
+/**
+ * The three set operations, as the same two circles with a region filled in.
+ *
+ * Drawn here rather than copied: Lucide has no boolean-operation set, and the
+ * shape of the answer is the icon — what is kept is what is filled. The circles
+ * are the union icon's, so the four read as one family and the difference between
+ * them is only ever which part is solid.
+ *
+ * The arcs meet where the circles do, at (8.06, 8.06) and (15.94, 15.94): the
+ * chord through two circles of radius 7 centred six units apart on each axis.
+ */
+const CIRCLES = (
+  <>
+    <circle cx="15" cy="9" r="7" />
+    <circle cx="9" cy="15" r="7" />
+  </>
+);
+
+/** Subtract: what the lower-left circle covers and the other does not. */
+export const SubtractIcon: IconComponent = () => (
+  <Glyph>
+    {CIRCLES}
+    <path
+      fill="currentColor"
+      stroke="none"
+      d="M8.06 8.06 A7 7 0 1 0 15.94 15.94 A7 7 0 0 0 8.06 8.06 Z"
+    />
+  </Glyph>
+);
+
+/** Intersect: the lens, which is what both cover. */
+export const IntersectIcon: IconComponent = () => (
+  <Glyph>
+    {CIRCLES}
+    <path
+      fill="currentColor"
+      stroke="none"
+      d="M8.06 8.06 A7 7 0 0 0 15.94 15.94 A7 7 0 0 0 8.06 8.06 Z"
+    />
+  </Glyph>
+);
+
+/** Exclude: both crescents, which is what exactly one of them covers. */
+export const ExcludeIcon: IconComponent = () => (
+  <Glyph>
+    {CIRCLES}
+    <path
+      fill="currentColor"
+      stroke="none"
+      d="M8.06 8.06 A7 7 0 1 0 15.94 15.94 A7 7 0 0 0 8.06 8.06 Z"
+    />
+    <path
+      fill="currentColor"
+      stroke="none"
+      d="M8.06 8.06 A7 7 0 1 1 15.94 15.94 A7 7 0 0 0 8.06 8.06 Z"
+    />
+  </Glyph>
+);
+
 export const UndoIcon: IconComponent = () => (
   <Glyph>
     <path d="M9 14 4 9l5-5" />

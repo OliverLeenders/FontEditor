@@ -201,6 +201,200 @@ export function contoursMeet(a: Contour, b: Contour): boolean {
 }
 
 /**
+ * What to do with two sets of contours, beyond joining them.
+ *
+ * Named for what is kept rather than for how it is done: `subtract` leaves what
+ * the target covers and the tool does not, `intersect` leaves what both cover,
+ * and `exclude` leaves what exactly one of them covers.
+ */
+export type SetOperation = "subtract" | "intersect" | "exclude";
+
+/**
+ * How an operation ended.
+ *
+ * Four endings rather than a glyph or `null`, because the three that are not a
+ * result are all worth saying out loud and none of them is a failure of the
+ * arithmetic. Shapes that do not overlap have nothing to subtract from each
+ * other; an operation that would leave nothing is almost always a mistake about
+ * which shape was the tool, and handing back an empty glyph would be a poor way
+ * to find out. `refused` is the union's own last resort: a boundary that will
+ * not close.
+ */
+export type CombineOutcome =
+  | { readonly kind: "done"; readonly glyph: Glyph; readonly places: number }
+  | { readonly kind: "apart" }
+  | { readonly kind: "empty" }
+  | { readonly kind: "refused" };
+
+/**
+ * Subtract, intersect or exclude one set of contours against the rest.
+ *
+ * `tool` names the contours being applied; every other closed contour is what
+ * they are applied to. Both sides take part in the cutting, so a tool that
+ * crosses itself or a target drawn as two overlapping strokes is resolved on the
+ * way past — which is what makes these operations usable on real drawings rather
+ * than on pairs of tidy shapes.
+ *
+ * The machinery is the union's, and the only thing that differs is which region
+ * is being traced. Every piece of every contour is cut at the crossings, and a
+ * piece is kept when the region is on one side of it and not the other:
+ *
+ *  - **union** — covered by either
+ *  - **subtract** — covered by the target and not by the tool
+ *  - **intersect** — covered by both
+ *  - **exclude** — covered by exactly one
+ *
+ * The pieces are then pointed so the region is on their left and chained, so the
+ * result comes out oriented: the boundary of a hole a subtraction cut runs the
+ * opposite way from the outline around it without anybody having to reverse it.
+ *
+ * The target keeps its counters, because both sides are asked by the non-zero
+ * rule rather than contour by contour: a bowl and its counter are covered and
+ * not covered exactly as they were, and a tool laid across the counter cuts
+ * nothing there because there was nothing there.
+ */
+export function combineContours(
+  g: Glyph,
+  ids: IdFactory,
+  op: SetOperation,
+  tool: ReadonlySet<ContourId>,
+): CombineOutcome {
+  const taken = (c: Contour): boolean => c.closed && c.nodes.length >= 2;
+  const closed = g.contours.filter(taken);
+
+  const tools = closed.filter((c) => tool.has(c.id));
+  const targets = closed.filter((c) => !tool.has(c.id));
+  // One side or the other empty: there is no pair to operate on, and an
+  // operation between a shape and nothing is not a thing anybody meant.
+  if (tools.length === 0 || targets.length === 0) return { kind: "apart" };
+
+  const eps = tolerance(closed);
+  const cuts = new Map<string, number[]>();
+  const flush: Flush[] = [];
+  let places = 0;
+
+  for (const [index, c] of closed.entries()) places += selfMeetings(c, index, cuts, flush, eps);
+  for (let i = 0; i < closed.length; i++) {
+    for (let j = i + 1; j < closed.length; j++) {
+      places += meetings(closed[i]!, closed[j]!, i, j, cuts, flush, eps);
+    }
+  }
+
+  const toolOutlines = tools.map(polygon);
+  const targetOutlines = targets.map(polygon);
+  const inTool = (p: Vec2): boolean => filled(p, toolOutlines);
+  const inTarget = (p: Vec2): boolean => filled(p, targetOutlines);
+
+  // Shapes that only sit near each other have nothing to do here, and saying so
+  // is better than the alternatives: a subtraction would quietly delete the
+  // tool, and an intersection would quietly delete everything.
+  if (!interact(tools, targets, toolOutlines, targetOutlines, eps)) return { kind: "apart" };
+
+  const inResult = (p: Vec2): boolean => {
+    const target = inTarget(p);
+    const cutter = inTool(p);
+    if (op === "subtract") return target && !cutter;
+    if (op === "intersect") return target && cutter;
+    return target !== cutter;
+  };
+
+  const pieces: Piece[] = [];
+  for (const [index, c] of closed.entries()) pieces.push(...split(c, index, cuts, eps));
+
+  const kept = onBoundaryOf(pieces, inResult, eps);
+  if (kept.length === 0) return { kind: "empty" };
+
+  const loops = walk(kept, ids, eps);
+  if (loops === null) return { kind: "refused" };
+
+  // Where the first of the contours that took part was, so the glyph's order is
+  // disturbed as little as it can be — open contours keep their places around it.
+  const at = g.contours.findIndex(taken);
+  const after = g.contours.slice(at + 1).filter((c) => !taken(c));
+  const contours = [...g.contours.slice(0, at), ...loops, ...after];
+
+  return { kind: "done", glyph: { ...g, contours }, places };
+}
+
+/**
+ * Whether two sets of contours overlap in area, rather than merely lie about in
+ * the same glyph.
+ *
+ * Three ways they can. Their boundaries cross, which the search has already
+ * found; the tool is swallowed by the target, which is how a hole is cut and has
+ * no crossings at all; or the target is swallowed by the tool. The last two are
+ * asked with a point known to be inside one, tested against the other.
+ */
+function interact(
+  tools: readonly Contour[],
+  targets: readonly Contour[],
+  toolOutlines: readonly Vec2[][],
+  targetOutlines: readonly Vec2[][],
+  eps: number,
+): boolean {
+  // Crossings between the two sides, and only between them: a tool that crosses
+  // itself says nothing about whether it reaches the target. Asked on a map of
+  // its own, because this is a question rather than a decision to cut anything.
+  for (const one of tools) {
+    for (const other of targets) {
+      if (meetings(one, other, 0, 1, new Map(), [], eps) > 0) return true;
+    }
+  }
+
+  for (const poly of toolOutlines) {
+    const p = somewhereInside(poly);
+    if (p !== null && filled(p, targetOutlines)) return true;
+  }
+  for (const poly of targetOutlines) {
+    const p = somewhereInside(poly);
+    if (p !== null && filled(p, toolOutlines)) return true;
+  }
+
+  // What is left is shapes whose boundaries touch without crossing — flush
+  // against each other, or meeting at a point. They share no area, so there is
+  // nothing for one to take out of the other.
+  return false;
+}
+
+/**
+ * A point strictly inside a polygon, or `null` for one with no inside.
+ *
+ * The middle of the first stretch a horizontal line through the polygon spends
+ * inside it. A centroid is not good enough — the centroid of a `C` is in the gap
+ * — and the answer has to be inside or the containment test above is worse than
+ * no test.
+ */
+function somewhereInside(poly: readonly Vec2[]): Vec2 | null {
+  if (poly.length < 3) return null;
+
+  let low = Infinity;
+  let high = -Infinity;
+  for (const p of poly) {
+    low = Math.min(low, p.y);
+    high = Math.max(high, p.y);
+  }
+  if (!(high > low)) return null;
+
+  const y = (low + high) / 2;
+  const xs: number[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
+    if (a.y === b.y) continue;
+    const lower = Math.min(a.y, b.y);
+    const upper = Math.max(a.y, b.y);
+    if (y < lower || y >= upper) continue;
+    xs.push(a.x + ((y - a.y) / (b.y - a.y)) * (b.x - a.x));
+  }
+  if (xs.length < 2) return null;
+
+  xs.sort((l, r) => l - r);
+  const from = xs[0]!;
+  const to = xs[1]!;
+  return to > from ? { x: (from + to) / 2, y } : null;
+}
+
+/**
  * A stretch of outline between two crossings.
  *
  * Just the curve and whether it was drawn as a line. Everything else about the
@@ -558,6 +752,24 @@ function split(c: Contour, index: number, cuts: Map<string, number[]>, eps: numb
  * appears twice and is kept once.
  */
 function onBoundary(pieces: readonly Piece[], outlines: readonly Vec2[][], eps: number): Piece[] {
+  return onBoundaryOf(pieces, (p) => filled(p, outlines), eps);
+}
+
+/**
+ * The same, for a region described by something other than "covered by any of
+ * these contours".
+ *
+ * Which region is being traced is the whole of the difference between the four
+ * operations. A piece is on the boundary of a region when the region is on one
+ * side of it and not the other, and it is pointed so the region is on its left —
+ * neither of those facts knows or cares whether the region is a union, what is
+ * left after a subtraction, or what two shapes have in common.
+ */
+function onBoundaryOf(
+  pieces: readonly Piece[],
+  inside: (p: Vec2) => boolean,
+  eps: number,
+): Piece[] {
   const kept: Piece[] = [];
 
   for (const piece of pieces) {
@@ -570,8 +782,8 @@ function onBoundary(pieces: readonly Piece[], outlines: readonly Vec2[][], eps: 
     const normal = { x: -along.y / length, y: along.x / length };
 
     const reach = PROBE * eps;
-    const left = filled({ x: at.x + normal.x * reach, y: at.y + normal.y * reach }, outlines);
-    const right = filled({ x: at.x - normal.x * reach, y: at.y - normal.y * reach }, outlines);
+    const left = inside({ x: at.x + normal.x * reach, y: at.y + normal.y * reach });
+    const right = inside({ x: at.x - normal.x * reach, y: at.y - normal.y * reach });
     if (left === right) continue;
 
     const facing = left ? piece : { curve: reverse(piece.curve), line: piece.line };
