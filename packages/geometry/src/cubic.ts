@@ -200,6 +200,22 @@ export function inflections(s: Cubic): number[] {
  * segments with nothing to fit.
  */
 export function refitJoin(before: Cubic, after: Cubic): Cubic | null {
+  return refittedJoin(before, after)?.curve ?? null;
+}
+
+/**
+ * The same fit, with how far it strays from the pair it replaces.
+ *
+ * What a caller deciding *whether* to take the point out needs. Taking one out is
+ * only ever worth doing when the outline barely moves, and "barely" is a number
+ * the caller sets — a tenth of a unit for tidying up, two units for a drawing
+ * that is to be simplified on purpose. Measured as the furthest any point of the
+ * old pair lands from the new curve, which is the distance a designer would see.
+ */
+export function refittedJoin(
+  before: Cubic,
+  after: Cubic,
+): { readonly curve: Cubic; readonly error: number } | null {
   const from = before.a;
   const to = after.b;
 
@@ -219,7 +235,7 @@ export function refitJoin(before: Cubic, after: Cubic): Cubic | null {
   // unequal segments would pull the result towards the shorter one. It is only
   // a start, because distance along the pair is not distance along the answer.
   let params = chordParameters(points);
-  if (params === null) return plain;
+  if (params === null) return { curve: plain, error: strayOf(plain, points) };
 
   let best = plain;
   let bestError = Infinity;
@@ -240,7 +256,20 @@ export function refitJoin(before: Cubic, after: Cubic): Cubic | null {
       bestError = error;
     }
   }
-  return best;
+  return { curve: best, error: strayOf(best, points) };
+}
+
+/**
+ * How far the furthest of `points` is from a curve.
+ *
+ * Measured by projection rather than at a parameter, because the answer is
+ * reported to a caller who is deciding whether the change is visible, and what is
+ * visible is the distance to the curve itself.
+ */
+function strayOf(s: Cubic, points: readonly Vec2[]): number {
+  let worst = 0;
+  for (const p of points) worst = Math.max(worst, project(s, p).distance);
+  return worst;
 }
 
 /** How many points are read off the pair, each side of the join. */

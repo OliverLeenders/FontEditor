@@ -89,6 +89,7 @@ export {
   project,
   quadraticToCubic,
   refitJoin,
+  refittedJoin,
   reverse,
   secondDerivative,
   split,
@@ -117,3 +118,5 @@ export type { CurveMeeting } from "./cubic.js";
 export { intersectCubics, intersectSegmentCubic, selfIntersection, unitRoots } from "./cubic.js";
 
 export { QUADRATIC_TOLERANCE, toQuadratics, toQuadraticsTogether } from "./quadratic.js";
+
+export { OFFSET_TOLERANCE, arcCubics, leftNormal, offsetCubic } from "./offset.js";
