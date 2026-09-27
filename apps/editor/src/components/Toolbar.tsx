@@ -19,6 +19,7 @@ import {
 } from "./icons.js";
 import { ViewMenu } from "./ViewMenu.js";
 import { RemoveOverlap } from "./RemoveOverlap.js";
+import { Reshape } from "./Reshape.js";
 import styles from "./Toolbar.module.css";
 
 type ToolButton = {
@@ -159,6 +160,10 @@ export function Toolbar(): React.JSX.Element {
       <div className={styles.divider} />
 
       <RemoveOverlap />
+
+      <div className={styles.divider} />
+
+      <Reshape />
 
       <div className={styles.spacer} />
 

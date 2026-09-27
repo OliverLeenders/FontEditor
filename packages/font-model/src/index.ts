@@ -252,6 +252,9 @@ export type { Measurement, PlacedGlyph, Section, SectionSpan } from "./measure.j
 export { measureAngle, measureGap, measureNormal, sectionAcross } from "./measure.js";
 
 export type { OverlapResult } from "./overlap.js";
+export type { OffsetJoin, OffsetOptions } from "./offset.js";
+export { offsetContour } from "./offset.js";
+export { keptByPolicy, simplifyContour } from "./simplify.js";
 export type { CombineOutcome, SetOperation } from "./overlap.js";
 export { combineContours, contoursMeet, removeOverlap } from "./overlap.js";
 

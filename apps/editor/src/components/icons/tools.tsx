@@ -150,6 +150,33 @@ export const ExcludeIcon: IconComponent = () => (
   </Glyph>
 );
 
+/**
+ * Offset: a shape with a wider copy of itself outside it.
+ *
+ * Two rounded squares, because what the operation does to a corner is the
+ * interesting part of it and a circle inside a circle would not show that.
+ */
+export const OffsetIcon: IconComponent = () => (
+  <Glyph>
+    <rect x="8" y="8" width="8" height="8" rx="1" />
+    <rect x="3" y="3" width="18" height="18" rx="4" />
+  </Glyph>
+);
+
+/**
+ * Simplify: a curve with the points that are coming off it.
+ *
+ * The curve stays, drawn through; the two points on it are hollow, which is how
+ * this editor draws a point that is not part of the outline it keeps.
+ */
+export const SimplifyIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M3 18c4-12 14-12 18 0" />
+    <circle cx="9" cy="10.4" r="1.6" />
+    <circle cx="15" cy="10.4" r="1.6" />
+  </Glyph>
+);
+
 export const UndoIcon: IconComponent = () => (
   <Glyph>
     <path d="M9 14 4 9l5-5" />

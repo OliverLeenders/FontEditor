@@ -344,6 +344,23 @@ nothing is left as a reference, so joining a letter does not flatten the accent 
 it. Where the edges cannot be resolved the button declines and says so rather than reshaping
 the letter.
 
+**Offset** moves an outline outwards or inwards: a panel on the bar takes a horizontal and a
+vertical distance — separately, because a letter given more weight usually wants more on the
+stems than on the thins — and a choice of what to do with the corners. Round puts an arc in,
+mitre carries the two sides on to their point, and flat cuts across. A mitre that would run away
+to a spike on a sharp corner is given up as a flat one. Inwards is a negative distance, and an
+inward offset that folds over itself is resolved on the way out, so what you get back is an
+outline rather than a knot. The em's own counters thin as the shape around them thickens, because
+outwards for a hole is inwards on the page.
+
+**Simplify** takes out the points the outline does not need: those are the ones a curve through
+their neighbours passes through anyway, to within a thousandth of the em. Two kinds are never
+taken out, whatever else is. A point at an extreme stays — it is what hinting rounds to the
+grid, what an interpolation needs on both sides to have anything to pair, and what several
+renderers read a glyph's extent from — and a corner stays, because taking one out would round it
+off. So a circle drawn on its four extremes and a rectangle both come back untouched, and the
+button says so rather than appearing to do nothing.
+
 Components are only ever drawn in by the whole-glyph union. Joining or cutting a _selection_
 leaves every reference alone — a selection names contours, and turning a reference into outlines
 because something was drawn across it is a decision to take deliberately rather than one to

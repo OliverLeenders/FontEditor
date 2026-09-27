@@ -58,7 +58,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph     |
 | 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
 | 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each  |
-| 32    | More outline operations             | half done: subtract, intersect and exclude; simplify and offset are what is left           |
+| 32    | More outline operations             | done: subtract, intersect, exclude, offset and simplify, beside the union and the extremes |
 | 33    | One answer to what a glyph is       | half done: the union sees components and joins what merely touches; the canvas is left     |
 | 34    | Drawing with a pen                  | planned: a skeleton and a nib, broad edge exactly and elliptical by offset                 |
 | 35    | A node that holds its curvature     | planned: harmonising that stays, and the squircle between a curve and a line               |
@@ -975,7 +975,7 @@ size with one feature between them is a stylistic set judged against what it sta
 on one page, without exporting anything. The blocks are remembered per browser with the other
 settings, so a page somebody set up is still there after a reload.
 
-#### Phase 32 — More outline operations — half done
+#### Phase 32 — More outline operations — done
 
 Union was the only boolean. Subtract, intersect and exclude are now beside it in the toolbar,
 and they are the union's own machinery with one thing changed: which region the boundary
@@ -992,8 +992,32 @@ do to each other, an operation that would leave nothing is declined rather than 
 a boundary that will not close is refused as it is for the union.
 
 Points at the extremes were the fifth of these and shipped in 0.1.17, from the curve's own
-menu. What is left is simplifying a contour — a fitting pass with an error bound — and
-offsetting a path, which is the kernel the elliptical nib of phase 34 needs.
+menu.
+
+Offsetting is the first thing in this project that cannot be exact. The offset of a cubic is a
+curve of degree ten, so no Bézier lies on it, and the answer is an approximation with a stated
+error: a piece is offset by moving its ends along their normals and scaling its handles by how
+much the radius changed there — `1 − d·κ`, which is exact for an arc and nearly right for
+anything drawn like one — and then halved and tried again wherever it strays further than a
+fiftieth of a unit. A quarter circle costs one halving. Straight sides are exact, because a
+line offset is a line.
+
+The corners are the rest of the work. Where the offset opens a corner out there is a gap to
+fill, and what fills it is a choice: an arc, a mitre, or a flat. Where it folds the corner over
+there is no gap but a crossing, and two straight sides are cut back to where they cross — which
+is what makes an inward offset of a rectangle another rectangle — while two curves are left
+crossing for the union to resolve. The distance is given per axis, because a letter thickened
+for weight wants more on the stems than on the thins, and a shape summed with an ellipse is a
+squashed shape summed with a circle, squashed back. That last line is the one the elliptical nib
+of phase 34 will use.
+
+Simplifying is the same fitting pass pointed the other way: a point can go when one curve
+through what is left is the curve that was there, which is what `refittedJoin` already answered
+for deleting a point by hand. What is new is the policy. A point at an extreme stays, because a
+font wants one there for hinting, for interpolation and for the renderers that read a glyph's
+extent off it, and drawing the same shape without one loses all of that. A corner stays, because
+the fit keeps the directions either side and would round it off. Everything else goes if the
+outline moves less than a thousandth of the em, least damaging first.
 
 #### Phase 33 — One answer to what a glyph is made of — half done
 

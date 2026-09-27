@@ -1,0 +1,86 @@
+/*
+ * The offset panel, hung off the bar's Offset button.
+ *
+ * A panel given its own class replaces the default one entirely, so the box it
+ * floats in is written out here as every other panel in the bar writes it: over
+ * the canvas, under its own button, rather than in the bar's own flow where it
+ * would push the bar taller every time it opened.
+ *
+ * Anchored to the right, like the feature switches and for the same reason: this
+ * sits well along a row of controls, and a panel growing rightwards from there
+ * would go off the window. Narrow, because it holds two numbers and three
+ * choices and nothing that wraps.
+ */
+.panel {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 20;
+  min-width: 12rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.rows {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.name {
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.field {
+  width: 4.5rem;
+}
+
+/* A fieldset for the three corner styles, because they are one choice and a
+   screen reader should hear them as one. */
+.joins {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  padding: 0.35rem 0.5rem 0.45rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+
+.join {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+
+.apply {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.apply:hover {
+  background: var(--surface-2);
+}
+
+.apply:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
