@@ -372,6 +372,77 @@ describe("harmonising", () => {
 });
 
 /**
+ * The switch that makes harmonising stay.
+ *
+ * Beside the one-shot, pressed when every selected join holds its curvature. What
+ * is asked here is that it writes the hold into the glyph and reads it back, and
+ * that it is not offered where nothing selected could hold anything.
+ */
+describe("holding a join's curvature", () => {
+  /** A bowl whose middle join sits between two curves, all of it selected. */
+  function bowl(): Store {
+    const store = freshStore();
+    act(() => {
+      const ids = counterIds("hold");
+      const name = store.editor.document.glyphOrder[0]!;
+      const c = contour(
+        ids.contour(),
+        [
+          node(ids.node(), { x: 0, y: 0 }, { out: { x: 40, y: 80 } }),
+          node(ids.node(), { x: 150, y: 120 }, { in: { x: 100, y: 120 }, out: { x: 200, y: 120 } }),
+          node(ids.node(), { x: 300, y: 0 }, { in: { x: 260, y: 20 } }),
+        ],
+        true,
+      );
+      store.setCurrentGlyph(name);
+      const document = updateGlyph(store.editor.document, name, (g) => addContour(g, c))!;
+      store.setEditor({
+        ...store.editor,
+        document,
+        focusedSegment: null,
+        // The whole bowl, because the section works on curves and opens only when
+        // a segment is in the selection. Of its three points only the middle one
+        // is between two curves; the other two meet the closing line.
+        selection: c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+      });
+    });
+    return store;
+  }
+
+  const held = (store: Store): boolean => {
+    const g = store.editor.document.glyphs[store.editor.currentGlyph]!;
+    return g.contours[g.contours.length - 1]!.nodes[1]!.harmonised;
+  };
+
+  it("holds the selected join when pressed, and shows that it does", () => {
+    const store = bowl();
+    render(<CurveSection />, store);
+    const button = screen.getByRole<HTMLButtonElement>("button", { name: "Hold" });
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(button);
+
+    expect(held(store)).toBe(true);
+    expect(screen.getByRole("button", { name: "Hold" }).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("lets go when pressed again", () => {
+    const store = bowl();
+    render(<CurveSection />, store);
+
+    fireEvent.click(screen.getByRole("button", { name: "Hold" }));
+    fireEvent.click(screen.getByRole("button", { name: "Hold" }));
+
+    expect(held(store)).toBe(false);
+  });
+
+  it("is not offered where nothing selected could hold anything", () => {
+    render(<CurveSection />, focusedOn("ok"));
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Hold" }).disabled).toBe(true);
+  });
+});
+
+/**
  * The pan as a number.
  *
  * A slider says roughly, and a lean worth keeping is worth being able to write

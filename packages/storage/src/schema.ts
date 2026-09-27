@@ -65,6 +65,16 @@ export type StoredNode = {
    * whole node, and still reads as both.
    */
   readonly hvLock?: true | "in" | "out";
+  /**
+   * Whether the node is kept where the curvature either side of it agrees.
+   *
+   * Omitted when it is not, which is almost every node. Like the lock above it,
+   * this is the editor's own idea rather than the outline format's, so it lives
+   * here and in the project file and nowhere else — a `.glif` has no word for it,
+   * and a node saved to one comes back an ordinary smooth node sitting exactly
+   * where it was left.
+   */
+  readonly harmonised?: true;
 };
 
 export type StoredContour = {
@@ -262,10 +272,11 @@ function encodeNode(n: Node): StoredNode {
     in: n.in === null ? null : point(n.in),
     out: n.out === null ? null : point(n.out),
   };
-  if (n.hvLock.in && n.hvLock.out) return { ...base, hvLock: true };
-  if (n.hvLock.in) return { ...base, hvLock: "in" };
-  if (n.hvLock.out) return { ...base, hvLock: "out" };
-  return base;
+  const held = n.harmonised ? { ...base, harmonised: true as const } : base;
+  if (n.hvLock.in && n.hvLock.out) return { ...held, hvLock: true };
+  if (n.hvLock.in) return { ...held, hvLock: "in" };
+  if (n.hvLock.out) return { ...held, hvLock: "out" };
+  return held;
 }
 
 export function encodeFontInfo(document: FontDocument): StoredFontInfo {
@@ -526,6 +537,7 @@ function decodeNode(raw: unknown): Decoded<Node> {
       in: incoming,
       out: outgoing,
       hvLock: decodeLock(raw["hvLock"]),
+      harmonised: raw["harmonised"] === true,
     }),
   );
 }

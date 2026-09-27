@@ -19,6 +19,8 @@ import {
   addAnchorAt,
   attachComponent,
   harmoniseSelection,
+  holdCurvatureInSelection,
+  selectionHoldsCurvature,
   selectedCanBeTangent,
   selectedNodeCount,
   selectionCanHarmonise,
@@ -219,6 +221,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     const acting = actingOn(editor, { contourId, nodeId, part: "point" });
     const many = selectedNodeCount(acting);
     const harmonises = selectionCanHarmonise(acting);
+    const holding = selectionHoldsCurvature(acting) ?? (harmonises ? false : null);
     const lockedBoth = selectionHvLocked(acting, "both");
 
     items.push(
@@ -268,6 +271,20 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
               icon: WavesIcon,
               note: counted(many),
               run: () => store.applyTool(harmoniseSelection(acting)),
+            },
+          ]
+        : []),
+      // The same, told to stay. Offered wherever a join could hold its
+      // curvature, which includes one already harmonious: holding is about the
+      // next drag, not this one.
+      ...(holding !== null
+        ? [
+            {
+              kind: "item" as const,
+              label: holding ? "Let go of curvature" : "Hold curvature",
+              icon: WavesIcon,
+              note: counted(many),
+              run: () => store.applyTool(holdCurvatureInSelection(acting, !holding)),
             },
           ]
         : []),

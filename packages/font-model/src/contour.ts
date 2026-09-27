@@ -292,8 +292,43 @@ export function enforceTangents(c: Contour): Contour {
   return nodes === null ? c : { ...c, nodes };
 }
 
-/** What every edit hands back: the contour with its tangent nodes settled. */
-const settled = (c: Contour | null): Contour | null => (c === null ? null : enforceTangents(c));
+/**
+ * The nodes that hold their own curvature, put back where they belong.
+ *
+ * After the tangents rather than before: settling a tangent moves a *handle*, and
+ * where a harmonised node belongs is read off the handles around it. Harmonising
+ * moves only the point, so it cannot disturb a tangent in return and one pass
+ * each way round is enough.
+ *
+ * No iteration for the same reason. The answer for a node depends on its own two
+ * handles and on the two beyond them, and on no node's position — so every node
+ * can be solved from the contour as it arrived, in any order, and the result is
+ * already the fixed point.
+ */
+export function enforceHarmony(c: Contour): Contour {
+  let nodes: Node[] | null = null;
+  for (let i = 0; i < c.nodes.length; i++) {
+    const n = c.nodes[i]!;
+    if (!n.harmonised) continue;
+
+    const pair = segmentsAround(c, n.id);
+    if (pair === null) continue;
+    const point = harmonisedJoin(pair.before, pair.after);
+    if (point === null) continue;
+    if (point.x === n.pt.x && point.y === n.pt.y && n.type === "smooth") continue;
+
+    nodes ??= c.nodes.slice();
+    // The point alone: the handles are the two curves' own and they stay. Smooth,
+    // because after the move it is — its handles are collinear through it by
+    // construction, and saying so keeps the next drag from breaking it.
+    nodes[i] = { ...n, pt: point, type: "smooth" };
+  }
+  return nodes === null ? c : { ...c, nodes };
+}
+
+/** What every edit hands back: tangents settled, then curvature held. */
+const settled = (c: Contour | null): Contour | null =>
+  c === null ? null : enforceHarmony(enforceTangents(c));
 
 export function translateNodeBy(c: Contour, id: NodeId, delta: Vec2): Contour | null {
   const i = nodeIndex(c, id);
@@ -319,7 +354,7 @@ export function translateNodes(c: Contour, ids: ReadonlySet<NodeId>, delta: Vec2
   if (!c.nodes.some((n) => ids.has(n.id))) return null;
 
   const nodes = c.nodes.map((n) => (ids.has(n.id) ? translateNode(n, delta) : n));
-  return enforceTangents({ ...c, nodes });
+  return settled({ ...c, nodes });
 }
 
 export function setNodePoint(c: Contour, id: NodeId, pt: Vec2): Contour | null {
@@ -888,6 +923,28 @@ export function curvatureAround(
  * `null` where there is nothing to do — a node between anything but two curves,
  * a straight side, or a node already where it belongs.
  */
+/**
+ * Ask a node to hold its curvature from now on, or to stop.
+ *
+ * Switching it on harmonises it at once, through the pass every edit ends with, so
+ * the node moves when the button is pressed rather than the next time something
+ * near it is dragged. Switching it off leaves it exactly where it is: what was
+ * asked for was to stop holding it there, not to put it back.
+ *
+ * `null` where the node cannot hold anything — one that is not between two curves
+ * — so a caller can tell a refusal from a no-op rather than offering a switch that
+ * does nothing.
+ */
+export function holdCurvature(c: Contour, id: NodeId, hold: boolean): Contour | null {
+  const i = nodeIndex(c, id);
+  const existing = c.nodes[i];
+  if (existing === undefined) return null;
+  if (hold && segmentsAround(c, id) === null) return null;
+  if (existing.harmonised === hold) return null;
+
+  return settled(replaceNode(c, i, { ...existing, harmonised: hold }));
+}
+
 export function harmoniseNode(c: Contour, id: NodeId): Contour | null {
   const pair = segmentsAround(c, id);
   if (pair === null) return null;

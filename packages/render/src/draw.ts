@@ -736,8 +736,30 @@ export function drawNodes(ctx: Canvas2D, s: Scene): void {
       ctx.stroke();
       ctx.fillStyle = colour;
       ctx.fill();
+      if (n.harmonised) drawHeldRing(ctx, s, p, colour);
     }
   }
+}
+
+/**
+ * The ring round a node that holds its own curvature.
+ *
+ * A smooth node's circle with a second circle round it, clear of it by a gap: the
+ * node is smooth, and something more is being done to it. Geometric, like every
+ * other point shape here, because a shape that is read at a glance has to differ
+ * from its neighbours in outline rather than in detail — a star at node size is a
+ * blob. Stroked, not filled, so it never covers the curve it sits on.
+ */
+function drawHeldRing(ctx: Canvas2D, s: Scene, p: Vec2, colour: string): void {
+  const r = s.metrics.nodeRadius * 1.9;
+  ctx.beginPath();
+  ctx.arc(p.x, p.y, r, 0, TAU);
+  ctx.strokeStyle = s.palette.halo;
+  ctx.lineWidth = s.metrics.haloWidth + 1.2;
+  ctx.stroke();
+  ctx.strokeStyle = colour;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
 }
 
 /**

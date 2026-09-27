@@ -721,6 +721,48 @@ describe("a tangent node's triangle", () => {
   });
 });
 
+describe("a node that holds its curvature", () => {
+  /** A smooth node between two curves, held or not. */
+  const withJoin = (held: boolean) => {
+    const ids = counterIds("held");
+    const c = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { out: vec(40, 80) }),
+        node(ids.node(), vec(150, 120), {
+          type: "smooth",
+          in: vec(100, 120),
+          out: vec(200, 120),
+          harmonised: held,
+        }),
+        node(ids.node(), vec(300, 0), { in: vec(260, 20) }),
+      ],
+      true,
+    );
+    return { ...base(c), glyph: addContour(glyph("h", { advance: 300 }), c) };
+  };
+
+  /** The circles drawn centred on the node, by radius. */
+  const circlesAt = (ctx: ReturnType<typeof render>) => {
+    const at = toScreen(VIEW, vec(150, 120));
+    return ctx
+      .all("arc")
+      .filter((o) => Math.abs(o.args[0]! - at.x) < 0.001 && Math.abs(o.args[1]! - at.y) < 0.001)
+      .map((o) => o.args[2]!);
+  };
+
+  it("has a ring round it that a smooth node does not", () => {
+    // The node's own circle is there either way; the held one has a second,
+    // larger one round it. Distinct in outline rather than in detail, because a
+    // point shape is read at a glance.
+    const plain = circlesAt(render(withJoin(false)));
+    const held = circlesAt(render(withJoin(true)));
+
+    expect(held.length).toBeGreaterThan(plain.length);
+    expect(Math.max(...held)).toBeGreaterThan(Math.max(...plain));
+  });
+});
+
 describe("the curvature comb", () => {
   const ring = () => {
     const ids = counterIds("cc");

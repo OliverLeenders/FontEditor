@@ -118,6 +118,40 @@ describe("serialization", () => {
     expect("hvLock" in encoded.contours[0]!.nodes[0]!).toBe(false);
   });
 
+  it("keeps a node that holds its curvature", () => {
+    // The editor's own idea rather than the outline format's, so it lives in the
+    // project file: a node told to stay harmonised that forgot after a reload
+    // would be a switch that only works until the tab closes.
+    const ids = counterIds("h");
+    const bowl = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { out: vec(40, 80) }),
+        node(ids.node(), vec(150, 120), {
+          in: vec(100, 120),
+          out: vec(200, 120),
+          harmonised: true,
+        }),
+        node(ids.node(), vec(300, 0), { in: vec(260, 20) }),
+      ],
+      true,
+    );
+    const decoded = decodeGlyph(
+      JSON.parse(JSON.stringify(encodeGlyph(addContour(glyph("o"), bowl)))) as unknown,
+    );
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) {
+      expect(decoded.value.contours[0]!.nodes[1]!.harmonised).toBe(true);
+      expect(decoded.value.contours[0]!.nodes[0]!.harmonised).toBe(false);
+    }
+  });
+
+  it("omits the hold when a node does not have it", () => {
+    const encoded = encodeGlyph(firstGlyph(document()));
+    expect("harmonised" in encoded.contours[0]!.nodes[0]!).toBe(false);
+  });
+
   it("stamps every file with a schema version", () => {
     expect(encodeGlyph(firstGlyph(document())).schema).toBe(SCHEMA_VERSION);
   });

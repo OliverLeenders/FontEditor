@@ -157,6 +157,8 @@ export {
   spaceFromText,
   unlinkMetricKey,
   harmoniseSelection,
+  holdCurvatureInSelection,
+  selectionHoldsCurvature,
   nodeCanBeTangent,
   nodeCanHarmonise,
   nodeHasMissingHandle,

@@ -135,6 +135,8 @@ export {
   extractSegmentHandles,
   extractSelectedHandles,
   harmoniseSelection,
+  holdCurvatureInSelection,
+  selectionHoldsCurvature,
   nodeCanBeTangent,
   nodeCanHarmonise,
   nodeHasMissingHandle,

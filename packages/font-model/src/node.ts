@@ -65,6 +65,25 @@ export type Node = {
   readonly out: Vec2 | null;
   /** Which handles are constrained to the horizontal or vertical axis. */
   readonly hvLock: HandleLock;
+  /**
+   * Whether this node is kept where the curvature either side of it agrees.
+   *
+   * Harmonising moves a node to that place. It is a one-shot operation, and the
+   * next drag of a handle beside it undoes what it did — which is the wrong shape
+   * for what it is used for, because the reason to harmonise a join is that it
+   * should *stay* smooth while the curves through it are drawn.
+   *
+   * A node with this set is solved again after every edit, and the solving needs
+   * no iteration: where the node belongs depends on the four handles around it and
+   * never on the points, so no node's answer can disturb another's.
+   *
+   * Beside `type` rather than a fourth kind of node, because it is not a fourth
+   * kind: a harmonised node is a smooth node with its position decided for it, and
+   * a fourth enum member would have to be handled by every switch that asks
+   * whether a node is smooth — and written into a `.glif`, which has no word for
+   * it.
+   */
+  readonly harmonised: boolean;
 };
 
 export type NodeInit = {
@@ -73,6 +92,7 @@ export type NodeInit = {
   readonly out?: Vec2 | null;
   /** `true` locks both handles, which is what the flag used to mean. */
   readonly hvLock?: boolean | Partial<HandleLock>;
+  readonly harmonised?: boolean;
 };
 
 /** Read an init's lock, accepting the boolean the field used to be. */
@@ -90,6 +110,7 @@ export function node(id: NodeId, pt: Vec2, init: NodeInit = {}): Node {
     in: init.in ?? null,
     out: init.out ?? null,
     hvLock: handleLock(init.hvLock),
+    harmonised: init.harmonised ?? false,
   };
 }
 

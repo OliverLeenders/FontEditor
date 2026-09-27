@@ -5,6 +5,9 @@ import {
   begin,
   commit,
   harmoniseSelection,
+  holdCurvatureInSelection,
+  selectionCanHarmonise,
+  selectionHoldsCurvature,
   holdWorkingPan,
   result,
   selectedCurvature,
@@ -70,6 +73,11 @@ export function CurveSection(): React.JSX.Element {
   const pointCount = useStoreValue(
     (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
   );
+  // Whether the selected joins hold their curvature: all, none, or a mixture. A
+  // primitive, so the panel re-renders when the answer changes and not otherwise.
+  const holds = useStoreValue((s) => selectionHoldsCurvature(s.session.editor));
+  // Whether pressing it would do anything, for a selection holding nothing yet.
+  const canHold = useStoreValue((s) => selectionCanHarmonise(s.session.editor) || holds !== null);
 
   // How many points the two buttons below would add. Counted rather than
   // guessed at: the buttons act on the focused segment when there is one and on
@@ -230,6 +238,25 @@ export function CurveSection(): React.JSX.Element {
             onClick={() => store.applyTool(harmoniseSelection(store.editor))}
           >
             Harmonise
+          </button>
+          {/* Beside the one-shot, because it is the same operation told to stay:
+              harmonising once is undone by the next drag of a handle, and a join
+              that is meant to be smooth should not have to be put right again
+              after every one. Pressed means every selected join holds it; a
+              mixed selection shows neither, and pressing it then holds them all. */}
+          <button
+            type="button"
+            className={styles.align}
+            aria-pressed={holds === true}
+            disabled={holds === null && !canHold}
+            title={
+              holds === true
+                ? "Stop keeping these joins harmonised; they stay where they are"
+                : "Keep these joins harmonised as the curves either side are drawn"
+            }
+            onClick={() => store.applyTool(holdCurvatureInSelection(store.editor, holds !== true))}
+          >
+            Hold
           </button>
         </div>
       </Field>

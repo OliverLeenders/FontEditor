@@ -9,6 +9,7 @@ import {
   contourById,
   curvatureAround,
   harmoniseNode,
+  holdCurvature,
   extendHandle,
   extendSegmentHandles,
   isHalfHandled,
@@ -167,6 +168,60 @@ export function nodeCanHarmonise(
   const glyph = currentGlyph(state);
   const c = glyph === null ? null : contourById(glyph, contourId);
   return c !== null && harmoniseNode(c, nodeId) !== null;
+}
+
+/**
+ * Whether the selected points hold their curvature, for a switch to show.
+ *
+ * `true` when every point that could hold it does, `false` when none does, and
+ * `null` for a mixture or for a selection with nothing that could — which is the
+ * three states a switch over several things has to be able to say.
+ */
+export function selectionHoldsCurvature(state: EditorState): boolean | null {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return null;
+
+  let on = 0;
+  let off = 0;
+  for (const item of state.selection) {
+    if (item.part !== "point") continue;
+    const c = contourById(glyph, item.contourId);
+    if (c === null) continue;
+    const n = c.nodes.find((each) => each.id === item.nodeId);
+    if (n === undefined) continue;
+    if (n.harmonised) on += 1;
+    else if (holdCurvature(c, item.nodeId, true) !== null) off += 1;
+  }
+
+  if (on === 0 && off === 0) return null;
+  if (off === 0) return true;
+  if (on === 0) return false;
+  return null;
+}
+
+/**
+ * Ask every selected point that can to hold its curvature, or to stop.
+ *
+ * One switch for the selection rather than per node, because the case it is for
+ * is a whole curve drawn smooth — every join of a bowl, not one of them — and a
+ * switch that had to be pressed once per node would be a reason not to use it.
+ * Points that cannot hold anything are passed over, as harmonising passes over
+ * them.
+ */
+export function holdCurvatureInSelection(state: EditorState, hold: boolean): ToolResult {
+  let editor = state;
+  for (const item of state.selection) {
+    if (item.part !== "point") continue;
+    const document = editCurrentGlyph(editor, (g) =>
+      updateContour(g, item.contourId, (c) => holdCurvature(c, item.nodeId, hold)),
+    );
+    if (document !== null) editor = { ...editor, document };
+  }
+  return done(
+    state,
+    editor === state ? null : editor,
+    hold ? "Hold curvature" : "Let go of curvature",
+  );
 }
 
 /** Whether every selected point could be tangent, for the inspector's button. */
