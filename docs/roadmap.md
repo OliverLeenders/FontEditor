@@ -1108,12 +1108,22 @@ placed as a component, the ruler and the measure all see the ink. The operations
 between masters, width and angle both, so a light master with a narrow pen and a bold one with
 a wide pen is a stroke that thickens along the axis.
 
-Two things were done more simply than this section planned. A `.ufo` is written the ink rather
-than the skeleton with the ink beside it: another application gets the letter it should, and
-the stroke is kept in the project file, as the axis lock and the held join are — but a `.ufo`
-saved and opened again comes back as outlines. And the knife divides an open stroke into two
-strokes with the same pen but leaves a closed one alone, because the way it cuts a closed shape
-— closing across a chord — would give a closed skeleton a new stretch of path.
+A `.ufo` is written both, as this section planned, though it took a release to get there. The
+ink goes into the outline, after every contour drawn as an outline, so another application gets
+the letter. The stroke goes into the glyph's own `lib` — its path, its pen, where it sat among the
+contours, and its points' held joins and axis locks — with a note of how many contours at the end
+of the outline are its ink and a fingerprint of exactly the points written for them. Opened
+again, if the fingerprint still matches, the ink is taken out and the stroke put back where it
+was, to the fraction of a unit it was drawn at rather than the whole units the outline is written
+in. If another application has redrawn the letter since, the file's outlines are what the letter
+now is, so they are kept and the stroke is let go, with a warning; putting a stale pen back over
+somebody's edit would undo it. This matters because saving is saving to a UFO folder — Ctrl-S —
+and 0.1.35, which wrote only the ink, turned strokes into outlines for anybody who kept their
+font that way.
+
+One thing was done more simply than planned. The knife divides an open stroke into two strokes
+with the same pen but leaves a closed one alone, because the way it cuts a closed shape — closing
+across a chord — would give a closed skeleton a new stretch of path.
 
 The oval pen is in too, as a third number on the same pen: a thickness across it. Nothing is
 the broad edge, and anything under half a unit is drawn as one, because the broad edge is exact

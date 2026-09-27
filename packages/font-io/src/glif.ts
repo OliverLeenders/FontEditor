@@ -17,6 +17,7 @@ import {
 } from "@typewright/font-model";
 import { IDENTITY_AFFINE, type Vec2 } from "@typewright/geometry";
 
+import { type KeptStrokes, restoreStrokes, takeStrokes } from "./stroke-lib.js";
 import {
   type XmlElement,
   childNamed,
@@ -91,6 +92,9 @@ export function parseGlif(
 
   const outline = childNamed(root, "outline");
   const contours: Contour[] = [];
+  // The text of each contour's points exactly as the file has them, beside the
+  // contour, for telling whether a stroke's ink is still what was written.
+  const pointsOf: string[][] = [];
   const components: Component[] = [];
   const anchors: Anchor[] = [];
 
@@ -108,7 +112,15 @@ export function parseGlif(
           continue;
         }
         const c = parseContour(element, ids, warn);
-        if (c !== null) contours.push(c);
+        if (c !== null) {
+          contours.push(c);
+          pointsOf.push(
+            childrenNamed(element, "point").map(
+              (p) =>
+                `${p.attributes["x"] ?? ""},${p.attributes["y"] ?? ""},${p.attributes["type"] ?? ""}`,
+            ),
+          );
+        }
       } else if (element.name === "component") {
         const placed = parseComponent(element, ids, warn);
         if (placed !== null) components.push(placed);
@@ -134,11 +146,28 @@ export function parseGlif(
     else guides.push(read);
   }
 
-  const { kept, markColor } = keptOf(root);
+  const { kept, markColor, strokes } = keptOf(root);
+
+  // Strokes written by this editor, put back in place of the ink that stood in for
+  // them — if the ink is still what was written. If another application has redrawn
+  // the letter since, the outlines are what the file says it is now, and a pen put
+  // back over them would undo that; so they are kept, and the strokes let go.
+  let drawn: readonly Contour[] = contours;
+  if (strokes !== null) {
+    const restored = restoreStrokes(contours, pointsOf, strokes, ids);
+    if (restored === null) {
+      warn(
+        `${name}: the outlines standing in for its pen strokes were changed by another application, so they were kept as outlines`,
+      );
+    } else {
+      drawn = restored;
+    }
+  }
+
   return glyph(name, {
     unicodes,
     advance,
-    contours,
+    contours: drawn,
     components,
     anchors,
     guides,
@@ -215,21 +244,50 @@ export function parseImage(element: XmlElement | null): ImageRef | null {
  * Kept as text rather than parsed, deliberately. Parsing would mean deciding
  * what these mean, and the whole point is that we do not know.
  */
-function keptOf(root: XmlElement): { kept: string[]; markColor: string | null } {
+function keptOf(root: XmlElement): {
+  kept: string[];
+  markColor: string | null;
+  strokes: KeptStrokes | null;
+} {
   const kept: string[] = [];
   let markColor: string | null = null;
+  let strokes: KeptStrokes | null = null;
   for (const child of root.children) {
     if (!isElement(child) || MODELLED.has(child.name)) continue;
     if (child.name === "lib") {
       // One key of the lib is modelled, the mark colour, and the rest are kept.
       const read = withoutMarkColor(child);
       markColor = read.markColor;
-      if (read.lib !== null) kept.push(writeXml(read.lib, "\t"));
+      // The strokes too: this editor's own entry, read into the model and written
+      // afresh on save, so it must not also ride along in what is kept.
+      const lib = read.lib === null ? null : withoutStrokes(read.lib);
+      if (lib !== null) {
+        strokes = lib.strokes;
+        if (lib.lib !== null) kept.push(writeXml(lib.lib, "\t"));
+      }
       continue;
     }
     kept.push(writeXml(child, "\t"));
   }
-  return { kept, markColor };
+  return { kept, markColor, strokes };
+}
+
+/**
+ * A glyph's `lib` with this editor's strokes taken out, and the strokes.
+ *
+ * A lib that held nothing but the strokes is not kept at all, the way one that
+ * held nothing but the mark colour is not.
+ */
+function withoutStrokes(lib: XmlElement): { lib: XmlElement | null; strokes: KeptStrokes | null } {
+  const dict = childNamed(lib, "dict");
+  if (dict === null) return { lib, strokes: null };
+
+  const { strokes, rest } = takeStrokes(dict);
+  if (rest === dict) return { lib, strokes };
+  if (!rest.children.some(isElement)) return { lib: null, strokes };
+
+  const children = lib.children.map((c) => (c === dict ? rest : c));
+  return { lib: { ...lib, children }, strokes };
 }
 
 /** The lib key a glyph's colour mark is kept under, by the UFO's own convention. */

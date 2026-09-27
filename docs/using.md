@@ -322,8 +322,11 @@ Choose **Outline** to make it an ordinary contour again; the path stays where it
 Selecting several contours sets the pen for all of them at once, and typing one number into a
 selection whose pens differ changes only that number on each. The pen interpolates between
 masters, so a narrow pen in the light master and a wide one in the bold give a stroke that
-thickens between them. What goes into the font and into a `.ufo` is the ink; the stroke itself
-is kept in the project, so a `.ufo` opened again comes back as outlines.
+thickens between them. What goes into the font is the ink. A `.ufo` gets the ink as the glyph's
+outline, so other applications see the letter, and the stroke itself in the glyph's `lib`, so a
+UFO folder saved and opened again comes back with its strokes. If another application has changed
+a stroke's outline in the meantime, the changed outline is kept as an outline and the file's
+import report says so, rather than the old pen being put back over the edit.
 
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it

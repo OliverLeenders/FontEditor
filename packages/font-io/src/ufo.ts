@@ -11,12 +11,13 @@ import {
   hasMetricKeys,
   inLayer,
   counterIds,
+  inkOf,
   isGroupKey,
   orderedGlyphs,
   segments,
-  withInk,
 } from "@typewright/font-model";
 
+import { strokesEntry } from "./stroke-lib.js";
 import { type XmlElement, childNamed, parseXml, writeXml } from "./xml.js";
 import { DEFAULT_LAYER_DIRECTORY, type ExtraLayer, layerContentsPlist } from "./ufo-layers.js";
 import { type ZipEntry, zip } from "./zip.js";
@@ -215,11 +216,25 @@ export function glif(g: Glyph): string {
 
   // A stroke is written as the ink it leaves. The format has no word for a pen, and
   // another application reading this file wants the shape of the letter rather
-  // than the line it was drawn along — so the skeleton and its nib stay in the
-  // project and the file gets outlines.
-  const drawable = withInk(g, counterIds(`ink-${g.name}-`)).contours.filter(
-    (c) => c.nodes.length >= 2,
+  // than the line it was drawn along. The ink goes after every outline, and the
+  // stroke itself goes in the glyph's lib with a note of how many contours at the
+  // end are its ink — which is how it comes back as a stroke; see stroke-lib.ts.
+  const outlines = g.contours.filter((c) => c.nib === undefined && c.nodes.length >= 2);
+  const skeletons = g.contours.flatMap((c, at) =>
+    c.nib === undefined ? [] : [{ at, contour: c }],
   );
+  const inkIds = counterIds(`ink-${g.name}-`);
+  const ink = skeletons
+    .flatMap(({ contour: c }) => inkOf(c, inkIds))
+    .filter((c) => c.nodes.length >= 2);
+  const drawable = [...outlines, ...ink];
+  const strokes =
+    skeletons.length === 0
+      ? []
+      : strokesEntry(
+          skeletons,
+          ink.map((c) => contourPoints(c).map(pointText)),
+        );
   if (drawable.length === 0 && g.components.length === 0) {
     lines.push("\t<outline/>");
   } else {
@@ -262,7 +277,9 @@ export function glif(g: Glyph): string {
   // Last, and unread: a note, an image, a lib — whatever this glyph
   // was read carrying that the model has no field for. Written back exactly as
   // it arrived, because saving a font must not take things out of it.
-  for (const element of withMarkColor(g.kept, g.markColor)) lines.push(element);
+  for (const element of withLibEntries(g.kept, [...markColorEntry(g.markColor), ...strokes])) {
+    lines.push(element);
+  }
 
   lines.push("</glyph>", "");
   return lines.join("\n");
@@ -723,14 +740,37 @@ export function exportUfo(
  * not a glif, and the rest of the first is somebody else's data that has to come
  * out as it went in. A glyph with no lib gets one holding the colour alone.
  */
-function withMarkColor(kept: readonly string[], markColor: string | null): readonly string[] {
-  if (markColor === null) return kept;
-
+/** The mark colour as a lib entry, or nothing for a glyph without one. */
+function markColorEntry(markColor: string | null): XmlElement[] {
+  if (markColor === null) return [];
   const text = (value: string): { readonly text: string } => ({ text: value });
-  const entry: XmlElement[] = [
+  return [
     { name: "key", attributes: {}, children: [text("public.markColor")] },
     { name: "string", attributes: {}, children: [text(markColor)] },
   ];
+}
+
+/**
+ * The text a point is written as, for the fingerprint of a stroke's ink.
+ *
+ * Exactly what the `<point>` element says — its x, its y, and its type — so the
+ * fingerprint taken here and the one taken from the file when it is read back are
+ * taken from the same thing.
+ */
+function pointText(p: { readonly x: number; readonly y: number; readonly type?: string }): string {
+  return `${String(p.x)},${String(p.y)},${p.type ?? ""}`;
+}
+
+/**
+ * The glyph's kept elements with this editor's lib entries merged in.
+ *
+ * The lib the glyph was read carrying is somebody else's as much as ours, so the
+ * entries go into it rather than replacing it: every key another application put
+ * there is written back where it was. Without one, a lib of our own is added.
+ */
+function withLibEntries(kept: readonly string[], entry: readonly XmlElement[]): readonly string[] {
+  if (entry.length === 0) return kept;
+
   const fresh: XmlElement = {
     name: "lib",
     attributes: {},
