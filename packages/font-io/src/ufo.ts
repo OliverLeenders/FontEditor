@@ -10,9 +10,11 @@ import {
   groupNameOf,
   hasMetricKeys,
   inLayer,
+  counterIds,
   isGroupKey,
   orderedGlyphs,
   segments,
+  withInk,
 } from "@typewright/font-model";
 
 import { type XmlElement, childNamed, parseXml, writeXml } from "./xml.js";
@@ -211,7 +213,13 @@ export function glif(g: Glyph): string {
     lines.push(`\t<unicode hex="${code.toString(16).toUpperCase().padStart(4, "0")}"/>`);
   }
 
-  const drawable = g.contours.filter((c) => c.nodes.length >= 2);
+  // A stroke is written as the ink it leaves. The format has no word for a pen, and
+  // another application reading this file wants the shape of the letter rather
+  // than the line it was drawn along — so the skeleton and its nib stay in the
+  // project and the file gets outlines.
+  const drawable = withInk(g, counterIds(`ink-${g.name}-`)).contours.filter(
+    (c) => c.nodes.length >= 2,
+  );
   if (drawable.length === 0 && g.components.length === 0) {
     lines.push("\t<outline/>");
   } else {

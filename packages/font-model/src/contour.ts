@@ -50,6 +50,36 @@ export type Contour = {
   readonly id: ContourId;
   readonly closed: boolean;
   readonly nodes: readonly Node[];
+  /**
+   * The pen this contour is drawn with, when it is a stroke rather than an outline.
+   *
+   * Absent for almost every contour, which is an outline: its points are the edge
+   * of the ink. Present, the contour is a skeleton — the path a broad-edged pen was
+   * drawn along — and the ink is worked out from it; see {@link inkOf}. Every tool
+   * that edits points edits a skeleton's points the same way, which is why a stroke
+   * is a contour with a pen rather than a shape of its own.
+   */
+  readonly nib?: Nib;
+};
+
+/**
+ * A pen: an edge held at a fixed angle, straight or rounded.
+ *
+ * The angle is measured anticlockwise from the horizontal, in degrees, the way a
+ * calligrapher states a pen angle — thirty for a foundational hand, forty-five or so
+ * for an italic. The width is in design units, along the angle.
+ *
+ * The thickness is across it. Absent, or nothing, the pen is a broad edge — a
+ * straight line with no thickness at all, which is what a cut quill is and what
+ * leaves the sharpest thicks and thins. Anything more is an oval, the shape a
+ * pointed pen or a worn nib leaves, whose thin strokes keep some weight; a thickness
+ * equal to the width is a round pen, which leaves the same weight in every
+ * direction.
+ */
+export type Nib = {
+  readonly angle: number;
+  readonly width: number;
+  readonly thickness?: number;
 };
 
 export type SegmentKind = "line" | "curve";

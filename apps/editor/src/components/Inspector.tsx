@@ -8,6 +8,7 @@ import { TransformPanel } from "./TransformPanel.js";
 import { AnchorsSection } from "./inspector/AnchorsSection.js";
 import { ComponentsSection } from "./inspector/ComponentsSection.js";
 import { CurveSection } from "./inspector/CurveSection.js";
+import { PenSection } from "./inspector/PenSection.js";
 import { GlyphSection } from "./inspector/GlyphSection.js";
 import { GuidesSection } from "./inspector/GuidesSection.js";
 import { LayersSection } from "./inspector/LayersSection.js";
@@ -254,6 +255,7 @@ export function Inspector(): React.JSX.Element | null {
         <GuidesSection />
         <PointSection />
         <CurveSection />
+        <PenSection />
 
         <Section
           name="transform"

@@ -97,6 +97,14 @@ export function cutGlyph(g: Glyph, a: Vec2, b: Vec2, ids: IdFactory): KnifeCut |
   for (const [index, list] of perContour) {
     const source = g.contours[index];
     if (source === undefined) continue;
+    // A skeleton is a path whatever its ink looks like, so an open one is divided
+    // the way any path is and keeps its pen in every piece. A closed one is left
+    // alone: closing across a chord is how the knife cuts ink, and a skeleton is
+    // not ink — the chord would be a new stretch of path the pen then draws along.
+    if (source.nib !== undefined) {
+      if (!source.closed) dividing.set(index, list);
+      continue;
+    }
     if (source.closed) cutting.set(index, list);
     else dividing.set(index, list);
   }
@@ -269,7 +277,11 @@ function dividePath(c: Contour, hits: readonly StrokeCrossing[], ids: IdFactory)
       in: i === 0 ? null : n.in,
       out: i === all.length - 1 ? null : n.out,
     }));
-    if (nodes.length >= 2) pieces.push(contour(pieces.length === 0 ? c.id : ids.contour(), nodes));
+    if (nodes.length >= 2) {
+      const piece = contour(pieces.length === 0 ? c.id : ids.contour(), nodes);
+      // A stroke cut in two is two strokes, drawn with the same pen.
+      pieces.push(c.nib === undefined ? piece : { ...piece, nib: c.nib });
+    }
     from = stop;
   }
 
@@ -479,5 +491,6 @@ function splitAtCrossings(
     if (last !== undefined) nodes.push(node(ids.node(), last.pt, { type: last.type, in: last.in }));
   }
 
-  return { contour: contour(c.id, nodes, closed), meetings };
+  const rebuilt = contour(c.id, nodes, closed);
+  return { contour: c.nib === undefined ? rebuilt : { ...rebuilt, nib: c.nib }, meetings };
 }

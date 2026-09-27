@@ -124,6 +124,7 @@ export {
 
 export type { OffsetRequest, ReshapeReport } from "./reshape.js";
 export { offsetAt, simplifyAt } from "./reshape.js";
+export { changePen, drawWithPen, selectionNib } from "./nib.js";
 export type { CombineReport } from "./combine.js";
 export { combineAt } from "./combine.js";
 export type { OverlapDone, OverlapOutcome } from "./overlap.js";

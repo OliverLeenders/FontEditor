@@ -2,6 +2,8 @@ import { type Vec2, flatten } from "@typewright/geometry";
 
 import { type Contour, reverseContour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import type { Glyph } from "./glyph.js";
+import { counterIds } from "./ids.js";
+import { withInk } from "./stroke.js";
 
 /**
  * Which way round a contour runs, and putting a set of them right.
@@ -287,7 +289,9 @@ export function shapesOf(contours: readonly Contour[]): ContourShape[] {
   const outers: number[] = [];
 
   for (let i = 0; i < contours.length; i++) {
-    if (!contours[i]!.closed) continue;
+    // A skeleton is not a shape, closed or not: it is the path a pen goes along,
+    // and its ink is somewhere else.
+    if (!contours[i]!.closed || contours[i]!.nib !== undefined) continue;
     if (depth[i]! % 2 === 0) {
       outers.push(i);
       continue;
@@ -372,7 +376,10 @@ const filled = new WeakMap<Glyph, readonly Contour[]>();
 export function filledContours(g: Glyph): readonly Contour[] {
   const known = filled.get(g);
   if (known !== undefined) return known;
-  const corrected = correctDirections(g.contours);
+  // What is filled is the ink, so a stroke fills what its pen leaves rather than
+  // its skeleton — which is an open line, or a closed one that is not the edge of
+  // anything. Ids for the ink are counted per glyph: nothing selects them.
+  const corrected = correctDirections(withInk(g, counterIds(`fill-${g.name}-`)).contours);
   filled.set(g, corrected);
   return corrected;
 }

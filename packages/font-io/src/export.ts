@@ -14,6 +14,7 @@ import {
   removeOverlap,
   resolveGlyphComponents,
   segments,
+  withInk,
   withResolvedMetrics,
 } from "@typewright/font-model";
 
@@ -90,13 +91,20 @@ function tracePath(path: OtPath, c: Contour): void {
  * one of the two reasons the UFO export exists alongside this one.
  */
 function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Contour[] {
-  if (g.components.length === 0) return g.contours;
+  // A stroke's skeleton is the path a pen was drawn along; what goes in the font is
+  // the ink it leaves. Worked out before anything else, so the directions and the
+  // union below see only outlines.
+  const own = withInk(g, ids).contours;
+  if (g.components.length === 0) return own;
 
   const source: ComponentSource = {
-    glyphOf: (name) => document.glyphs[name] ?? null,
+    glyphOf: (name) => {
+      const found = document.glyphs[name];
+      return found === undefined ? null : withInk(found, ids);
+    },
   };
 
-  return [...g.contours, ...resolveGlyphComponents(source, g.name, g.components, ids)];
+  return [...own, ...resolveGlyphComponents(source, g.name, g.components, ids)];
 }
 
 /**

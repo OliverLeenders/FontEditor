@@ -45,6 +45,7 @@ type StoredNode = {
   readonly in: Vec2 | null;
   readonly out: Vec2 | null;
   readonly hvLock: boolean | { readonly in?: boolean; readonly out?: boolean };
+  readonly harmonised?: boolean;
 };
 
 type Payload = {
@@ -53,6 +54,7 @@ type Payload = {
   readonly contours: ReadonlyArray<{
     readonly closed: boolean;
     readonly nodes: readonly StoredNode[];
+    readonly nib?: { readonly angle: number; readonly width: number; readonly thickness?: number };
   }>;
 };
 
@@ -84,6 +86,9 @@ export function clipboardText(state: EditorState): string | null {
   const payload: Payload = {
     kind: MARKER,
     version: VERSION,
+    // The pen and the held joins go with the path. A stroke pasted as a bare
+    // skeleton would fill nothing, and a held join that forgot on the way would
+    // go crooked the first time a handle beside it moved.
     contours: contours.map((c) => ({
       closed: c.closed,
       nodes: c.nodes.map((n) => ({
@@ -92,7 +97,9 @@ export function clipboardText(state: EditorState): string | null {
         in: n.in,
         out: n.out,
         hvLock: { in: n.hvLock.in, out: n.hvLock.out },
+        ...(n.harmonised ? { harmonised: true } : {}),
       })),
+      ...(c.nib === undefined ? {} : { nib: { ...c.nib } }),
     })),
   };
   return JSON.stringify(payload, null, 1);
@@ -160,6 +167,21 @@ function readLock(raw: unknown): { in: boolean; out: boolean } {
   return { in: false, out: false };
 }
 
+/** A pen from the clipboard, or `null` for none or for one that cannot be read. */
+function readNib(
+  raw: unknown,
+): { readonly angle: number; readonly width: number; readonly thickness?: number } | null {
+  if (!isRecord(raw)) return null;
+  const angle = raw["angle"];
+  const width = raw["width"];
+  if (typeof angle !== "number" || !Number.isFinite(angle)) return null;
+  if (typeof width !== "number" || !Number.isFinite(width) || width < 0) return null;
+  const thickness = raw["thickness"];
+  return typeof thickness === "number" && Number.isFinite(thickness) && thickness > 0
+    ? { angle, width, thickness }
+    : { angle, width };
+}
+
 export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
   let raw: unknown;
   try {
@@ -188,6 +210,7 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
           in: point(rawNode["in"]),
           out: point(rawNode["out"]),
           hvLock: readLock(rawNode["hvLock"]),
+          harmonised: rawNode["harmonised"] === true,
         }),
       );
     }
@@ -195,7 +218,9 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
     // A contour of fewer than two points draws nothing and cannot be edited
     // into anything; dropping it is kinder than pasting an invisible artefact.
     if (nodes.length < 2) continue;
-    contours.push(contour(ids.contour(), nodes, entry["closed"] !== false));
+    const pasted = contour(ids.contour(), nodes, entry["closed"] !== false);
+    const nib = readNib(entry["nib"]);
+    contours.push(nib === null ? pasted : { ...pasted, nib });
   }
 
   return contours.length === 0 ? null : contours;

@@ -9,10 +9,10 @@ import {
   tangent,
 } from "@typewright/geometry";
 
-import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import { type Contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import { type CurvePiece, contourOfCurves } from "./curves.js";
 import { contourWinding } from "./direction.js";
 import type { IdFactory } from "./ids.js";
-import { type Node, node } from "./node.js";
 
 /**
  * Offsetting a contour: the same shape, fatter or thinner.
@@ -76,7 +76,9 @@ export type OffsetOptions = {
  * make one undo step out of two decisions.
  */
 export function offsetContour(c: Contour, ids: IdFactory, options: OffsetOptions): Contour | null {
-  if (!c.closed || c.nodes.length < 2) return null;
+  // A skeleton is a path, not the edge of the ink, and moving it outwards would be
+  // moving the line the pen is drawn along. Its weight is the nib's.
+  if (!c.closed || c.nodes.length < 2 || c.nib !== undefined) return null;
   if (options.x === 0 && options.y === 0) return null;
   if (options.x * options.y < 0) return null;
   // One axis of nothing is a pen with no width in that direction, which is a
@@ -116,7 +118,7 @@ export function offsetContour(c: Contour, ids: IdFactory, options: OffsetOptions
 }
 
 /** A piece of the offset outline, and whether it was drawn as a straight line. */
-type Piece = { readonly curve: Cubic; readonly line: boolean };
+type Piece = CurvePiece;
 
 /**
  * Every segment of a contour offset, with the corners between them filled in.
@@ -373,41 +375,3 @@ const scaleCubic = (s: Cubic, by: Vec2): Cubic =>
     { x: s.c2.x * by.x, y: s.c2.y * by.y },
     { x: s.b.x * by.x, y: s.b.y * by.y },
   );
-
-/**
- * A closed contour out of a chain of curves.
- *
- * The same job the union does after walking a boundary, and the same rule: the
- * node types are read back from the geometry, because a piece cut out of a curve
- * does not remember what kind of node it started at. A piece that was drawn as a
- * line keeps its handles retracted, so a straight edge stays straight through a
- * save and a load.
- */
-function contourOfCurves(chain: readonly Piece[], ids: IdFactory): Contour {
-  const nodes: Node[] = chain.map((piece, i) => {
-    const before = chain[(i - 1 + chain.length) % chain.length]!;
-    const incoming = before.line ? null : before.curve.c2;
-    const outgoing = piece.line ? null : piece.curve.c1;
-    return node(ids.node(), piece.curve.a, {
-      type: smooth(piece.curve.a, incoming, outgoing) ? "smooth" : "corner",
-      in: incoming,
-      out: outgoing,
-    });
-  });
-  return contour(ids.contour(), nodes, true);
-}
-
-/** Whether two handles leave a point in one straight line, and opposite ways. */
-function smooth(pt: Vec2, incoming: Vec2 | null, outgoing: Vec2 | null): boolean {
-  if (incoming === null || outgoing === null) return false;
-
-  const before = { x: pt.x - incoming.x, y: pt.y - incoming.y };
-  const after = { x: outgoing.x - pt.x, y: outgoing.y - pt.y };
-  const lb = Math.hypot(before.x, before.y);
-  const la = Math.hypot(after.x, after.y);
-  if (lb === 0 || la === 0) return false;
-
-  const cross = (before.x * after.y - before.y * after.x) / (lb * la);
-  const dot = (before.x * after.x + before.y * after.y) / (lb * la);
-  return dot > 0 && Math.abs(cross) < 0.01;
-}

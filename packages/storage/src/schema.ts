@@ -81,6 +81,15 @@ export type StoredContour = {
   readonly id: string;
   readonly closed: boolean;
   readonly nodes: readonly StoredNode[];
+  /**
+   * The pen, for a contour that is a stroke's skeleton. Omitted for an outline,
+   * which is nearly every contour.
+   *
+   * Here and nowhere else: a `.ufo` is written the ink rather than the skeleton,
+   * because another application wants the shape of the letter, so the project file
+   * is where a stroke is kept as a stroke.
+   */
+  readonly nib?: { readonly angle: number; readonly width: number; readonly thickness?: number };
 };
 
 export type StoredComponent = {
@@ -261,7 +270,15 @@ function encodeComponent(c: Component): StoredComponent {
 }
 
 function encodeContour(c: Contour): StoredContour {
-  return { id: c.id, closed: c.closed, nodes: c.nodes.map(encodeNode) };
+  const base = { id: c.id, closed: c.closed, nodes: c.nodes.map(encodeNode) };
+  if (c.nib === undefined) return base;
+  const { angle, width, thickness } = c.nib;
+  // Thickness only for an oval: a broad edge is written as it always was.
+  return {
+    ...base,
+    nib:
+      thickness === undefined || thickness === 0 ? { angle, width } : { angle, width, thickness },
+  };
 }
 
 function encodeNode(n: Node): StoredNode {
@@ -567,7 +584,32 @@ function decodeContour(raw: unknown): Decoded<Contour> {
     nodes.push(decoded.value);
   }
 
-  return ok(contour(raw["id"], nodes, raw["closed"] === true));
+  const plain = contour(raw["id"], nodes, raw["closed"] === true);
+  const nib = decodeNib(raw["nib"]);
+  return ok(nib === null ? plain : { ...plain, nib });
+}
+
+/**
+ * A stored pen, or `null` for none.
+ *
+ * A pen that cannot be read is dropped rather than failing the contour: the
+ * skeleton is still a path worth having, and a glyph that refused to open over a
+ * malformed angle would lose the whole drawing to save one number.
+ */
+function decodeNib(
+  raw: unknown,
+): { readonly angle: number; readonly width: number; readonly thickness?: number } | null {
+  if (!isRecord(raw)) return null;
+  const angle = raw["angle"];
+  const width = raw["width"];
+  if (typeof angle !== "number" || !Number.isFinite(angle)) return null;
+  if (typeof width !== "number" || !Number.isFinite(width) || width < 0) return null;
+  // A thickness that cannot be read leaves the broad edge rather than dropping the
+  // pen: the stroke is still worth having.
+  const thickness = raw["thickness"];
+  return typeof thickness === "number" && Number.isFinite(thickness) && thickness > 0
+    ? { angle, width, thickness }
+    : { angle, width };
 }
 
 export function decodeGlyph(raw: unknown): Decoded<Glyph> {

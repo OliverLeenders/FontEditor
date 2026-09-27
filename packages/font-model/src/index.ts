@@ -51,7 +51,7 @@ export {
   wouldRecurse,
 } from "./component.js";
 
-export type { Contour, Segment, SegmentKind } from "./contour.js";
+export type { Contour, Nib, Segment, SegmentKind } from "./contour.js";
 export {
   appendNode,
   balanceSegment,
@@ -256,6 +256,7 @@ export { measureAngle, measureGap, measureNormal, sectionAcross } from "./measur
 export type { OverlapResult } from "./overlap.js";
 export type { OffsetJoin, OffsetOptions } from "./offset.js";
 export { offsetContour } from "./offset.js";
+export { DEFAULT_NIB, inkOf, isOval, samePen, withInk, withNib } from "./stroke.js";
 export { keptByPolicy, simplifyContour } from "./simplify.js";
 export type { CombineOutcome, SetOperation } from "./overlap.js";
 export { combineContours, contoursMeet, removeOverlap } from "./overlap.js";

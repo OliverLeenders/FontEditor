@@ -147,6 +147,71 @@ describe("serialization", () => {
     }
   });
 
+  it("keeps a stroke's pen", () => {
+    // Without it a stroke would come back from a reload as a bare path, which
+    // fills nothing: the letter would lose every stroke drawn in it.
+    const ids = counterIds("n");
+    const stem = {
+      ...contour(ids.contour(), [node(ids.node(), vec(0, 0)), node(ids.node(), vec(0, 300))]),
+      nib: { angle: 30, width: 80 },
+    };
+    const decoded = decodeGlyph(
+      JSON.parse(JSON.stringify(encodeGlyph(addContour(glyph("l"), stem)))) as unknown,
+    );
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) expect(decoded.value.contours[0]!.nib).toEqual({ angle: 30, width: 80 });
+  });
+
+  it("keeps an oval pen's thickness", () => {
+    const ids = counterIds("o");
+    const stem = {
+      ...contour(ids.contour(), [node(ids.node(), vec(0, 0)), node(ids.node(), vec(0, 300))]),
+      nib: { angle: 30, width: 80, thickness: 24 },
+    };
+    const decoded = decodeGlyph(
+      JSON.parse(JSON.stringify(encodeGlyph(addContour(glyph("l"), stem)))) as unknown,
+    );
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) {
+      expect(decoded.value.contours[0]!.nib).toEqual({ angle: 30, width: 80, thickness: 24 });
+    }
+  });
+
+  it("writes a broad pen without a thickness, as it always was", () => {
+    const ids = counterIds("q");
+    const stem = {
+      ...contour(ids.contour(), [node(ids.node(), vec(0, 0)), node(ids.node(), vec(0, 300))]),
+      nib: { angle: 30, width: 80, thickness: 0 },
+    };
+    const encoded = encodeGlyph(addContour(glyph("l"), stem));
+    expect(encoded.contours[0]!.nib).toEqual({ angle: 30, width: 80 });
+  });
+
+  it("writes no pen for an outline", () => {
+    const encoded = encodeGlyph(firstGlyph(document()));
+    expect("nib" in encoded.contours[0]!).toBe(false);
+  });
+
+  it("keeps the path when its pen cannot be read", () => {
+    const ids = counterIds("m");
+    const stem = contour(ids.contour(), [
+      node(ids.node(), vec(0, 0)),
+      node(ids.node(), vec(0, 300)),
+    ]);
+    const stored = JSON.parse(JSON.stringify(encodeGlyph(addContour(glyph("l"), stem)))) as {
+      contours: Record<string, unknown>[];
+    };
+    stored.contours[0]!["nib"] = { angle: "steep", width: 80 };
+
+    const decoded = decodeGlyph(stored);
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) {
+      expect(decoded.value.contours[0]!.nodes).toHaveLength(2);
+      expect(decoded.value.contours[0]!.nib).toBeUndefined();
+    }
+  });
+
   it("omits the hold when a node does not have it", () => {
     const encoded = encodeGlyph(firstGlyph(document()));
     expect("harmonised" in encoded.contours[0]!.nodes[0]!).toBe(false);

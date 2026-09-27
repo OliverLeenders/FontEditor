@@ -115,8 +115,11 @@ export function removeOverlap(
   // An open contour has no inside, and a contour of one node has no outline, so
   // neither can take part; both are carried through untouched, the same as a
   // contour the caller did not name.
+  // A skeleton is not ink — it is the path a pen is drawn along — so joining it to
+  // the outlines around it would be joining a line to a shape. Its ink is worked
+  // out elsewhere, and unioned there.
   const taken = (c: Contour): boolean =>
-    c.closed && c.nodes.length >= 2 && (only === null || only.has(c.id));
+    c.closed && c.nodes.length >= 2 && c.nib === undefined && (only === null || only.has(c.id));
 
   const closed = g.contours.filter(taken);
   if (closed.length === 0) return { glyph: g, crossings: 0 };
@@ -259,7 +262,7 @@ export function combineContours(
   op: SetOperation,
   tool: ReadonlySet<ContourId>,
 ): CombineOutcome {
-  const taken = (c: Contour): boolean => c.closed && c.nodes.length >= 2;
+  const taken = (c: Contour): boolean => c.closed && c.nodes.length >= 2 && c.nib === undefined;
   const closed = g.contours.filter(taken);
 
   const tools = closed.filter((c) => tool.has(c.id));

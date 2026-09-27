@@ -164,7 +164,7 @@ function mixContour(
   others: readonly (Contour | undefined)[],
   weights: readonly number[],
 ): Contour {
-  return {
+  const mixed: Contour = {
     ...base,
     nodes: base.nodes.map((n, i) =>
       mixNode(
@@ -173,6 +173,39 @@ function mixContour(
         weights,
       ),
     ),
+  };
+  if (base.nib === undefined) return mixed;
+
+  // The pen interpolates with the path it draws. A light master drawn with a
+  // narrow nib and a bold one with a wide nib is what a stroke between them is
+  // for: the weight is the pen's as much as the skeleton's. A master without a
+  // pen on this contour counts as the base's, the same way a missing point does.
+  return {
+    ...mixed,
+    nib: {
+      angle: mix(
+        others.map((c) => c?.nib?.angle ?? null),
+        weights,
+        base.nib.angle,
+      ),
+      width: mix(
+        others.map((c) => c?.nib?.width ?? null),
+        weights,
+        base.nib.width,
+      ),
+      // Absent is a broad edge, which is a thickness of nothing — so a broad pen in
+      // one master and an oval in the other is an oval that fills out along the
+      // axis, which is what somebody drawing the two would mean.
+      ...(base.nib.thickness === undefined && others.every((c) => c?.nib?.thickness === undefined)
+        ? {}
+        : {
+            thickness: mix(
+              others.map((c) => (c?.nib === undefined ? null : (c.nib.thickness ?? 0))),
+              weights,
+              base.nib.thickness ?? 0,
+            ),
+          }),
+    },
   };
 }
 

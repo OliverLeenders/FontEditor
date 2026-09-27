@@ -1,4 +1,5 @@
 import { resolveGlyphComponents } from "./component.js";
+import { withInk } from "./stroke.js";
 import type { FontDocument } from "./document.js";
 import type { Glyph } from "./glyph.js";
 import { counterIds } from "./ids.js";
@@ -22,7 +23,9 @@ import { counterIds } from "./ids.js";
 const drawn = new WeakMap<FontDocument, WeakMap<Glyph, Glyph>>();
 
 export function drawableGlyph(document: FontDocument, glyph: Glyph): Glyph {
-  if (glyph.components.length === 0) return glyph;
+  if (glyph.components.length === 0 && !glyph.contours.some((c) => c.nib !== undefined)) {
+    return glyph;
+  }
 
   let known = drawn.get(document);
   if (known === undefined) {
@@ -32,18 +35,21 @@ export function drawableGlyph(document: FontDocument, glyph: Glyph): Glyph {
   const remembered = known.get(glyph);
   if (remembered !== undefined) return remembered;
 
-  const source = { glyphOf: (name: string) => document.glyphs[name] ?? null };
+  // Ids for contours nothing selects: they exist to be drawn.
+  const ids = counterIds(`drawn-${glyph.name}-`);
+  // A glyph placed as a component draws what it draws, strokes included: the
+  // component is asked for its ink, not for its skeletons.
+  const source = {
+    glyphOf: (name: string) => {
+      const found = document.glyphs[name];
+      return found === undefined ? null : withInk(found, ids);
+    },
+  };
   const resolved: Glyph = {
     ...glyph,
     contours: [
-      ...glyph.contours,
-      ...resolveGlyphComponents(
-        source,
-        glyph.name,
-        glyph.components,
-        // Ids for contours nothing selects: they exist to be drawn.
-        counterIds(`drawn-${glyph.name}-`),
-      ),
+      ...withInk(glyph, ids).contours,
+      ...resolveGlyphComponents(source, glyph.name, glyph.components, ids),
     ],
     components: [],
   };
