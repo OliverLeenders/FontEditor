@@ -59,9 +59,9 @@ desktop application installs from a release, updates itself, and says which vers
 | 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
 | 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each  |
 | 32    | More outline operations             | done: subtract, intersect, exclude, offset and simplify, beside the union and the extremes |
-| 33    | One answer to what a glyph is       | half done: the union sees components and joins what merely touches; the canvas is left     |
+| 33    | One answer to what a glyph is       | done: the union, the ruler, the gap measure and the knife see components                   |
 | 34    | Drawing with a pen                  | planned: a skeleton and a nib, broad edge exactly and elliptical by offset                 |
-| 35    | A node that holds its curvature     | planned: harmonising that stays, and the squircle between a curve and a line               |
+| 35    | A node that holds its curvature     | half done: harmonising that stays; the squircle between a curve and a line is left         |
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
 
 ### What the table missed
@@ -1019,7 +1019,7 @@ extent off it, and drawing the same shape without one loses all of that. A corne
 the fit keeps the directions either side and would round it off. Everything else goes if the
 outline moves less than a thousandth of the em, least damaging first.
 
-#### Phase 33 — One answer to what a glyph is made of — half done
+#### Phase 33 — One answer to what a glyph is made of — done
 
 A component is already geometry the document does not store: the outlines belong to the glyph
 referred to, and `drawableGlyph` draws them in where they are wanted. Everything that only
@@ -1052,8 +1052,22 @@ edge has ink on both sides of it, and that is now the question asked. It matters
 tidiness: a rasteriser antialiasing each square against a shared edge separately leaves a pale
 line down the middle of what should be solid.
 
-What is left is the canvas: the edit view, hit-testing and the knife still read the contours as
-stored, so a stroke would be invisible to all three. That is the half phase 34 needs.
+The second half turned out smaller than this said, and the paragraph above was wrong about it
+too. The edit view already drew a glyph's components and the pointer already found them —
+`resolvedComponents` in the scene and a `components` option on the hit index had been doing it
+for some time. What had not been told were three readers that went by the contours as stored:
+the ruler, which laid across a dollar sign read the `S` and passed straight through the bars;
+the gap measure, which measured to the edge of the parts drawn in place; and the knife, which cut
+the `S` and left the bars whole.
+
+The ruler and the measure now read the glyph as drawn — one function, `drawnGlyph`, the glyph's
+own contours first with their ids and its components drawn in after them — so a segment found by
+id is found exactly where it was. The knife changes the glyph, so it follows the union's rule
+instead: the components its stroke crosses become outlines and are cut, the ones it does not
+reach stay references, and the undo menu says which happened.
+
+What a stroke or a squircle will need from this is `drawnGlyph` and the canvas's own resolving,
+which both exist. The rest is theirs to add.
 
 #### Phase 34 — Drawing with a pen instead of an outline
 
@@ -1080,7 +1094,7 @@ write outlines. A `.ufo` keeps the skeleton and the nib in a lib key of this edi
 the flattened outline beside them, so another application sees a font and this one still sees
 the pen.
 
-#### Phase 35 — A node that holds its own curvature
+#### Phase 35 — A node that holds its own curvature — half done
 
 Harmonising moves a node to where the curvature either side of it agrees, once, and the next
 drag of a handle undoes it. The arithmetic is closed and already written — the node slides
@@ -1088,6 +1102,15 @@ along the line between its own two handles — so what is missing is only that i
 A node marked as holding its curvature would be solved again after every edit, and that needs
 no iteration to settle: the answer depends on the four handles and never on the points, so no
 one node's answer can disturb another's.
+
+The first half is in. A node can be asked to hold its curvature — **Hold** in the Curve
+section, beside **Harmonise**, or from the menu — and it is then solved again after every edit,
+in the same pass that settles tangent nodes. After that pass rather than before, because settling
+a tangent moves a handle and a held node reads the handles around it; and never iterated, because
+where a held node belongs depends on handles and on no node's position. It is drawn as a smooth
+node with a ring round it. The flag lives in the project file, like the axis lock beside it: a
+`.glif` has no word for it, and a node saved to one comes back an ordinary smooth node sitting
+exactly where it was left.
 
 Between a curve and a straight line there is no answer of that kind. A line has no curvature,
 so a curve meeting it continuously has to arrive with none, and the only way there without

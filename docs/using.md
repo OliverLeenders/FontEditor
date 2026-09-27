@@ -307,6 +307,15 @@ and every substitution and positioning rule as feature source in the Features wo
 What this editor cannot compile yet — cursive attachment, marks on ligatures — is kept in
 the source and named in the import report.
 
+**Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
+to where the curvature either side of it agrees — once. The next drag of a handle beside it
+undoes that. **Hold** beside it makes it stay: a held point is put back where the curvatures
+agree after every edit, so the curves through it can be drawn freely and the join stays smooth.
+It slides along the line between its own two handles and never touches them, so the directions
+the curves were drawn with are kept. A held point is drawn with a ring round it. Only a point
+between two curves can hold anything; a straight side has no curvature to agree with. Press
+**Hold** again to let go, and the point stays where it is.
+
 **Setting a line with the features on.** The Spacing bar and the Proof bar each have a
 **Features** panel: the first row applies the font's own rules or silences them, and under it
 is a switch for every feature the feature file defines. Each starts where a text renderer
@@ -360,6 +369,13 @@ grid, what an interpolation needs on both sides to have anything to pair, and wh
 renderers read a glyph's extent from — and a corner stays, because taking one out would round it
 off. So a circle drawn on its four extremes and a rectangle both come back untouched, and the
 button says so rather than appearing to do nothing.
+
+**The knife and components.** A stroke drawn across a component cuts it as it would any
+contour: a reference cannot be cut, so the component becomes outlines first, and the undo menu
+says **Cut through component** rather than just **Cut**. A stroke that only enters a component
+puts a point on it the same way. Components the stroke does not reach are left as references.
+The ruler and the gap measure read components too, so a ruler laid across a letter built partly
+by reference measures the whole of it.
 
 Components are only ever drawn in by the whole-glyph union. Joining or cutting a _selection_
 leaves every reference alone — a selection names contours, and turning a reference into outlines
