@@ -13,6 +13,7 @@ import { type IdFactory, counterIds } from "./ids.js";
 import { corneredContour, hasContinuousCorners } from "./corner.js";
 import { contourOfCurves } from "./curves.js";
 import { removeOverlap } from "./overlap.js";
+import { joinsFurther, unionByPolygons } from "./polygon-union.js";
 
 /**
  * Drawing with a pen: a contour that is a skeleton, and the ink it leaves.
@@ -56,7 +57,14 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   // overlapping, so they are drawn as they are rather than not at all.
   const joined =
     regions.length < 2 ? null : removeOverlap(glyph("", { contours: [...regions] }), ids);
-  const answer = joined === null ? regions : joined.glyph.contours;
+  let answer: readonly Contour[] =
+    joined === null ? regions : joined.glyph.contours.filter((r) => thickness(r) >= SLIVER);
+  // The union of curves can be fooled by edges lying all but on top of each other
+  // — the legs of a stroke at a sharp corner — into handing back loops that still
+  // overlap, or meet along an edge. Checked, and joined as polygons where they do.
+  if (joined !== null && answer.length > 1 && joinsFurther(answer)) {
+    answer = unionByPolygons(regions, ids) ?? answer;
+  }
   joinedInk.set(c, answer);
   return answer;
 }

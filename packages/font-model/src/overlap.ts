@@ -17,6 +17,7 @@ import { corneredContour, hasContinuousCorners } from "./corner.js";
 import type { Glyph } from "./glyph.js";
 import type { ContourId, IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
+import { unionByPolygons } from "./polygon-union.js";
 
 /**
  * Removing overlap: the outline of what a glyph's contours cover together.
@@ -179,9 +180,10 @@ export function removeOverlap(
   for (const [index, c] of closed.entries()) pieces.push(...split(c, index, cuts, eps));
 
   const kept = onBoundary(pieces, outlines(), eps);
-  if (kept.length === 0) return null;
-
-  const loops = walk(kept, ids, eps);
+  // Where the union of curves cannot close the boundary — edges lying all but on
+  // top of each other, which it cannot sort into buried and not — the polygon
+  // union settles it, refitted; see unionByPolygons.
+  const loops = (kept.length === 0 ? null : walk(kept, ids, eps)) ?? unionByPolygons(closed, ids);
   if (loops === null) return null;
 
   // The union lands where the working set began, and everything else keeps the

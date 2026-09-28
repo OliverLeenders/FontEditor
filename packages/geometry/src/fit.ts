@@ -48,6 +48,9 @@ export function fitCubics(
   return out;
 }
 
+/** The longest a fitted handle may be, in chords. */
+const HANDLE_MOST = 3;
+
 /** How deep the splitting may go before a curve is accepted as it is. */
 const MAX_DEPTH = 24;
 
@@ -170,7 +173,19 @@ function handlesFor(
   if (Math.abs(det) > 1e-12) {
     const s1 = (x0 * c11 - x1 * c01) / det;
     const s2 = (c00 * x1 - c01 * x0) / det;
-    if (s1 > chord * 1e-6 && s2 > chord * 1e-6 && Number.isFinite(s1) && Number.isFinite(s2)) {
+    // A length more than a few chords long is a system too near degenerate to
+    // trust — samples almost in a line along the given directions — and one taken
+    // at its word writes a handle a hundred billion units long. The third of the
+    // chord instead, and the fit splits if that does not do.
+    const most = chord * HANDLE_MOST;
+    if (
+      s1 > chord * 1e-6 &&
+      s2 > chord * 1e-6 &&
+      s1 < most &&
+      s2 < most &&
+      Number.isFinite(s1) &&
+      Number.isFinite(s2)
+    ) {
       alpha1 = s1;
       alpha2 = s2;
     }

@@ -265,6 +265,16 @@ export function ovalBands(
 }
 
 /**
+ * Whether an oval pen along a curve bends round tighter than itself somewhere, so
+ * the side on the inside of the bend folds back over itself.
+ */
+export function ovalFolds(curve: Cubic, pen: PenShape): boolean {
+  const { inward } = squashFor(pen, OFFSET_TOLERANCE);
+  const squashed = mapCubic(curve, inward);
+  return folds(squashed, 1) || folds(squashed, -1);
+}
+
+/**
  * What fills the outside of a corner between two curves, drawn with an oval pen
  * standing at the corner — or `null` where the join is not a corner.
  */
@@ -409,12 +419,21 @@ function cap(p: Vec2, normal: Vec2, atEnd: boolean): Cubic[] {
  * whether to halve the stretch and look again.
  */
 function folds(c: Cubic, distance: number): boolean {
-  for (let i = 0; i <= 16; i++) {
-    const k = curvature(c, i / 16);
+  // Asked a hair inside each end as well as along: a curve whose handle is pulled
+  // onto its end point has no curvature to report at the end itself, and all but
+  // unbounded curvature just short of it — which is where it folds.
+  for (let i = 0; i <= FOLD_SAMPLES; i++) {
+    const t = Math.min(1 - END_INSIDE, Math.max(END_INSIDE, i / FOLD_SAMPLES));
+    const k = curvature(c, t);
     if (k !== null && 1 - distance * k < 0) return true;
   }
   return false;
 }
+
+/** How many places along a curve its folding is asked at. */
+const FOLD_SAMPLES = 32;
+/** How far inside each end a curve is asked, as a parameter. */
+const END_INSIDE = 1e-3;
 
 /** A side drawn straight, from where the pen's edge starts to where it ends. */
 function straightAcross(c: Cubic, distance: number, startNormal: Vec2, endNormal: Vec2): Cubic {

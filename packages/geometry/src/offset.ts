@@ -155,14 +155,21 @@ function approximate(s: Cubic, distance: number): Cubic | null {
   const startScale = Math.max(0, 1 - distance * (curvature(s, 0) ?? 0));
   const endScale = Math.max(0, 1 - distance * (curvature(s, 1) ?? 0));
 
-  const c1 = {
-    x: from.x + (s.c1.x - s.a.x) * startScale,
-    y: from.y + (s.c1.y - s.a.y) * startScale,
+  // No handle longer than the piece is across. Beside a handle pulled onto its
+  // own point the curvature reads as all but infinite, and a scale that large on a
+  // handle all but nothing long threw it a hundred billion units away; a handle as
+  // long as the chord is already more than any arc wants, and where it is wrong
+  // the error is measured below and the piece is halved.
+  const chord = Math.hypot(to.x - from.x, to.y - from.y);
+  const held = (dx: number, dy: number, scale: number): Vec2 => {
+    const length = Math.hypot(dx, dy) * scale;
+    const k = length > chord && length > 0 ? chord / length : 1;
+    return { x: dx * scale * k, y: dy * scale * k };
   };
-  const c2 = {
-    x: to.x + (s.c2.x - s.b.x) * endScale,
-    y: to.y + (s.c2.y - s.b.y) * endScale,
-  };
+  const out1 = held(s.c1.x - s.a.x, s.c1.y - s.a.y, startScale);
+  const in2 = held(s.c2.x - s.b.x, s.c2.y - s.b.y, endScale);
+  const c1 = { x: from.x + out1.x, y: from.y + out1.y };
+  const c2 = { x: to.x + in2.x, y: to.y + in2.y };
 
   const answer = cubic(from, c1, c2, to);
   return finite(answer) ? answer : null;

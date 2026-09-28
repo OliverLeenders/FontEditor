@@ -128,6 +128,7 @@ export {
   nibStroke,
   nibTangencies,
   ovalBands,
+  ovalFolds,
   ovalCap,
   ovalWedge,
   reverseLoop,

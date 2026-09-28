@@ -1258,6 +1258,19 @@ now one outline through its pinches: the left of one run carries on as the right
 and the union has no line there to decide about. Where a boundary piece has no ink either side
 at the probe's usual distance, the ink is thinner than the probe, and the probe is tried closer.
 
+An oval pen along a path with a sharp V and bends tighter than itself needed three more. A
+stretch that folds was halved until it did not, and a bend genuinely tighter than the pen folds
+at every scale, so it came out as two hundred slivers; it is now traced the way a changing pen
+is, folded samples left out and the edge fitted, in one band. Beside a handle pulled onto its
+point the offset's handle scale read all but infinite and threw a handle a hundred billion units
+away; offset handles are now held to the length of the piece. And the V's two legs sweep the
+same positions of the pen, leaving edges a few thousandths of a unit apart that the union of
+curves cannot sort into buried and not. For that there is a second union: the contours flattened
+to a fiftieth of a unit, snapped to a fine grid so edges meant to be one are one, joined by
+polygon-clipping (Martinez–Rueda, MIT), and cubics fitted back through the result with its
+corners kept. It is used where the union of curves gives up, and for a stroke's ink where that
+union's answer would still join further.
+
 #### Parked
 
 - **A second font in a pane of the split window**, until windows per font have shown whether

@@ -1,6 +1,6 @@
 import { type Cubic, arcLength, cubic, endTangent, evaluate, tangent } from "./cubic.js";
 import { fitCubics } from "./fit.js";
-import { halfNib, nibStroke, ovalBands, ovalCap, ovalWedge } from "./nib.js";
+import { halfNib, nibStroke, ovalBands, ovalCap, ovalFolds, ovalWedge } from "./nib.js";
 import { OFFSET_TOLERANCE, leftNormal } from "./offset.js";
 import type { Vec2 } from "./vec2.js";
 
@@ -290,7 +290,14 @@ export function penPathStroke(
       loops.push(
         ...(isBroad(pen)
           ? nibStroke(curve, halfNib(pen.angle, pen.width))
-          : ovalBands(curve, pen, tolerance)),
+          : // A bend tighter than the pen folds its inside edge back over itself
+            // at every scale, and halving the stretch until it did not fold made
+            // hundreds of slivers of a tight curve. Traced instead the way a pen
+            // that changes is: the edge sampled, the folded samples left out, and
+            // fitted — one band for the curve.
+            ovalFolds(curve, pen)
+            ? varyingBands(curve, () => pen, tolerance)
+            : ovalBands(curve, pen, tolerance)),
       );
     } else {
       loops.push(...varyingBands(curve, profile.at, tolerance));
