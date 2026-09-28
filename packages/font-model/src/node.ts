@@ -1,5 +1,6 @@
 import { type Vec2, add, addScaled, distance, length, sub } from "@typewright/geometry";
 
+import type { Nib } from "./contour.js";
 import type { NodeId } from "./ids.js";
 
 /**
@@ -84,6 +85,16 @@ export type Node = {
    * it.
    */
   readonly harmonised: boolean;
+  /**
+   * The pen at this point, for a point of a stroke's skeleton.
+   *
+   * A stroke's pen is set at its points and changes smoothly along each segment
+   * from one point's pen to the next: the angle turns, the width and thickness
+   * grow or shrink. Absent, the point has the contour's own pen, which is what
+   * every point of a stroke drawn with one pen has. On a point of an outline it
+   * means nothing and is never set.
+   */
+  readonly pen?: Nib;
 };
 
 export type NodeInit = {
@@ -93,6 +104,7 @@ export type NodeInit = {
   /** `true` locks both handles, which is what the flag used to mean. */
   readonly hvLock?: boolean | Partial<HandleLock>;
   readonly harmonised?: boolean;
+  readonly pen?: Nib;
 };
 
 /** Read an init's lock, accepting the boolean the field used to be. */
@@ -111,6 +123,7 @@ export function node(id: NodeId, pt: Vec2, init: NodeInit = {}): Node {
     out: init.out ?? null,
     hvLock: handleLock(init.hvLock),
     harmonised: init.harmonised ?? false,
+    ...(init.pen === undefined ? {} : { pen: init.pen }),
   };
 }
 

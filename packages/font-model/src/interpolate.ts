@@ -239,6 +239,34 @@ function mixNode(
             weights,
             base.out,
           ),
+    // A point's own pen interpolates with it, the way the contour's does. A master
+    // whose point has no pen of its own counts as the base's here, as a missing
+    // value always does.
+    ...(base.pen === undefined
+      ? {}
+      : {
+          pen: {
+            angle: mix(
+              others.map((n) => n?.pen?.angle ?? null),
+              weights,
+              base.pen.angle,
+            ),
+            width: mix(
+              others.map((n) => n?.pen?.width ?? null),
+              weights,
+              base.pen.width,
+            ),
+            ...(base.pen.thickness === undefined
+              ? {}
+              : {
+                  thickness: mix(
+                    others.map((n) => n?.pen?.thickness ?? null),
+                    weights,
+                    base.pen.thickness,
+                  ),
+                }),
+          },
+        }),
   };
 }
 

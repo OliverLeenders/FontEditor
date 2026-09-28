@@ -73,6 +73,31 @@ export function tangent(s: Cubic, t: number): Vec2 | null {
 }
 
 /**
+ * The unit direction a curve leaves its start by, or arrives at its end by.
+ *
+ * Where the handle at that end is pulled onto its own point, the derivative there
+ * is nothing and {@link tangent} rightly says there is no tangent at that
+ * parameter — but the curve still leaves in a direction, the one its next control
+ * point lies in, and that is the limit the tangent approaches. It is what a
+ * question about a *join* wants: a curve leaving a corner with only one handle is
+ * the commonest curve in a font, and treating it as having no direction dropped it
+ * from every operation that asked which way it went.
+ *
+ * `null` only for a curve whose four points are one point.
+ */
+export function endTangent(s: Cubic, at: 0 | 1): Vec2 | null {
+  const steps =
+    at === 0
+      ? [sub(s.c1, s.a), sub(s.c2, s.a), sub(s.b, s.a)]
+      : [sub(s.b, s.c2), sub(s.b, s.c1), sub(s.b, s.a)];
+  for (const step of steps) {
+    const len = Math.hypot(step.x, step.y);
+    if (len > 0 && Number.isFinite(len)) return { x: step.x / len, y: step.y / len };
+  }
+  return null;
+}
+
+/**
  * The second derivative at `t`, in Bernstein form.
  *
  * Differentiated symbolically rather than by sampling the first derivative
@@ -840,6 +865,18 @@ const MEET_BUDGET = 50_000;
  * crossings would tear the outline apart. Saying so is the only honest reply.
  */
 export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
+  // Two straight segments lying on one line are the commonest way for curves to
+  // lie along each other — two shapes set flush, the pieces of a pen stroke meeting
+  // across their shared edge — and the search below can only find that out by
+  // running out of its budget, fifty thousand steps later. Asked directly, it is a
+  // handful of cross products.
+  if (straightAlong(a, b)) return null;
+  // Curves whose control points' boxes do not touch cannot meet, since each curve
+  // lies inside its own control points' hull. Most pairs a union asks about are
+  // nowhere near each other, and this is four comparisons where the search below
+  // would work out two exact bounding boxes first.
+  if (apart(a, b)) return [];
+
   const found: CurveMeeting[] = [];
   let steps = 0;
   // On an object rather than in a plain `let` so that reading it after the
@@ -903,6 +940,58 @@ export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
   if (ran.out) return null;
 
   return found.sort((l, r) => l.t1 - r.t1);
+}
+
+/**
+ * Whether two cubics are straight segments lying along the same stretch of one line.
+ *
+ * Straight: both handles on the chord. On one line: the other segment's ends within
+ * the meeting tolerance of it. Along the same stretch: their extents along that line
+ * overlap by more than the tolerance — two segments that merely meet end to end, or
+ * sit apart on one line, are not lying along each other, and are left to the search,
+ * which finds a touching end at once.
+ */
+function straightAlong(a: Cubic, b: Cubic): boolean {
+  if (!isStraightSegment(a) || !isStraightSegment(b)) return false;
+
+  const dx = a.b.x - a.a.x;
+  const dy = a.b.y - a.a.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return false;
+  const ux = dx / length;
+  const uy = dy / length;
+
+  const off = (p: Vec2): number => Math.abs((p.x - a.a.x) * uy - (p.y - a.a.y) * ux);
+  if (off(b.a) > MEET_TOLERANCE || off(b.b) > MEET_TOLERANCE) return false;
+
+  const along = (p: Vec2): number => (p.x - a.a.x) * ux + (p.y - a.a.y) * uy;
+  const low = Math.max(0, Math.min(along(b.a), along(b.b)));
+  const high = Math.min(length, Math.max(along(b.a), along(b.b)));
+  return high - low > MEET_TOLERANCE;
+}
+
+/** Whether two cubics' control-point boxes are further apart than the meeting tolerance. */
+function apart(a: Cubic, b: Cubic): boolean {
+  const ax = [a.a.x, a.c1.x, a.c2.x, a.b.x];
+  const ay = [a.a.y, a.c1.y, a.c2.y, a.b.y];
+  const bx = [b.a.x, b.c1.x, b.c2.x, b.b.x];
+  const by = [b.a.y, b.c1.y, b.c2.y, b.b.y];
+  return (
+    Math.max(...ax) < Math.min(...bx) - MEET_TOLERANCE ||
+    Math.max(...bx) < Math.min(...ax) - MEET_TOLERANCE ||
+    Math.max(...ay) < Math.min(...by) - MEET_TOLERANCE ||
+    Math.max(...by) < Math.min(...ay) - MEET_TOLERANCE
+  );
+}
+
+/** Whether a cubic is a straight segment: both handles on the line between its ends. */
+function isStraightSegment(s: Cubic): boolean {
+  const dx = s.b.x - s.a.x;
+  const dy = s.b.y - s.a.y;
+  const length = Math.hypot(dx, dy);
+  if (length === 0) return false;
+  const off = (p: Vec2): number => Math.abs((p.x - s.a.x) * dy - (p.y - s.a.y) * dx) / length;
+  return off(s.c1) <= MEET_TOLERANCE && off(s.c2) <= MEET_TOLERANCE;
 }
 
 /**

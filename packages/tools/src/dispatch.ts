@@ -33,6 +33,7 @@ export function pointerDown(
     case "select":
       return select.pointerDown(state, input, options);
     case "pen":
+    case "stroke":
       return pen.pointerDown(state, input, options);
     case "rect":
     case "ellipse":
@@ -55,6 +56,7 @@ export function pointerMove(
     case "select":
       return select.pointerMove(state, input, options);
     case "pen":
+    case "stroke":
       return pen.pointerMove(state, input, options);
     case "rect":
     case "ellipse":
@@ -77,6 +79,7 @@ export function pointerUp(
     case "select":
       return select.pointerUp(state, input);
     case "pen":
+    case "stroke":
       return pen.pointerUp(state, input);
     case "rect":
     case "ellipse":
@@ -97,6 +100,7 @@ export function pointerLeave(state: EditorState): ToolResult {
     case "select":
       return select.pointerLeave(state);
     case "pen":
+    case "stroke":
       return pen.pointerLeave(state);
     case "rect":
     case "ellipse":
@@ -121,6 +125,7 @@ export function doubleClick(
     case "select":
       return select.doubleClick(state, input, options);
     case "pen":
+    case "stroke":
       return pen.doubleClick(state);
     case "rect":
     case "ellipse":
@@ -145,6 +150,7 @@ export function keyDown(
     case "select":
       return select.keyDown(state, input, options);
     case "pen":
+    case "stroke":
       return pen.keyDown(state, input);
     case "rect":
     case "ellipse":
@@ -170,6 +176,8 @@ function toolShortcut(input: KeyInput): ToolId | null {
   if (input.modifiers.ctrl || input.modifiers.meta || input.modifiers.alt) return null;
   const key = input.key.toLowerCase();
   if (key === "p") return "pen";
+  // N for nib: the stroke tool, which draws like the pen and starts strokes.
+  if (key === "n") return "stroke";
   if (key === "v") return "select";
   if (key === "r") return "rect";
   if (key === "e") return "ellipse";

@@ -1,15 +1,15 @@
 import {
   type Cubic,
-  halfNib,
+  type PenShape,
+  blendPen,
   loopArea,
-  nibStroke,
-  ovalPathStroke,
+  penPathStroke,
   reverseLoop,
 } from "@typewright/geometry";
 
 import { type Contour, type Nib, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { type Glyph, glyph } from "./glyph.js";
-import type { IdFactory } from "./ids.js";
+import { type IdFactory, counterIds } from "./ids.js";
 import { contourOfCurves } from "./curves.js";
 import { removeOverlap } from "./overlap.js";
 
@@ -42,9 +42,55 @@ export const DEFAULT_NIB: Nib = { angle: 30, width: 80 };
  * all, drawn entirely along the nib's own edge, draws nothing.
  */
 export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
+  if (c.nib === undefined) return [c];
+  const known = joinedInk.get(c);
+  if (known !== undefined) return known;
+
+  const regions = inkRegions(c);
+  // One outline out of the regions. The union may decline a boundary it cannot
+  // close; the regions are still the right ink by the non-zero rule, only
+  // overlapping, so they are drawn as they are rather than not at all.
+  const joined =
+    regions.length < 2 ? null : removeOverlap(glyph("", { contours: [...regions] }), ids);
+  const answer = joined === null ? regions : joined.glyph.contours;
+  joinedInk.set(c, answer);
+  return answer;
+}
+
+/**
+ * Answers remembered per contour, which is what makes a stroke cheap to draw.
+ *
+ * The model is persistent: a contour that has not changed is the same object, so
+ * dragging one point of one stroke leaves every other stroke's contour — and its
+ * answer here — exactly where it was, and only the stroke being dragged is worked
+ * out again. Nothing needs invalidating by hand, because a changed contour is a
+ * different key.
+ */
+const joinedInk = new WeakMap<Contour, readonly Contour[]>();
+const regionsOf = new WeakMap<Contour, readonly Contour[]>();
+
+/** Ids for the regions of a stroke's ink: nothing selects them, they are drawn. */
+const regionIds = counterIds("ink-");
+
+/**
+ * The ink a stroke leaves, as the regions it is made of, not joined.
+ *
+ * What the canvas fills, and why it fills this rather than the joined outline:
+ * every region is turned the same way round, the way outlines are, so the non-zero
+ * rule fills overlapping regions exactly as it would fill their union — and the
+ * union is by far the dearest part of a stroke, dear enough that drawing one while
+ * its points were dragged ran at a few frames a second. The joined outline is for
+ * where one outline is what is asked for: the font, the `.ufo`, the ruler.
+ */
+export function inkRegions(c: Contour): readonly Contour[] {
   const nib = c.nib;
   if (nib === undefined) return [c];
-  if (!(nib.width > 0) || c.nodes.length < 2) return [];
+  const known = regionsOf.get(c);
+  if (known !== undefined) return known;
+  if (!(nib.width > 0) || c.nodes.length < 2) {
+    regionsOf.set(c, []);
+    return [];
+  }
 
   const curves: Cubic[] = [];
   for (let i = 0; i < segmentCount(c); i++) {
@@ -52,32 +98,24 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
     if (segment !== null) curves.push(segmentCubic(segment));
   }
 
-  // A broad edge is worked out a curve at a time and needs to know nothing about
-  // its neighbours: each stretch includes the nib at its ends, and that covers the
-  // corners. An oval needs the path, because its joins are wedges round the
-  // corners and its ends are caps only where the path actually ends.
-  const half = halfNib(nib.angle, nib.width);
-  const pieces = isOval(nib)
-    ? ovalPathStroke(curves, c.closed, nib.angle, nib.width, nib.thickness ?? 0)
-    : curves.flatMap((curve) => nibStroke(curve, half));
+  // The pen at every point, which is the point's own where it has one and the
+  // contour's where it does not; along each segment it blends from one to the
+  // next. Where a segment's two pens are the same, its ink is worked out as it
+  // always was — exactly, for a broad edge.
+  const pieces = penPathStroke(curves, pensOf(c), c.closed);
 
-  // Every piece the same way round, or two that overlap with opposite turns cancel
-  // where they cross and leave a hole in the stroke.
+  // Every piece the same way round — anticlockwise, which is how an outline's
+  // outer contour is turned for the fill — or two that overlap with opposite
+  // turns cancel where they cross and leave a hole in the stroke.
   const loops = pieces.map((loop) => (loopArea(loop) < 0 ? reverseLoop(loop) : loop));
-  if (loops.length === 0) return [];
-
   const regions = loops.map((loop) =>
     contourOfCurves(
       loop.map((curve) => ({ curve, line: straight(curve) })),
-      ids,
+      regionIds,
     ),
   );
-
-  // One outline out of the regions. The union may decline a boundary it cannot
-  // close; the regions are still the right ink by the non-zero rule, only
-  // overlapping, so they are drawn as they are rather than not at all.
-  const joined = removeOverlap(glyph("", { contours: regions }), ids);
-  return joined === null ? regions : joined.glyph.contours;
+  regionsOf.set(c, regions);
+  return regions;
 }
 
 /**
@@ -92,6 +130,38 @@ const OVAL_FROM = 0.5;
 /** Whether a pen is drawn as an oval, or as the broad edge it is too thin to differ from. */
 export function isOval(nib: Nib): boolean {
   return (nib.thickness ?? 0) >= OVAL_FROM;
+}
+
+/** The pen at a point of a stroke: the point's own, or the contour's. */
+export function penAt(c: Contour, i: number): Nib | null {
+  const own = c.nodes[i]?.pen;
+  return own ?? c.nib ?? null;
+}
+
+/** The pen at every point of a stroke, as the geometry wants it. */
+function pensOf(c: Contour): PenShape[] {
+  return c.nodes.map((_, i) => {
+    const pen = penAt(c, i) ?? { angle: 0, width: 0 };
+    return { angle: pen.angle, width: pen.width, thickness: pen.thickness ?? 0 };
+  });
+}
+
+/**
+ * The pen a fraction of the way from one pen to another, as a stroke's pen.
+ *
+ * What a point put into a stroke is given: the pen the stroke already had at that
+ * place, so putting a point in changes nothing about the ink until the point's pen
+ * is changed. The angle turns the short way round, over half a turn.
+ */
+export function blendNib(a: Nib, b: Nib, t: number): Nib {
+  const pen = blendPen(
+    { angle: a.angle, width: a.width, thickness: a.thickness ?? 0 },
+    { angle: b.angle, width: b.width, thickness: b.thickness ?? 0 },
+    t,
+  );
+  return pen.thickness > 0
+    ? { angle: pen.angle, width: pen.width, thickness: pen.thickness }
+    : { angle: pen.angle, width: pen.width };
 }
 
 /**

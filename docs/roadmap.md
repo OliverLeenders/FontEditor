@@ -1140,6 +1140,35 @@ folds back over itself and would fill with a hole in it; such a stretch is halve
 not fold, and a stretch too short to matter has that side drawn straight across. For a round pen
 every point of the joined outline is the pen's radius from the path, which is tested.
 
+After the oval pen came three things found by drawing with it. Ink went missing on segments
+whose end handles were pulled back into their points: the direction of a curve at such an end
+is not where its derivative says, because the derivative is nothing there, and the moved path,
+the corner wedges and the offset's corners all asked for it. They now take the limit the curve
+approaches, which is the direction towards the next handle along.
+
+Drawing was slow, a fifth of a second a frame for an oval stroke, and nearly all of it was the
+union joining a stroke's pieces — pieces that share straight edges exactly, which the curve
+intersection bisected down to its budget before giving up. Two cheap questions now come first:
+whether the two curves are straight and along one line, and whether their boxes meet at all.
+The fill does not need the union either. Every piece is turned to wind the same way and filled
+together, which paints the same pixels as the joined outline; the union is worked out only where
+one outline is wanted — the exporter, a `.ufo`, the ruler and the measure — and remembered per
+contour, so dragging one stroke works out that stroke's ink alone. A frame is now a fraction of a
+millisecond for a broad pen and a few for an oval.
+
+And the pen is set at points rather than once for the stroke. A stroke's own pen is what every
+point has until a point is given one of its own; along each segment the pen blends from one
+point's to the next, the angle the short way round over half a turn. Where a segment's two pens
+are the same its ink is worked out exactly, as before. Where they differ there is no exact
+answer — the edge is where a changing pen's furthest point is carried along a curve, which is no
+cubic — so the edge is sampled and fitted with cubics to within a fiftieth of a unit, the fitting
+being the classic least-squares one with the edge's own directions at its ends. A broad edge that
+turns through the direction of the path pinches there, as a real one does. A point put into a
+stroke, by the menu, at its extremes or with the knife, is given the blended pen at its place, so the ink
+is unchanged until its pen is. The points' pens go into the project file, the clipboard, a
+`.ufo`'s stroke entry, and interpolation. A **Stroke** tool, `N`, draws as the pen tool does
+and starts a stroke with the last pen set.
+
 #### Phase 35 — A node that holds its own curvature — half done
 
 Harmonising moves a node to where the curvature either side of it agrees, once, and the next

@@ -78,6 +78,7 @@ export {
   harmonisedJoin,
   cubic,
   derivative,
+  endTangent,
   evaluate,
   evaluateQuadratic,
   extrema,
@@ -126,8 +127,22 @@ export {
   loopArea,
   nibStroke,
   nibTangencies,
-  ovalPathStroke,
-  ovalStroke,
+  ovalBands,
+  ovalCap,
+  ovalWedge,
   reverseLoop,
   runsAlongNib,
 } from "./nib.js";
+
+export type { PenShape } from "./pen.js";
+export {
+  blendPen,
+  isBroad,
+  ovalPathStroke,
+  ovalStroke,
+  penPathStroke,
+  penSupport,
+  samePenShape,
+} from "./pen.js";
+
+export { fitCubics } from "./fit.js";

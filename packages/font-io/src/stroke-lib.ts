@@ -52,6 +52,7 @@ type StoredNode = {
   readonly out: readonly [number, number] | null;
   readonly hvLock?: readonly [boolean, boolean];
   readonly harmonised?: true;
+  readonly pen?: Nib;
 };
 
 /** What was read out of a glyph's lib: the strokes, and what their ink should be. */
@@ -146,6 +147,7 @@ function storedNode(n: Contour["nodes"][number]): StoredNode {
     out: n.out === null ? null : pair(n.out),
     ...(n.hvLock.in || n.hvLock.out ? { hvLock: [n.hvLock.in, n.hvLock.out] as const } : {}),
     ...(n.harmonised ? { harmonised: true as const } : {}),
+    ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
   };
 }
 
@@ -252,6 +254,24 @@ function readNode(raw: unknown): StoredNode | null {
       ? { hvLock: [r["hvLock"][0] === true, r["hvLock"][1] === true] as const }
       : {}),
     ...(r["harmonised"] === true ? { harmonised: true as const } : {}),
+    ...penOf(r["pen"]),
+  };
+}
+
+/** A point's own pen as stored, or nothing where it has none or it cannot be read. */
+function penOf(raw: unknown): { readonly pen?: Nib } {
+  if (typeof raw !== "object" || raw === null) return {};
+  const r = raw as Record<string, unknown>;
+  const angle = r["angle"];
+  const width = r["width"];
+  const thickness = r["thickness"];
+  if (typeof angle !== "number" || !Number.isFinite(angle)) return {};
+  if (typeof width !== "number" || !Number.isFinite(width) || width < 0) return {};
+  return {
+    pen:
+      typeof thickness === "number" && Number.isFinite(thickness) && thickness > 0
+        ? { angle, width, thickness }
+        : { angle, width },
   };
 }
 
@@ -299,6 +319,7 @@ export function restoreStrokes(
               out: n.out === null ? null : { x: n.out[0], y: n.out[1] },
               hvLock: n.hvLock === undefined ? false : { in: n.hvLock[0], out: n.hvLock[1] },
               harmonised: n.harmonised === true,
+              ...(n.pen === undefined ? {} : { pen: n.pen }),
             },
           ),
         ),

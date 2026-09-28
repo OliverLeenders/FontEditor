@@ -256,7 +256,7 @@ export { measureAngle, measureGap, measureNormal, sectionAcross } from "./measur
 export type { OverlapResult } from "./overlap.js";
 export type { OffsetJoin, OffsetOptions } from "./offset.js";
 export { offsetContour } from "./offset.js";
-export { DEFAULT_NIB, inkOf, isOval, samePen, withInk, withNib } from "./stroke.js";
+export { DEFAULT_NIB, inkOf, inkRegions, isOval, samePen, withInk, withNib } from "./stroke.js";
 export { keptByPolicy, simplifyContour } from "./simplify.js";
 export type { CombineOutcome, SetOperation } from "./overlap.js";
 export { combineContours, contoursMeet, removeOverlap } from "./overlap.js";
@@ -376,7 +376,7 @@ export { attachComponents, buildComposite, compositePlan, compositeParts } from 
 
 export type { SectionStop } from "./measure.js";
 
-export { drawableGlyph } from "./drawable.js";
+export { drawableGlyph, measurableGlyph } from "./drawable.js";
 
 export { componentLanding } from "./composites.js";
 

@@ -16,7 +16,8 @@ const { addContour, contour, counterIds, node, updateGlyph } =
  *
  * The commands are tested in tools and the ink in the model. What is asked here
  * is that the two buttons write what they say, that the numbers appear only where
- * there is a pen to describe, and that a number typed goes to the pen.
+ * there is a pen to describe, and that a number typed goes to the pen at the
+ * selected points — the stroke's own pen where every point is selected.
  */
 
 type Store = ReturnType<typeof freshStore>;
@@ -50,11 +51,28 @@ function withPath(): Store {
   return store;
 }
 
-/** The pen on the path the test added, which is the glyph's last contour. */
-const pen = (store: Store) => {
+/** The path the test added, which is the glyph's last contour. */
+const path = (store: Store) => {
   const g = store.editor.document.glyphs[store.editor.currentGlyph]!;
-  return g.contours[g.contours.length - 1]!.nib;
+  return g.contours[g.contours.length - 1]!;
 };
+
+/** The pen on that path. */
+const pen = (store: Store) => path(store).nib;
+
+/** The pens its two points have of their own. */
+const pointPens = (store: Store) => path(store).nodes.map((n) => n.pen);
+
+/** Select both points of the path, as selecting the whole stroke does. */
+function selectAll(store: Store): void {
+  act(() => {
+    const c = path(store);
+    store.setEditor({
+      ...store.editor,
+      selection: c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+    });
+  });
+}
 
 /**
  * Open the section the way a person does, by its header.
@@ -96,19 +114,49 @@ describe("the pen section", () => {
     );
   });
 
-  it("shows the pen's numbers and writes what is typed", () => {
+  it("writes what is typed to the pen at the selected point", () => {
+    // One end selected: the pen changes there and blends along to the other end,
+    // which keeps the stroke's pen.
     const store = opened(withPath());
     fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
 
     fireEvent.change(screen.getByLabelText("Pen angle"), { target: { value: "45" } });
     fireEvent.change(screen.getByLabelText("Pen width"), { target: { value: "60" } });
 
-    expect(pen(store)).toEqual({ angle: 45, width: 60 });
+    expect(pen(store)).toEqual({ angle: 30, width: 80 });
+    expect(pointPens(store)).toEqual([{ angle: 45, width: 60 }, undefined]);
+    expect(screen.getByLabelText<HTMLInputElement>("Pen width").value).toBe("60");
+  });
+
+  it("changes the stroke's own pen when every point is selected", () => {
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    selectAll(store);
+
+    fireEvent.change(screen.getByLabelText("Pen width"), { target: { value: "60" } });
+
+    expect(pen(store)).toEqual({ angle: 30, width: 60 });
+    expect(pointPens(store)).toEqual([undefined, undefined]);
+  });
+
+  it("shows points with different pens as a mixture", () => {
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    fireEvent.change(screen.getByLabelText("Pen width"), { target: { value: "60" } });
+    selectAll(store);
+
+    const width = screen.getByLabelText<HTMLInputElement>("Pen width");
+    expect(width.value).toBe("");
+    expect(width.placeholder).toBe("—");
+    // Typed into, the number goes to both, and one pen at both ends is the stroke's.
+    fireEvent.change(width, { target: { value: "70" } });
+    expect(pen(store)).toEqual({ angle: 30, width: 70 });
   });
 
   it("makes an oval of the pen when given a thickness", () => {
     const store = opened(withPath());
     fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    selectAll(store);
     expect(screen.getByLabelText<HTMLInputElement>("Pen thickness").value).toBe("0");
 
     fireEvent.change(screen.getByLabelText("Pen thickness"), { target: { value: "24" } });

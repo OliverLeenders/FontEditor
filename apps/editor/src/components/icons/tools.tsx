@@ -177,6 +177,25 @@ export const SimplifyIcon: IconComponent = () => (
   </Glyph>
 );
 
+/**
+ * Stroke: the mark a broad pen leaves, thin where it starts and thick where it
+ * turns across the pen, with the pen's edge at its foot.
+ *
+ * Drawn here rather than copied: Lucide has pens and brushes but nothing that says
+ * a stroke of changing width, which is the one thing this tool does that the pen
+ * does not.
+ */
+export const StrokeIcon: IconComponent = () => (
+  <Glyph>
+    <path
+      fill="currentColor"
+      stroke="none"
+      d="M4.5 19.5C8 18.5 9.8 14.2 11.6 10.9 13.4 7.6 16.3 4.8 20 4.5L20.8 6.3C17.8 6.9 15.6 9.4 13.9 12.4 11.9 16 9.3 20.3 5.2 21.2Z"
+    />
+    <path d="M3 18.5l3.5 3.5" />
+  </Glyph>
+);
+
 export const UndoIcon: IconComponent = () => (
   <Glyph>
     <path d="M9 14 4 9l5-5" />

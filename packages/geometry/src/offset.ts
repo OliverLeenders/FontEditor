@@ -7,6 +7,7 @@ import {
   project,
   split,
   tangent,
+  endTangent,
 } from "./cubic.js";
 import type { Vec2 } from "./vec2.js";
 
@@ -58,7 +59,9 @@ const CHECKS = 12;
  * point. There is no side to move towards there.
  */
 export function leftNormal(s: Cubic, t: number): Vec2 | null {
-  const along = tangent(s, t);
+  // At an end, the direction the curve leaves or arrives by even where the handle
+  // there is retracted: a curve leaving a corner with one handle still has a side.
+  const along = t === 0 ? endTangent(s, 0) : t === 1 ? endTangent(s, 1) : tangent(s, t);
   if (along === null) return null;
   const length = Math.hypot(along.x, along.y);
   if (length === 0 || !Number.isFinite(length)) return null;

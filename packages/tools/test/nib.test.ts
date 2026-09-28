@@ -10,6 +10,8 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { parseClipboard, clipboardText } from "../src/clipboard.js";
+import { keyDown, pointerDown, pointerUp } from "../src/dispatch.js";
+import { keyInput, pointerInput } from "../src/input.js";
 import { changePen, drawWithPen, selectionNib } from "../src/commands/nib.js";
 import { type EditorState, editorState } from "../src/state.js";
 
@@ -109,11 +111,32 @@ describe("switching the pen on and off", () => {
   });
 });
 
+/** Every point of the given contours selected: the whole of each stroke. */
+const everyPoint = (state: EditorState, ...which: number[]): EditorState => {
+  const contours = state.document.glyphs["l"]!.contours;
+  return {
+    ...state,
+    selection: which.flatMap((i) =>
+      contours[i]!.nodes.map((n) => ({
+        contourId: contours[i]!.id,
+        nodeId: n.id,
+        part: "point" as const,
+      })),
+    ),
+  };
+};
+
+/** The pen at each point of a contour: its own, or the stroke's. */
+const pensAt = (state: EditorState, i: number) => {
+  const c = state.document.glyphs["l"]!.contours[i]!;
+  return c.nodes.map((n) => n.pen ?? c.nib);
+};
+
 describe("changing the pen", () => {
-  it("changes the thing typed and leaves the other", () => {
-    // Two strokes with different widths: a typed angle gives both that angle and
-    // leaves each its own width.
-    const chosen = selecting(
+  it("changes the thing typed at every selected point and leaves the other", () => {
+    // Two strokes with different widths: a typed angle gives every point of both
+    // that angle and leaves each its own width.
+    const chosen = everyPoint(
       withContours(
         withNib(stroke(0), { angle: 30, width: 80 }),
         withNib(stroke(200), { angle: 30, width: 20 }),
@@ -123,15 +146,60 @@ describe("changing the pen", () => {
     );
     const { state, effects } = changePen(chosen, { angle: 60 });
 
-    expect(penOf(state, 0)).toEqual({ angle: 60, width: 80 });
-    expect(penOf(state, 1)).toEqual({ angle: 60, width: 20 });
+    expect(pensAt(state, 0)).toEqual([
+      { angle: 60, width: 80 },
+      { angle: 60, width: 80 },
+    ]);
+    expect(pensAt(state, 1)).toEqual([
+      { angle: 60, width: 20 },
+      { angle: 60, width: 20 },
+    ]);
     expect(effects[0]).toMatchObject({ label: "Pen angle" });
   });
 
+  it("changes only the points selected, so the pen blends along the stroke", () => {
+    // The end of a stroke widened and the start left: the pen is set point by point
+    // and changes from one to the other along the segment between them.
+    const base = withContours(withNib(stroke(0), { angle: 30, width: 40 }));
+    const c = base.document.glyphs["l"]!.contours[0]!;
+    const end = {
+      ...base,
+      selection: [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" as const }],
+    };
+    const { state } = changePen(end, { width: 90 });
+
+    expect(pensAt(state, 0)).toEqual([
+      { angle: 30, width: 40 },
+      { angle: 30, width: 90 },
+    ]);
+  });
+
+  it("stores nothing at a point set back to its stroke's pen", () => {
+    const base = withContours(withNib(stroke(0), { angle: 30, width: 40 }));
+    const c = base.document.glyphs["l"]!.contours[0]!;
+    const end = {
+      ...base,
+      selection: [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" as const }],
+    };
+    const widened = changePen(end, { width: 90 }).state;
+    const back = changePen(widened, { width: 40 }).state;
+
+    expect("pen" in back.document.glyphs["l"]!.contours[0]!.nodes[1]!).toBe(false);
+  });
+
+  it("remembers the pen set, for the next stroke drawn", () => {
+    const chosen = everyPoint(withContours(withNib(stroke(0), { angle: 30, width: 80 })), 0);
+    const { state } = changePen(chosen, { angle: 45 });
+    expect(state.strokePen).toEqual({ angle: 45, width: 80 });
+  });
+
   it("changes the thickness on its own, and says so", () => {
-    const chosen = selecting(withContours(withNib(stroke(0), { angle: 30, width: 80 })), 0);
+    const chosen = everyPoint(withContours(withNib(stroke(0), { angle: 30, width: 80 })), 0);
     const { state, effects } = changePen(chosen, { thickness: 20 });
-    expect(penOf(state, 0)).toEqual({ angle: 30, width: 80, thickness: 20 });
+    expect(pensAt(state, 0)).toEqual([
+      { angle: 30, width: 80, thickness: 20 },
+      { angle: 30, width: 80, thickness: 20 },
+    ]);
     expect(effects[0]).toMatchObject({ label: "Pen thickness" });
   });
 
@@ -184,9 +252,50 @@ describe("the clipboard", () => {
     expect(pasted[0]!.nodes[0]!.harmonised).toBe(false);
   });
 
+  it("pastes the pens set at points", () => {
+    const drawn = withNib(stroke(0), { angle: 30, width: 80 });
+    const penned = {
+      ...drawn,
+      nodes: [drawn.nodes[0]!, { ...drawn.nodes[1]!, pen: { angle: 60, width: 40 } }],
+    };
+    const chosen = selecting(withContours(penned), 0);
+    const pasted = parseClipboard(clipboardText(chosen)!, ids)!;
+    expect(pasted[0]!.nodes.map((n) => n.pen)).toEqual([undefined, { angle: 60, width: 40 }]);
+  });
+
   it("pastes an outline without a pen", () => {
     const chosen = selecting(withContours(stroke(0)), 0);
     const pasted = parseClipboard(clipboardText(chosen)!, ids)!;
     expect("nib" in pasted[0]!).toBe(false);
+  });
+});
+
+describe("the stroke tool", () => {
+  const click = (state: EditorState, x: number, y: number) =>
+    pointerUp(pointerDown(state, pointerInput({ x, y }), { ids }).state).state;
+  const drawn = (state: EditorState) => state.document.glyphs["l"]!.contours;
+
+  it("is in hand on N", () => {
+    expect(keyDown(withContours(), keyInput("n")).state.activeTool).toBe("stroke");
+  });
+
+  it("draws a stroke with the last pen set", () => {
+    const start = { ...withContours(), activeTool: "stroke" as const };
+    const set = { ...start, strokePen: { angle: 45, width: 50, thickness: 10 } };
+    const after = click(click(set, 100, 0), 100, 300);
+
+    expect(drawn(after)).toHaveLength(1);
+    expect(drawn(after)[0]!.nib).toEqual({ angle: 45, width: 50, thickness: 10 });
+    expect(drawn(after)[0]!.nodes).toHaveLength(2);
+  });
+
+  it("starts with the default pen before any is set", () => {
+    const start = { ...withContours(), activeTool: "stroke" as const };
+    expect(drawn(click(start, 100, 0))[0]!.nib).toEqual({ angle: 30, width: 80 });
+  });
+
+  it("leaves the pen tool drawing outlines", () => {
+    const start = { ...withContours(), activeTool: "pen" as const };
+    expect("nib" in drawn(click(start, 100, 0))[0]!).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import {
+  blendPen,
   type Cubic,
   type HandleScales,
   type Rect,
@@ -118,6 +119,31 @@ export function segmentCount(c: Contour): number {
   const n = c.nodes.length;
   if (n < 2) return 0;
   return c.closed ? n : n - 1;
+}
+
+/**
+ * The pen a stroke has a fraction `t` of the way from one of its points to the
+ * next, or `null` where there is nothing to give a new point: an outline, or a
+ * stroke whose pen there is simply the contour's own.
+ */
+export function penBetween(c: Contour, from: number, to: number, t: number): Nib | null {
+  if (c.nib === undefined) return null;
+  const a = c.nodes[from]?.pen ?? c.nib;
+  const b = c.nodes[to]?.pen ?? c.nib;
+  const mixed = blendPen(
+    { angle: a.angle, width: a.width, thickness: a.thickness ?? 0 },
+    { angle: b.angle, width: b.width, thickness: b.thickness ?? 0 },
+    t,
+  );
+  const pen: Nib =
+    mixed.thickness > 0
+      ? { angle: mixed.angle, width: mixed.width, thickness: mixed.thickness }
+      : { angle: mixed.angle, width: mixed.width };
+  const same =
+    pen.angle === c.nib.angle &&
+    pen.width === c.nib.width &&
+    (pen.thickness ?? 0) === (c.nib.thickness ?? 0);
+  return same ? null : pen;
 }
 
 export function segments(c: Contour): Segment[] {
@@ -702,6 +728,11 @@ export function insertNodeOnSegment(
     nodes[j] = { ...to, in: right.c2 };
     inserted = node(ids.node(), left.b, { type: "smooth", in: left.c2, out: right.c1 });
   }
+
+  // On a stroke, the new point has the pen the stroke already had there, blended
+  // from the pens either side, so putting a point in leaves the ink as it was.
+  const pen = penBetween(c, index, j, t);
+  if (pen !== null) inserted = { ...inserted, pen };
 
   nodes.splice(index + 1, 0, inserted);
   return settled({ ...c, nodes });

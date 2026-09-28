@@ -111,7 +111,11 @@ export function pointerDown(
 
 function startContour(state: EditorState, input: PointerInput, ids: IdFactory): ToolResult {
   const first = node(ids.node(), input.point);
-  const created: Contour = contour(ids.contour(), [first], false);
+  // The stroke tool draws the same way and starts a stroke instead of an outline,
+  // with the last pen set, so a run of strokes is drawn with one pen.
+  const plain = contour(ids.contour(), [first], false);
+  const stroking = state.activeTool === "stroke";
+  const created: Contour = stroking ? { ...plain, nib: state.strokePen } : plain;
   const document = editCurrentGlyph(state, (g) => addContour(g, created));
   if (document === null) return result(state);
 
@@ -122,7 +126,7 @@ function startContour(state: EditorState, input: PointerInput, ids: IdFactory): 
       selection: [],
       pen: { contourId: created.id, lastNodeId: first.id, pullingHandles: true, pulled: false },
     },
-    [begin("Start contour", false)],
+    [begin(stroking ? "Start stroke" : "Start contour", false)],
   );
 }
 

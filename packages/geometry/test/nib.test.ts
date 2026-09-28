@@ -1,16 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { type Cubic, cubic, evaluate, tangent } from "../src/cubic.js";
+import { type Cubic, cubic, endTangent, evaluate, intersectCubics, tangent } from "../src/cubic.js";
 import {
   halfNib,
   loopArea,
   nibStroke,
   nibTangencies,
-  ovalPathStroke,
-  ovalStroke,
   reverseLoop,
   runsAlongNib,
 } from "../src/nib.js";
+import { ovalPathStroke, ovalStroke } from "../src/pen.js";
 import { vec } from "../src/vec2.js";
 
 /**
@@ -265,5 +264,47 @@ describe("an oval pen along a path", () => {
     const loops = ovalPathStroke([line(0, 0, 100, 0), line(100, 0, 200, 0)], false, 0, 40, 40);
     // Two bands and two caps: the join is smooth, and the bands meet flush.
     expect(loops).toHaveLength(4);
+  });
+});
+
+describe("the direction a curve leaves or arrives by", () => {
+  it("is its next control point's direction where the handle is on the point", () => {
+    // A curve leaving a corner with only its far handle: there is no derivative at
+    // the start, but the curve still leaves along (1, 1).
+    const oneHandled = cubic(vec(0, 0), vec(0, 0), vec(50, 50), vec(100, 0));
+    expect(tangent(oneHandled, 0)).toBeNull();
+    const start = endTangent(oneHandled, 0)!;
+    expect(start.x).toBeCloseTo(Math.SQRT1_2, 9);
+    expect(start.y).toBeCloseTo(Math.SQRT1_2, 9);
+  });
+
+  it("arrives the same way at the far end", () => {
+    const oneHandled = cubic(vec(0, 0), vec(50, 50), vec(100, 0), vec(100, 0));
+    const end = endTangent(oneHandled, 1)!;
+    expect(end.x).toBeCloseTo(Math.SQRT1_2, 9);
+    expect(end.y).toBeCloseTo(-Math.SQRT1_2, 9);
+  });
+
+  it("has none only for a curve that is a single point", () => {
+    expect(endTangent(cubic(vec(3, 3), vec(3, 3), vec(3, 3), vec(3, 3)), 0)).toBeNull();
+  });
+});
+
+describe("where two curves meet, asked cheaply", () => {
+  it("says two straight segments on one line lie along each other", () => {
+    const one = line(0, 0, 100, 50);
+    const back = line(100, 50, 0, 0);
+    expect(intersectCubics(one, back)).toBeNull();
+    // A shorter stretch of the same line, lying along part of it.
+    expect(intersectCubics(one, line(20, 10, 60, 30))).toBeNull();
+  });
+
+  it("does not say it of two segments that only meet end to end", () => {
+    const met = intersectCubics(line(0, 0, 100, 0), line(100, 0, 200, 0));
+    expect(met).not.toBeNull();
+  });
+
+  it("finds nothing between curves whose control points are nowhere near", () => {
+    expect(intersectCubics(line(0, 0, 100, 0), line(0, 500, 100, 500))).toEqual([]);
   });
 });

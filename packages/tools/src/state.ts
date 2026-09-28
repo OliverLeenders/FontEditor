@@ -8,14 +8,17 @@ import {
   type Glyph,
   type GlyphName,
   type Measurement,
+  type Nib,
   type NodeId,
-  drawableGlyph,
+  DEFAULT_NIB,
   glyphNamed,
+  measurableGlyph,
   inLayer,
   updateGlyphInLayer,
 } from "@typewright/font-model";
 
-export type ToolId = "select" | "pen" | "rect" | "ellipse" | "knife" | "measure" | "section";
+export type ToolId =
+  "select" | "pen" | "stroke" | "rect" | "ellipse" | "knife" | "measure" | "section";
 import {
   type BoxFrame,
   type BoxHandle,
@@ -306,6 +309,13 @@ export type EditorState = {
    * about the reference rather than about anything inside it.
    */
   readonly selectedComponent: ComponentId | null;
+  /**
+   * The pen a new stroke starts with: the last one set in the Pen section.
+   *
+   * So that drawing several strokes with one pen is setting it once. Starts as the
+   * default pen, a foundational hand's angle and a stem's worth of width.
+   */
+  readonly strokePen: Nib;
   /** The segment nearest the cursor. Follows the pointer; forgotten when it leaves. */
   readonly hoveredSegment: SegmentRef | null;
   /**
@@ -366,6 +376,7 @@ export function editorState(init: EditorStateInit): EditorState {
     hoveredGuide: null,
     hoveredAnchor: null,
     selectedComponent: null,
+    strokePen: DEFAULT_NIB,
     hoveredSegment: init.hoveredSegment ?? null,
     focusedSegment: init.focusedSegment ?? null,
     cursor: init.cursor ?? null,
@@ -419,7 +430,9 @@ export function currentGlyph(state: EditorState): Glyph | null {
  */
 export function drawnGlyph(state: EditorState): Glyph | null {
   const g = currentGlyph(state);
-  return g === null ? null : drawableGlyph(state.document, g);
+  // Joined ink, because these readers count edges: a ruler across a stroke drawn as
+  // its regions would stop wherever two regions meet, inside the ink.
+  return g === null ? null : measurableGlyph(state.document, g);
 }
 
 /**

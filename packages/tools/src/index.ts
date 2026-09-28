@@ -132,6 +132,7 @@ export {
   type CombineReport,
   changePen,
   drawWithPen,
+  selectedPointPen,
   selectionNib,
   type OffsetRequest,
   type ReshapeReport,

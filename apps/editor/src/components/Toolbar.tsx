@@ -11,6 +11,7 @@ import {
   KnifeIcon,
   MeasureIcon,
   PenIcon,
+  StrokeIcon,
   RectIcon,
   RedoIcon,
   SelectIcon,
@@ -42,6 +43,13 @@ type ToolButton = {
 const TOOLS: readonly ToolButton[] = [
   { id: "select", key: "V", label: "Select", hint: "Select and edit  (V)", icon: SelectIcon },
   { id: "pen", key: "P", label: "Pen", hint: "Draw contours  (P)", icon: PenIcon },
+  {
+    id: "stroke",
+    key: "N",
+    label: "Stroke",
+    hint: "Draw strokes with the last pen set  (N)",
+    icon: StrokeIcon,
+  },
   { id: "knife", key: "K", label: "Knife", hint: "Cut across the outline  (K)", icon: KnifeIcon },
   {
     id: "rect",

@@ -46,6 +46,7 @@ type StoredNode = {
   readonly out: Vec2 | null;
   readonly hvLock: boolean | { readonly in?: boolean; readonly out?: boolean };
   readonly harmonised?: boolean;
+  readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
 };
 
 type Payload = {
@@ -98,6 +99,7 @@ export function clipboardText(state: EditorState): string | null {
         out: n.out,
         hvLock: { in: n.hvLock.in, out: n.hvLock.out },
         ...(n.harmonised ? { harmonised: true } : {}),
+        ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
       })),
       ...(c.nib === undefined ? {} : { nib: { ...c.nib } }),
     })),
@@ -211,6 +213,12 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
           out: point(rawNode["out"]),
           hvLock: readLock(rawNode["hvLock"]),
           harmonised: rawNode["harmonised"] === true,
+          ...((): {
+            pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+          } => {
+            const pen = readNib(rawNode["pen"]);
+            return pen === null ? {} : { pen };
+          })(),
         }),
       );
     }

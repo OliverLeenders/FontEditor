@@ -168,3 +168,19 @@ describe("what it will not do", () => {
     expect(offsetContour(flat, ids, { x: 10, y: 10 })).toBeNull();
   });
 });
+
+describe("a curve leaving a corner with one handle", () => {
+  it("gets the round join, not a flat one", () => {
+    // A square whose top edge is a curve with its handles both at the far end: the
+    // curve leaves the top-left corner with its handle on the corner. The corner
+    // used to be read as having no direction there, and was cut flat.
+    const drawn = rectContour(ids, { minX: 0, minY: 0, maxX: 100, maxY: 100 });
+    const nodes = drawn.nodes.map((n, i) =>
+      i === 2 ? { ...n, out: { x: 60, y: 130 } } : i === 3 ? { ...n, in: { x: 0, y: 100 } } : n,
+    );
+    const out = offsetContour({ ...drawn, nodes }, ids, { x: 10, y: 10, join: "round" })!;
+    // A round join at the top-left puts an arc there, which has handles.
+    const nearCorner = out.nodes.filter((n) => n.pt.x < 5 && n.pt.y > 95);
+    expect(nearCorner.some((n) => n.in !== null || n.out !== null)).toBe(true);
+  });
+});

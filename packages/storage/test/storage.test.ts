@@ -163,6 +163,29 @@ describe("serialization", () => {
     if (decoded.ok) expect(decoded.value.contours[0]!.nib).toEqual({ angle: 30, width: 80 });
   });
 
+  it("keeps the pens set at points", () => {
+    const ids = counterIds("p");
+    const stem = {
+      ...contour(ids.contour(), [
+        node(ids.node(), vec(0, 0)),
+        node(ids.node(), vec(0, 300), { pen: { angle: 60, width: 40, thickness: 12 } }),
+      ]),
+      nib: { angle: 30, width: 80 },
+    };
+    const encoded = encodeGlyph(addContour(glyph("l"), stem));
+    // A point with the stroke's pen stores nothing.
+    expect("pen" in encoded.contours[0]!.nodes[0]!).toBe(false);
+    const decoded = decodeGlyph(JSON.parse(JSON.stringify(encoded)) as unknown);
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) {
+      expect(decoded.value.contours[0]!.nodes.map((n) => n.pen)).toEqual([
+        undefined,
+        { angle: 60, width: 40, thickness: 12 },
+      ]);
+    }
+  });
+
   it("keeps an oval pen's thickness", () => {
     const ids = counterIds("o");
     const stem = {

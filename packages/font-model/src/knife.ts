@@ -1,6 +1,14 @@
 import { type Cubic, type Vec2, subcurve } from "@typewright/geometry";
 
-import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import {
+  type Contour,
+  type Nib,
+  contour,
+  penBetween,
+  segmentAt,
+  segmentCount,
+  segmentCubic,
+} from "./contour.js";
 import { type StrokeCrossing, byContour, samePoint, strokeCrossings } from "./crossings.js";
 import { contourPolygon, insidePolygons, shapesOf } from "./direction.js";
 import type { Glyph } from "./glyph.js";
@@ -435,7 +443,12 @@ function splitAtCrossings(
 
   // The ring of pieces, each with the anchor it starts at.
   type Piece = { readonly cubic: Cubic; readonly line: boolean };
-  type Anchor = { readonly pt: Vec2; readonly type: Node["type"]; readonly u: number | null };
+  type Anchor = {
+    readonly pt: Vec2;
+    readonly type: Node["type"];
+    readonly u: number | null;
+    readonly pen?: Nib;
+  };
 
   const pieces: Piece[] = [];
   const anchors: Anchor[] = [];
@@ -450,6 +463,7 @@ function splitAtCrossings(
       pt: start.pt,
       type: crossed ? "corner" : start.type,
       u: crossed ? onNode.get(i)! : null,
+      ...(start.pen === undefined ? {} : { pen: start.pen }),
     });
 
     const whole = segmentCubic(segment);
@@ -462,7 +476,14 @@ function splitAtCrossings(
       // Every stop but the last opens a piece; the ones after the first are the
       // interior crossings, and each becomes an anchor of its own.
       if (k + 1 < stops.length - 1) {
-        anchors.push({ pt: subcurve(whole, 0, stops[k + 1]!).b, type: "corner", u: ts[k]!.u });
+        // A point the knife puts into a stroke has the pen the stroke had there.
+        const pen = penBetween(c, i, (i + 1) % c.nodes.length, stops[k + 1]!);
+        anchors.push({
+          pt: subcurve(whole, 0, stops[k + 1]!).b,
+          type: "corner",
+          u: ts[k]!.u,
+          ...(pen === null ? {} : { pen }),
+        });
       }
     }
   }
@@ -479,6 +500,7 @@ function splitAtCrossings(
         type: anchor.type,
         in: before.line ? null : before.cubic.c2,
         out: after.line ? null : after.cubic.c1,
+        ...(anchor.pen === undefined ? {} : { pen: anchor.pen }),
       }),
     );
     if (anchor.u !== null) meetings.push({ contour: contourIndex, index, u: anchor.u });
@@ -488,7 +510,15 @@ function splitAtCrossings(
   // the node it wraps to is already the first.
   if (!closed) {
     const last = c.nodes[c.nodes.length - 1];
-    if (last !== undefined) nodes.push(node(ids.node(), last.pt, { type: last.type, in: last.in }));
+    if (last !== undefined) {
+      nodes.push(
+        node(ids.node(), last.pt, {
+          type: last.type,
+          in: last.in,
+          ...(last.pen === undefined ? {} : { pen: last.pen }),
+        }),
+      );
+    }
   }
 
   const rebuilt = contour(c.id, nodes, closed);

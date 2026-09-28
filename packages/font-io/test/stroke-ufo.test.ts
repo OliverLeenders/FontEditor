@@ -91,6 +91,22 @@ describe("a stroke through a .glif", () => {
     expect(back.contours[0]!.nodes.map((n) => n.harmonised)).toEqual([false, true, false]);
   });
 
+  it("keeps the pens set at points", () => {
+    const drawn = curl();
+    const penned = {
+      ...drawn,
+      nodes: drawn.nodes.map((n, i) => (i === 2 ? { ...n, pen: { angle: 80, width: 30 } } : n)),
+    };
+    const { glyph: back, warnings } = throughGlif(glyph("s", { contours: [penned] }));
+
+    expect(warnings).toEqual([]);
+    expect(back.contours[0]!.nodes.map((n) => n.pen)).toEqual([
+      undefined,
+      undefined,
+      { angle: 80, width: 30 },
+    ]);
+  });
+
   it("keeps an oval pen's thickness", () => {
     const { glyph: back } = throughGlif(glyph("s", { contours: [curl(20)] }));
     expect(back.contours[0]!.nib).toEqual({ angle: 30, width: 60, thickness: 20 });

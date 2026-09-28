@@ -2,8 +2,7 @@ import { type Vec2, flatten } from "@typewright/geometry";
 
 import { type Contour, reverseContour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import type { Glyph } from "./glyph.js";
-import { counterIds } from "./ids.js";
-import { withInk } from "./stroke.js";
+import { inkRegions } from "./stroke.js";
 
 /**
  * Which way round a contour runs, and putting a set of them right.
@@ -378,8 +377,16 @@ export function filledContours(g: Glyph): readonly Contour[] {
   if (known !== undefined) return known;
   // What is filled is the ink, so a stroke fills what its pen leaves rather than
   // its skeleton — which is an open line, or a closed one that is not the edge of
-  // anything. Ids for the ink are counted per glyph: nothing selects them.
-  const corrected = correctDirections(withInk(g, counterIds(`fill-${g.name}-`)).contours);
+  // anything. The regions of it rather than their union: each is already turned
+  // the way an outer contour is, so the fill is the same, and the union is too dear
+  // to work out on every move of a drag. They are not direction-corrected with the
+  // outlines, which would take a region overlapping its neighbour for a counter.
+  const outlines = g.contours.filter((c) => c.nib === undefined);
+  const strokes = g.contours.filter((c) => c.nib !== undefined);
+  const corrected =
+    strokes.length === 0
+      ? correctDirections(g.contours)
+      : [...correctDirections(outlines), ...strokes.flatMap((c) => inkRegions(c))];
   filled.set(g, corrected);
   return corrected;
 }

@@ -319,10 +319,19 @@ whose ends and corners are round; the same as the width is a round pen, the same
 handles, hold its joins, cut an open one in two with the knife and both halves keep the pen.
 Choose **Outline** to make it an ordinary contour again; the path stays where it is.
 
-Selecting several contours sets the pen for all of them at once, and typing one number into a
-selection whose pens differ changes only that number on each. The pen interpolates between
-masters, so a narrow pen in the light master and a wide one in the bold give a stroke that
-thickens between them. What goes into the font is the ink. A `.ufo` gets the ink as the glyph's
+The pen is set at points, and changes smoothly along each segment from one point's pen to the
+next: the angle turns, the width and thickness grow or shrink. The numbers in the Pen section are
+the pen at the points selected, so select one end of a stroke and widen the pen there, and the
+stroke swells towards it; select every point, and the whole stroke's pen changes. Typing one number
+into a selection whose pens differ changes only that number at each point. A point put into a
+stroke — **Insert point here**, points added at extremes, or the knife — is given the pen the
+stroke already had at that place, so the ink does not change until you change it.
+
+The **Stroke** tool (`N`) draws exactly as the pen tool does and makes strokes instead of
+outlines, with the last pen set in the Pen section — so a run of strokes in one hand is the pen
+set once. Until a pen has been set it draws with thirty degrees and eighty units. The pen interpolates between
+masters, point by point, so a narrow pen in the light master and a wide one in the bold give a
+stroke that thickens between them. What goes into the font is the ink. A `.ufo` gets the ink as the glyph's
 outline, so other applications see the letter, and the stroke itself in the glyph's `lib`, so a
 UFO folder saved and opened again comes back with its strokes. If another application has changed
 a stroke's outline in the meantime, the changed outline is kept as an outline and the file's

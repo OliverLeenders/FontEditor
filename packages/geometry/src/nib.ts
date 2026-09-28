@@ -1,5 +1,6 @@
-import { type Cubic, cubic, curvature, evaluate, reverse, split, tangent } from "./cubic.js";
+import { type Cubic, cubic, curvature, endTangent, evaluate, reverse, split } from "./cubic.js";
 import { OFFSET_TOLERANCE, arcCubics, leftNormal, offsetCubic } from "./offset.js";
+import type { PenShape } from "./pen.js";
 import type { Vec2 } from "./vec2.js";
 
 /**
@@ -213,106 +214,76 @@ export function reverseLoop(loop: readonly Cubic[]): Cubic[] {
 }
 
 /**
- * What an oval pen leaves along a path, as closed loops of cubics.
+ * The maps into and out of the space where an oval pen is a unit circle.
  *
- * An oval is a circle squashed along one axis and turned, so the ink an oval pen
- * leaves is the ink a round pen leaves along the path squashed the other way,
- * squashed back. The round pen is the easier problem — its ink is everything
- * within a fixed distance of the path — and it is traced here in the squashed
- * space, where the pen is a circle of radius one, and then stretched back out.
- *
- * The oval is `width` long along its angle and `thickness` across it. A thickness
- * of nothing is the broad edge, which has an exact answer of its own; see
- * {@link nibStroke}. A thickness equal to the width is a round pen.
- *
- * Not exact, unlike the broad edge: the sides are offset curves, which no Bézier
- * follows, and they are approximated to within `tolerance` design units the way
- * offsetting an outline is.
- *
- * Three kinds of piece, and none of them shares a curve with another, which is
- * what lets the union join them. Each segment is a *band* — out along one side,
- * straight across, back along the other, straight across — so two segments that
- * meet smoothly share the straight line across their join, which is the flush edge
- * the union already joins. A corner opens a gap on its outside, and a *wedge* fills
- * it: two radii and the arc between them, meeting the bands along those same
- * straight lines. And an open path's two ends each get a *cap*, half the pen's
- * circle closed by its diameter. The first version of this gave every segment
- * round ends of its own, and two round ends at one point are one arc drawn twice —
- * which the union cannot split, since there is no crossing on it to split at.
+ * Turned back by the pen's angle, then each axis divided by the pen's half-size
+ * along it — and the other way to come back. The tolerance is scaled with them: a
+ * unit in the squashed space is as long as the pen's longer half.
  */
-export function ovalPathStroke(
-  segments: readonly Cubic[],
-  closed: boolean,
-  angleDegrees: number,
-  width: number,
-  thickness: number,
-  tolerance: number = OFFSET_TOLERANCE,
-): Cubic[][] {
-  const along = width / 2;
-  const across = thickness / 2;
-  if (!(along > 0) || !(across > 0) || segments.length === 0) return [];
-
-  const a = (angleDegrees * Math.PI) / 180;
+function squashFor(
+  pen: PenShape,
+  tolerance: number,
+): {
+  readonly inward: (p: Vec2) => Vec2;
+  readonly outward: (p: Vec2) => Vec2;
+  readonly fine: number;
+} {
+  const along = pen.width / 2;
+  const across = pen.thickness / 2;
+  const a = (pen.angle * Math.PI) / 180;
   const cos = exactly(Math.cos(a));
   const sin = exactly(Math.sin(a));
-
-  // Into the space where the pen is a unit circle: turned back by its angle, then
-  // each axis divided by the pen's half-size along it. And out again.
-  const inward = (p: Vec2): Vec2 => ({
-    x: (cos * p.x + sin * p.y) / along,
-    y: (-sin * p.x + cos * p.y) / across,
-  });
-  const outward = (p: Vec2): Vec2 => {
-    const x = p.x * along;
-    const y = p.y * across;
-    return { x: cos * x - sin * y, y: sin * x + cos * y };
+  return {
+    inward: (p) => ({
+      x: (cos * p.x + sin * p.y) / along,
+      y: (-sin * p.x + cos * p.y) / across,
+    }),
+    outward: (p) => {
+      const x = p.x * along;
+      const y = p.y * across;
+      return { x: cos * x - sin * y, y: sin * x + cos * y };
+    },
+    fine: tolerance / Math.max(along, across),
   };
-
-  // Segments with no direction — a point, a handle-less curve of no length — have
-  // no sides to offset and are passed over; they would only put a zero-length
-  // band in the way of the joins either side of them.
-  const squashed = segments
-    .map((s) => mapCubic(s, inward))
-    .filter((s) => leftNormal(s, 0) !== null && leftNormal(s, 1) !== null);
-  if (squashed.length === 0) return [];
-
-  // The tolerance is in design units, and a unit in the squashed space is as long
-  // as the pen's longer half.
-  const fine = tolerance / Math.max(along, across);
-
-  const loops: Cubic[][] = [];
-  for (const s of squashed) loops.push(...bands(s, fine, 0));
-
-  const joins = closed ? squashed.length : squashed.length - 1;
-  for (let i = 0; i < joins; i++) {
-    const wedge = cornerWedge(squashed[i]!, squashed[(i + 1) % squashed.length]!);
-    if (wedge !== null) loops.push(wedge);
-  }
-
-  if (!closed) {
-    const first = squashed[0]!;
-    const last = squashed[squashed.length - 1]!;
-    loops.push(cap(last.b, leftNormal(last, 1)!, true));
-    loops.push(cap(first.a, leftNormal(first, 0)!, false));
-  }
-
-  return loops.map((loop) => loop.map((c) => mapCubic(c, outward)));
 }
 
 /**
- * What an oval pen leaves along a single curve, drawn as an open path of its own.
+ * The bands an oval pen leaves along one curve, in the curve's own space.
  *
- * For a caller with one curve and no path around it. A contour's stroke is worked
- * out with {@link ovalPathStroke}, which knows where the curves meet.
+ * Traced in the space where the pen is a circle, where the sides are offsets, and
+ * mapped back. Empty for a curve with no direction.
  */
-export function ovalStroke(
-  s: Cubic,
-  angleDegrees: number,
-  width: number,
-  thickness: number,
+export function ovalBands(
+  curve: Cubic,
+  pen: PenShape,
   tolerance: number = OFFSET_TOLERANCE,
 ): Cubic[][] {
-  return ovalPathStroke([s], false, angleDegrees, width, thickness, tolerance);
+  const { inward, outward, fine } = squashFor(pen, tolerance);
+  const squashed = mapCubic(curve, inward);
+  if (leftNormal(squashed, 0) === null || leftNormal(squashed, 1) === null) return [];
+  return bands(squashed, fine, 0).map((loop) => loop.map((c) => mapCubic(c, outward)));
+}
+
+/**
+ * What fills the outside of a corner between two curves, drawn with an oval pen
+ * standing at the corner — or `null` where the join is not a corner.
+ */
+export function ovalWedge(before: Cubic, after: Cubic, pen: PenShape): Cubic[] | null {
+  const { inward, outward } = squashFor(pen, OFFSET_TOLERANCE);
+  const wedge = cornerWedge(mapCubic(before, inward), mapCubic(after, inward));
+  return wedge === null ? null : wedge.map((c) => mapCubic(c, outward));
+}
+
+/**
+ * The round end an oval pen leaves where a path ends: at the far end of `curve`
+ * when `atEnd`, at its start otherwise.
+ */
+export function ovalCap(curve: Cubic, atEnd: boolean, pen: PenShape): Cubic[] | null {
+  const { inward, outward } = squashFor(pen, OFFSET_TOLERANCE);
+  const squashed = mapCubic(curve, inward);
+  const normal = leftNormal(squashed, atEnd ? 1 : 0);
+  if (normal === null) return null;
+  return cap(atEnd ? squashed.b : squashed.a, normal, atEnd).map((c) => mapCubic(c, outward));
 }
 
 /** How many times a stretch is halved looking for one that does not fold. */
@@ -391,8 +362,8 @@ function bands(c: Cubic, tolerance: number, depth: number): Cubic[][] {
  * crossings are what the union is best at.
  */
 function cornerWedge(before: Cubic, after: Cubic): Cubic[] | null {
-  const arriving = tangent(before, 1);
-  const leaving = tangent(after, 0);
+  const arriving = endTangent(before, 1);
+  const leaving = endTangent(after, 0);
   if (arriving === null || leaving === null) return null;
 
   const turn = arriving.x * leaving.y - arriving.y * leaving.x;

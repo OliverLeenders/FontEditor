@@ -5,13 +5,14 @@ import {
   type Contour,
   contour,
   contourBounds,
+  insertNodeOnSegment,
   segmentAt,
   segmentCount,
   segmentCubic,
 } from "../src/contour.js";
 import { contourWinding } from "../src/direction.js";
 import { drawableGlyph } from "../src/drawable.js";
-import { filledContours } from "../src/direction.js";
+import { filledContours, insideGlyph } from "../src/direction.js";
 import { fontDocument } from "../src/document.js";
 import { component } from "../src/component.js";
 import { glyph } from "../src/glyph.js";
@@ -591,5 +592,180 @@ describe("a round pen, joined", () => {
         expect(nearest).toBeCloseTo(15, 0);
       }
     }
+  });
+});
+
+describe("a stroke whose ends have their handles on their points", () => {
+  /**
+   * The stroke from the bug report: a curve through two smooth points, its first
+   * and last segments each with one handle pulled onto the corner it leaves. An
+   * oval pen drew ink along the middle segment only, because the direction a curve
+   * leaves a corner by was read as "none" where its handle sat on the point.
+   */
+  const reported = () =>
+    contour(ids.contour(), [
+      node(ids.node(), { x: 75, y: -207 }),
+      node(
+        ids.node(),
+        { x: 262, y: -139 },
+        { type: "smooth", in: { x: 165, y: -116 }, out: { x: 283, y: -143 } },
+      ),
+      node(
+        ids.node(),
+        { x: 385, y: -175 },
+        { type: "smooth", in: { x: 348, y: -160 }, out: { x: 456, y: -203 } },
+      ),
+      node(ids.node(), { x: 497, y: -248 }),
+    ]);
+
+  for (const nib of [
+    { angle: 30, width: 80 },
+    { angle: 30, width: 80, thickness: 20 },
+    { angle: 0, width: 60, thickness: 60 },
+  ]) {
+    it(`is inked along its whole length with ${JSON.stringify(nib)}`, () => {
+      const c = withNib(reported(), nib);
+      const g = glyph("x", { contours: [c] });
+      for (let i = 0; i < segmentCount(c); i++) {
+        const s = segmentCubic(segmentAt(c, i)!);
+        for (let k = 1; k < 10; k++) expect(insideGlyph(g, evaluate(s, k / 10))).toBe(true);
+      }
+    });
+  }
+
+  it("is drawn fast enough to drag", () => {
+    // The fill is what the canvas asks for on every move of a drag, and it used to
+    // take a fifth of a second for this stroke and over half a second for an oval.
+    // The bound is loose on purpose: it catches a return to that, not a slow machine.
+    const start = performance.now();
+    for (let i = 0; i < 10; i++) {
+      const moved = contour(
+        ids.contour(),
+        reported().nodes.map((n) => ({ ...n, pt: { x: n.pt.x + i, y: n.pt.y } })),
+      );
+      filledContours(
+        glyph("x", { contours: [withNib(moved, { angle: 30, width: 80, thickness: 20 })] }),
+      );
+    }
+    expect((performance.now() - start) / 10).toBeLessThan(40);
+  });
+});
+
+describe("pens set at points", () => {
+  /**
+   * Straight up from the baseline, drawn with a level broad nib — the full width
+   * across the stroke — and a point at the top whose own nib stands upright, along
+   * the stroke, where it draws no width at all.
+   */
+  const turning = (): Contour => {
+    const c = withNib(
+      path([
+        [0, 0],
+        [0, 300],
+      ]),
+      { angle: 0, width: 80 },
+    );
+    return { ...c, nodes: [c.nodes[0]!, { ...c.nodes[1]!, pen: { angle: 90, width: 40 } }] };
+  };
+
+  it("draw a stroke that changes along the way from one to the next", () => {
+    // Near the bottom the nib is level and the ink is its full width; near the top
+    // it has turned to stand along the stroke, and the ink has all but run out.
+    const g = glyph("l", { advance: 600, contours: [turning()] });
+    expect(insideGlyph(g, { x: 30, y: 20 })).toBe(true);
+    expect(insideGlyph(g, { x: 30, y: 280 })).toBe(false);
+    expect(insideGlyph(g, { x: 0, y: 280 })).toBe(true);
+  });
+
+  it("give a point put into a segment the pen already there", () => {
+    const split = insertNodeOnSegment(turning(), 0, 0.5, ids)!;
+    expect(split.nodes[1]!.pen).toEqual({ angle: 45, width: 60 });
+    expect(split.nib).toEqual({ angle: 0, width: 80 });
+  });
+
+  it("give a point put into a stroke of one pen nothing of its own", () => {
+    const plain = withNib(
+      path([
+        [0, 0],
+        [0, 300],
+      ]),
+      { angle: 30, width: 80 },
+    );
+    const split = insertNodeOnSegment(plain, 0, 0.5, ids)!;
+    expect("pen" in split.nodes[1]!).toBe(false);
+  });
+
+  it("leave the ink as it was when a point is put in", () => {
+    // The new point's pen is the blend at its place, so the stroke either side
+    // blends from and to the same pens it did before.
+    const before = glyph("l", { advance: 600, contours: [turning()] });
+    const after = glyph("l", {
+      advance: 600,
+      contours: [insertNodeOnSegment(turning(), 0, 0.5, ids)!],
+    });
+    for (const [x, y] of [
+      [30, 20],
+      [25, 100],
+      [15, 200],
+      [30, 280],
+      [0, 280],
+    ] as const) {
+      expect(insideGlyph(after, { x, y })).toBe(insideGlyph(before, { x, y }));
+    }
+  });
+
+  it("are given to the ends the knife makes", () => {
+    const g = glyph("l", { contours: [turning()] });
+    const cut = cutGlyph(g, { x: -100, y: 150 }, { x: 100, y: 150 }, ids)!;
+
+    const ends = cut.glyph.contours.flatMap((c) => c.nodes.filter((n) => n.pt.y === 150));
+    expect(ends).toHaveLength(2);
+    for (const n of ends) expect(n.pen).toEqual({ angle: 45, width: 60 });
+    const top = cut.glyph.contours.flatMap((c) => c.nodes.filter((n) => n.pt.y === 300));
+    expect(top[0]!.pen).toEqual({ angle: 90, width: 40 });
+  });
+
+  it("are quick enough to redraw while a point is dragged", () => {
+    // A pen that changes at every point is fitted rather than worked out exactly,
+    // which is the slow part; eleven curved segments of it, broad and oval, stay
+    // well inside a frame. Fresh contours each time, as a drag makes them. The
+    // middle time is the one judged, after one run to warm up: the first run pays
+    // for compiling, and a run that lands on a collection or on a machine busy
+    // with other suites says nothing about the code.
+    for (const thickness of [0, 20]) {
+      const times: number[] = [];
+      for (let run = 0; run < 11; run++) {
+        const nodes = Array.from({ length: 12 }, (_, i) => {
+          const y = 200 * Math.sin(i / 2);
+          return node(
+            ids.node(),
+            { x: i * 60 + run, y },
+            {
+              type: "smooth",
+              in: { x: i * 60 - 20 + run, y: y - 30 },
+              out: { x: i * 60 + 20 + run, y: y + 30 },
+              pen: { angle: 30 + i * 7, width: 60 + (i % 3) * 20, thickness },
+            },
+          );
+        });
+        const c = { ...contour(ids.contour(), nodes), nib: { angle: 30, width: 80, thickness } };
+        const start = performance.now();
+        filledContours(glyph("s", { contours: [c] }));
+        if (run > 0) times.push(performance.now() - start);
+      }
+      times.sort((a, b) => a - b);
+      expect(times[5]!).toBeLessThan(40);
+    }
+  });
+
+  it("interpolate with their points", () => {
+    const at = (angle: number, width: number) => {
+      const c = turning();
+      return glyph("l", {
+        contours: [{ ...c, nodes: [c.nodes[0]!, { ...c.nodes[1]!, pen: { angle, width } }] }],
+      });
+    };
+    const half = interpolateGlyph([at(60, 40), at(80, 80)], [0.5, 0.5])!;
+    expect(half.contours[0]!.nodes[1]!.pen).toEqual({ angle: 70, width: 60 });
   });
 });

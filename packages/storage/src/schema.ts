@@ -75,6 +75,8 @@ export type StoredNode = {
    * where it was left.
    */
   readonly harmonised?: true;
+  /** The pen at this point of a stroke, where it has one of its own. */
+  readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
 };
 
 export type StoredContour = {
@@ -289,7 +291,8 @@ function encodeNode(n: Node): StoredNode {
     in: n.in === null ? null : point(n.in),
     out: n.out === null ? null : point(n.out),
   };
-  const held = n.harmonised ? { ...base, harmonised: true as const } : base;
+  const penned = n.pen === undefined ? base : { ...base, pen: { ...n.pen } };
+  const held = n.harmonised ? { ...penned, harmonised: true as const } : penned;
   if (n.hvLock.in && n.hvLock.out) return { ...held, hvLock: true };
   if (n.hvLock.in) return { ...held, hvLock: "in" };
   if (n.hvLock.out) return { ...held, hvLock: "out" };
@@ -555,6 +558,7 @@ function decodeNode(raw: unknown): Decoded<Node> {
       out: outgoing,
       hvLock: decodeLock(raw["hvLock"]),
       harmonised: raw["harmonised"] === true,
+      ...penField(decodeNib(raw["pen"])),
     }),
   );
 }
@@ -587,6 +591,15 @@ function decodeContour(raw: unknown): Decoded<Contour> {
   const plain = contour(raw["id"], nodes, raw["closed"] === true);
   const nib = decodeNib(raw["nib"]);
   return ok(nib === null ? plain : { ...plain, nib });
+}
+
+/** A pen as the optional field a node is built with. */
+function penField(
+  pen: { readonly angle: number; readonly width: number; readonly thickness?: number } | null,
+): {
+  readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+} {
+  return pen === null ? {} : { pen };
 }
 
 /**

@@ -4,9 +4,9 @@ import {
   OFFSET_TOLERANCE,
   arcCubics,
   cubic,
+  endTangent,
   leftNormal,
   offsetCubic,
-  tangent,
 } from "@typewright/geometry";
 
 import { type Contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
@@ -204,8 +204,8 @@ function settle(
   const start = head.curve.a;
   if (Math.hypot(start.x - end.x, start.y - end.y) < JOINED) return [...run];
 
-  const arriving = tangent(previous.curve, 1);
-  const leaving = tangent(head.curve, 0);
+  const arriving = endTangent(previous.curve, 1);
+  const leaving = endTangent(head.curve, 0);
   const turn =
     arriving === null || leaving === null ? 0 : arriving.x * leaving.y - arriving.y * leaving.x;
 
@@ -272,8 +272,8 @@ function cornerBetween(
 
   const flat = [{ curve: straight(end, start), line: true }];
 
-  const arriving = tangent(from, 1);
-  const leaving = tangent(to, 0);
+  const arriving = endTangent(from, 1);
+  const leaving = endTangent(to, 0);
   if (arriving === null || leaving === null) return flat;
 
   const spike = mitrePoint(end, arriving, start, leaving);
