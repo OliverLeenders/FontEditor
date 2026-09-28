@@ -1,4 +1,4 @@
-import type { Vec2 } from "@typewright/geometry";
+import type { SegmentBlend, Vec2 } from "@typewright/geometry";
 import {
   type Contour,
   type IdFactory,
@@ -7,6 +7,7 @@ import {
   addContour,
   contour,
   node,
+  readSegmentBlend,
   removeContour,
 } from "@typewright/font-model";
 
@@ -47,6 +48,7 @@ type StoredNode = {
   readonly hvLock: boolean | { readonly in?: boolean; readonly out?: boolean };
   readonly harmonised?: boolean;
   readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+  readonly blend?: { readonly angle: string; readonly shape: string };
 };
 
 type Payload = {
@@ -100,6 +102,7 @@ export function clipboardText(state: EditorState): string | null {
         hvLock: { in: n.hvLock.in, out: n.hvLock.out },
         ...(n.harmonised ? { harmonised: true } : {}),
         ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
+        ...(n.blend === undefined ? {} : { blend: { ...n.blend } }),
       })),
       ...(c.nib === undefined ? {} : { nib: { ...c.nib } }),
     })),
@@ -218,6 +221,10 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
           } => {
             const pen = readNib(rawNode["pen"]);
             return pen === null ? {} : { pen };
+          })(),
+          ...((): { blend?: SegmentBlend } => {
+            const blend = readSegmentBlend(rawNode["blend"]);
+            return blend === undefined ? {} : { blend };
           })(),
         }),
       );

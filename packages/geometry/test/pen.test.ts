@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import { type Cubic, cubic, evaluate, project } from "../src/cubic.js";
 import { fitCubics } from "../src/fit.js";
-import { type PenShape, blendPen, penPathStroke, penSupport } from "../src/pen.js";
+import {
+  type PenBlend,
+  type PenShape,
+  blendPen,
+  penPathStroke,
+  penProfiles,
+  penSupport,
+} from "../src/pen.js";
 import { vec } from "../src/vec2.js";
 
 /**
@@ -226,5 +233,98 @@ describe("a stroke whose pen changes along it", () => {
     const ys = edge(loops).map((p) => p.y);
     expect(Math.max(...ys)).toBeCloseTo(30, 9);
     expect(Math.min(...ys)).toBeCloseTo(-30, 9);
+  });
+});
+
+describe("how a pen changes along a segment", () => {
+  const thin: PenShape = { angle: 0, width: 20, thickness: 20 };
+  const wide: PenShape = { angle: 0, width: 60, thickness: 60 };
+
+  /** One straight segment, 300 long, blended one way for both parts of the pen. */
+  const one = (blend: PenBlend, curve = line(0, 0, 300, 0)) =>
+    penProfiles([curve], [thin, wide], false, [{ angle: blend, shape: blend }])[0]!;
+
+  it("goes evenly by distance, not by the curve's parameter", () => {
+    // A straight line whose handles bunch towards its start: halfway along the
+    // parameter is well past halfway along the line.
+    const bunched = cubic(vec(0, 0), vec(10, 0), vec(20, 0), vec(300, 0));
+    const profile = one("linear", bunched);
+    const halfway = [0.1, 0.3, 0.5, 0.7, 0.9]
+      .map((t) => ({ t, x: evaluate(bunched, t).x }))
+      .reduce((best, p) => (Math.abs(p.x - 150) < Math.abs(best.x - 150) ? p : best));
+    expect(profile.at(halfway.t).width).toBeCloseTo(20 + 40 * (halfway.x / 300), 0);
+  });
+
+  it("eases away from one pen and into the other", () => {
+    const eased = one("ease");
+    const even = one("linear");
+    // Barely changed a tenth of the way along, where even has done a tenth.
+    expect(eased.at(0.1).width - 20).toBeLessThan((even.at(0.1).width - 20) / 2);
+    expect(eased.at(0.5).width).toBeCloseTo(40, 6);
+    expect(60 - eased.at(0.9).width).toBeLessThan((60 - even.at(0.9).width) / 2);
+  });
+
+  it("holds the first pen the whole way on a step", () => {
+    const step = one("step");
+    expect(step.at(0.99).width).toBe(20);
+    expect(step.constant).toEqual(thin);
+  });
+
+  it("carries its rate of change through a point when smooth", () => {
+    // Three points along a line, the pen growing 20, 40, 80: linear turns a corner
+    // at the middle point, smooth passes through it at one rate.
+    const curves = [line(0, 0, 100, 0), line(100, 0, 200, 0)];
+    const pens: PenShape[] = [
+      { angle: 0, width: 20, thickness: 20 },
+      { angle: 0, width: 40, thickness: 40 },
+      { angle: 0, width: 80, thickness: 80 },
+    ];
+    const smooth = { angle: "smooth", shape: "smooth" } as const;
+    const [a, b] = penProfiles(curves, pens, false, [smooth, smooth]);
+    const h = 1e-3;
+    const into = (a!.at(1).width - a!.at(1 - h).width) / h;
+    const out = (b!.at(h).width - b!.at(0).width) / h;
+    expect(out).toBeCloseTo(into, 1);
+  });
+
+  it("never goes past either pen when smooth", () => {
+    // Up then down: a spline that is not monotone would overshoot 80 on the way.
+    const curves = [line(0, 0, 100, 0), line(100, 0, 200, 0)];
+    const pens: PenShape[] = [
+      { angle: 0, width: 20, thickness: 0 },
+      { angle: 0, width: 80, thickness: 0 },
+      { angle: 0, width: 30, thickness: 0 },
+    ];
+    const smooth = { angle: "smooth", shape: "smooth" } as const;
+    const profiles = penProfiles(curves, pens, false, [smooth, smooth]);
+    for (const p of profiles) {
+      for (let k = 0; k <= 50; k++) expect(p.at(k / 50).width).toBeLessThanOrEqual(80 + 1e-9);
+    }
+  });
+
+  it("is constant, and exact, where both ends have the same pen whatever the blend", () => {
+    const curves = [line(0, 0, 100, 0), line(100, 0, 200, 0)];
+    const pens: PenShape[] = [wide, wide, thin];
+    for (const blend of ["linear", "smooth", "ease", "step"] as const) {
+      const [first] = penProfiles(curves, pens, false, [
+        { angle: blend, shape: blend },
+        { angle: blend, shape: blend },
+      ]);
+      expect(first!.constant).toEqual(wide);
+    }
+  });
+
+  it("blends the angle and the shape each its own way", () => {
+    const profile = penProfiles(
+      [line(0, 0, 300, 0)],
+      [
+        { angle: 0, width: 20, thickness: 0 },
+        { angle: 90, width: 60, thickness: 0 },
+      ],
+      false,
+      [{ angle: "step", shape: "linear" }],
+    )[0]!;
+    expect(profile.at(0.5).angle).toBe(0);
+    expect(profile.at(0.5).width).toBeCloseTo(40, 6);
   });
 });

@@ -31,8 +31,9 @@ import {
   hasMetricKeys,
   imageRef,
   node,
+  readSegmentBlend,
 } from "@typewright/font-model";
-import type { Vec2 } from "@typewright/geometry";
+import type { SegmentBlend, Vec2 } from "@typewright/geometry";
 
 /**
  * The on-disk format, written out explicitly rather than by dumping the model.
@@ -77,6 +78,8 @@ export type StoredNode = {
   readonly harmonised?: true;
   /** The pen at this point of a stroke, where it has one of its own. */
   readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+  /** How the pen changes along the segment leaving this point, where not linear. */
+  readonly blend?: { readonly angle: string; readonly shape: string };
 };
 
 export type StoredContour = {
@@ -291,7 +294,8 @@ function encodeNode(n: Node): StoredNode {
     in: n.in === null ? null : point(n.in),
     out: n.out === null ? null : point(n.out),
   };
-  const penned = n.pen === undefined ? base : { ...base, pen: { ...n.pen } };
+  const pennedOnly = n.pen === undefined ? base : { ...base, pen: { ...n.pen } };
+  const penned = n.blend === undefined ? pennedOnly : { ...pennedOnly, blend: { ...n.blend } };
   const held = n.harmonised ? { ...penned, harmonised: true as const } : penned;
   if (n.hvLock.in && n.hvLock.out) return { ...held, hvLock: true };
   if (n.hvLock.in) return { ...held, hvLock: "in" };
@@ -559,6 +563,7 @@ function decodeNode(raw: unknown): Decoded<Node> {
       hvLock: decodeLock(raw["hvLock"]),
       harmonised: raw["harmonised"] === true,
       ...penField(decodeNib(raw["pen"])),
+      ...blendField(readSegmentBlend(raw["blend"])),
     }),
   );
 }
@@ -591,6 +596,11 @@ function decodeContour(raw: unknown): Decoded<Contour> {
   const plain = contour(raw["id"], nodes, raw["closed"] === true);
   const nib = decodeNib(raw["nib"]);
   return ok(nib === null ? plain : { ...plain, nib });
+}
+
+/** A blend as the optional field a node is built with. */
+function blendField(blend: SegmentBlend | undefined): { readonly blend?: SegmentBlend } {
+  return blend === undefined ? {} : { blend };
 }
 
 /** A pen as the optional field a node is built with. */

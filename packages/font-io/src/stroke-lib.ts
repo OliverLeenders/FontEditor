@@ -5,7 +5,9 @@ import {
   type NodeType,
   contour,
   node,
+  readSegmentBlend,
 } from "@typewright/font-model";
+import type { SegmentBlend } from "@typewright/geometry";
 
 import { type XmlElement, isElement, textOf } from "./xml.js";
 
@@ -53,6 +55,7 @@ type StoredNode = {
   readonly hvLock?: readonly [boolean, boolean];
   readonly harmonised?: true;
   readonly pen?: Nib;
+  readonly blend?: SegmentBlend;
 };
 
 /** What was read out of a glyph's lib: the strokes, and what their ink should be. */
@@ -148,6 +151,7 @@ function storedNode(n: Contour["nodes"][number]): StoredNode {
     ...(n.hvLock.in || n.hvLock.out ? { hvLock: [n.hvLock.in, n.hvLock.out] as const } : {}),
     ...(n.harmonised ? { harmonised: true as const } : {}),
     ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
+    ...(n.blend === undefined ? {} : { blend: { ...n.blend } }),
   };
 }
 
@@ -255,6 +259,10 @@ function readNode(raw: unknown): StoredNode | null {
       : {}),
     ...(r["harmonised"] === true ? { harmonised: true as const } : {}),
     ...penOf(r["pen"]),
+    ...((): { readonly blend?: SegmentBlend } => {
+      const blend = readSegmentBlend(r["blend"]);
+      return blend === undefined ? {} : { blend };
+    })(),
   };
 }
 
@@ -320,6 +328,7 @@ export function restoreStrokes(
               hvLock: n.hvLock === undefined ? false : { in: n.hvLock[0], out: n.hvLock[1] },
               harmonised: n.harmonised === true,
               ...(n.pen === undefined ? {} : { pen: n.pen }),
+              ...(n.blend === undefined ? {} : { blend: n.blend }),
             },
           ),
         ),

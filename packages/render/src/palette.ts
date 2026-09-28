@@ -38,6 +38,12 @@ export type RenderPalette = {
   readonly handleLine: string;
   readonly tunniLine: string;
   readonly tunniPoint: string;
+  /**
+   * Where a contour starts and which way it runs: the ring and the chevron.
+   * Drawn faint, so a node's own blue deepened a little, and a colour of its own
+   * so nothing else is ever taken for it.
+   */
+  readonly contourStart: string;
   readonly intersection: string;
   readonly marqueeFill: string;
   readonly marqueeStroke: string;
@@ -128,6 +134,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   handleLine: "#B4BFCA",
   tunniLine: "#2C6DAF",
   tunniPoint: "#A96F22",
+  contourStart: "#245E9A",
   intersection: "#B4BFCA",
   marqueeFill: "rgba(44,109,175,0.08)",
   marqueeStroke: "#2C6DAF",
@@ -169,6 +176,7 @@ export const DARK_PALETTE: RenderPalette = {
   handleLine: "#3A4655",
   tunniLine: "#74AEE2",
   tunniPoint: "#D6A05A",
+  contourStart: "#8CBCE8",
   intersection: "#3A4655",
   marqueeFill: "rgba(116,174,226,0.10)",
   marqueeStroke: "#74AEE2",

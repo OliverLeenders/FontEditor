@@ -38,7 +38,9 @@ import {
   convertSegment,
   deleteSelectedPoints,
   insertPointOnSegment,
+  convertStrokesToOutlines,
   selectContour,
+  strokesToOutline,
   retractHandle,
   reverseContourAt,
   segmentHasMissingHandle,
@@ -63,10 +65,10 @@ import {
   AnchorIcon,
   CentreGlyphIcon,
   CirclePlusIcon,
-  ComponentIcon,
+  PuzzleIcon,
   DistributeCentreIcon,
   ExternalLinkIcon,
-  GridIcon,
+  EqualApproximatelyIcon,
   IterationCcwIcon,
   LockIcon,
   MaximizeIcon,
@@ -84,6 +86,10 @@ import {
   UngroupIcon,
   WavesIcon,
   PointIcon,
+  CornerPointIcon,
+  ClefTrebleIcon,
+  MusicIcon,
+  BrushIcon,
 } from "./icons.js";
 
 export type MenuRequest = {
@@ -140,7 +146,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     {
       kind: "item",
       label: `Round selection${editor.selection.length === 0 ? "" : ` (${String(unroundedSelected(editor))})`}`,
-      icon: GridIcon,
+      icon: EqualApproximatelyIcon,
       // Offered even with nothing out of place, so the menu does not change
       // shape between two glyphs that look the same.
       disabled: editor.selection.length === 0,
@@ -149,7 +155,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     {
       kind: "item",
       label: "Round this glyph",
-      icon: GridIcon,
+      icon: EqualApproximatelyIcon,
       run: () => store.applyTool(roundGlyphAt(editor, editor.currentGlyph)),
     },
   ];
@@ -177,9 +183,9 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         run: () => store.applyTool(addAnchorAt(editor, request.point, ids)),
       },
       { kind: "separator" },
-      // Level and upright, which is what almost every guide is, and both scopes
-      // because the scope is the decision: the x-height belongs to the typeface
-      // and this letter's diagonal belongs to the letter.
+      // Level and upright, which is what almost every guide is. In this glyph:
+      // a guide is made global from its own menu, which is one item there rather
+      // than two more here.
       {
         kind: "item",
         label: "Add horizontal guide",
@@ -191,18 +197,6 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         label: "Add vertical guide",
         icon: GuideUpIcon,
         run: () => store.applyTool(addGuideAt(editor, request.point, 90, "glyph", ids)),
-      },
-      {
-        kind: "item",
-        label: "Add horizontal guide, for the whole font",
-        icon: GuideAcrossIcon,
-        run: () => store.applyTool(addGuideAt(editor, request.point, 0, "font", ids)),
-      },
-      {
-        kind: "item",
-        label: "Add vertical guide, for the whole font",
-        icon: GuideUpIcon,
-        run: () => store.applyTool(addGuideAt(editor, request.point, 90, "font", ids)),
       },
       { kind: "separator" },
       ...rounding,
@@ -235,7 +229,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Corner",
-        icon: PointIcon,
+        icon: CornerPointIcon,
         note: counted(many),
         run: () => store.applyTool(setPointType(acting, "corner")),
       },
@@ -268,7 +262,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
             {
               kind: "item" as const,
               label: "Harmonise",
-              icon: WavesIcon,
+              icon: ClefTrebleIcon,
               note: counted(many),
               run: () => store.applyTool(harmoniseSelection(acting)),
             },
@@ -282,7 +276,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
             {
               kind: "item" as const,
               label: holding ? "Let go of curvature" : "Hold curvature",
-              icon: WavesIcon,
+              icon: MusicIcon,
               note: counted(many),
               run: () => store.applyTool(holdCurvatureInSelection(acting, !holding)),
             },
@@ -335,6 +329,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         icon: IterationCcwIcon,
         run: () => store.applyTool(reverseContourAt(editor, contourId)),
       },
+      ...strokeItems(store, editor, contourId),
       {
         kind: "item",
         label: many > 1 ? "Delete points" : "Delete point",
@@ -386,7 +381,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Corner",
-        icon: PointIcon,
+        icon: CornerPointIcon,
         note: counted(many),
         run: () => store.applyTool(setPointType(acting, "corner")),
       },
@@ -428,12 +423,15 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         run: () => store.applyTool(extractSelectedHandles(acting)),
       });
     }
-    items.push({
-      kind: "item",
-      label: "Reverse contour",
-      icon: IterationCcwIcon,
-      run: () => store.applyTool(reverseContourAt(editor, contourId)),
-    });
+    items.push(
+      {
+        kind: "item",
+        label: "Reverse contour",
+        icon: IterationCcwIcon,
+        run: () => store.applyTool(reverseContourAt(editor, contourId)),
+      },
+      ...strokeItems(store, editor, contourId),
+    );
     return items;
   }
 
@@ -472,7 +470,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       {
         kind: "item",
         label: "Remove component",
-        icon: ComponentIcon,
+        icon: PuzzleIcon,
         run: () => store.applyTool(removeComponent(editor, componentId)),
       },
     ];
@@ -626,8 +624,30 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       icon: IterationCcwIcon,
       run: () => store.applyTool(reverseContourAt(editor, segment.contourId)),
     },
+    ...strokeItems(store, editor, segment.contourId),
   );
   return items;
+}
+
+/**
+ * Turning a stroke into the outlines it draws, where the contour is a stroke.
+ *
+ * The contour clicked and every other stroke selected, the way the contour
+ * commands beside it act on the selection: a stroke is drawn in several pieces
+ * more often than not, and converting them is one decision. Offered only where
+ * there is a stroke, since on an outline it would do nothing.
+ */
+function strokeItems(store: EditorStore, editor: EditorState, contourId: string): Item[] {
+  const count = strokesToOutline(editor, contourId).size;
+  if (count === 0) return [];
+  return [
+    {
+      kind: "item",
+      label: count > 1 ? "Convert strokes to outlines" : "Convert stroke to outlines",
+      icon: BrushIcon,
+      run: () => store.applyTool(convertStrokesToOutlines(editor, contourId, ids)),
+    },
+  ];
 }
 
 /**
@@ -790,10 +810,7 @@ function guideItems(store: EditorStore, id: string): Item[] {
   return [
     {
       kind: "item",
-      label:
-        found.scope === "glyph"
-          ? "Give this guide to the whole font"
-          : "Keep this guide in this glyph",
+      label: found.scope === "glyph" ? "Make this guide global" : "Keep this guide in this glyph",
       icon: FrameIcon,
       run: () =>
         store.applyTool(moveGuideToScope(editor, id, found.scope === "glyph" ? "font" : "glyph")),

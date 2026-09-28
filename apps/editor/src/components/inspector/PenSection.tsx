@@ -1,9 +1,18 @@
-import { changePen, drawWithPen, selectedPointPen, selectionNib } from "@typewright/tools";
+import type { PenBlend } from "@typewright/geometry";
+import {
+  type BlendChannel,
+  changePen,
+  drawWithPen,
+  selectedPenBlend,
+  selectedPointPen,
+  selectionNib,
+  setPenBlend,
+} from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
 import { NumberField } from "../NumberField.js";
-import { PenIcon } from "../icons.js";
+import { BrushIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field } from "./fields.js";
 
@@ -17,8 +26,10 @@ import { Field } from "./fields.js";
  * edge, more for an oval. The angle is read the way a calligrapher reads it, anticlockwise
  * from level, so thirty is a foundational hand and forty-five an italic.
  *
- * Whole contours, as every contour-level setting is. A contour is claimed by any
- * of its points being selected.
+ * Outline or Stroke is said of whole contours, claimed by any of their points
+ * being selected. The numbers are the pen at the selected points, and the blends
+ * how it changes along the segments leaving them: a stroke's pen is set point by
+ * point.
  */
 export function PenSection(): React.JSX.Element {
   const store = useEditorStore();
@@ -29,6 +40,9 @@ export function PenSection(): React.JSX.Element {
   // The pen at the selected points, which is what the numbers describe: the pen is
   // set point by point and blends along each segment from one point to the next.
   const pen = useStoreValue((s) => selectedPointPen(s.session.editor));
+  // How the pen changes along the segments leaving those points, part by part.
+  const angleBlend = useStoreValue((s) => selectedPenBlend(s.session.editor, "angle"));
+  const shapeBlend = useStoreValue((s) => selectedPenBlend(s.session.editor, "shape"));
 
   const selected = stroke !== null;
   const drawing = stroke !== null && stroke !== "none";
@@ -39,7 +53,7 @@ export function PenSection(): React.JSX.Element {
     <Section
       name="pen"
       title="Pen"
-      icon={PenIcon}
+      icon={BrushIcon}
       relevant={drawing}
       empty={!selected}
       emptyNote="nothing selected"
@@ -114,6 +128,62 @@ export function PenSection(): React.JSX.Element {
           </Field>
         </>
       )}
+
+      {/* How the pen goes from these points' pens to the next points' along each
+          segment, for the angle and for the shape. Only where a selected point
+          starts a segment of a stroke: the last point of an open one has no
+          segment after it to say anything about. */}
+      {angleBlend !== null && <BlendField label="Angle blend" channel="angle" value={angleBlend} />}
+      {shapeBlend !== null && <BlendField label="Shape blend" channel="shape" value={shapeBlend} />}
     </Section>
+  );
+}
+
+const BLENDS: readonly {
+  readonly value: PenBlend;
+  readonly label: string;
+  readonly title: string;
+}[] = [
+  { value: "linear", label: "Linear", title: "Evenly along the segment" },
+  {
+    value: "smooth",
+    label: "Smooth",
+    title: "Along a curve through the pens at all the points, with no corner where a point is",
+  },
+  { value: "ease", label: "Ease", title: "Slowly away from this point and slowly into the next" },
+  { value: "step", label: "Step", title: "This point's pen held until the next point" },
+];
+
+/**
+ * One row of blend buttons: how one part of the pen changes along the segments
+ * leaving the selected points. A mixed selection presses none of them, and
+ * pressing one gives it to all.
+ */
+function BlendField({
+  label,
+  channel,
+  value,
+}: {
+  readonly label: string;
+  readonly channel: BlendChannel;
+  readonly value: PenBlend | "mixed";
+}): React.JSX.Element {
+  const store = useEditorStore();
+  return (
+    <Field label={label} group>
+      <div className={styles.segmented}>
+        {BLENDS.map((b) => (
+          <button
+            key={b.value}
+            type="button"
+            aria-pressed={value === b.value}
+            title={b.title}
+            onClick={() => store.applyTool(setPenBlend(store.editor, channel, b.value))}
+          >
+            {b.label}
+          </button>
+        ))}
+      </div>
+    </Field>
   );
 }

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { installBrowserGlobals } from "./browser-globals.js";
@@ -182,5 +182,20 @@ describe("the pen section", () => {
 
     expect(screen.getByRole("button", { name: /nothing selected/ })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Stroke" })).toBeNull();
+  });
+});
+
+describe("the pen's blends", () => {
+  it("offers them at the start of a segment of a stroke, and sets the one pressed", () => {
+    const store = opened(withPath());
+    expect(screen.queryByRole("group", { name: "Shape blend" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+
+    const shape = within(screen.getByRole("group", { name: "Shape blend" }));
+    expect(shape.getByRole("button", { name: "Linear" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(shape.getByRole("button", { name: "Smooth" }));
+
+    expect(path(store).nodes[0]!.blend).toEqual({ angle: "linear", shape: "smooth" });
+    expect(shape.getByRole("button", { name: "Smooth" }).getAttribute("aria-pressed")).toBe("true");
   });
 });

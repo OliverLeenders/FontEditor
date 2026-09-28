@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import { NumberField } from "./NumberField.js";
-import { OffsetIcon, SimplifyIcon } from "./icons.js";
+import { OffsetIcon, SparklesIcon } from "./icons.js";
 import styles from "./Reshape.module.css";
 import bar from "./Toolbar.module.css";
 
@@ -143,7 +143,7 @@ export function Reshape(): React.JSX.Element {
         aria-label={chosen ? "Simplify selection" : "Simplify"}
         onClick={() => apply("simplify")}
       >
-        <SimplifyIcon />
+        <SparklesIcon />
       </button>
 
       {note === null ? null : (

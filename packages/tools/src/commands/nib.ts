@@ -1,10 +1,15 @@
 import {
   type Contour,
+  type ContourId,
+  type IdFactory,
   type Nib,
+  contour,
+  inkOf,
   samePen as sameNib,
   updateContour,
   withNib,
 } from "@typewright/font-model";
+import type { PenBlend } from "@typewright/geometry";
 
 import { type ToolResult, result } from "../effects.js";
 import { type EditorState, currentGlyph, editCurrentGlyph } from "../state.js";
@@ -150,6 +155,137 @@ export function changePen(state: EditorState, change: Partial<Nib>): ToolResult 
         ? "Pen thickness"
         : "Pen width";
   return done(state, after, label);
+}
+
+/**
+ * The strokes a conversion to outlines would take: the one named, and every other
+ * stroke the selection claims when that one is among them. Only the one named
+ * when it is not selected, so a right-click on a stroke outside the selection
+ * does not reach into it.
+ */
+export function strokesToOutline(state: EditorState, contourId: string): Set<ContourId> {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return new Set();
+  const named = glyph.contours.find((c) => c.id === contourId);
+  if (named?.nib === undefined) return new Set();
+  const claimed = state.selection.some((item) => item.contourId === contourId);
+  const strokes = claimed ? selected(state).filter((c) => c.nib !== undefined) : [named];
+  return new Set(strokes.map((c) => c.id));
+}
+
+/**
+ * Turn strokes into the outlines they draw.
+ *
+ * Each stroke is replaced, where it sat in the glyph's order, by its ink joined
+ * into outlines — the same outlines the exporter writes — with ids of their own,
+ * since the ink a stroke is drawn with on screen is shared and a glyph must not
+ * hold two contours of one id. The selection is cleared: the points it named are
+ * gone.
+ */
+export function convertStrokesToOutlines(
+  state: EditorState,
+  contourId: string,
+  ids: IdFactory,
+): ToolResult {
+  const chosen = strokesToOutline(state, contourId);
+  if (chosen.size === 0) return result(state);
+
+  const document = editCurrentGlyph(state, (g) => ({
+    ...g,
+    contours: g.contours.flatMap((c) =>
+      chosen.has(c.id)
+        ? inkOf(c, ids).map((ink) =>
+            contour(
+              ids.contour(),
+              ink.nodes.map((n) => ({ ...n, id: ids.node() })),
+              ink.closed,
+            ),
+          )
+        : [c],
+    ),
+  }));
+  const after = document === null ? null : { ...state, document, selection: [] };
+  return done(
+    state,
+    after,
+    chosen.size > 1 ? "Convert strokes to outlines" : "Convert stroke to outlines",
+  );
+}
+
+/** Which part of the pen a blend is about: its angle, or its width and thickness. */
+export type BlendChannel = "angle" | "shape";
+
+/**
+ * The selected points of strokes that start a segment, by contour: every point of a
+ * closed stroke, and all but the last of an open one, which has no segment after it.
+ */
+function blendPoints(state: EditorState): { contour: Contour; index: number }[] {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return [];
+  const out: { contour: Contour; index: number }[] = [];
+  for (const item of state.selection) {
+    if (item.part !== "point") continue;
+    const c = glyph.contours.find((each) => each.id === item.contourId);
+    if (c === undefined || c.nib === undefined) continue;
+    const index = c.nodes.findIndex((n) => n.id === item.nodeId);
+    if (index < 0 || (!c.closed && index === c.nodes.length - 1)) continue;
+    out.push({ contour: c, index });
+  }
+  return out;
+}
+
+/**
+ * How the pen changes along the segments leaving the selected points, for one
+ * part of the pen: the blend they share, `"mixed"` where they differ, `null`
+ * where no selected point starts a segment of a stroke.
+ */
+export function selectedPenBlend(
+  state: EditorState,
+  channel: BlendChannel,
+): PenBlend | "mixed" | null {
+  let found: PenBlend | null = null;
+  for (const { contour: c, index } of blendPoints(state)) {
+    const blend = c.nodes[index]!.blend?.[channel] ?? "linear";
+    if (found === null) found = blend;
+    else if (found !== blend) return "mixed";
+  }
+  return found;
+}
+
+/**
+ * Set how the pen changes along the segments leaving the selected points, for its
+ * angle or for its shape. A point whose two blends are both linear again stores
+ * nothing, as one never changed does.
+ */
+export function setPenBlend(
+  state: EditorState,
+  channel: BlendChannel,
+  blend: PenBlend,
+): ToolResult {
+  const chosen = new Map<string, Set<number>>();
+  for (const { contour: c, index } of blendPoints(state)) {
+    const set = chosen.get(c.id) ?? new Set<number>();
+    set.add(index);
+    chosen.set(c.id, set);
+  }
+
+  const after = edit(state, selected(state), (c) => {
+    const indices = chosen.get(c.id);
+    if (indices === undefined) return c;
+    const nodes = c.nodes.map((n, i) => {
+      if (!indices.has(i)) return n;
+      const current = n.blend ?? { angle: "linear" as const, shape: "linear" as const };
+      if (current[channel] === blend) return n;
+      const next = { ...current, [channel]: blend };
+      if (next.angle === "linear" && next.shape === "linear") {
+        const { blend: _dropped, ...rest } = n;
+        return rest;
+      }
+      return { ...n, blend: next };
+    });
+    return nodes.some((n, i) => n !== c.nodes[i]) ? { ...c, nodes } : c;
+  });
+  return done(state, after, channel === "angle" ? "Pen angle blend" : "Pen shape blend");
 }
 
 /** The whole contours the selection claims, in the order the glyph has them. */

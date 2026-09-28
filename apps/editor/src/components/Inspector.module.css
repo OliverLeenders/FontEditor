@@ -610,6 +610,18 @@
   opacity: 0.38;
   cursor: default;
 }
+/* A button that says what it does in words and in an icon, the icon first. */
+.labelled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+.labelled svg {
+  width: 0.9rem;
+  height: 0.9rem;
+  flex: none;
+}
 
 /* The curvature readout: the two radii, how far apart they are, and the button
    that closes the gap. */

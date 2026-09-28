@@ -305,7 +305,7 @@ export const MopIcon: IconComponent = () => (
   </Glyph>
 );
 
-/** Rounding to whole units, which is putting the drawing on the grid. */
+/** The font workspace: the glyphs laid out on a grid. */
 export const GridIcon: IconComponent = () => (
   <Glyph>
     <path d="M12 3v18" />
@@ -578,13 +578,10 @@ export const TypeIcon: IconComponent = () => (
   </Glyph>
 );
 
-/** A glyph placed inside another one. */
-export const ComponentIcon: IconComponent = () => (
+/** A glyph placed inside another one: a piece that fits. */
+export const PuzzleIcon: IconComponent = () => (
   <Glyph>
-    <path d="M15.536 11.293a1 1 0 0 0 0 1.414l2.376 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z" />
-    <path d="M2.297 11.293a1 1 0 0 0 0 1.414l2.377 2.377a1 1 0 0 0 1.414 0l2.377-2.377a1 1 0 0 0 0-1.414L6.088 8.916a1 1 0 0 0-1.414 0z" />
-    <path d="M8.916 17.912a1 1 0 0 0 0 1.415l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.415l-2.377-2.376a1 1 0 0 0-1.414 0z" />
-    <path d="M8.916 4.674a1 1 0 0 0 0 1.414l2.377 2.376a1 1 0 0 0 1.414 0l2.377-2.376a1 1 0 0 0 0-1.414l-2.377-2.377a1 1 0 0 0-1.414 0z" />
+    <path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z" />
   </Glyph>
 );
 
@@ -605,10 +602,26 @@ export const ImageIcon: IconComponent = () => (
   </Glyph>
 );
 
-/** The selected point: a node on the line it sits in. */
+/**
+ * The selected point: a node on the line it sits in. A round node, because that
+ * is how the canvas draws a smooth one, and it doubles as the Smooth item.
+ */
 export const PointIcon: IconComponent = () => (
   <Glyph>
     <circle cx="12" cy="12" r="3" />
+    <line x1="3" x2="9" y1="12" y2="12" />
+    <line x1="15" x2="21" y1="12" y2="12" />
+  </Glyph>
+);
+
+/**
+ * A corner point: the same line with a square node, which is how the canvas tells
+ * a corner from a smooth point. Lucide's *git-commit-horizontal* with the circle
+ * squared, the one icon here drawn to our meaning rather than copied.
+ */
+export const CornerPointIcon: IconComponent = () => (
+  <Glyph>
+    <rect x="9" y="9" width="6" height="6" />
     <line x1="3" x2="9" y1="12" y2="12" />
     <line x1="15" x2="21" y1="12" y2="12" />
   </Glyph>
@@ -648,5 +661,33 @@ export const SettingsIcon: IconComponent = () => (
   <Glyph>
     <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
     <circle cx="12" cy="12" r="3" />
+  </Glyph>
+);
+
+/**
+ * The ones added from lucide-static v1.48.0.
+ *
+ * Harmonising is the treble clef and holding it is the notes: a join whose two
+ * curvatures agree is in tune, and one told to stay that way keeps playing it.
+ * Rounding is *equal-approximately*, which is exactly what it does to a number.
+ */
+export const ClefTrebleIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M10.586 21.414a2 2 0 0 0 3.378-1.791L11.036 4.377a2 2 0 1 1 3.378 1.037C12.414 7.414 7 8 7 13a5 5 0 0 0 5 5 5 4 0 0 0 5-4 3 3 0 0 0-3-3 3 2 0 0 0-3 2" />
+  </Glyph>
+);
+
+export const MusicIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M9 18V5l12-2v13" />
+    <circle cx="6" cy="18" r="3" />
+    <circle cx="18" cy="16" r="3" />
+  </Glyph>
+);
+
+export const EqualApproximatelyIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M5 15a6.5 6.5 0 0 1 7 0 6.5 6.5 0 0 0 7 0" />
+    <path d="M5 9a6.5 6.5 0 0 1 7 0 6.5 6.5 0 0 0 7 0" />
   </Glyph>
 );

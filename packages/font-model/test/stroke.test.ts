@@ -6,6 +6,7 @@ import {
   contour,
   contourBounds,
   insertNodeOnSegment,
+  readSegmentBlend,
   segmentAt,
   segmentCount,
   segmentCubic,
@@ -758,6 +759,29 @@ describe("pens set at points", () => {
     }
   });
 
+  it("hold along a stepped segment and change at the next point", () => {
+    // Held, the stroke keeps the level nib — the full width — right up to the top.
+    const c = turning();
+    const stepped = {
+      ...c,
+      nodes: [{ ...c.nodes[0]!, blend: { angle: "step", shape: "step" } as const }, c.nodes[1]!],
+    };
+    const g = glyph("l", { advance: 600, contours: [stepped] });
+    expect(insideGlyph(g, { x: 30, y: 280 })).toBe(true);
+  });
+
+  it("give a point put into a segment its blend, and the pen that blend has there", () => {
+    const c = turning();
+    const stepped = {
+      ...c,
+      nodes: [{ ...c.nodes[0]!, blend: { angle: "step", shape: "step" } as const }, c.nodes[1]!],
+    };
+    const split = insertNodeOnSegment(stepped, 0, 0.5, ids)!;
+    expect(split.nodes[1]!.blend).toEqual({ angle: "step", shape: "step" });
+    // Held, the pen halfway is still the first point's, which is the stroke's own.
+    expect("pen" in split.nodes[1]!).toBe(false);
+  });
+
   it("interpolate with their points", () => {
     const at = (angle: number, width: number) => {
       const c = turning();
@@ -767,5 +791,23 @@ describe("pens set at points", () => {
     };
     const half = interpolateGlyph([at(60, 40), at(80, 80)], [0.5, 0.5])!;
     expect(half.contours[0]!.nodes[1]!.pen).toEqual({ angle: 70, width: 60 });
+  });
+});
+
+describe("reading a stored blend", () => {
+  it("reads the words it knows and nothing for all linear", () => {
+    expect(readSegmentBlend({ angle: "smooth", shape: "ease" })).toEqual({
+      angle: "smooth",
+      shape: "ease",
+    });
+    expect(readSegmentBlend({ angle: "linear", shape: "linear" })).toBeUndefined();
+    expect(readSegmentBlend("smooth")).toBeUndefined();
+  });
+
+  it("reads a word from a later version as linear", () => {
+    expect(readSegmentBlend({ angle: "wobble", shape: "step" })).toEqual({
+      angle: "linear",
+      shape: "step",
+    });
   });
 });

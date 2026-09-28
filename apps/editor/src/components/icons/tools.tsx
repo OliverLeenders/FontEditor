@@ -164,35 +164,27 @@ export const OffsetIcon: IconComponent = () => (
 );
 
 /**
- * Simplify: a curve with the points that are coming off it.
- *
- * The curve stays, drawn through; the two points on it are hollow, which is how
- * this editor draws a point that is not part of the outline it keeps.
+ * Simplify: tidying the outline up, as Lucide's *sparkles* says it, from
+ * lucide-static v1.48.0.
  */
-export const SimplifyIcon: IconComponent = () => (
+export const SparklesIcon: IconComponent = () => (
   <Glyph>
-    <path d="M3 18c4-12 14-12 18 0" />
-    <circle cx="9" cy="10.4" r="1.6" />
-    <circle cx="15" cy="10.4" r="1.6" />
+    <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+    <path d="M20 2v4" />
+    <path d="M22 4h-4" />
+    <circle cx="4" cy="20" r="2" />
   </Glyph>
 );
 
 /**
- * Stroke: the mark a broad pen leaves, thin where it starts and thick where it
- * turns across the pen, with the pen's edge at its foot.
- *
- * Drawn here rather than copied: Lucide has pens and brushes but nothing that says
- * a stroke of changing width, which is the one thing this tool does that the pen
- * does not.
+ * Brush: drawing with a pen that has a shape — the stroke tool, and the Pen
+ * section that sets the pen. Lucide's *brush*, from lucide-static v1.48.0.
  */
-export const StrokeIcon: IconComponent = () => (
+export const BrushIcon: IconComponent = () => (
   <Glyph>
-    <path
-      fill="currentColor"
-      stroke="none"
-      d="M4.5 19.5C8 18.5 9.8 14.2 11.6 10.9 13.4 7.6 16.3 4.8 20 4.5L20.8 6.3C17.8 6.9 15.6 9.4 13.9 12.4 11.9 16 9.3 20.3 5.2 21.2Z"
-    />
-    <path d="M3 18.5l3.5 3.5" />
+    <path d="m11 10 3 3" />
+    <path d="M6.5 21A3.5 3.5 0 1 0 3 17.5a2.62 2.62 0 0 1-.708 1.792A1 1 0 0 0 3 21z" />
+    <path d="M9.969 17.031 21.378 5.624a1 1 0 0 0-3.002-3.002L6.967 14.031" />
   </Glyph>
 );
 

@@ -1169,6 +1169,14 @@ is unchanged until its pen is. The points' pens go into the project file, the cl
 `.ufo`'s stroke entry, and interpolation. A **Stroke** tool, `N`, draws as the pen tool does
 and starts a stroke with the last pen set.
 
+How the pen changes between two points is chosen per segment, for the angle and the shape
+separately: linear, smooth, eased or held. Every blend is measured by distance along the path
+rather than by the curve's parameter, so an even change is even however the handles are pulled.
+Smooth is a monotone cubic through the pens at all the points (PCHIP): the rate of change
+carries through a point, and between two points the pen never passes either end, so a width
+cannot overshoot, and a segment whose two pens agree stays that pen — which keeps the exact
+ink for it. A stroke can also be converted to the outlines it draws from the canvas menu.
+
 #### Phase 35 — A node that holds its own curvature — half done
 
 Harmonising moves a node to where the curvature either side of it agrees, once, and the next

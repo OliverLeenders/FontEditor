@@ -12,7 +12,13 @@ import { describe, expect, it } from "vitest";
 import { parseClipboard, clipboardText } from "../src/clipboard.js";
 import { keyDown, pointerDown, pointerUp } from "../src/dispatch.js";
 import { keyInput, pointerInput } from "../src/input.js";
-import { changePen, drawWithPen, selectionNib } from "../src/commands/nib.js";
+import {
+  changePen,
+  drawWithPen,
+  selectedPenBlend,
+  selectionNib,
+  setPenBlend,
+} from "../src/commands/nib.js";
 import { type EditorState, editorState } from "../src/state.js";
 
 const ids = counterIds("nib-cmd");
@@ -256,11 +262,15 @@ describe("the clipboard", () => {
     const drawn = withNib(stroke(0), { angle: 30, width: 80 });
     const penned = {
       ...drawn,
-      nodes: [drawn.nodes[0]!, { ...drawn.nodes[1]!, pen: { angle: 60, width: 40 } }],
+      nodes: [
+        { ...drawn.nodes[0]!, blend: { angle: "ease", shape: "step" } as const },
+        { ...drawn.nodes[1]!, pen: { angle: 60, width: 40 } },
+      ],
     };
     const chosen = selecting(withContours(penned), 0);
     const pasted = parseClipboard(clipboardText(chosen)!, ids)!;
     expect(pasted[0]!.nodes.map((n) => n.pen)).toEqual([undefined, { angle: 60, width: 40 }]);
+    expect(pasted[0]!.nodes[0]!.blend).toEqual({ angle: "ease", shape: "step" });
   });
 
   it("pastes an outline without a pen", () => {
@@ -297,5 +307,44 @@ describe("the stroke tool", () => {
   it("leaves the pen tool drawing outlines", () => {
     const start = { ...withContours(), activeTool: "pen" as const };
     expect("nib" in drawn(click(start, 100, 0))[0]!).toBe(false);
+  });
+});
+
+describe("blending the pen along a segment", () => {
+  const pens = () => selecting(withContours(withNib(stroke(0), { angle: 30, width: 80 })), 0);
+  const blendOf = (state: EditorState) => state.document.glyphs["l"]!.contours[0]!.nodes[0]!.blend;
+
+  it("is linear until it is set", () => {
+    expect(selectedPenBlend(pens(), "angle")).toBe("linear");
+    expect(selectedPenBlend(pens(), "shape")).toBe("linear");
+  });
+
+  it("sets the angle and the shape each on its own", () => {
+    const eased = setPenBlend(pens(), "shape", "ease").state;
+    expect(blendOf(eased)).toEqual({ angle: "linear", shape: "ease" });
+    expect(selectedPenBlend(eased, "angle")).toBe("linear");
+    expect(selectedPenBlend(eased, "shape")).toBe("ease");
+  });
+
+  it("stores nothing once both are linear again", () => {
+    const eased = setPenBlend(pens(), "shape", "ease").state;
+    const back = setPenBlend(eased, "shape", "linear").state;
+    expect(blendOf(back)).toBeUndefined();
+  });
+
+  it("says nothing of the last point of an open stroke, which starts no segment", () => {
+    const state = pens();
+    const c = state.document.glyphs["l"]!.contours[0]!;
+    const last = {
+      ...state,
+      selection: [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" as const }],
+    };
+    expect(selectedPenBlend(last, "angle")).toBeNull();
+  });
+
+  it("passes over an outline", () => {
+    const outline = selecting(withContours(stroke(0)), 0);
+    expect(selectedPenBlend(outline, "angle")).toBeNull();
+    expect(setPenBlend(outline, "angle", "smooth").state).toBe(outline);
   });
 });

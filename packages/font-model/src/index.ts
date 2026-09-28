@@ -66,6 +66,7 @@ export {
   extendSegmentHandles,
   isHalfHandled,
   insertNodeOnSegment,
+  readSegmentBlend,
   insertNodesOnSegment,
   makeSegmentCurve,
   makeSegmentLine,

@@ -102,7 +102,13 @@ export function inkRegions(c: Contour): readonly Contour[] {
   // contour's where it does not; along each segment it blends from one to the
   // next. Where a segment's two pens are the same, its ink is worked out as it
   // always was — exactly, for a broad edge.
-  const pieces = penPathStroke(curves, pensOf(c), c.closed);
+  const pieces = penPathStroke(
+    curves,
+    pensOf(c),
+    c.closed,
+    undefined,
+    c.nodes.map((n) => n.blend),
+  );
 
   // Every piece the same way round — anticlockwise, which is how an outline's
   // outer contour is turned for the fill — or two that overlap with opposite

@@ -85,12 +85,9 @@ describe("context menu", () => {
       // Named for the anchor it would make, which is the first usual name the
       // glyph is not already using.
       "Add anchor here (top)",
-      // Level and upright, in both scopes: which scope a guide is in is the
-      // decision, so the menu asks rather than guessing.
+      // Level and upright, in this glyph; a guide is made global from its own menu.
       "Add horizontal guide",
       "Add vertical guide",
-      "Add horizontal guide, for the whole font",
-      "Add vertical guide, for the whole font",
       "Round selection",
       "Round this glyph",
     ]);
@@ -508,6 +505,53 @@ describe("context menu", () => {
     expect(first()).not.toEqual(before);
     // The same points, walked the other way, so nothing is lost.
     expect([...first()].sort()).toEqual([...before].sort());
+  });
+  describe("a stroke", () => {
+    /** Put a pen on the test's contour, making it a stroke. */
+    function stroke(): void {
+      const name = store.editor.currentGlyph;
+      const document = updateGlyph(store.editor.document, name, (g) => ({
+        ...g,
+        contours: g.contours.map((c) =>
+          c.id === contourId ? { ...c, nib: { angle: 30, width: 40 } } : c,
+        ),
+      }))!;
+      store.setEditor({ ...store.editor, document });
+    }
+    const contours = () => store.editor.document.glyphs[store.editor.currentGlyph]!.contours;
+
+    it("is offered its conversion to outlines, and an outline is not", () => {
+      expect(labels(store, node())).not.toContain("Convert stroke to outlines");
+      stroke();
+      expect(labels(store, node())).toContain("Convert stroke to outlines");
+      expect(labels(store, segment())).toContain("Convert stroke to outlines");
+    });
+
+    it("becomes the outlines it draws, where it sat", () => {
+      stroke();
+      const before = contours();
+      const at = before.findIndex((c) => c.id === contourId);
+      run(store, segment(), "Convert stroke to outlines");
+
+      const after = contours();
+      expect(after.some((c) => c.id === contourId)).toBe(false);
+      expect(after.every((c) => c.nib === undefined)).toBe(true);
+      // The contours before it are where they were, and the ink is closed outline.
+      expect(after.slice(0, at)).toEqual(before.slice(0, at));
+      expect(after.length).toBeGreaterThanOrEqual(before.length);
+      expect(after[at]!.closed).toBe(true);
+      // Every id in the glyph is its own.
+      const ids = after.flatMap((c) => [c.id, ...c.nodes.map((n) => n.id)]);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("is undone in one step", () => {
+      stroke();
+      const before = contours();
+      run(store, node(), "Convert stroke to outlines");
+      store.undo();
+      expect(contours()).toEqual(before);
+    });
   });
 });
 

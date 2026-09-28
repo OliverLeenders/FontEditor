@@ -763,6 +763,56 @@ describe("a node that holds its curvature", () => {
   });
 });
 
+describe("where a contour starts", () => {
+  /** A straight run along the x axis, from (0, 0) to (400, 0), open. */
+  const run = (reversed = false) => {
+    const ids = counterIds("start");
+    const ends = [vec(0, 0), vec(400, 0)];
+    const nodes = (reversed ? [...ends].reverse() : ends).map((p) => node(ids.node(), p));
+    return contour(ids.contour(), nodes);
+  };
+  const drawn = (c: Contour, selected = false) =>
+    render({
+      ...base(c),
+      glyph: addContour(glyph("s", { advance: 400 }), c),
+      selection: selected ? [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }] : [],
+    });
+  const marks = (ctx: RecordingContext) =>
+    ctx.ops.filter((o) => o.strokeStyle === LIGHT_PALETTE.contourStart);
+
+  it("puts a ring round the first point and no other", () => {
+    const c = run();
+    const ctx = drawn(c);
+    const first = toScreen(VIEW, vec(0, 0));
+    const last = toScreen(VIEW, vec(400, 0));
+    const rings = marks(ctx).filter((o) => o.op === "arc");
+    expect(rings).toHaveLength(1);
+    expect(rings[0]!.args[0]).toBeCloseTo(first.x, 6);
+    expect(rings[0]!.args[1]).toBeCloseTo(first.y, 6);
+    expect(Math.abs(rings[0]!.args[0]! - last.x)).toBeGreaterThan(1);
+  });
+
+  it("points the chevron the way the contour runs", () => {
+    // The chevron's tip is its middle point; drawn one way the tip is further
+    // along +x than its arms, drawn the other way it is further along -x.
+    const tipOffset = (c: Contour) => {
+      const lines = marks(drawn(c)).filter((o) => o.op === "moveTo" || o.op === "lineTo");
+      const [arm, tip] = lines.slice(-3);
+      return tip!.args[0]! - arm!.args[0]!;
+    };
+    expect(tipOffset(run())).toBeGreaterThan(0);
+    expect(tipOffset(run(true))).toBeLessThan(0);
+  });
+
+  it("is faint, and stronger on the contour being worked on", () => {
+    const c = run();
+    const faint = marks(drawn(c)).find((o) => o.op === "stroke")!.globalAlpha;
+    const strong = marks(drawn(c, true)).find((o) => o.op === "stroke")!.globalAlpha;
+    expect(faint).toBeLessThan(0.5);
+    expect(strong).toBeGreaterThan(faint);
+  });
+});
+
 describe("the curvature comb", () => {
   const ring = () => {
     const ids = counterIds("cc");

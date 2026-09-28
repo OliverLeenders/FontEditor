@@ -1,4 +1,4 @@
-import { type Vec2, handleIntersection } from "@typewright/geometry";
+import { type Vec2, derivative, evaluate, handleIntersection } from "@typewright/geometry";
 import {
   type Contour,
   type Glyph,
@@ -78,6 +78,8 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawSnapGuides(ctx, s);
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
+    // Under the nodes: the ring is round the first one and must not cover it.
+    drawContourStarts(ctx, s);
     drawNodes(ctx, s);
     // Over the points they name, and only when asked for.
     drawPointNumbers(ctx, s);
@@ -739,6 +741,98 @@ export function drawNodes(ctx: Canvas2D, s: Scene): void {
       if (n.harmonised) drawHeldRing(ctx, s, p, colour);
     }
   }
+}
+
+/**
+ * Where each contour starts, and which way it runs.
+ *
+ * A faint ring round the first point, wider than a held node's and much fainter,
+ * and an open chevron on the outline a little way past it, pointing along the
+ * contour. Both matter once there are masters — interpolation pairs points from
+ * the start, and a contour running the other way in one master is a contour
+ * turned inside out between them — and both matter to the fill, which the
+ * direction decides. Faint, because on most days neither is the question; a
+ * contour with a point selected shows them more strongly, since that is the one
+ * being worked on. The node keeps its own shape: square or round is what it is,
+ * and the start is something more about it.
+ */
+export function drawContourStarts(ctx: Canvas2D, s: Scene): void {
+  const touched = new Set<string>(s.selection.map((item) => item.contourId));
+  for (const c of s.glyph.contours) {
+    const first = c.nodes[0];
+    const segment = segments(c)[0];
+    if (first === undefined || segment === undefined) continue;
+
+    const p = toScreen(s.view, first.pt);
+    ctx.save();
+    ctx.globalAlpha = touched.has(c.id) ? START_STRONG : START_FAINT;
+    ctx.strokeStyle = s.palette.contourStart;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, s.metrics.nodeRadius * START_RING, 0, TAU);
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    const mark = chevronAlong(s, segmentCubic(segment), p);
+    if (mark !== null) {
+      const { at, forward } = mark;
+      const across = { x: -forward.y, y: forward.x };
+      ctx.beginPath();
+      ctx.moveTo(
+        at.x - forward.x * CHEVRON + across.x * CHEVRON,
+        at.y - forward.y * CHEVRON + across.y * CHEVRON,
+      );
+      ctx.lineTo(at.x + forward.x * CHEVRON, at.y + forward.y * CHEVRON);
+      ctx.lineTo(
+        at.x - forward.x * CHEVRON - across.x * CHEVRON,
+        at.y - forward.y * CHEVRON - across.y * CHEVRON,
+      );
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/** How strongly the start marks are drawn, on a contour and on a selected one. */
+const START_FAINT = 0.35;
+const START_STRONG = 0.8;
+/** The start ring's radius, in node radii: clear of a held node's ring at 1.9. */
+const START_RING = 2.6;
+/** How far along the outline the chevron sits from the first point, in pixels. */
+const CHEVRON_OFFSET = 18;
+/** Half the chevron's size, in pixels. */
+const CHEVRON = 3.5;
+
+/**
+ * Where on the first segment the chevron goes, and which way it points, on screen.
+ *
+ * A fixed distance past the first point measured on screen, so it sits clear of
+ * the ring at every zoom; halfway along a segment too short for that. The
+ * direction is the segment's own there, turned into screen coordinates, where y
+ * runs down.
+ */
+function chevronAlong(
+  s: Scene,
+  curve: ReturnType<typeof segmentCubic>,
+  start: Vec2,
+): { readonly at: Vec2; readonly forward: Vec2 } | null {
+  let t = 0.5;
+  for (let k = 1; k <= 64; k++) {
+    const q = toScreen(s.view, evaluate(curve, k / 64));
+    if (Math.hypot(q.x - start.x, q.y - start.y) >= CHEVRON_OFFSET) {
+      t = k / 64;
+      break;
+    }
+  }
+  const at = toScreen(s.view, evaluate(curve, t));
+  const d = derivative(curve, t);
+  const ahead = toScreen(s.view, { x: evaluate(curve, t).x + d.x, y: evaluate(curve, t).y + d.y });
+  const dx = ahead.x - at.x;
+  const dy = ahead.y - at.y;
+  const length = Math.hypot(dx, dy);
+  if (!(length > 1e-9)) return null;
+  return { at, forward: { x: dx / length, y: dy / length } };
 }
 
 /**

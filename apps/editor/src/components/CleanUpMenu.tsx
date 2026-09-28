@@ -10,7 +10,7 @@ import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import type { Item } from "./MenuItems.js";
 import styles from "./OpenFont.module.css";
-import { AnchorIcon, GridIcon, MopIcon } from "./icons.js";
+import { AnchorIcon, EqualApproximatelyIcon, MopIcon } from "./icons.js";
 
 /** How long the result of the last tidy stays on screen. */
 const NOTE_MS = 4000;
@@ -49,7 +49,7 @@ export function CleanUpMenu(): React.JSX.Element {
     {
       kind: "item",
       label: "Round coordinates",
-      icon: GridIcon,
+      icon: EqualApproximatelyIcon,
       disabled: reading,
       run: () => {
         const count = unroundedCount(store.editor);

@@ -1,4 +1,4 @@
-import { type Cubic, cubic, endTangent, evaluate, tangent } from "./cubic.js";
+import { type Cubic, arcLength, cubic, endTangent, evaluate, tangent } from "./cubic.js";
 import { fitCubics } from "./fit.js";
 import { halfNib, nibStroke, ovalBands, ovalCap, ovalWedge } from "./nib.js";
 import { OFFSET_TOLERANCE, leftNormal } from "./offset.js";
@@ -59,6 +59,172 @@ export function blendPen(a: PenShape, b: PenShape, t: number): PenShape {
 }
 
 /**
+ * How a pen changes along one segment, from its first point's pen to its last's.
+ *
+ * - `linear`: evenly, by distance along the path.
+ * - `smooth`: along a curve through the pens at all the points, so the rate of
+ *   change carries on through a point instead of turning there — no corner in the
+ *   ink's edge where a point is. The curve is the monotone kind (Fritsch and
+ *   Carlson's, as PCHIP has it): between two points it never goes past either
+ *   pen, so a pen growing from 40 to 80 is never 85 on the way, and one that is
+ *   the same at both ends of a segment stays that pen along it.
+ * - `ease`: slowly away from the first pen and slowly into the last, the change
+ *   happening mostly in the middle.
+ * - `step`: the first pen held the whole way, changing at the next point.
+ */
+export type PenBlend = "linear" | "smooth" | "ease" | "step";
+
+/** How the angle and the shape — width and thickness together — change along a segment. */
+export type SegmentBlend = { readonly angle: PenBlend; readonly shape: PenBlend };
+
+const LINEAR: SegmentBlend = { angle: "linear", shape: "linear" };
+
+/**
+ * One segment's pen as it goes: `at(t)` is the pen at parameter `t` of the
+ * segment's curve, and `constant` is the pen when it does not change along the
+ * segment at all — which is when the ink has an exact answer.
+ */
+export type PenProfile = {
+  readonly at: (t: number) => PenShape;
+  readonly constant: PenShape | null;
+};
+
+/**
+ * Every segment's pen along a path, given the pens at its points and how each
+ * segment blends between them.
+ *
+ * `pens` and `curves` are as {@link penPathStroke} has them; `blends[i]` is the
+ * blend along curve `i`, linear where it is not given. Distance along the path is
+ * what a blend is measured by, not the curve's parameter, so that a pen changing
+ * evenly changes evenly however the curve's handles are pulled.
+ */
+export function penProfiles(
+  curves: readonly Cubic[],
+  pens: readonly PenShape[],
+  closed: boolean,
+  blends?: readonly (SegmentBlend | undefined)[],
+): PenProfile[] {
+  const count = curves.length;
+  if (count === 0 || pens.length < (closed ? count : count + 1)) return [];
+  const penAt = (i: number): PenShape => pens[closed ? ((i % count) + count) % count : i]!;
+  const lengths = curves.map((c) => arcLength(c));
+
+  // The three channels, each as its value at a point and its change along a
+  // segment. The angle's change is the short way round over half a turn, as
+  // blendPen has it, so every channel can be treated as a plain number.
+  type Channel = (pen: PenShape) => number;
+  const angle: Channel = (p) => p.angle;
+  const width: Channel = (p) => p.width;
+  const thickness: Channel = (p) => p.thickness;
+  const change = (channel: Channel, segment: number): number =>
+    channel === angle
+      ? shortTurn(penAt(segment).angle, penAt(segment + 1).angle)
+      : channel(penAt(segment + 1)) - channel(penAt(segment));
+  const secant = (channel: Channel, segment: number): number => {
+    const length = lengths[segment]!;
+    return length > 0 ? change(channel, segment) / length : 0;
+  };
+
+  // The rate of change a smooth blend passes through a point with, per unit of
+  // length: PCHIP's weighted harmonic mean of the secants either side, nothing
+  // where they disagree in sign or either is flat, and the one secant at an open
+  // end.
+  const slope = (channel: Channel, point: number): number => {
+    const arriving = closed ? (point - 1 + count) % count : point >= 1 ? point - 1 : null;
+    const leaving = closed ? point % count : point < count ? point : null;
+    if (arriving === null) return leaving === null ? 0 : secant(channel, leaving);
+    if (leaving === null) return secant(channel, arriving);
+    const before = secant(channel, arriving);
+    const after = secant(channel, leaving);
+    if (!(before * after > 0)) return 0;
+    const lb = lengths[arriving]!;
+    const la = lengths[leaving]!;
+    const w1 = 2 * la + lb;
+    const w2 = la + 2 * lb;
+    return (w1 + w2) / (w1 / before + w2 / after);
+  };
+
+  return curves.map((curve, i) => {
+    const blend = blends?.[i] ?? LINEAR;
+    const from = penAt(i);
+    const length = lengths[i]!;
+
+    const along = (channel: Channel, kind: PenBlend): ((s: number) => number) => {
+      const v0 = channel(from);
+      const dv = change(channel, i);
+      if (dv === 0 || kind === "step") return () => v0;
+      if (kind === "linear") return (s) => v0 + dv * s;
+      if (kind === "ease") return (s) => v0 + dv * s * s * (3 - 2 * s);
+      const m0 = slope(channel, i) * length;
+      const m1 = slope(channel, i + 1) * length;
+      return (s) => {
+        const s2 = s * s;
+        const s3 = s2 * s;
+        return (
+          (2 * s3 - 3 * s2 + 1) * v0 +
+          (s3 - 2 * s2 + s) * m0 +
+          (-2 * s3 + 3 * s2) * (v0 + dv) +
+          (s3 - s2) * m1
+        );
+      };
+    };
+
+    const held = (channel: Channel, kind: PenBlend) => kind === "step" || change(channel, i) === 0;
+    const constant =
+      held(angle, blend.angle) && held(width, blend.shape) && held(thickness, blend.shape)
+        ? from
+        : null;
+    if (constant !== null) return { at: () => constant, constant };
+
+    const a = along(angle, blend.angle);
+    const w = along(width, blend.shape);
+    const k = along(thickness, blend.shape);
+    const distance = distanceAlong(curve);
+    return {
+      at: (t) => {
+        const s = distance(t);
+        return { angle: a(s), width: Math.max(0, w(s)), thickness: Math.max(0, k(s)) };
+      },
+      constant: null,
+    };
+  });
+}
+
+/** The turn from one nib angle to another, the short way round over half a turn. */
+function shortTurn(from: number, to: number): number {
+  let turn = (to - from) % 180;
+  if (turn > 90) turn -= 180;
+  if (turn < -90) turn += 180;
+  return turn;
+}
+
+/** How many chords a curve is measured by, for distance along it. */
+const DISTANCE_STEPS = 48;
+
+/**
+ * The fraction of a curve's length reached at parameter `t`, from a table of
+ * chords. Close enough for a pen's blend, which nobody measures to the unit, and
+ * the same curve always gives the same answer.
+ */
+function distanceAlong(curve: Cubic): (t: number) => number {
+  const table = new Float64Array(DISTANCE_STEPS + 1);
+  let last = curve.a;
+  for (let k = 1; k <= DISTANCE_STEPS; k++) {
+    const p = evaluate(curve, k / DISTANCE_STEPS);
+    table[k] = table[k - 1]! + Math.hypot(p.x - last.x, p.y - last.y);
+    last = p;
+  }
+  const total = table[DISTANCE_STEPS]!;
+  if (!(total > 0)) return (t) => t;
+  return (t) => {
+    const x = Math.min(1, Math.max(0, t)) * DISTANCE_STEPS;
+    const k = Math.min(DISTANCE_STEPS - 1, Math.floor(x));
+    const f = x - k;
+    return (table[k]! + (table[k + 1]! - table[k]!) * f) / total;
+  };
+}
+
+/**
  * The point of the pen, centred on the origin, furthest out in a direction.
  *
  * The edge of the ink on each side of a path is where the pen reaches furthest
@@ -97,32 +263,37 @@ export function penSupport(pen: PenShape, direction: Vec2): Vec2 {
  * varying curve adds bands of its own, fitted. At a point the pen is one pen
  * whichever curve is asked, so the pieces meet along the same straight line across
  * the ink, and the union joins them.
+ *
+ * `blends[i]` is how the pen changes along curve `i`; see {@link PenBlend}.
  */
 export function penPathStroke(
   curves: readonly Cubic[],
   pens: readonly PenShape[],
   closed: boolean,
   tolerance: number = OFFSET_TOLERANCE,
+  blends?: readonly (SegmentBlend | undefined)[],
 ): Cubic[][] {
   const count = curves.length;
   if (count === 0 || pens.length < (closed ? count : count + 1)) return [];
   const penAt = (i: number): PenShape => pens[closed ? i % count : i]!;
+  const profiles = penProfiles(curves, pens, closed, blends);
 
   const loops: Cubic[][] = [];
   for (let i = 0; i < count; i++) {
     const curve = curves[i]!;
-    const from = penAt(i);
-    const to = penAt(i + 1);
-    if (!(from.width > 0) && !(to.width > 0)) continue;
-
-    if (samePenShape(from, to)) {
+    const profile = profiles[i]!;
+    // No pen at either end is no ink, whatever happens between.
+    if (!(penAt(i).width > 0) && !(penAt(i + 1).width > 0)) continue;
+    const pen = profile.constant;
+    if (pen !== null) {
+      if (!(pen.width > 0)) continue;
       loops.push(
-        ...(isBroad(from)
-          ? nibStroke(curve, halfNib(from.angle, from.width))
-          : ovalBands(curve, from, tolerance)),
+        ...(isBroad(pen)
+          ? nibStroke(curve, halfNib(pen.angle, pen.width))
+          : ovalBands(curve, pen, tolerance)),
       );
     } else {
-      loops.push(...varyingBands(curve, from, to, tolerance));
+      loops.push(...varyingBands(curve, profile.at, tolerance));
     }
   }
 
@@ -138,8 +309,10 @@ export function penPathStroke(
   }
 
   if (!closed) {
-    const first = pens[0]!;
-    const last = pens[count]!;
+    // The pen each end of the ink is drawn with, which for a held last segment is
+    // the pen it held rather than the one set at the last point.
+    const first = profiles[0]!.at(0);
+    const last = profiles[count - 1]!.at(1);
     if (!isBroad(last) && last.width > 0) {
       const end = ovalCap(curves[count - 1]!, true, last);
       if (end !== null) loops.push(end);
@@ -174,7 +347,7 @@ const SAMPLES = 48;
  * fold is drawn straight across: the pen's ends either side of it overlap the whole
  * of the fold, and a side that looped back would fill with a hole in it.
  */
-function varyingBands(curve: Cubic, from: PenShape, to: PenShape, tolerance: number): Cubic[][] {
+function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: number): Cubic[][] {
   type Sample = {
     readonly t: number;
     readonly at: Vec2;
@@ -191,7 +364,7 @@ function varyingBands(curve: Cubic, from: PenShape, to: PenShape, tolerance: num
       t === 0 ? endTangent(curve, 0) : t === 1 ? endTangent(curve, 1) : tangent(curve, t);
     const normal = leftNormal(curve, t);
     if (along === null || normal === null) continue;
-    const pen = blendPen(from, to, t);
+    const pen = penOn(t);
     const at = evaluate(curve, t);
     const reach = penSupport(pen, normal);
     const angle = (pen.angle * Math.PI) / 180;
@@ -216,7 +389,7 @@ function varyingBands(curve: Cubic, from: PenShape, to: PenShape, tolerance: num
   for (let k = 1; k < samples.length; k++) {
     const previous = samples[k - 1]!;
     const here = samples[k]!;
-    const thin = isBroad(blendPen(from, to, previous.t)) && isBroad(blendPen(from, to, here.t));
+    const thin = isBroad(penOn(previous.t)) && isBroad(penOn(here.t));
     if (thin && previous.side !== 0 && here.side !== 0 && previous.side !== here.side) {
       runs.push([here]);
     } else {
@@ -238,14 +411,14 @@ function varyingBands(curve: Cubic, from: PenShape, to: PenShape, tolerance: num
     const leftCurves = fitCubics(
       left,
       tolerance,
-      edgeDirection(curve, from, to, first, 1, 1),
-      edgeDirection(curve, from, to, last, 1, -1),
+      edgeDirection(curve, penOn, first, 1, 1),
+      edgeDirection(curve, penOn, last, 1, -1),
     );
     const rightCurves = fitCubics(
       right,
       tolerance,
-      edgeDirection(curve, from, to, first, -1, 1),
-      edgeDirection(curve, from, to, last, -1, -1),
+      edgeDirection(curve, penOn, first, -1, 1),
+      edgeDirection(curve, penOn, last, -1, -1),
     );
     if (leftCurves.length === 0 || rightCurves.length === 0) continue;
 
@@ -272,8 +445,7 @@ function varyingBands(curve: Cubic, from: PenShape, to: PenShape, tolerance: num
  */
 function edgeDirection(
   curve: Cubic,
-  from: PenShape,
-  to: PenShape,
+  penOn: (t: number) => PenShape,
   t: number,
   side: 1 | -1,
   inward: 1 | -1,
@@ -283,7 +455,7 @@ function edgeDirection(
   const edgeAt = (u: number): Vec2 | null => {
     const normal = leftNormal(curve, u);
     if (normal === null) return null;
-    const reach = penSupport(blendPen(from, to, u), { x: normal.x * side, y: normal.y * side });
+    const reach = penSupport(penOn(u), { x: normal.x * side, y: normal.y * side });
     const at = evaluate(curve, u);
     return { x: at.x + reach.x, y: at.y + reach.y };
   };

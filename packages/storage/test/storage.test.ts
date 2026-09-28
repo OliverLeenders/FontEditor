@@ -167,7 +167,7 @@ describe("serialization", () => {
     const ids = counterIds("p");
     const stem = {
       ...contour(ids.contour(), [
-        node(ids.node(), vec(0, 0)),
+        node(ids.node(), vec(0, 0), { blend: { angle: "smooth", shape: "ease" } }),
         node(ids.node(), vec(0, 300), { pen: { angle: 60, width: 40, thickness: 12 } }),
       ]),
       nib: { angle: 30, width: 80 },
@@ -182,6 +182,10 @@ describe("serialization", () => {
       expect(decoded.value.contours[0]!.nodes.map((n) => n.pen)).toEqual([
         undefined,
         { angle: 60, width: 40, thickness: 12 },
+      ]);
+      expect(decoded.value.contours[0]!.nodes.map((n) => n.blend)).toEqual([
+        { angle: "smooth", shape: "ease" },
+        undefined,
       ]);
     }
   });

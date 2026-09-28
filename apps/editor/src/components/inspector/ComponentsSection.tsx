@@ -13,7 +13,7 @@ import { useState } from "react";
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
 import { NumberField } from "../NumberField.js";
-import { ComponentIcon, FlipHorizontalIcon, FlipVerticalIcon, TrashIcon } from "../icons.js";
+import { PuzzleIcon, FlipHorizontalIcon, FlipVerticalIcon, TrashIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { shown } from "./fields.js";
 
@@ -55,7 +55,7 @@ export function ComponentsSection(): React.JSX.Element {
   return (
     <Section
       name="components"
-      icon={ComponentIcon}
+      icon={PuzzleIcon}
       title="Components"
       note={components.length === 0 ? undefined : String(components.length)}
       relevant={components.length > 0}

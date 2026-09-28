@@ -95,7 +95,13 @@ describe("a stroke through a .glif", () => {
     const drawn = curl();
     const penned = {
       ...drawn,
-      nodes: drawn.nodes.map((n, i) => (i === 2 ? { ...n, pen: { angle: 80, width: 30 } } : n)),
+      nodes: drawn.nodes.map((n, i) =>
+        i === 2
+          ? { ...n, pen: { angle: 80, width: 30 } }
+          : i === 0
+            ? { ...n, blend: { angle: "smooth", shape: "step" } as const }
+            : n,
+      ),
     };
     const { glyph: back, warnings } = throughGlif(glyph("s", { contours: [penned] }));
 
@@ -105,6 +111,7 @@ describe("a stroke through a .glif", () => {
       undefined,
       { angle: 80, width: 30 },
     ]);
+    expect(back.contours[0]!.nodes[0]!.blend).toEqual({ angle: "smooth", shape: "step" });
   });
 
   it("keeps an oval pen's thickness", () => {

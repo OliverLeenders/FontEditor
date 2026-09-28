@@ -171,8 +171,10 @@ twist. Both are set from the right-click menu: **Start the contour here** on a p
 **Bring forward** and **Send back** on a contour, which say where it sits as they offer it.
 Turn **Point numbers** on in the View menu to read the pairing off the canvas — `2.3` is the
 third point of the second contour, and the first point of each contour is picked out, since
-that is where the pairing starts. The Masters panel's compatibility check opens the glyph
-and selects the contour a line is about.
+that is where the pairing starts. Without them, every contour's first point has a faint ring
+round it and a small chevron on the outline just past it, pointing the way the contour runs;
+both are stronger on a contour with a point selected. The Masters panel's compatibility check
+opens the glyph and selects the contour a line is about.
 
 **Between the masters.** The Spacing line and the Proof have a **Between** switch and a
 slider for each axis: the text is then set with the family worked out at that place rather
@@ -317,7 +319,9 @@ thick where the path runs across the pen and pinches to nothing where it runs al
 edge, as a cut quill does; more than nothing is an oval, whose thin strokes keep some weight and
 whose ends and corners are round; the same as the width is a round pen, the same weight every way. Every point tool works on the path as it does on any contour — drag its points and
 handles, hold its joins, cut an open one in two with the knife and both halves keep the pen.
-Choose **Outline** to make it an ordinary contour again; the path stays where it is.
+Choose **Outline** to make it an ordinary contour again; the path stays where it is. To keep the ink
+instead, right-click the stroke and choose **Convert stroke to outlines**: it is replaced by the
+outlines it draws, the ones an exported font gets, and every stroke selected with it goes too.
 
 The pen is set at points, and changes smoothly along each segment from one point's pen to the
 next: the angle turns, the width and thickness grow or shrink. The numbers in the Pen section are
@@ -326,6 +330,14 @@ stroke swells towards it; select every point, and the whole stroke's pen changes
 into a selection whose pens differ changes only that number at each point. A point put into a
 stroke — **Insert point here**, points added at extremes, or the knife — is given the pen the
 stroke already had at that place, so the ink does not change until you change it.
+
+How the pen gets from one point's pen to the next is set per segment, on the point that starts
+it, and separately for the angle and for the shape — width and thickness together. The Pen
+section's **Angle blend** and **Shape blend** rows offer four: **Linear**, evenly by distance
+along the path; **Smooth**, along a curve through the pens at all the points, so the change
+carries on through a point instead of turning a corner there, and never goes past either pen on
+the way; **Ease**, slowly away from the point and slowly into the next; and **Step**, the point's
+pen held until the next point. A point put into a segment takes its blend with it.
 
 The **Stroke** tool (`N`) draws exactly as the pen tool does and makes strokes instead of
 outlines, with the last pen set in the Pen section — so a run of strokes in one hand is the pen

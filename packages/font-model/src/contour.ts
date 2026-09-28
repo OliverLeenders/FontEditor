@@ -1,6 +1,8 @@
 import {
-  blendPen,
   type Cubic,
+  type PenBlend,
+  type PenShape,
+  type SegmentBlend,
   type HandleScales,
   type Rect,
   type TunniStatus,
@@ -17,6 +19,7 @@ import {
   lerp,
   lineAsCubic,
   moveTunniLine,
+  penProfiles,
   refitJoin,
   setLambdas,
   setTunniPoint,
@@ -122,19 +125,31 @@ export function segmentCount(c: Contour): number {
 }
 
 /**
- * The pen a stroke has a fraction `t` of the way from one of its points to the
- * next, or `null` where there is nothing to give a new point: an outline, or a
- * stroke whose pen there is simply the contour's own.
+ * The pen a stroke has at parameter `t` of segment `index`, as the segment's
+ * blend has it there, or `null` where there is nothing to give a new point: an
+ * outline, or a stroke whose pen there is simply the contour's own.
  */
-export function penBetween(c: Contour, from: number, to: number, t: number): Nib | null {
+export function penBetween(c: Contour, index: number, t: number): Nib | null {
   if (c.nib === undefined) return null;
-  const a = c.nodes[from]?.pen ?? c.nib;
-  const b = c.nodes[to]?.pen ?? c.nib;
-  const mixed = blendPen(
-    { angle: a.angle, width: a.width, thickness: a.thickness ?? 0 },
-    { angle: b.angle, width: b.width, thickness: b.thickness ?? 0 },
-    t,
-  );
+  const nib = c.nib;
+  const shape = (n: Nib): PenShape => ({
+    angle: n.angle,
+    width: n.width,
+    thickness: n.thickness ?? 0,
+  });
+  const curves: Cubic[] = [];
+  for (let i = 0; i < segmentCount(c); i++) {
+    const s = segmentAt(c, i);
+    if (s !== null) curves.push(segmentCubic(s));
+  }
+  const profile = penProfiles(
+    curves,
+    c.nodes.map((n) => shape(n.pen ?? nib)),
+    c.closed,
+    c.nodes.map((n) => n.blend),
+  )[index];
+  if (profile === undefined) return null;
+  const mixed = profile.at(t);
   const pen: Nib =
     mixed.thickness > 0
       ? { angle: mixed.angle, width: mixed.width, thickness: mixed.thickness }
@@ -144,6 +159,21 @@ export function penBetween(c: Contour, from: number, to: number, t: number): Nib
     pen.width === c.nib.width &&
     (pen.thickness ?? 0) === (c.nib.thickness ?? 0);
   return same ? null : pen;
+}
+
+const BLENDS: readonly PenBlend[] = ["linear", "smooth", "ease", "step"];
+
+/**
+ * A stored blend, read back: both halves known words, or nothing. A word this
+ * version does not know is read as linear, so a file from a later version still
+ * opens with its strokes drawn, only more plainly.
+ */
+export function readSegmentBlend(raw: unknown): SegmentBlend | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const r = raw as Record<string, unknown>;
+  const word = (value: unknown): PenBlend => BLENDS.find((b) => b === value) ?? "linear";
+  const blend = { angle: word(r["angle"]), shape: word(r["shape"]) };
+  return blend.angle === "linear" && blend.shape === "linear" ? undefined : blend;
 }
 
 export function segments(c: Contour): Segment[] {
@@ -729,10 +759,13 @@ export function insertNodeOnSegment(
     inserted = node(ids.node(), left.b, { type: "smooth", in: left.c2, out: right.c1 });
   }
 
-  // On a stroke, the new point has the pen the stroke already had there, blended
-  // from the pens either side, so putting a point in leaves the ink as it was.
-  const pen = penBetween(c, index, j, t);
+  // On a stroke, the new point has the pen the stroke already had there, as the
+  // segment's blend puts it, so putting a point in leaves the ink as it was — or
+  // nearly, for an eased or smooth blend, which is worked out afresh over each of
+  // the two shorter segments. Both halves blend the way the whole one did.
+  const pen = penBetween(c, index, t);
   if (pen !== null) inserted = { ...inserted, pen };
+  if (from.blend !== undefined) inserted = { ...inserted, blend: from.blend };
 
   nodes.splice(index + 1, 0, inserted);
   return settled({ ...c, nodes });

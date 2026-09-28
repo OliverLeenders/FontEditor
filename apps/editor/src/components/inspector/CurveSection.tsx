@@ -27,7 +27,7 @@ import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
 import { NumberField } from "../NumberField.js";
 import { Stepper } from "../Stepper.js";
-import { SplineIcon } from "../icons.js";
+import { ClefTrebleIcon, MusicIcon, SplineIcon } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field, shown } from "./fields.js";
 
@@ -232,11 +232,12 @@ export function CurveSection(): React.JSX.Element {
           </span>
           <button
             type="button"
-            className={styles.align}
+            className={`${styles.align} ${styles.labelled}`}
             disabled={pointCount === 0}
             title="Move the selected points to where the curvature either side of them agrees"
             onClick={() => store.applyTool(harmoniseSelection(store.editor))}
           >
+            <ClefTrebleIcon />
             Harmonise
           </button>
           {/* Beside the one-shot, because it is the same operation told to stay:
@@ -246,7 +247,7 @@ export function CurveSection(): React.JSX.Element {
               mixed selection shows neither, and pressing it then holds them all. */}
           <button
             type="button"
-            className={styles.align}
+            className={`${styles.align} ${styles.labelled}`}
             aria-pressed={holds === true}
             disabled={holds === null && !canHold}
             title={
@@ -256,6 +257,7 @@ export function CurveSection(): React.JSX.Element {
             }
             onClick={() => store.applyTool(holdCurvatureInSelection(store.editor, holds !== true))}
           >
+            <MusicIcon />
             Hold
           </button>
         </div>

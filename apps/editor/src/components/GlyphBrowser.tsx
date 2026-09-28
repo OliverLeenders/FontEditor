@@ -52,7 +52,7 @@ import {
   ArrowLeftRightIcon,
   CopyIcon,
   CopyPlusIcon,
-  GridIcon,
+  EqualApproximatelyIcon,
   PenToolIcon,
   SearchIcon,
   SortIcon,
@@ -476,7 +476,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
       {
         kind: "item",
         label: "Round coordinates",
-        icon: GridIcon,
+        icon: EqualApproximatelyIcon,
         run: () => {
           if (!several) store.setCurrentGlyph(name);
           store.applyTool(roundGlyphsAt(store.editor, names));

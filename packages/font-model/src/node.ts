@@ -1,5 +1,7 @@
 import { type Vec2, add, addScaled, distance, length, sub } from "@typewright/geometry";
 
+import type { SegmentBlend } from "@typewright/geometry";
+
 import type { Nib } from "./contour.js";
 import type { NodeId } from "./ids.js";
 
@@ -95,6 +97,12 @@ export type Node = {
    * means nothing and is never set.
    */
   readonly pen?: Nib;
+  /**
+   * How the pen changes along the segment that leaves this point, for a point of a
+   * stroke: the angle and the shape each linear, smooth, eased or held. Absent,
+   * both are linear.
+   */
+  readonly blend?: SegmentBlend;
 };
 
 export type NodeInit = {
@@ -105,6 +113,7 @@ export type NodeInit = {
   readonly hvLock?: boolean | Partial<HandleLock>;
   readonly harmonised?: boolean;
   readonly pen?: Nib;
+  readonly blend?: SegmentBlend;
 };
 
 /** Read an init's lock, accepting the boolean the field used to be. */
@@ -124,6 +133,7 @@ export function node(id: NodeId, pt: Vec2, init: NodeInit = {}): Node {
     hvLock: handleLock(init.hvLock),
     harmonised: init.harmonised ?? false,
     ...(init.pen === undefined ? {} : { pen: init.pen }),
+    ...(init.blend === undefined ? {} : { blend: init.blend }),
   };
 }
 

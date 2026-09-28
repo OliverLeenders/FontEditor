@@ -477,7 +477,7 @@ function splitAtCrossings(
       // interior crossings, and each becomes an anchor of its own.
       if (k + 1 < stops.length - 1) {
         // A point the knife puts into a stroke has the pen the stroke had there.
-        const pen = penBetween(c, i, (i + 1) % c.nodes.length, stops[k + 1]!);
+        const pen = penBetween(c, i, stops[k + 1]!);
         anchors.push({
           pt: subcurve(whole, 0, stops[k + 1]!).b,
           type: "corner",
