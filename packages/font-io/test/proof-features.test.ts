@@ -461,7 +461,10 @@ describe("a font that does more than this editor compiles", () => {
     expect(warnings).toMatch(/cursive attachment/);
     expect(warnings).toMatch(/mark attachment to ligatures/);
     expect(warnings).toMatch(/pair adjustments other than kerning/);
-    expect(warnings).toMatch(/names and parameters of ss01/);
+    // A stylistic set's name comes back as the block it was written in, and is not
+    // a thing to warn about any more.
+    expect(features).toMatch(/featureNames \{\s*name "Alternate a";\s*\};/);
+    expect(warnings).not.toMatch(/ss01/);
 
     const before = open(original);
     const after = open(exportFont(read.document).bytes);
