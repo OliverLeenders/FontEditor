@@ -29,7 +29,7 @@ export { tableChecksum, withTable } from "./sfnt.js";
 
 export type { ExportResult } from "./export.js";
 export { FontExportError, exportFont } from "./export.js";
-export { exportFileName } from "./file-name.js";
+export { exportFileName, ufoFolderName } from "./file-name.js";
 
 export { exportVariableTrueType } from "./variable-truetype.js";
 

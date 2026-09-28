@@ -45,6 +45,12 @@ function pickerFn(): FolderPicker | null {
  */
 export async function pickFolder(
   mode: "read" | "readwrite" = "readwrite",
+  /**
+   * Which place the browser should open at: where fonts were last opened from,
+   * or where they were last saved to. Two, so saving a new font does not open
+   * inside the last font's own folder.
+   */
+  place: "font" | "fonts" = "font",
 ): Promise<DiskFolder | null> {
   const pick = pickerFn();
   if (pick === null) throw new Error("this browser cannot open folders");
@@ -52,7 +58,7 @@ export async function pickFolder(
   try {
     // The id makes the browser reopen where this editor was last, rather than
     // wherever the last download went.
-    return await pick({ mode, id: "typewright-ufo" });
+    return await pick({ mode, id: place === "font" ? "typewright-ufo" : "typewright-fonts" });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return null;
     throw error;

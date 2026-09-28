@@ -17,7 +17,7 @@ import {
   textAt,
   writeFolder,
 } from "@typewright/disk";
-import { crc32, entryBytes, readUfo, ufoFiles } from "@typewright/font-io";
+import { crc32, entryBytes, readUfo, ufoFiles, ufoFolderName } from "@typewright/font-io";
 import { type FontDocument, randomIds } from "@typewright/font-model";
 
 import { type FontHost, adoptDocument, adoptImages } from "./fonts.js";
@@ -154,22 +154,27 @@ export async function saveFolder(host: FontHost): Promise<SaveReport> {
 }
 
 /**
- * Write the font to a folder the user picks, and work there from now on.
+ * Write the font somewhere the user picks, and work there from now on.
  *
- * A folder that already holds something which is not a UFO is refused. Save as
- * is meant to be pointed at a new folder or at an older version of this font,
- * and neither of those is "somebody's documents folder, now with a
- * metainfo.plist in it".
+ * What is picked is *where to keep* the font — a folder of fonts, a project's
+ * folder — and the font goes into a UFO of its own inside it, named after the
+ * font: `Family-Style.ufo`. That is what Save As means everywhere else, and it
+ * answers the question a bare folder picker left open, of whether the folder
+ * picked is the font or somewhere fonts live.
+ *
+ * Two exceptions, both where the folder picked is plainly meant to be the font
+ * itself: an empty folder whose name ends in `.ufo`, made for this font, and
+ * this font's own folder picked again. A folder that is some other font's UFO is
+ * refused — it is somebody's font, not a place to put one — and a UFO of the
+ * same name already there is never written over: the font gets the next free
+ * name beside it instead.
  */
 export async function saveFolderAs(host: FontHost): Promise<SaveReport | null> {
-  const folder = await pickFolder("readwrite");
-  if (folder === null) return null;
+  const place = await pickFolder("readwrite", "fonts");
+  if (place === null) return null;
+  if (!(await askAccess(place, "readwrite"))) throw new Error(`${place.name} cannot be written to`);
 
-  const holds = await whatItHolds(folder);
-  if (holds === "other") {
-    throw new Error(`${folder.name} has files in it and is not a UFO; pick an empty folder`);
-  }
-
+  const folder = await folderFor(host, place);
   const report = await writeTo(host, folder);
   // The same font, kept somewhere else from now on. `writeTo` has already
   // pointed the handle and the font's project at the new folder, together with
@@ -369,6 +374,56 @@ async function checkFolder(host: FontHost, folder: DiskFolder): Promise<void> {
 const SENTINELS = ["metainfo.plist", "fontinfo.plist", "glyphs/contents.plist"];
 
 /** Whether a folder is empty, is a UFO already, or is somebody else's. */
+/**
+ * The folder the font goes into, given the one picked: the font's own UFO inside
+ * it, made if need be. See saveFolderAs for the rules.
+ */
+async function folderFor(host: FontHost, place: DiskFolder): Promise<DiskFolder> {
+  const current = host.folder();
+  const mine = async (folder: DiskFolder): Promise<boolean> =>
+    current !== null && (await sameEntry(current, folder));
+
+  const holds = await whatItHolds(place);
+  if (holds === "ufo") {
+    if (await mine(place)) return place;
+    throw new Error(
+      `${place.name} is another font's UFO. Pick the folder you want this font kept in, and it will be saved there as a UFO of its own.`,
+    );
+  }
+  if (holds === "empty" && place.name.toLowerCase().endsWith(".ufo")) return place;
+
+  const wanted = ufoFolderName(host.state().session.editor.document);
+  const stem = wanted.slice(0, -".ufo".length);
+  for (let n = 1; n < 100; n++) {
+    const name = n === 1 ? wanted : `${stem}-${String(n)}.ufo`;
+    const existing = await childFolder(place, name);
+    if (existing === null) return await place.getDirectoryHandle(name, { create: true });
+    const inside = await whatItHolds(existing);
+    if (inside === "empty" || (inside === "ufo" && (await mine(existing)))) return existing;
+  }
+  throw new Error(`${place.name} already holds a hundred fonts called ${stem}`);
+}
+
+/** A folder of that name inside another, or `null` where there is none. */
+async function childFolder(parent: DiskFolder, name: string): Promise<DiskFolder | null> {
+  for await (const [entry, handle] of parent.entries()) {
+    if (entry === name) return handle.kind === "directory" ? handle : null;
+  }
+  return null;
+}
+
+/** Whether two handles are the same folder on disk, as far as the browser can say. */
+async function sameEntry(a: DiskFolder, b: DiskFolder): Promise<boolean> {
+  if (a === b) return true;
+  const same = (a as { isSameEntry?: (other: unknown) => Promise<boolean> }).isSameEntry;
+  if (typeof same !== "function") return false;
+  try {
+    return await same.call(a, b);
+  } catch {
+    return false;
+  }
+}
+
 async function whatItHolds(folder: DiskFolder): Promise<"empty" | "ufo" | "other"> {
   let empty = true;
   for await (const [name] of folder.entries()) {

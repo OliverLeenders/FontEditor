@@ -1,3 +1,4 @@
+import { ufoFolderName } from "@typewright/font-io";
 import { canOpenFolders } from "@typewright/disk";
 import { useRef, useState } from "react";
 
@@ -164,12 +165,19 @@ export function FileMenu(): React.JSX.Element {
       });
     }
 
+    // Saving names the file it makes: a font is kept on disk as a UFO of its own,
+    // in whatever folder is picked to hold it.
+    const ufo = ufoFolderName(store.editor.document);
     items.push({ kind: "separator" });
     items.push({
       kind: "item",
-      label: folder.name === null ? "Save to a folder…" : "Save",
+      label: folder.name === null ? "Save…" : "Save",
       icon: SaveIcon,
       note: "Ctrl-S",
+      hint:
+        folder.name === null
+          ? `Choose a folder to keep this font in, as ${ufo}`
+          : `Write the changes to ${folder.name}`,
       disabled: working || (folder.name !== null && !dirty),
       run: () => void save(),
     });
@@ -177,6 +185,7 @@ export function FileMenu(): React.JSX.Element {
       kind: "item",
       label: "Save as…",
       icon: FolderOutputIcon,
+      hint: `Keep this font in another folder, as ${ufo}, and work there from now on`,
       disabled: working,
       run: () =>
         void attempt(async () => {

@@ -8,21 +8,7 @@
   gap: 0.25rem;
 }
 
+/* Drawn by the global select; see controls.css. */
 .select {
-  padding: 0.2rem 0.3rem;
-  border: 1px solid var(--rule);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font: inherit;
-  font-size: 0.76rem;
-}
-
-.select:disabled {
-  opacity: 0.45;
-}
-
-.select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
+  max-width: 11rem;
 }

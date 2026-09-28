@@ -2,6 +2,12 @@
    other. Thin on purpose — every row it takes is a row the drawing loses — and
    above the panes rather than inside one, so a split window has one of it. */
 .bar {
+  /* Above the panes, which each hold a toolbar of their own at z-index 30: the
+     preferences hang down over them, and without a layer of this bar's own the
+     toolbar that comes later in the page was painted over the panel. Below the
+     full-window sheets, which cover everything. */
+  position: relative;
+  z-index: 35;
   display: flex;
   align-items: center;
   justify-content: space-between;

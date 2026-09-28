@@ -11,6 +11,9 @@
   padding: 0 0.5rem;
   background: var(--surface);
   border-bottom: 1px solid var(--rule);
+  /* The menus' own shadow, so the canvas reads as lying under the bar rather
+     than beside it. */
+  box-shadow: var(--shadow);
 }
 
 .group {

@@ -63,11 +63,22 @@
   padding: 0.2rem 0.35rem;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
-  background: var(--ground);
+  background-color: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
+}
+select.input {
+  height: var(--control);
+  padding: 0 1.5rem 0 0.55rem;
+  background-color: var(--ground);
+  font-family: inherit;
+}
+@supports (appearance: base-select) {
+  select.input {
+    padding-right: 0.45rem;
+  }
 }
 .input[data-wrong="true"] {
   border-color: var(--warn);

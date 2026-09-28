@@ -81,7 +81,7 @@ describe("the font's folder in the bar", () => {
 
     expect(screen.getByRole("menuitemcheckbox", { name: "Open folder…" })).toBeTruthy();
     // There is nowhere to save to yet, so the item says what pressing it does.
-    expect(screen.getByRole("menuitemcheckbox", { name: /^Save to a folder/ })).toBeTruthy();
+    expect(screen.getByRole("menuitemcheckbox", { name: /^Save…/ })).toBeTruthy();
   });
 
   it("names the folder once one is open", async () => {
@@ -194,7 +194,7 @@ describe("the font's folder in the bar", () => {
     expect(store.editor.document).toBe(before);
     // Still nowhere to save to, so the item still asks for a folder.
     openMenu();
-    expect(screen.getByRole("menuitemcheckbox", { name: /^Save to a folder/ })).toBeTruthy();
+    expect(screen.getByRole("menuitemcheckbox", { name: /^Save…/ })).toBeTruthy();
   });
 
   it("offers nothing about folders in a browser that has none", () => {

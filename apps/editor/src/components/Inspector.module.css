@@ -30,7 +30,10 @@
   border-radius: 0;
   border-top: 0;
   border-bottom: 0;
-  box-shadow: none;
+  /* Still above the drawing, as the floating panel is: the shadow thrown
+     sideways over the canvas it sits beside. */
+  z-index: 3;
+  box-shadow: var(--shadow-side);
 }
 .panel[data-dock="right"] {
   border-right: 0;

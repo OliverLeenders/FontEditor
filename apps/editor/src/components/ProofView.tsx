@@ -325,6 +325,7 @@ export function ProofView(): React.JSX.Element {
     <div className={styles.proof}>
       <div className={styles.bar}>
         <LocationBar />
+        <span className={styles.separator} aria-hidden="true" />
 
         {/* What the page is: one size, or a ladder of them. Choosing the ladder
             fills it in, because a waterfall with no rungs is an empty page and
@@ -373,6 +374,7 @@ export function ProofView(): React.JSX.Element {
           />
           <span className={styles.value}>{leading.toFixed(2)}</span>
         </label>
+        <span className={styles.separator} aria-hidden="true" />
 
         {/* Beside the way the line is set rather than by the text, which is at
             the other end of the view: this chooses what is set, and everything
@@ -393,6 +395,7 @@ export function ProofView(): React.JSX.Element {
             </option>
           ))}
         </select>
+        <span className={styles.separator} aria-hidden="true" />
 
         <TextSettingsControls
           value={settings}

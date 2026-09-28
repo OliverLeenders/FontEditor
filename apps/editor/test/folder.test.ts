@@ -6,7 +6,7 @@ import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js
 installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
-const { ufoFiles } = await import("@typewright/font-io");
+const { ufoFiles, ufoFolderName } = await import("@typewright/font-io");
 const { writeFolder } = await import("@typewright/disk");
 const { updateGlyph } = await import("@typewright/font-model");
 
@@ -124,11 +124,51 @@ describe("the font's folder on disk", () => {
     expect([...fresh.all().keys()]).toContain("metainfo.plist");
   });
 
-  it("will not save over a folder that holds something else", async () => {
-    offer(new FakeFolder("Documents").put("taxes.pdf", "not a font"));
+  it("keeps the font as a UFO of its own inside the folder picked", async () => {
+    // The folder picked is where fonts are kept, not the font: whatever else is
+    // in it stays, and the font goes into a UFO named after it.
+    const fonts = new FakeFolder("Documents").put("taxes.pdf", "not a font");
+    offer(fonts);
 
-    await expect(store.saveFolderAs()).rejects.toThrow(/empty folder/);
+    const report = await store.saveFolderAs();
+
+    const name = ufoFolderName(store.editor.document);
+    expect(report?.name).toBe(name);
+    expect(store.getState().folder.name).toBe(name);
+    expect(fonts.all().get("taxes.pdf")).toBe("not a font");
+    expect([...fonts.all().keys()]).toContain(`${name}/metainfo.plist`);
+  });
+
+  it("will not save into another font's UFO", async () => {
+    // What the picker opened at, for a second font, used to be the first font's
+    // own folder — and saving there wrote the second font over the first.
+    offer(await ufoOf(store, "Other.ufo"));
+
+    await expect(store.saveFolderAs()).rejects.toThrow(/another font's UFO/);
     expect(store.getState().folder.name).toBeNull();
+  });
+
+  it("gives the font the next free name beside a UFO already called that", async () => {
+    const fonts = new FakeFolder("Fonts");
+    const name = ufoFolderName(store.editor.document);
+    const taken = await fonts.getDirectoryHandle(name, { create: true });
+    await writeFolder(taken, ufoFiles(store.editor.document));
+    offer(fonts);
+
+    const report = await store.saveFolderAs();
+
+    expect(report?.name).toBe(name.replace(/\.ufo$/, "-2.ufo"));
+  });
+
+  it("saves into its own folder when that is the one picked", async () => {
+    const own = await ufoOf(store, "Mine.ufo");
+    offer(own);
+    await store.openFolder();
+    edit(store);
+
+    const report = await store.saveFolderAs();
+
+    expect(report?.name).toBe("Mine.ufo");
   });
 
   it("forgets the folder when a different font is opened", async () => {

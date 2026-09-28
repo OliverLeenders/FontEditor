@@ -44,7 +44,21 @@
 }
 
 .field {
+  box-sizing: border-box;
   width: 4.5rem;
+  height: var(--control);
+  padding: 0 0.4rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.field:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
 }
 
 /* A fieldset for the three corner styles, because they are one choice and a

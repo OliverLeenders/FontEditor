@@ -52,12 +52,9 @@
   font-size: 0.72rem;
   color: var(--ink-3);
 }
+/* Drawn by the global select; see controls.css. */
 .processing select {
-  font: inherit;
-  color: var(--ink);
-  background: var(--ground);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
+  flex: none;
 }
 
 .axis,
@@ -175,12 +172,6 @@
 }
 .condition select {
   min-width: 0;
-  font: inherit;
-  font-size: 0.78rem;
-  color: var(--ink);
-  background: var(--ground);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
 }
 
 .to {

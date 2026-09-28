@@ -551,4 +551,17 @@ workspaces and remembered the same way.
 Edits autosave to the browser's private filesystem after a second's pause, so closing
 the tab and coming back keeps your work. Note that this store belongs to the browser,
 not to you — the files cannot be opened in a file manager. To keep a font where other
-tools can read it, save it to a UFO folder from the File menu.
+tools can read it, save it from the File menu, or with Ctrl-S.
+
+**Where a font is kept.** Each font is kept on disk as a UFO of its own — a folder named after
+the font, such as `MyFont-Regular.ufo`. The first time a font is saved, you are asked for the
+folder to keep it _in_: your fonts folder, or the folder of the project the font belongs to.
+The editor makes `MyFont-Regular.ufo` inside it; anything else in that folder is left alone,
+and a font already there under the same name is never written over — the new one is saved
+beside it as `MyFont-Regular-2.ufo`. From then on Ctrl-S writes to that UFO without asking.
+**Save as** does the same for another place, and the font is worked on there afterwards. The
+picker opens where you last kept a font, not inside the last font's own folder, and it will
+not save one font into another font's UFO. An empty folder whose name ends in `.ufo` is taken
+as the font's own, if you would rather make the folder yourself. **Open folder** is the other
+way round: there you pick the `.ufo` itself. The **Fonts** list names the UFO each font is
+kept in, or says it has not been saved to disk yet.

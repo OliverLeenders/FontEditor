@@ -383,6 +383,7 @@ export function SpacingView({
             </option>
           ))}
         </select>
+        <span className={styles.separator} aria-hidden="true" />
         <TextSettingsControls
           value={settings}
           document={document}
@@ -391,7 +392,9 @@ export function SpacingView({
           onChange={(next) => store.setSpacingTextSettings(next)}
           onApplyFeaturesChange={() => store.toggleApplyFeatures()}
         />
+        <span className={styles.separator} aria-hidden="true" />
         <LocationBar />
+        <span className={styles.separator} aria-hidden="true" />
 
         {/* Two exclusive modes rather than a modifier key: adjusting a letter's
             own space and adjusting the gap before it are different jobs, and
@@ -421,6 +424,7 @@ export function SpacingView({
           first={previousName}
           second={selectedName}
         />
+        <span className={styles.separator} aria-hidden="true" />
         <label className={styles.sizeLabel}>
           Size
           <input

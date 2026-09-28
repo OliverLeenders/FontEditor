@@ -17,6 +17,10 @@
   padding: 0.5rem 0.7rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
+  /* Lifted off what it sets, as the drawing's toolbar is. */
+  position: relative;
+  z-index: 2;
+  box-shadow: var(--shadow);
 }
 
 .sizeLabel {
@@ -94,22 +98,24 @@
 }
 
 /* The specimen list, sized to its longest name rather than to what it holds. */
+/* Drawn by the global select; see controls.css. */
 .specimens {
-  padding: 0.28rem 0.4rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink);
-  font-size: 0.82rem;
+  flex: none;
 }
 
 /* One size or a ladder of them, in the same clothes as the specimen list beside
    it: the two are the same kind of choice about what is on the page. */
 .mode {
-  padding: 0.28rem 0.4rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink);
-  font-size: 0.82rem;
+  flex: none;
+}
+
+/* Between the groups the bar holds: what is set, how it is set, where in the
+   designspace, what the keys do, how big. A rule rather than a wider gap, so the
+   groups read as groups without the bar spreading out. */
+.separator {
+  flex: none;
+  align-self: center;
+  width: 1px;
+  height: 1.1rem;
+  background: var(--rule-strong);
 }

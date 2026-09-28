@@ -98,3 +98,95 @@ input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
+
+/*
+ * Lists to choose from, drawn as the rest of the controls are.
+ *
+ * Closed: the height of everything else in a bar, the rule colour, the corner
+ * radius, and a chevron drawn from two gradients in the text's own colour so it
+ * follows the theme without an image per theme.
+ *
+ * Open: where the browser lets a page draw the list — Chromium, which the
+ * desktop application runs on — it is the editor's menu, the same surface,
+ * border, shadow and rows as every other menu, rather than the platform's list
+ * in the platform's blue. Elsewhere the platform's list it stays.
+ */
+select {
+  box-sizing: border-box;
+  height: var(--control);
+  padding: 0 1.5rem 0 0.55rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background-color: var(--canvas);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
+    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
+  background-position:
+    calc(100% - 0.8rem) 52%,
+    calc(100% - 0.55rem) 52%;
+  background-size: 0.25rem 0.25rem;
+  background-repeat: no-repeat;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+select:hover:not(:disabled) {
+  border-color: var(--ink-3);
+}
+select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) {
+    appearance: base-select;
+  }
+  select {
+    display: inline-flex;
+    align-items: center;
+    background-image: none;
+    padding-right: 0.45rem;
+  }
+  select::picker-icon {
+    color: var(--ink-3);
+    font-size: 0.7rem;
+    margin-left: 0.35rem;
+  }
+  ::picker(select) {
+    margin-top: 0.3rem;
+    padding: 0.2rem;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+  option {
+    padding: 0.25rem 0.5rem;
+    border-radius: 2px;
+    color: var(--ink);
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  /* A step lighter than the menu under the pointer, as a menu row is; the one
+     chosen is said by its tick, not by a slab of accent. */
+  option:hover,
+  option:focus-visible {
+    background: var(--surface-2);
+    outline: none;
+  }
+  option:checked {
+    font-weight: 500;
+  }
+  option::checkmark {
+    color: var(--accent);
+  }
+}
