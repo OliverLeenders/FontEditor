@@ -41,60 +41,101 @@ export function hasContinuousCorners(c: Contour): boolean {
   return c.nodes.some((_, i) => continuousAt(c, i));
 }
 
-/** A contour's segments as curves, and the joins at its continuous corners by node. */
-type Rounding = {
+/** A contour's segments as curves, whether each is straight, and how long. */
+type Sides = {
   readonly curves: readonly Cubic[];
   readonly straight: readonly boolean[];
-  readonly joins: ReadonlyMap<number, ContinuousJoin>;
+  readonly lengths: readonly number[];
 };
+
+const sidesOf = new WeakMap<Contour, Sides>();
+
+function sides(c: Contour): Sides {
+  const known = sidesOf.get(c);
+  if (known !== undefined) return known;
+  const curves: Cubic[] = [];
+  const straight: boolean[] = [];
+  for (let i = 0; i < segmentCount(c); i++) {
+    const s = segmentAt(c, i)!;
+    curves.push(segmentCubic(s));
+    straight.push(s.kind === "line");
+  }
+  const found = { curves, straight, lengths: curves.map((s) => arcLength(s)) };
+  sidesOf.set(c, found);
+  return found;
+}
+
+/**
+ * The most of each side a corner may spend: not more than a side has, nor more
+ * than half of one whose other end is rounded too, so two rounds on one side meet
+ * at most in its middle.
+ */
+function mostSize(c: Contour, k: number): number {
+  const { lengths } = sides(c);
+  const n = c.nodes.length;
+  const incoming = (k - 1 + n) % n;
+  const outgoing = k % lengths.length;
+  const share = (segment: number, otherEnd: number): number =>
+    lengths[segment]! * (continuousAt(c, otherEnd) ? 0.5 : 0.98);
+  return Math.min(share(incoming, incoming), share(outgoing, (k + 1) % n));
+}
+
+/** The join at node `k` spending `size`, or `null` where none can be drawn. */
+function joinAt(c: Contour, k: number, size: number): ContinuousJoin | null {
+  const { curves, straight } = sides(c);
+  const n = c.nodes.length;
+  const incoming = (k - 1 + n) % n;
+  const outgoing = k % curves.length;
+  return continuousJoin(
+    curves[incoming]!,
+    curves[outgoing]!,
+    straight[incoming]!,
+    straight[outgoing]!,
+    { size, smoothness: c.nodes[k]!.continuous!.smoothness },
+  );
+}
+
+/** How far along one of its sides from the node a join's end lies. */
+function spentAlong(c: Contour, k: number, join: ContinuousJoin, side: "in" | "out"): number {
+  const { curves } = sides(c);
+  const n = c.nodes.length;
+  return side === "in"
+    ? arcLength(subcurve(curves[(k - 1 + n) % n]!, join.before, 1))
+    : arcLength(subcurve(curves[k % curves.length]!, 0, join.after));
+}
+
+/** A contour's segments as curves, and the joins at its continuous corners by node. */
+type Rounding = Sides & { readonly joins: ReadonlyMap<number, ContinuousJoin> };
 
 const roundings = new WeakMap<Contour, Rounding>();
 
 /**
  * The joins of a contour's continuous corners, worked out once per contour.
  *
- * A corner cannot spend more of a side than the side has, nor more than half of
- * one whose other end is rounded too, so two rounds on one side meet at most in
- * its middle.
+ * Where a join cannot be drawn at its size — a tangent join's ramp needing more
+ * of its line than the line has — it is tried smaller, halving, before being let
+ * go: a round a little smaller than asked is better than a corner that is not
+ * rounded at all.
  */
 function roundingOf(c: Contour): Rounding {
   const known = roundings.get(c);
   if (known !== undefined) return known;
 
-  const count = segmentCount(c);
-  const curves: Cubic[] = [];
-  const straight: boolean[] = [];
-  for (let i = 0; i < count; i++) {
-    const s = segmentAt(c, i)!;
-    curves.push(segmentCubic(s));
-    straight.push(s.kind === "line");
-  }
-  const lengths = curves.map((s) => arcLength(s));
-  const n = c.nodes.length;
-
   const joins = new Map<number, ContinuousJoin>();
-  for (let k = 0; k < n; k++) {
+  for (let k = 0; k < c.nodes.length; k++) {
     if (!continuousAt(c, k)) continue;
-    const incoming = (k - 1 + n) % n;
-    const outgoing = k % count;
-    const share = (segment: number, otherEnd: number): number =>
-      lengths[segment]! * (continuousAt(c, otherEnd) ? 0.5 : 0.98);
-    const size = Math.min(
-      c.nodes[k]!.continuous!.size,
-      share(incoming, incoming),
-      share(outgoing, (k + 1) % n),
-    );
-    const join = continuousJoin(
-      curves[incoming]!,
-      curves[outgoing]!,
-      straight[incoming]!,
-      straight[outgoing]!,
-      { size, smoothness: c.nodes[k]!.continuous!.smoothness },
-    );
-    if (join !== null) joins.set(k, join);
+    let size = Math.min(c.nodes[k]!.continuous!.size, mostSize(c, k));
+    for (let attempt = 0; attempt < 6 && size > 0.5; attempt++) {
+      const join = joinAt(c, k, size);
+      if (join !== null) {
+        joins.set(k, join);
+        break;
+      }
+      size /= 2;
+    }
   }
 
-  const rounding = { curves, straight, joins };
+  const rounding = { ...sides(c), joins };
   roundings.set(c, rounding);
   return rounding;
 }
@@ -158,6 +199,10 @@ export function continuousCuts(c: Contour): ReadonlyMap<number, { before: Vec2; 
  * The size a corner would have for its round to begin at the point on one of its
  * sides nearest `p`: the distance along that side from the node. What dragging a
  * corner's end along its side sets.
+ *
+ * At a tangent join the end on the straight side is worked out from the size
+ * rather than being it, so there the size is the one whose round ends where the
+ * pointer is, found by halving.
  */
 export function continuousSizeAt(c: Contour, index: number, side: "in" | "out", p: Vec2): number {
   const n = c.nodes.length;
@@ -165,7 +210,21 @@ export function continuousSizeAt(c: Contour, index: number, side: "in" | "out", 
   if (segment === null) return 0;
   const curve = segmentCubic(segment);
   const { t } = project(curve, p);
-  return arcLength(side === "in" ? subcurve(curve, t, 1) : subcurve(curve, 0, t));
+  const wanted = arcLength(side === "in" ? subcurve(curve, t, 1) : subcurve(curve, 0, t));
+
+  const join = continuousAt(c, index) ? roundingOf(c).joins.get(index) : undefined;
+  const derived = join?.derived === "before" ? "in" : join?.derived === "after" ? "out" : null;
+  if (derived !== side) return wanted;
+
+  let lo = 0.5;
+  let hi = mostSize(c, index);
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    const trial = joinAt(c, index, mid);
+    if (trial === null || spentAlong(c, index, trial, side) > wanted) hi = mid;
+    else lo = mid;
+  }
+  return lo;
 }
 
 /**

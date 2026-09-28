@@ -129,6 +129,53 @@ describe("a continuous corner", () => {
   });
 });
 
+describe("a continuous tangent point", () => {
+  /** A line along the baseline into a bowl rising from it, through a tangent point. */
+  const shoulder = (size: number): Contour =>
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), { x: 0, y: 0 }),
+        node(
+          ids.node(),
+          { x: 300, y: 0 },
+          { type: "tangent", out: { x: 410, y: 0 }, continuous: { size, smoothness: 0.6 } },
+        ),
+        node(ids.node(), { x: 500, y: 200 }, { in: { x: 500, y: 90 } }),
+      ],
+      true,
+    );
+
+  it("ramps from the line into the bowl without curving harder than the bowl", () => {
+    const drawn = corneredContour(shoulder(60));
+    expect(points(drawn).some((p) => p.x === 300 && p.y === 0)).toBe(false);
+    let most = 0;
+    let ramp = 0;
+    for (let i = 0; i < segmentCount(drawn); i++) {
+      const s = segmentAt(drawn, i)!;
+      if (s.kind !== "curve") continue;
+      const cubic = segmentCubic(s);
+      if (cubic.a.y === 0 && cubic.a.x < 300) {
+        for (let k = 0; k <= 40; k++) ramp = Math.max(ramp, Math.abs(curvature(cubic, k / 40)!));
+      } else {
+        most = Math.max(most, Math.abs(curvature(cubic, 0)!));
+      }
+    }
+    expect(ramp).toBeGreaterThan(0);
+    expect(ramp).toBeLessThanOrEqual(most * 1.02);
+  });
+
+  it("takes the size whose ramp ends where its line end is dragged", () => {
+    const c = shoulder(60);
+    const size = continuousSizeAt(c, 1, "in", { x: 220, y: 3 });
+    const moved = {
+      ...c,
+      nodes: c.nodes.map((n, i) => (i === 1 ? { ...n, continuous: { size, smoothness: 0.6 } } : n)),
+    };
+    expect(continuousCuts(moved).get(1)!.before.x).toBeCloseTo(220, 0);
+  });
+});
+
 describe("operations on a rounded outline", () => {
   it("leaves the corner as it is when nothing overlaps", () => {
     const g = glyph("o", { contours: [square()] });

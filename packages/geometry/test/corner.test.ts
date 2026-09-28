@@ -62,6 +62,19 @@ describe("a continuous corner between two lines", () => {
     expect(curvature(ramp!.curve, 1)!).toBeCloseTo(curvature(arc!.curve, 0)!, 3);
   });
 
+  it("ramps into the arc without going past its curvature", () => {
+    // A ramp that overshot the arc's curvature and came back to it drew a horn in
+    // the comb at each end of the arc.
+    for (const smoothness of [0.3, 0.6, 1]) {
+      const join = continuousJoin(across, up, true, true, { size: 150, smoothness })!;
+      const ramp = join.pieces[0]!.curve;
+      const end = Math.abs(curvature(ramp, 1)!);
+      for (let k = 1; k <= 40; k++) {
+        expect(Math.abs(curvature(ramp, k / 40)!)).toBeLessThanOrEqual(end * 1.05);
+      }
+    }
+  });
+
   it("stays inside the corner and within the size along each side", () => {
     const join = continuousJoin(across, up, true, true, { size: 150, smoothness: 0.8 })!;
     for (const { curve } of join.pieces) {
@@ -99,9 +112,24 @@ describe("a curve settling into a line", () => {
     const piece = join.pieces[0]!.curve;
     expect(Math.abs(curvature(piece, 1)!)).toBeLessThan(1e-9);
     expect(curvature(piece, 0)!).toBeCloseTo(curvature(bowl, join.before)!, 6);
-    // It ends on the line, the size along it.
+    // It ends on the line, past the point, as far along it as the ramp needs:
+    // that end is worked out, not set by the size.
     expect(piece.b.y).toBeCloseTo(0, 9);
-    expect(piece.b.x).toBeCloseTo(60, 6);
+    expect(piece.b.x).toBeGreaterThan(0);
+    expect(join.derived).toBe("after");
+  });
+
+  it("never curves harder than the curve it leaves", () => {
+    // The first version solved the one cubic outright, and its curvature rose a
+    // fifth above the curve's before falling to nothing: a bulge in the comb.
+    for (const size of [30, 60, 100]) {
+      const join = continuousJoin(bowl, on, false, true, { size, smoothness: 1 })!;
+      const piece = join.pieces[0]!.curve;
+      const start = Math.abs(curvature(piece, 0)!);
+      for (let k = 1; k <= 40; k++) {
+        expect(Math.abs(curvature(piece, k / 40)!)).toBeLessThanOrEqual(start * 1.02);
+      }
+    }
   });
 
   it("works the other way round, from a line into a curve", () => {
@@ -111,6 +139,9 @@ describe("a curve settling into a line", () => {
     const piece = join.pieces[0]!.curve;
     expect(Math.abs(curvature(piece, 0)!)).toBeLessThan(1e-9);
     expect(curvature(piece, 1)!).toBeCloseTo(curvature(rise, join.after)!, 6);
+    expect(join.derived).toBe("before");
+    expect(piece.a.y).toBeCloseTo(0, 9);
+    expect(piece.a.x).toBeLessThan(0);
   });
 });
 
