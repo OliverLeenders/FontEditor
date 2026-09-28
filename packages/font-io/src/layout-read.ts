@@ -138,7 +138,21 @@ export type ReadFeature = {
   readonly lookups: readonly number[];
   /** Whether it carries parameters: a stylistic set's name, a size range. */
   readonly params: boolean;
+  /** The parameters, where they are a stylistic set's or a character variant's. */
+  readonly parameters?: ReadFeatureParameters;
 };
+
+/** A stylistic set's name, or a character variant's names and characters, by name-table number. */
+export type ReadFeatureParameters =
+  | { readonly kind: "stylistic"; readonly name: number }
+  | {
+      readonly kind: "variant";
+      readonly label: number;
+      readonly tooltip: number;
+      readonly sample: number;
+      readonly params: readonly number[];
+      readonly characters: readonly number[];
+    };
 
 export type ReadLayout = {
   readonly scripts: readonly ReadScript[];
@@ -303,9 +317,51 @@ function readFeatures(r: Reader, at: number): ReadFeature[] {
     const lookupCount = r.u16(feature + 2);
     const lookups: number[] = [];
     for (let j = 0; j < lookupCount; j++) lookups.push(r.u16(feature + 4 + j * 2));
-    out.push({ tag: r.tag(record), lookups, params: r.u16(feature) !== 0 });
+    const tag = r.tag(record);
+    const offset = r.u16(feature);
+    const parameters = offset === 0 ? undefined : readParameters(r, feature + offset, tag);
+    out.push({
+      tag,
+      lookups,
+      params: offset !== 0,
+      ...(parameters === undefined ? {} : { parameters }),
+    });
   }
   return out;
+}
+
+/**
+ * A feature's parameters, where its tag says what they are: a stylistic set's
+ * name, or a character variant's. Anything else, or anything that will not read,
+ * is left as parameters nothing here understands.
+ */
+function readParameters(r: Reader, at: number, tag: string): ReadFeatureParameters | undefined {
+  try {
+    if (/^ss(0[1-9]|1[0-9]|20)$/.test(tag)) {
+      return { kind: "stylistic", name: r.u16(at + 2) };
+    }
+    if (/^cv[0-9][0-9]$/.test(tag)) {
+      const count = r.u16(at + 8);
+      const first = r.u16(at + 10);
+      const chars = r.u16(at + 12);
+      const characters: number[] = [];
+      for (let i = 0; i < chars; i++) {
+        const p = at + 14 + i * 3;
+        characters.push((r.u16(p) << 8) | (r.u16(p + 1) & 0xff));
+      }
+      return {
+        kind: "variant",
+        label: r.u16(at + 2),
+        tooltip: r.u16(at + 4),
+        sample: r.u16(at + 6),
+        params: first === 0 ? [] : Array.from({ length: count }, (_, i) => first + i),
+        characters,
+      };
+    }
+  } catch (error) {
+    if (!(error instanceof OutOfBounds)) throw error;
+  }
+  return undefined;
 }
 
 function readLookup(r: Reader, at: number, table: "GSUB" | "GPOS"): ReadLookup {

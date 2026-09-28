@@ -47,7 +47,10 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   const known = joinedInk.get(c);
   if (known !== undefined) return known;
 
-  const regions = inkRegions(c);
+  // Slivers left out: where the path runs along the nib's own edge a stretch of
+  // ink can be a hair thin, less ink than anything shows, and its two long sides
+  // lying all but on each other are more than the union can tell apart.
+  const regions = inkRegions(c).filter((r) => thickness(r) >= SLIVER);
   // One outline out of the regions. The union may decline a boundary it cannot
   // close; the regions are still the right ink by the non-zero rule, only
   // overlapping, so they are drawn as they are rather than not at all.
@@ -56,6 +59,26 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   const answer = joined === null ? regions : joined.glyph.contours;
   joinedInk.set(c, answer);
   return answer;
+}
+
+/** Below this average thickness, in units, a region of ink is a sliver. */
+const SLIVER = 0.25;
+
+/**
+ * How thick a region is on average: its area over half its perimeter, from its
+ * points — rough, and only ever asked whether it is next to nothing.
+ */
+function thickness(c: Contour): number {
+  const pts = c.nodes.map((n) => n.pt);
+  let area = 0;
+  let perimeter = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!;
+    const b = pts[(i + 1) % pts.length]!;
+    area += a.x * b.y - b.x * a.y;
+    perimeter += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return perimeter === 0 ? 0 : Math.abs(area) / perimeter;
 }
 
 /**

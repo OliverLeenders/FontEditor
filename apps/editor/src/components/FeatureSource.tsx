@@ -250,8 +250,9 @@ export function FeatureSource({
   };
 
   const accept = (open: Popup, item: Completion): void => {
-    const text = value.slice(0, open.from) + item.label + value.slice(open.to);
-    const at = open.from + item.label.length;
+    const written = item.insert ?? item.label;
+    const text = value.slice(0, open.from) + written + value.slice(open.to);
+    const at = open.from + (item.caret ?? written.length);
     setPopup(null);
     apply({ text, start: at, end: at });
   };

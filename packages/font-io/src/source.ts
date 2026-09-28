@@ -8,6 +8,7 @@ import type { PathCommand } from "./commands.js";
 import { GPOS, GSUB, readGdef, readLayout } from "./layout-read.js";
 import type { LayoutTables } from "./layout-source.js";
 import { type SourceKerning, kerningFromGpos, kerningFromKernTable } from "./readkern.js";
+import { readNames } from "./names.js";
 import { readTablesOf } from "./sfnt.js";
 
 /**
@@ -265,9 +266,11 @@ function readLayoutTables(bytes: ArrayBuffer, glyphCount: number): LayoutTables 
   const gsub = find(GSUB);
   const gpos = find(GPOS);
   const gdef = find("GDEF");
+  const name = find("name");
   return {
     gsub: gsub === null ? null : readLayout(gsub, GSUB, glyphCount),
     gpos: gpos === null ? null : readLayout(gpos, GPOS, glyphCount),
     gdef: gdef === null ? null : readGdef(gdef),
+    names: name === null ? [] : readNames(name),
   };
 }

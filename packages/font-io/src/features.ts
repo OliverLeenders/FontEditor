@@ -1,13 +1,16 @@
 import {
+  type FeaCvParameters,
+  type FeaFeature,
   type FeaGdef,
   type FeaLookup,
+  type FeaName,
   type FeaProblem,
   type FeaRule,
   type FeaSource,
   type FeaStatement,
   parseFea,
 } from "./fea.js";
-import { singlePos } from "./gpos.js";
+import { Writer, singlePos } from "./gpos.js";
 import {
   type AlternateSub,
   type LigatureSub,
@@ -47,6 +50,8 @@ import {
  */
 
 export type CompiledFeatures = {
+  /** The names the features' parameters refer to, for the name table. */
+  readonly names: readonly FeatureName[];
   /** GSUB. Empty when nothing compiled, so a caller writes no table rather than an empty one. */
   readonly table: Uint8Array;
   /**
@@ -103,7 +108,14 @@ const NO_GDEF: GdefFromFeatures = {
   carets: new Map(),
 };
 
+/**
+ * A name the feature file gives, to go into the name table under `id`: one
+ * record for each platform and language it was written for.
+ */
+export type FeatureName = { readonly id: number; readonly records: readonly FeaName[] };
+
 export const NO_FEATURES: CompiledFeatures = {
+  names: [],
   table: new Uint8Array(0),
   substitution: { entries: [], lookups: [] },
   positioning: { entries: [], lookups: [] },
@@ -125,10 +137,54 @@ export const NO_FEATURES: CompiledFeatures = {
 export function compileFeatures(
   source: string,
   glyphId: (name: string) => number | undefined,
+  options: CompileOptions = {},
 ): CompiledFeatures {
   if (source.trim() === "") return NO_FEATURES;
-  return new Compilation(parseFea(source), glyphId).result();
+  return new Compilation(parseFea(source), glyphId, options).result();
 }
+
+export type CompileOptions = {
+  /** The first name-table number the features' names are given; 256 unless said. */
+  readonly firstNameId?: number;
+  /**
+   * Whether to gather an \`aalt\` where the file writes none — which a font going
+   * out wants, so a glyph palette offers every alternate, and a test of what one
+   * feature compiles to does not.
+   */
+  readonly gatherAalt?: boolean;
+};
+
+/**
+ * The features an `aalt` is gathered from when the file writes none: the ones
+ * whose substitutions are alternates somebody might choose one at a time —
+ * stylistic sets, character variants, swashes, small capitals, figure styles.
+ */
+const AALT_SOURCES = new Set([
+  "salt",
+  "swsh",
+  "cswh",
+  "titl",
+  "ornm",
+  "nalt",
+  "hist",
+  "smcp",
+  "c2sc",
+  "pcap",
+  "c2pc",
+  "unic",
+  "case",
+  "sups",
+  "subs",
+  "sinf",
+  "ordn",
+  "onum",
+  "lnum",
+  "pnum",
+  "tnum",
+  "zero",
+]);
+const gathersByDefault = (tag: string): boolean =>
+  AALT_SOURCES.has(tag) || /^ss(0[1-9]|1[0-9]|20)$/.test(tag) || /^cv[0-9][0-9]$/.test(tag);
 
 type Table = "sub" | "pos";
 
@@ -192,27 +248,158 @@ class Compilation {
   private readonly attachNamed = new Map<string, number>();
   private readonly markSetNamed = new Map<string, number>();
   private readonly carets = new Map<number, number[]>();
+  /** The names features' parameters refer to, and the next number to give one. */
+  private readonly names: FeatureName[] = [];
+  private nextName: number;
+  /** Each feature's parameters, by tag. */
+  private readonly params = new Map<string, Uint8Array>();
 
   constructor(
     parsed: FeaSource,
     private readonly glyphId: (name: string) => number | undefined,
+    private readonly options: CompileOptions,
   ) {
+    this.nextName = options.firstNameId ?? 256;
     this.problems = [...parsed.problems];
     this.systems = parsed.languageSystems.length > 0 ? parsed.languageSystems : DEFAULT_SYSTEMS;
     for (const block of parsed.blocks) {
       if (block.kind === "lookup") this.lookupBlock(block.lookup);
-      else this.feature(block.feature.tag, block.feature.statements);
+      // Gathered at the end, from features that may come after it.
+      else if (block.feature.tag !== "aalt")
+        this.feature(block.feature.tag, block.feature.statements);
+      if (block.kind === "feature") this.parametersOf(block.feature);
     }
+    this.aalt(parsed);
     if (parsed.gdef !== null) this.gdefBlock(parsed.gdef);
+  }
+
+  /** A name for the name table, and the number it will have there. */
+  private name(records: readonly FeaName[]): number {
+    if (records.length === 0) return 0;
+    const id = this.nextName++;
+    this.names.push({ id, records });
+    return id;
+  }
+
+  /**
+   * A stylistic set's name, or a character variant's parameters, as the bytes
+   * its feature table points at.
+   */
+  private parametersOf(feature: FeaFeature): void {
+    if (feature.names.length > 0) {
+      const w = new Writer();
+      w.u16(0); // version
+      w.u16(this.name(feature.names));
+      this.params.set(feature.tag, w.finish());
+      return;
+    }
+    const cv: FeaCvParameters | null = feature.cvParameters;
+    if (cv === null) return;
+    const label = this.name(cv.label);
+    const tooltip = this.name(cv.tooltip);
+    const sample = this.name(cv.sample);
+    // The alternates' names are numbered one after another, from the first.
+    const firstParam = cv.params.length === 0 ? 0 : this.nextName;
+    for (const param of cv.params) {
+      const id = this.nextName++;
+      this.names.push({ id, records: param });
+    }
+    const w = new Writer();
+    w.u16(0); // format
+    w.u16(label);
+    w.u16(tooltip);
+    w.u16(sample);
+    w.u16(cv.params.length);
+    w.u16(firstParam);
+    w.u16(cv.characters.length);
+    for (const code of cv.characters) {
+      w.u8((code >> 16) & 0xff);
+      w.u8((code >> 8) & 0xff);
+      w.u8(code & 0xff);
+    }
+    this.params.set(feature.tag, w.finish());
+  }
+
+  /**
+   * Access All Alternates: every alternate of every glyph, gathered from the
+   * features `aalt` names — or, where the file has no `aalt`, from the ones
+   * such a feature usually gathers — so an application's glyph palette can offer
+   * them all. Single and alternate substitutions only, as the format intends:
+   * glyphs with one alternate in a single substitution, those with more in an
+   * alternate one.
+   */
+  private aalt(parsed: FeaSource): void {
+    const written = parsed.features.find((f) => f.tag === "aalt");
+    if (written === undefined && this.options.gatherAalt !== true) return;
+    const gathered: string[] =
+      written === undefined
+        ? [...new Set(parsed.features.map((f) => f.tag).filter(gathersByDefault))]
+        : written.statements.flatMap((s) => (s.kind === "feature" ? [s.tag] : []));
+    const rules = [
+      ...gathered.flatMap((tag) =>
+        parsed.features.filter((f) => f.tag === tag).flatMap((f) => f.rules),
+      ),
+      ...(written?.rules ?? []),
+    ];
+
+    const alternates = new Map<number, number[]>();
+    const add = (from: string, to: string): void => {
+      const a = this.glyphId(from);
+      const b = this.glyphId(to);
+      if (a === undefined || b === undefined || a === b) return;
+      const list = alternates.get(a) ?? [];
+      if (!list.includes(b)) list.push(b);
+      alternates.set(a, list);
+    };
+    for (const rule of rules) {
+      if (rule.kind === "single") rule.from.forEach((from, i) => add(from, rule.to[i]!));
+      else if (rule.kind === "alternate") for (const to of rule.alternates) add(rule.from, to);
+    }
+    if (alternates.size === 0) return;
+
+    const one = [...alternates].filter(([, list]) => list.length === 1);
+    const several = [...alternates].filter(([, list]) => list.length > 1);
+    const lookups: Lookup[] = [];
+    if (one.length > 0) {
+      lookups.push({
+        type: 1,
+        subtables: [singleSubst({ from: one.map(([g]) => g), to: one.map(([, l]) => l[0]!) })],
+      });
+    }
+    if (several.length > 0) {
+      lookups.push({
+        type: 3,
+        subtables: [
+          alternateSubst(
+            several.sort(([a], [b]) => a - b).map(([from, list]) => ({ from, alternates: list })),
+          ),
+        ],
+      });
+    }
+    for (const lookup of lookups) {
+      const index = this.slots.sub.length;
+      this.slots.sub.push(lookup);
+      this.entries.sub.push({ tag: "aalt", lookups: [index] });
+    }
+    if (!this.tags.includes("aalt")) this.tags.push("aalt");
   }
 
   result(): CompiledFeatures {
     const lookups = (table: Table): Lookup[] =>
       this.slots[table].map((slot) => ("singles" in slot ? written(slot) : slot));
+    // Each feature's parameters on every entry of it: the table writes them once
+    // per record, whichever language the record is for.
+    const withParams = (entries: readonly FeatureEntry[]): FeatureEntry[] =>
+      mergeFeatures(entries, []).map((e) => {
+        const params = this.params.get(e.tag);
+        return params === undefined ? e : { ...e, params };
+      });
+    const substitution = withParams(this.entries.sub);
     return {
-      table: layoutTable(mergeFeatures(this.entries.sub, []), lookups("sub"), this.systems),
-      substitution: { entries: mergeFeatures(this.entries.sub, []), lookups: lookups("sub") },
-      positioning: { entries: mergeFeatures(this.entries.pos, []), lookups: lookups("pos") },
+      names: this.names,
+      table: layoutTable(substitution, lookups("sub"), this.systems),
+      substitution: { entries: substitution, lookups: lookups("sub") },
+      positioning: { entries: withParams(this.entries.pos), lookups: lookups("pos") },
       systems: this.systems,
       tags: this.tags,
       rules: this.rules,

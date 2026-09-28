@@ -74,6 +74,9 @@ export type OverlapResult = {
  */
 const PROBE = 0.5;
 
+/** How many times a piece with no ink either side is asked again, an eighth as far each time. */
+const THIN_TRIES = 4;
+
 /** The floor under "the same place", for a glyph too small to have an opinion. */
 const JOIN = 0.05;
 
@@ -797,9 +800,24 @@ function onBoundaryOf(
     const length = Math.hypot(along.x, along.y) || 1;
     const normal = { x: -along.y / length, y: along.x / length };
 
-    const reach = PROBE * eps;
-    const left = inside({ x: at.x + normal.x * reach, y: at.y + normal.y * reach });
-    const right = inside({ x: at.x - normal.x * reach, y: at.y - normal.y * reach });
+    // Outside on both sides means the region is thinner there than the probe
+    // reaches — a stroke near where its pen pinches it to nothing — since a piece
+    // of a region's edge always has the region on one side. Asked again closer in,
+    // until one side finds it. Inside on both sides is a buried piece, and is not
+    // asked again: closer in is where coincident edges' fuzz is.
+    let reach = PROBE * eps;
+    let left = inside({ x: at.x + normal.x * reach, y: at.y + normal.y * reach });
+    let right = inside({ x: at.x - normal.x * reach, y: at.y - normal.y * reach });
+    // A stretch drawn out and straight back along itself has nothing either side
+    // at any distance that is not arithmetic, and is no edge at all: it is not
+    // asked again.
+    const spike =
+      !left && !right && pieces.some((other) => other !== piece && reversedTwin(other, piece, eps));
+    for (let i = 0; i < THIN_TRIES && !left && !right && !spike; i++) {
+      reach /= 8;
+      left = inside({ x: at.x + normal.x * reach, y: at.y + normal.y * reach });
+      right = inside({ x: at.x - normal.x * reach, y: at.y - normal.y * reach });
+    }
     if (left === right) continue;
 
     const facing = left ? piece : { curve: reverse(piece.curve), line: piece.line };
@@ -808,6 +826,15 @@ function onBoundaryOf(
   }
 
   return kept;
+}
+
+/** Whether one piece is another drawn the other way: the same ends swapped, and the same middle. */
+function reversedTwin(a: Piece, b: Piece, eps: number): boolean {
+  return (
+    near(a.curve.a, b.curve.b, eps) &&
+    near(a.curve.b, b.curve.a, eps) &&
+    near(evaluate(a.curve, 0.5), evaluate(b.curve, 0.5), eps)
+  );
 }
 
 /**

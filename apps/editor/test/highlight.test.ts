@@ -16,6 +16,18 @@ const kinds = (source: string) =>
     .map((token) => `${token.kind}:${token.text}`);
 
 describe("colouring feature source", () => {
+  it("colours a name as one string, spaces and # and all", () => {
+    expect(kinds('featureNames { name "No. #2 alt"; };')).toEqual([
+      "keyword:featureNames",
+      "punctuation:{",
+      "keyword:name",
+      'string:"No. #2 alt"',
+      "punctuation:;",
+      "punctuation:}",
+      "punctuation:;",
+    ]);
+  });
+
   it("gives back every character, in order", () => {
     const source =
       "languagesystem DFLT dflt;\n@FIGS = [zero one];\n\nfeature liga {\n\tsub f' i by fi; # a comment\n} liga;\n  pos @caps <10 0 20 0>;";

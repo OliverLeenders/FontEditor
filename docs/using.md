@@ -384,6 +384,29 @@ set the way a reader's would be. A moment after a line is set, HarfBuzz takes it
 sets it exactly as the exported font would; until then the editor's own shaper stands in, and
 it takes the first of a rule offering several alternates rather than choosing between them.
 
+**Naming stylistic sets.** A stylistic set is named in the feature file, inside the set, the way
+every other font tool reads it:
+
+```
+feature ss01 {
+    featureNames {
+        name "Single-storey a";
+    };
+    sub a by a.ss01;
+} ss01;
+```
+
+A character variant takes `cvParameters` instead — a `FeatUILabelNameID` block for its name,
+and optionally a line on what it does, a sample, a name for each alternate
+(`ParamUILabelNameID`) and the characters it changes (`Character 0x0061;`). Type
+`featureNames` or `cvParameters` and accept the completion to get the block with the caret
+in the name. The names go into the exported font, where an application's typography panel
+shows them, and the Features switches show them beside the tag. A font opened from a file gives
+its names back as these blocks. `aalt`, the feature a glyph palette lists every alternate from,
+is compiled as written — `feature aalt { feature ss01; feature salt; } aalt;` — and if the file
+has none, the exported font gets one gathered from the stylistic sets, character variants,
+stylistic and swash alternates, small capitals and figure styles.
+
 **Joining shapes, and what that does to components.** **Remove overlap** takes the outline of
 what the selected contours cover together, or of the whole glyph where nothing is selected. Two
 shapes that cross are joined, and so are two that share an edge and no area — two squares set

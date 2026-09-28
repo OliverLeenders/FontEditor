@@ -293,6 +293,9 @@
 [data-kind="number"] {
   color: var(--syntax-number);
 }
+[data-kind="string"] {
+  color: var(--syntax-class);
+}
 [data-kind="comment"] {
   color: var(--ink-3);
   font-style: italic;

@@ -114,6 +114,42 @@ export function withNames(
   return { table: nameTable(records), ids };
 }
 
+/**
+ * Add names at numbers already given them — the feature file's, whose numbers its
+ * features' parameters point at — each for the platforms and languages it was
+ * written for. A record already there under the same number, platform, encoding
+ * and language is replaced.
+ */
+export function withNumberedNames(
+  table: Uint8Array,
+  names: readonly {
+    readonly id: number;
+    readonly records: readonly {
+      readonly platform: number;
+      readonly encoding: number;
+      readonly language: number;
+      readonly text: string;
+    }[];
+  }[],
+): Uint8Array {
+  const added: NameRecord[] = names.flatMap((name) =>
+    name.records.map((r) => ({
+      platformId: r.platform,
+      encodingId: r.encoding,
+      languageId: r.language,
+      nameId: name.id,
+      text: r.platform === 3 ? utf16(r.text) : latin1(r.text),
+    })),
+  );
+  const same = (a: NameRecord, b: NameRecord): boolean =>
+    a.platformId === b.platformId &&
+    a.encodingId === b.encodingId &&
+    a.languageId === b.languageId &&
+    a.nameId === b.nameId;
+  const kept = readNames(table).filter((r) => !added.some((a) => same(a, r)));
+  return nameTable([...kept, ...added]);
+}
+
 function utf16(text: string): Uint8Array {
   const out = new Bytes();
   for (let i = 0; i < text.length; i++) out.u16(text.charCodeAt(i));

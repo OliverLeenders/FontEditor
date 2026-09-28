@@ -212,19 +212,38 @@ export type FeatureChoice = {
  */
 export function featureChoices(document: FontDocument): FeatureChoice[] {
   const defaults = new Set(DEFAULT_FEATURES);
+  const named = ownNames(document.features);
   return featureTags(document.features).map((tag) => ({
     tag,
-    label: featureLabel(tag),
+    label: named.get(tag) ?? featureLabel(tag),
     byDefault: defaults.has(tag),
   }));
+}
+
+/**
+ * The names the feature file gives its stylistic sets and character variants:
+ * the English one on Windows where there is one, as most applications show,
+ * and the first given otherwise.
+ */
+function ownNames(source: string): Map<string, string> {
+  const out = new Map<string, string>();
+  if (!/featureNames|cvParameters/.test(source)) return out;
+  for (const feature of parseFea(source).features) {
+    const names = feature.names.length > 0 ? feature.names : (feature.cvParameters?.label ?? []);
+    const english = names.find((n) => n.platform === 3 && n.language === 0x409) ?? names[0];
+    if (english !== undefined && english.text.trim() !== "" && !out.has(feature.tag)) {
+      out.set(feature.tag, english.text);
+    }
+  }
+  return out;
 }
 
 function featureLabel(tag: string): string {
   const known = FEATURES[tag];
   if (known !== undefined) return known;
   // A stylistic set or a character variant is one of twenty or ninety-nine, and
-  // naming them all would be a table of nothing but numbers. The font can give
-  // them names of its own, which this editor does not compile yet.
+  // naming them all would be a table of nothing but numbers. Where the file
+  // gives one a name of its own, that is shown instead; see ownNames.
   const numbered = /^(ss|cv)(\d\d)$/.exec(tag);
   if (numbered === null) return tag;
   const kind = numbered[1] === "ss" ? "Stylistic set" : "Character variant";

@@ -14,7 +14,16 @@ import { KEYWORDS, highlightFea } from "./highlight.js";
 
 export type CompletionKind = "glyph" | "class" | "lookup" | "keyword" | "tag";
 
-export type Completion = { readonly label: string; readonly kind: CompletionKind };
+export type Completion = {
+  readonly label: string;
+  readonly kind: CompletionKind;
+  /**
+   * What accepting it writes, where that is more than the label: a block to fill
+   * in. `caret` is where in it the caret is left, the end where not given.
+   */
+  readonly insert?: string;
+  readonly caret?: number;
+};
 
 export type CompletionList = {
   /** The word being completed, which accepting a completion replaces whole. */
@@ -135,7 +144,10 @@ export function completionsAt(
   else if (before === "feature") candidates = of(FEATURE_TAGS, "tag");
   else candidates = [...of(glyphs, "glyph"), ...of([...KEYWORDS], "keyword")];
 
-  const items = ranked(candidates, typed).slice(0, MAX_COMPLETIONS);
+  const indent = /^[ \t]*/.exec(source.slice(source.lastIndexOf("\n", start - 1) + 1))?.[0] ?? "";
+  const items = ranked(candidates, typed)
+    .slice(0, MAX_COMPLETIONS)
+    .map((item) => (item.kind === "keyword" ? withBlock(item, indent) : item));
   if (items.length === 0) return null;
   if (!asked && items.length === 1 && items[0]!.label === source.slice(start, end)) return null;
   return { from: start, to: end, items };
@@ -163,4 +175,30 @@ export function glyphAt(
     at = end;
   }
   return null;
+}
+
+/**
+ * The two blocks a name is written in, offered whole: accepting `featureNames`
+ * writes the block with an empty name in it and leaves the caret between the
+ * quotes, since the name is the only thing anybody writes one for.
+ */
+function withBlock(item: Completion, indent: string): Completion {
+  const inner = `${indent}    `;
+  if (item.label === "featureNames") {
+    const insert = `featureNames {\n${inner}name "";\n${indent}};`;
+    return { ...item, insert, caret: insert.indexOf('""') + 1 };
+  }
+  if (item.label === "cvParameters") {
+    const deeper = `${inner}    `;
+    const insert = [
+      "cvParameters {",
+      `${inner}FeatUILabelNameID {`,
+      `${deeper}name "";`,
+      `${inner}};`,
+      `${inner}Character 0x;`,
+      `${indent}};`,
+    ].join("\n");
+    return { ...item, insert, caret: insert.indexOf('""') + 1 };
+  }
+  return item;
 }

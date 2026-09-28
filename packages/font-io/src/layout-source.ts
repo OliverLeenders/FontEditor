@@ -1,4 +1,5 @@
 import type {
+  ReadFeature,
   AnchorPoint,
   ContextRule,
   GlyphSet,
@@ -9,6 +10,7 @@ import type {
   ValueRecord,
 } from "./layout-read.js";
 import type { SourceKernSide, SourceKerning } from "./readkern.js";
+import type { NameRecord } from "./names.js";
 
 /**
  * A font's layout tables, turned back into what this editor keeps.
@@ -44,6 +46,8 @@ export type RecoveredLayout = {
 };
 
 export type LayoutTables = {
+  /** The font's name table, for the names stylistic sets and character variants give. */
+  readonly names?: readonly NameRecord[];
   readonly gsub: ReadLayout | null;
   readonly gpos: ReadLayout | null;
   readonly gdef: ReadGdef | null;
@@ -93,7 +97,7 @@ export function recoverLayout(
     gpos === null ? new Set<number>() : anchorsFrom(gpos, anchors, xHeight, names, warn);
 
   // ---- everything else, as source ---------------------------------------------
-  const writer = new SourceWriter(nameOf, tables.gdef, warn);
+  const writer = new SourceWriter(nameOf, tables.gdef, warn, tables.names ?? []);
   const gsubText = tables.gsub === null ? "" : writer.table("sub", tables.gsub, new Set());
   const gposText =
     gpos === null ? "" : writer.table("pos", gpos, new Set([...kernLookups, ...markLookups]));
@@ -350,7 +354,69 @@ class SourceWriter {
     private readonly nameOf: (id: number) => string,
     private readonly gdef: ReadGdef | null,
     private readonly warn: (message: string) => void,
+    private readonly names: readonly NameRecord[] = [],
   ) {}
+
+  /**
+   * The name statements for one name-table number: one for each platform and
+   * language it is recorded in, US English on Windows and English on the
+   * Macintosh written without numbers, as a feature file usually has them.
+   */
+  private nameStatements(id: number, indent: string): string[] {
+    const out: string[] = [];
+    for (const record of this.names) {
+      if (record.nameId !== id) continue;
+      const windows = record.platformId === 3;
+      if (!windows && record.platformId !== 1) continue;
+      // Each unit as it is, where it is plain ASCII that needs no escape; the
+      // rest as the format's escapes — a UTF-16 unit in four hex digits on
+      // Windows, a byte in two on the Macintosh.
+      const units = windows ? utf16Units(record.text) : [...record.text];
+      const escaped = units
+        .map((unit) => {
+          const plain = unit >= 0x20 && unit < 0x7f && unit !== 0x22 && unit !== 0x5c;
+          if (plain) return String.fromCharCode(unit);
+          return `\\${unit.toString(16).padStart(windows ? 4 : 2, "0")}`;
+        })
+        .join("");
+      const usual = windows
+        ? record.encodingId === 1 && record.languageId === 0x409
+        : record.encodingId === 0 && record.languageId === 0;
+      const numbers = usual
+        ? windows
+          ? ""
+          : "1 "
+        : `${String(record.platformId)} ${String(record.encodingId)} 0x${record.languageId.toString(16)} `;
+      out.push(`${indent}name ${numbers}"${escaped}";`);
+    }
+    return out;
+  }
+
+  /** A feature's names and parameters, as the lines that open its block. */
+  private parameterLines(feature: ReadFeature | undefined): string[] {
+    const p = feature?.parameters;
+    if (p === undefined) return [];
+    if (p.kind === "stylistic") {
+      const names = this.nameStatements(p.name, "        ");
+      return names.length === 0 ? [] : ["    featureNames {", ...names, "    };"];
+    }
+    const lines: string[] = ["    cvParameters {"];
+    const block = (keyword: string, id: number): void => {
+      if (id === 0) return;
+      const names = this.nameStatements(id, "            ");
+      if (names.length === 0) return;
+      lines.push(`        ${keyword} {`, ...names, "        };");
+    };
+    block("FeatUILabelNameID", p.label);
+    block("FeatUITooltipTextNameID", p.tooltip);
+    block("SampleTextNameID", p.sample);
+    for (const id of p.params) block("ParamUILabelNameID", id);
+    for (const code of p.characters) {
+      lines.push(`        Character 0x${code.toString(16).toUpperCase().padStart(4, "0")};`);
+    }
+    lines.push("    };");
+    return lines.length === 2 ? [] : lines;
+  }
 
   /**
    * One table's lookups and features, as source. Lookups in `skip` have gone
@@ -680,8 +746,8 @@ class SourceWriter {
 
     const blocks: string[] = [];
     for (const tag of tags) {
-      if (layout.features.some((f) => f.tag === tag && f.params)) {
-        this.warn(`the names and parameters of ${tag.trim()} are not imported`);
+      if (layout.features.some((f) => f.tag === tag && f.params && f.parameters === undefined)) {
+        this.warn(`the parameters of ${tag.trim()} are not imported`);
       }
       const lookupsIn = (indices: readonly number[]): number[] => {
         const set = new Set<number>();
@@ -721,7 +787,10 @@ class SourceWriter {
         }
       }
       const trimmed = tag.trim();
-      blocks.push([`feature ${trimmed} {`, ...lines, `} ${trimmed};`].join("\n"));
+      const opening = this.parameterLines(
+        layout.features.find((f) => f.tag === tag && f.parameters !== undefined),
+      );
+      blocks.push([`feature ${trimmed} {`, ...opening, ...lines, `} ${trimmed};`].join("\n"));
     }
     return blocks.join("\n\n");
   }
@@ -778,4 +847,11 @@ function anchorText(a: AnchorPoint | null): string {
   return a.point === null
     ? `<anchor ${String(a.x)} ${String(a.y)}>`
     : `<anchor ${String(a.x)} ${String(a.y)} contourpoint ${String(a.point)}>`;
+}
+
+/** A Windows name record's UTF-16 units, big-endian. */
+function utf16Units(bytes: Uint8Array): number[] {
+  const out: number[] = [];
+  for (let i = 0; i + 1 < bytes.length; i += 2) out.push((bytes[i]! << 8) | bytes[i + 1]!);
+  return out;
 }

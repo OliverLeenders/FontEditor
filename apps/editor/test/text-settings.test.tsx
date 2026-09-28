@@ -110,6 +110,24 @@ describe("the features a font defines", () => {
     ]);
   });
 
+  it("shows the name the file gives a stylistic set or a character variant", () => {
+    const named = setFeatures(
+      fontDocument([glyph("a", { unicodes: [0x61] }), glyph("a.ss01"), glyph("a.cv01")]),
+      [
+        "feature ss01 {",
+        '  featureNames { name 1 "Mac name"; name "Single-storey a"; };',
+        "  sub a by a.ss01;",
+        "} ss01;",
+        "feature cv01 {",
+        '  cvParameters { FeatUILabelNameID { name "Round a"; }; };',
+        "  sub a by a.cv01;",
+        "} cv01;",
+        "",
+      ].join("\n"),
+    );
+    expect(featureChoices(named).map((c) => c.label)).toEqual(["Single-storey a", "Round a"]);
+  });
+
   it("says nothing for a font with no feature file", () => {
     expect(featureChoices(fontDocument([glyph("a", { unicodes: [0x61] })]))).toEqual([]);
   });

@@ -691,7 +691,38 @@ type ReadGsub = {
   lookups: { lookupType: number; lookupFlag: number; subtables: unknown[] }[];
 };
 
-const gsubOf = (features: string): ReadGsub => reread(features).tables.gsub as unknown as ReadGsub;
+/**
+ * The exported GSUB, with the aalt export gathers set aside: its lookups come last
+ * and it is tested on its own, so what these tests ask about is the rest.
+ */
+const gsubOf = (features: string): ReadGsub => {
+  const gsub = reread(features).tables.gsub as unknown as ReadGsub;
+  const aalt = new Set(
+    gsub.features.filter((f) => f.tag === "aalt").flatMap((f) => f.feature.lookupListIndexes),
+  );
+  if (aalt.size === 0 || features.includes("aalt")) return gsub;
+  // The feature list without it, and every language's indexes into the list moved
+  // to match.
+  const kept = gsub.features.flatMap((f, i) => (f.tag === "aalt" ? [] : [i]));
+  const remap = (indexes: number[]): number[] =>
+    indexes.filter((i) => kept.includes(i)).map((i) => kept.indexOf(i));
+  return {
+    scripts: gsub.scripts.map((s) => ({
+      tag: s.tag,
+      script: {
+        ...(s.script.defaultLangSys === undefined
+          ? {}
+          : { defaultLangSys: { featureIndexes: remap(s.script.defaultLangSys.featureIndexes) } }),
+        langSysRecords: s.script.langSysRecords.map((r) => ({
+          tag: r.tag,
+          langSys: { featureIndexes: remap(r.langSys.featureIndexes) },
+        })),
+      },
+    })),
+    features: kept.map((i) => gsub.features[i]!),
+    lookups: gsub.lookups.filter((_, i) => !aalt.has(i)),
+  };
+};
 
 describe("compiling the rest of the language", () => {
   const compile = (source: string) =>

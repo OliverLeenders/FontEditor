@@ -164,6 +164,8 @@ export type FeaStatement =
     }
   /** `lookup NAME;` inside a feature: a lookup defined elsewhere, used here. */
   | { readonly kind: "lookup"; readonly name: string; readonly line: number }
+  /** `feature ss01;` inside `aalt`: a feature whose alternates it gathers. */
+  | { readonly kind: "feature"; readonly tag: string; readonly line: number }
   /** `lookup NAME { … } NAME;` inside a feature: defined here, and used here. */
   | { readonly kind: "block"; readonly lookup: FeaLookup };
 
@@ -176,9 +178,40 @@ export type FeaLookup = {
   readonly line: number;
 };
 
+/**
+ * One name a feature is known by, for one platform and language.
+ *
+ * Windows is platform 3 with encoding 1 and language 0x409, US English, which is
+ * what `name "…";` means with no numbers; Macintosh is platform 1, encoding 0,
+ * language 0. The text is decoded, escapes and all.
+ */
+export type FeaName = {
+  readonly platform: number;
+  readonly encoding: number;
+  readonly language: number;
+  readonly text: string;
+};
+
+/**
+ * What a character variant says about itself: its name, a line on what it does,
+ * a word to try it on, a name for each of its alternates, and the characters it
+ * changes. Every part may be left out.
+ */
+export type FeaCvParameters = {
+  readonly label: readonly FeaName[];
+  readonly tooltip: readonly FeaName[];
+  readonly sample: readonly FeaName[];
+  readonly params: readonly (readonly FeaName[])[];
+  readonly characters: readonly number[];
+};
+
 export type FeaFeature = {
   /** The four-character tag, such as `liga`. */
   readonly tag: string;
+  /** A stylistic set's name, from `featureNames`; empty where it has none. */
+  readonly names: readonly FeaName[];
+  /** A character variant's `cvParameters`, or `null` where it has none. */
+  readonly cvParameters: FeaCvParameters | null;
   readonly statements: readonly FeaStatement[];
   /**
    * Every rule the feature applies, in order: its own, those of lookups it
@@ -265,6 +298,15 @@ export function tokenize(source: string): Token[] {
     if (PUNCTUATION.has(ch)) {
       tokens.push({ text: ch, line });
       at += 1;
+      continue;
+    }
+    if (ch === '"') {
+      // A string, the one place a space or a `#` is not a break: a name. It is
+      // one token, quotes included, so a reader can tell it from a glyph name.
+      let end = at + 1;
+      while (end < source.length && source[end] !== '"' && source[end] !== "\n") end += 1;
+      tokens.push({ text: source.slice(at, Math.min(end + 1, source.length)), line });
+      at = end + 1;
       continue;
     }
 
@@ -656,14 +698,9 @@ const REFUSED_IN_FEATURE: ReadonlyMap<string, string> = new Map([
     "enumerate",
     "a pair adjustment is kerning, which is edited in the Spacing workspace rather than here",
   ],
-  [
-    "feature",
-    "a feature that gathers other features, such as aalt, is not compiled by this editor",
-  ],
+  ["feature", "only aalt gathers other features"],
   ["markClass", REFUSED_AT_TOP.get("markClass")!],
   ["parameters", "feature parameters are not compiled by this editor"],
-  ["featureNames", "feature names are not compiled by this editor"],
-  ["cvParameters", "character variant parameters are not compiled by this editor"],
   ["sizemenuname", "size menu names are not compiled by this editor"],
 ]);
 
@@ -682,12 +719,44 @@ function readFeature(keyword: Token, r: Reader): FeaFeature | null {
 
   const statements: FeaStatement[] = [];
   const rules: FeaRule[] = [];
+  let names: FeaName[] = [];
+  let cvParameters: FeaCvParameters | null = null;
 
   for (;;) {
     const token = r.take();
     if (token === undefined) {
       r.complain(keyword.line, `feature ${tag.text} is never closed`);
       break;
+    }
+
+    if (token.text === "featureNames") {
+      if (!STYLISTIC_SET.test(tag.text)) {
+        r.complain(token.line, "feature names belong to a stylistic set, ss01 to ss20");
+        skipStatementOrBlock(r);
+        continue;
+      }
+      names = readNamesBlock(token, r);
+      continue;
+    }
+    if (token.text === "cvParameters") {
+      if (!CHARACTER_VARIANT.test(tag.text)) {
+        r.complain(token.line, "character variant parameters belong to cv01 to cv99");
+        skipStatementOrBlock(r);
+        continue;
+      }
+      cvParameters = readCvParameters(token, r);
+      continue;
+    }
+    if (token.text === "feature" && tag.text === "aalt") {
+      const gathered = r.take();
+      if (gathered === undefined || !isTag(gathered)) {
+        r.complain(token.line, "aalt gathers a feature by its tag");
+        skipInside(r);
+        continue;
+      }
+      if (r.peek()?.text === ";") r.take();
+      statements.push({ kind: "feature", tag: gathered.text, line: token.line });
+      continue;
     }
     if (token.text === "}") {
       // The tag is repeated after the brace, and disagreeing is a mistake worth
@@ -770,7 +839,143 @@ function readFeature(keyword: Token, r: Reader): FeaFeature | null {
     if (statement.kind === "rule") rules.push(statement.rule);
   }
 
-  return { tag: tag.text, statements, rules, line: keyword.line };
+  return { tag: tag.text, names, cvParameters, statements, rules, line: keyword.line };
+}
+
+/** The tags that may have names: stylistic sets, and character variants. */
+const STYLISTIC_SET = /^ss(0[1-9]|1[0-9]|20)$/;
+const CHARACTER_VARIANT = /^cv(0[1-9]|[1-9][0-9])$/;
+
+/** `{ name …; name …; };` — the block `featureNames` and each part of `cvParameters` hold. */
+function readNamesBlock(keyword: Token, r: Reader): FeaName[] {
+  const names: FeaName[] = [];
+  if (r.peek()?.text !== "{") {
+    r.complain(keyword.line, `expected "{" after ${keyword.text}`);
+    skipInside(r);
+    return names;
+  }
+  r.take();
+  for (;;) {
+    const token = r.take();
+    if (token === undefined) {
+      r.complain(keyword.line, `${keyword.text} is never closed`);
+      return names;
+    }
+    if (token.text === "}") break;
+    if (token.text === ";") continue;
+    if (token.text !== "name") {
+      r.complain(token.line, `${keyword.text} holds name statements, not "${token.text}"`);
+      skipInside(r);
+      continue;
+    }
+    const name = readName(token, r);
+    if (name !== null) names.push(name);
+  }
+  if (r.peek()?.text === ";") r.take();
+  return names;
+}
+
+/**
+ * `name [platform [encoding language]] "text";`, the text decoded.
+ *
+ * The escapes are the format's: four hex digits for a UTF-16 unit on Windows,
+ * two for a byte on the Macintosh, after a backslash.
+ */
+function readName(keyword: Token, r: Reader): FeaName | null {
+  const numbers: number[] = [];
+  while (r.peek() !== undefined && !r.peek()!.text.startsWith('"') && r.peek()!.text !== ";") {
+    const word = r.take()!;
+    const value = word.text.startsWith("0x") ? parseInt(word.text.slice(2), 16) : Number(word.text);
+    if (!Number.isInteger(value) || value < 0) {
+      r.complain(word.line, `"${word.text}" is not a platform, encoding or language number`);
+      skipInside(r);
+      return null;
+    }
+    numbers.push(value);
+  }
+  const quoted = r.take();
+  if (
+    quoted === undefined ||
+    !quoted.text.startsWith('"') ||
+    !quoted.text.endsWith('"') ||
+    quoted.text.length < 2
+  ) {
+    r.complain(keyword.line, "a name statement ends with the name in double quotes");
+    skipInside(r);
+    return null;
+  }
+  if (r.peek()?.text === ";") r.take();
+
+  const platform = numbers[0] ?? 3;
+  if (platform !== 1 && platform !== 3) {
+    r.complain(keyword.line, "a name is for platform 3, Windows, or 1, Macintosh");
+    return null;
+  }
+  if (numbers.length === 2) {
+    r.complain(
+      keyword.line,
+      "a name gives a platform alone, or a platform, an encoding and a language",
+    );
+    return null;
+  }
+  const encoding = numbers[1] ?? (platform === 3 ? 1 : 0);
+  const language = numbers[2] ?? (platform === 3 ? 0x409 : 0);
+  const body = quoted.text.slice(1, -1);
+  const width = platform === 3 ? 4 : 2;
+  const decoded = body.replace(
+    new RegExp(`\\\\([0-9A-Fa-f]{${String(width)}})`, "g"),
+    (_, hex: string) => String.fromCharCode(parseInt(hex, 16)),
+  );
+  return { platform, encoding, language, text: decoded };
+}
+
+/** A character variant's `cvParameters { … };` block. */
+function readCvParameters(keyword: Token, r: Reader): FeaCvParameters | null {
+  let label: FeaName[] = [];
+  let tooltip: FeaName[] = [];
+  let sample: FeaName[] = [];
+  const params: FeaName[][] = [];
+  const characters: number[] = [];
+  if (r.peek()?.text !== "{") {
+    r.complain(keyword.line, 'expected "{" after cvParameters');
+    skipInside(r);
+    return null;
+  }
+  r.take();
+  for (;;) {
+    const token = r.take();
+    if (token === undefined) {
+      r.complain(keyword.line, "cvParameters is never closed");
+      break;
+    }
+    if (token.text === "}") break;
+    if (token.text === ";") continue;
+    if (token.text === "FeatUILabelNameID") label = readNamesBlock(token, r);
+    else if (token.text === "FeatUITooltipTextNameID") tooltip = readNamesBlock(token, r);
+    else if (token.text === "SampleTextNameID") sample = readNamesBlock(token, r);
+    else if (token.text === "ParamUILabelNameID") params.push(readNamesBlock(token, r));
+    else if (token.text === "Character") {
+      const value = r.take();
+      const code =
+        value === undefined
+          ? NaN
+          : value.text.startsWith("0x")
+            ? parseInt(value.text.slice(2), 16)
+            : Number(value.text);
+      if (!Number.isInteger(code) || code < 0 || code > 0x10ffff) {
+        r.complain(token.line, "Character takes a Unicode value, such as 0x0061");
+        skipInside(r);
+        continue;
+      }
+      characters.push(code);
+      if (r.peek()?.text === ";") r.take();
+    } else {
+      r.complain(token.line, `"${token.text}" is not something cvParameters holds`);
+      skipStatementOrBlock(r);
+    }
+  }
+  if (r.peek()?.text === ";") r.take();
+  return { label, tooltip, sample, params, characters };
 }
 
 /**

@@ -6,7 +6,7 @@
  * typed. So it reads words the way the compiler's own tokenizer does — split at
  * white space and the language's punctuation — and names each by what it looks
  * like: a keyword, a tag after the words that take one, a `@class`, a number, a
- * comment, or otherwise a glyph name. Every character of the source is in
+ * comment, a quoted name, or otherwise a glyph name. Every character of the source is in
  * exactly one piece, in order, so joining the pieces gives the source back.
  */
 
@@ -17,6 +17,7 @@ export type TokenKind =
   | "class"
   | "glyph"
   | "number"
+  | "string"
   | "punctuation"
   | "mark"
   | "space"
@@ -31,15 +32,19 @@ export const KEYWORDS: ReadonlySet<string> = new Set([
   "anon",
   "anonymous",
   "base",
+  "Character",
   "by",
   "contourpoint",
   "cursive",
+  "cvParameters",
   "device",
   "enum",
   "enumerate",
   "exclude_dflt",
   "feature",
   "featureNames",
+  "FeatUILabelNameID",
+  "FeatUITooltipTextNameID",
   "from",
   "GlyphClassDef",
   "ignore",
@@ -61,6 +66,7 @@ export const KEYWORDS: ReadonlySet<string> = new Set([
   "markClass",
   "name",
   "NULL",
+  "ParamUILabelNameID",
   "parameters",
   "pos",
   "position",
@@ -68,6 +74,7 @@ export const KEYWORDS: ReadonlySet<string> = new Set([
   "reversesub",
   "RightToLeft",
   "rsub",
+  "SampleTextNameID",
   "script",
   "sizemenuname",
   "sub",
@@ -126,6 +133,16 @@ export function highlightFea(source: string): Token[] {
     if (ch === "'") {
       tokens.push({ kind: "mark", text: ch });
       at += 1;
+      continue;
+    }
+    if (ch === '"') {
+      // A name, to its closing quote or the end of the line: a space or a `#`
+      // inside one is part of the name, not a break or a comment.
+      let end = at + 1;
+      while (end < source.length && source[end] !== '"' && source[end] !== "\n") end += 1;
+      if (source[end] === '"') end += 1;
+      tokens.push({ kind: "string", text: source.slice(at, end) });
+      at = end;
       continue;
     }
     if (PUNCTUATION.has(ch)) {

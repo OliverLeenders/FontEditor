@@ -60,6 +60,12 @@ export type FeatureEntry = {
   readonly tag: string;
   readonly lookups: readonly number[];
   readonly system?: LanguageSystem;
+  /**
+   * The feature's parameters, written after its lookup list: a stylistic set's
+   * name, a character variant's names and characters. By name-table number, so
+   * the names themselves are the name table's business.
+   */
+  readonly params?: Uint8Array;
 };
 
 /**
@@ -126,6 +132,10 @@ export function layoutTable(
   // What each system's features are: the lookups of every entry that applies
   // there, in lookup-list order, each once.
   const records: { tag: string; lookups: number[] }[] = [];
+  // Parameters are the feature's, whichever language's record of it they are
+  // written into.
+  const paramsOf = new Map<string, Uint8Array>();
+  for (const f of usable) if (f.params !== undefined) paramsOf.set(f.tag, f.params);
   const recordKey = (tag: string, list: readonly number[]) => `${tag}|${list.join(",")}`;
   const keysOf = new Map<LanguageSystem, string[]>();
   for (const system of everywhere) {
@@ -197,10 +207,14 @@ export function layoutTable(
   const indexOf = new Map(sorted.map((r, i) => [recordKey(r.tag, r.lookups), i]));
 
   const featureTables = sorted.map((feature) => {
+    const params = paramsOf.get(feature.tag);
     const w = new Writer();
-    w.u16(0); // no feature params
+    // The parameters follow the lookup list, and the offset to them is from the
+    // start of this feature table.
+    w.u16(params === undefined ? 0 : 4 + feature.lookups.length * 2);
     w.u16(feature.lookups.length);
     for (const index of feature.lookups) w.u16(index);
+    if (params !== undefined) w.bytesOf(params);
     return w.finish();
   });
 
@@ -424,7 +438,9 @@ export function shiftFeatures(features: readonly FeatureEntry[], by: number): Fe
 
 /** An entry with other lookups, and no `system` key at all where it had none. */
 function withLookups(entry: FeatureEntry, lookups: readonly number[]): FeatureEntry {
-  return entry.system === undefined
-    ? { tag: entry.tag, lookups }
-    : { tag: entry.tag, lookups, system: entry.system };
+  const base =
+    entry.system === undefined
+      ? { tag: entry.tag, lookups }
+      : { tag: entry.tag, lookups, system: entry.system };
+  return entry.params === undefined ? base : { ...base, params: entry.params };
 }

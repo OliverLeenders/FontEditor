@@ -19,6 +19,21 @@ function at(text: string, asked = false) {
 
 const labels = (text: string, asked = false) => at(text, asked)?.items.map((i) => i.label) ?? null;
 
+describe("completing a name block", () => {
+  it("writes featureNames as a block, the caret between the quotes", () => {
+    const list = at("feature ss01 {\n    featureN|\n} ss01;")!;
+    const item = list.items.find((i) => i.label === "featureNames")!;
+    expect(item.insert).toBe('featureNames {\n        name "";\n    };');
+    expect(item.insert!.slice(0, item.caret)).toBe('featureNames {\n        name "');
+  });
+
+  it("writes cvParameters with a label and a character to fill in", () => {
+    const item = at("cvPara|", true)!.items.find((i) => i.label === "cvParameters")!;
+    expect(item.insert).toContain("FeatUILabelNameID {");
+    expect(item.insert).toContain("Character 0x;");
+  });
+});
+
 describe("the word at the caret", () => {
   it("runs to the punctuation either side", () => {
     expect(wordAround("sub [f_i a.sc];", 7)).toEqual({ start: 5, end: 8 });

@@ -62,6 +62,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 33    | One answer to what a glyph is       | done: the union, the ruler, the gap measure and the knife see components                   |
 | 34    | Drawing with a pen                  | done: a broad edge exactly, an oval to within a fiftieth of a unit, on any contour         |
 | 35    | A node that holds its curvature     | done: harmonising that stays, and continuous corners drawn round without extra points      |
+| 36    | Named alternates                    | done: set and variant names from the feature file, and aalt as written or gathered         |
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
 
 ### What the table missed
@@ -1223,6 +1224,40 @@ where nothing crosses, the union hands the glyph back with its corners still con
 strokes already use. On the canvas the round is the outline, the sharp corner a dashed line under
 it, and the ends of a selected corner's round are diamonds that drag its size along the sides.
 
+#### Phase 36 — Alternates somebody else's application can find — done
+
+A stylistic set drawn and proofed here was, in every other application, "Stylistic Set 1":
+the feature file's `featureNames` and `cvParameters` were refused, and there was no `aalt` for
+a glyph palette to list alternates from.
+
+The names are written where every font tool reads them, in the feature file, and compiled the way
+the format means: a stylistic set's feature table points at its parameters — a version and a
+name-table number — and a character variant's at its label, tooltip, sample, the names of its
+alternates numbered one after another, and the characters it changes as 24-bit values. The
+numbers are taken from 256 upwards and the names written into the name table for the platforms
+and languages the file gives, US English on Windows where it gives none; a variable font's axis
+and instance names are added after them and take the next numbers. The tokenizer learned strings,
+which a name is the first thing in the language to need: a space or a `#` inside one is part of
+it. A font opened from a file has its names read back into the same blocks.
+
+`aalt` is compiled as written — the features it names gathered, and its own rules — into a
+single substitution for glyphs with one alternate and an alternate substitution for the rest. A
+file with none gets one on export, gathered from the features whose alternates somebody picks one
+at a time: stylistic sets, character variants, `salt`, the swashes, small capitals, the figure
+styles. Only on export: a compile asked what one feature does is not handed an `aalt` too.
+
+In the editor the Features switches show the name beside the tag, the source colours a name as one
+string, and `featureNames` and `cvParameters` complete to their blocks with the caret in the name.
+
+Turning a stroke into outlines is fixed in the same release. The union gave up on two things a
+broad pen leaves, and the pieces of the ink went into the letter as they were, lines across the
+stroke and all: a stretch where the path runs along the nib's own edge, whose ink is a hair thin
+— such slivers are now left out — and a pinch, where a varying pen's bands met along the nib's
+line with a sliver of ink either side that the union's probe stepped over. A varying segment is
+now one outline through its pinches: the left of one run carries on as the right of the next,
+and the union has no line there to decide about. Where a boundary piece has no ink either side
+at the probe's usual distance, the ink is thinner than the probe, and the probe is tried closer.
+
 #### Parked
 
 - **A second font in a pane of the split window**, until windows per font have shown whether
@@ -1238,6 +1273,3 @@ it, and the ends of a selected corner's round are diamonds that drag its size al
 - **The other containers a Macintosh font arrives in** — `.dfont`, MacBinary, BinHex, and
   the pre-5 `SIT!` archives with their own five compressors. The resource fork reader
   handles all of them once something unwraps them; nothing has asked yet.
-- **Names for a stylistic set** (`featureNames`, `cvXX` parameters) and gathering `aalt`,
-  which is what would make the alternates this editor can now draw and preview findable by
-  name in somebody else's application.

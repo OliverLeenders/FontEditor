@@ -22,7 +22,7 @@ import { node } from "../src/node.js";
 import { offsetContour } from "../src/offset.js";
 import { removeOverlap } from "../src/overlap.js";
 import { rectContour } from "../src/shapes.js";
-import { DEFAULT_NIB, inkOf, isOval, withInk, withNib } from "../src/stroke.js";
+import { DEFAULT_NIB, inkOf, inkRegions, isOval, withInk, withNib } from "../src/stroke.js";
 import { interpolateGlyph } from "../src/interpolate.js";
 import { cutGlyph } from "../src/knife.js";
 
@@ -809,5 +809,107 @@ describe("reading a stored blend", () => {
       angle: "linear",
       shape: "step",
     });
+  });
+});
+
+describe("a stroke turned into outlines", () => {
+  type P = [number, number];
+  const at = (pt: P, handles: [P | null, P | null], pen?: { angle: number; width: number }) =>
+    node(
+      ids.node(),
+      { x: pt[0], y: pt[1] },
+      {
+        type: handles[0] !== null && handles[1] !== null ? "smooth" : "corner",
+        in: handles[0] === null ? null : { x: handles[0][0], y: handles[0][1] },
+        out: handles[1] === null ? null : { x: handles[1][0], y: handles[1][1] },
+        ...(pen === undefined ? {} : { pen }),
+      },
+    );
+  const thin = { angle: 30, width: 20 };
+
+  // The two strokes of an n, drawn with a broad pen at thirty degrees that thins
+  // at the ends; each leaves its first point almost along the nib's own edge.
+  const stem = (): Contour => ({
+    ...contour(ids.contour(), [
+      at([140, 670], [null, [190, 700]], thin),
+      at(
+        [245, 705],
+        [
+          [200, 705],
+          [300, 705],
+        ],
+      ),
+      at(
+        [305, 590],
+        [
+          [305, 650],
+          [300, 520],
+        ],
+      ),
+      at([294, 388], [null, null]),
+      at([277, 35], [null, null], thin),
+    ]),
+    nib: { angle: 30, width: 90 },
+  });
+  const arch = (): Contour => ({
+    ...contour(ids.contour(), [
+      at([312, 472], [null, [400, 640]], thin),
+      at(
+        [586, 705],
+        [
+          [480, 705],
+          [690, 705],
+        ],
+      ),
+      at(
+        [744, 487],
+        [
+          [744, 600],
+          [742, 420],
+        ],
+      ),
+      at([724, 138], [null, null]),
+      at(
+        [797, 34],
+        [
+          [740, 34],
+          [830, 34],
+        ],
+      ),
+      at([883, 63], [[850, 50], null], thin),
+    ]),
+    nib: { angle: 30, width: 90 },
+  });
+
+  it("joins the pieces of its ink rather than handing them back as they are", () => {
+    // The pieces overlap, a band for each stretch of the path. The union used to
+    // give up on these two — a hair-thin band where the path leaves along the
+    // nib, and loops that met along the nib's line at a pinch — and the pieces
+    // went into the letter as they were, lines across the stroke and all.
+    for (const c of [stem(), arch()]) {
+      const regions = inkRegions(c).length;
+      const ink = inkOf(c, ids);
+      expect(ink.length).toBeLessThan(regions);
+      expect(ink.length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("covers the same ground as the pieces did", () => {
+    const g = glyph("n", { advance: 900, contours: [stem(), arch()] });
+    const joined = glyph("n", {
+      advance: 900,
+      contours: [...inkOf(stem(), ids), ...inkOf(arch(), ids)],
+    });
+    for (const p of [
+      { x: 290, y: 300 },
+      { x: 250, y: 690 },
+      { x: 600, y: 700 },
+      { x: 735, y: 300 },
+      { x: 780, y: 40 },
+      { x: 500, y: 300 },
+      { x: 100, y: 100 },
+    ]) {
+      expect(insideGlyph(joined, p)).toBe(insideGlyph(g, p));
+    }
   });
 });

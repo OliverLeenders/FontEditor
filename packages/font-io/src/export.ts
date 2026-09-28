@@ -21,7 +21,8 @@ import {
 import { kerningLookups, kerningSubtables } from "./gpos.js";
 import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
-import { compileFeatures } from "./features.js";
+import { type FeatureName, compileFeatures } from "./features.js";
+import { withNumberedNames } from "./names.js";
 import { gdefTable } from "./gdef.js";
 import { type SwapVariations, gsubWithSwaps } from "./feature-variations.js";
 import { compileMarks } from "./marks.js";
@@ -534,6 +535,8 @@ export type LayoutTables = {
   readonly gpos: Uint8Array;
   readonly gsub: Uint8Array;
   readonly gdef: Uint8Array;
+  /** The names the features' parameters point at, for the name table. */
+  readonly names: readonly FeatureName[];
   readonly warnings: readonly string[];
 };
 
@@ -551,7 +554,7 @@ export function layoutTables(
   options: ExportOptions = {},
 ): LayoutTables {
   const warnings: string[] = [];
-  const features = compileFeatures(document.features, glyphIdOf);
+  const features = compileFeatures(document.features, glyphIdOf, { gatherAalt: true });
 
   // One GPOS from two sources: the kerning the editor keeps in its own model,
   // and whatever positioning the feature file asks for. A second table is not a
@@ -611,12 +614,17 @@ export function layoutTables(
           (message) => warnings.push(message),
         );
 
-  return { gpos, gsub, gdef, warnings };
+  return { gpos, gsub, gdef, names: features.names, warnings };
 }
 
 /** A compiled font with its layout tables spliced in, or as it was where there are none. */
 export function withLayoutTables(bytes: ArrayBuffer, layout: LayoutTables): ArrayBuffer {
-  if (layout.gpos.length === 0 && layout.gsub.length === 0 && layout.gdef.length === 0) {
+  if (
+    layout.gpos.length === 0 &&
+    layout.gsub.length === 0 &&
+    layout.gdef.length === 0 &&
+    layout.names.length === 0
+  ) {
     return bytes;
   }
 
@@ -626,6 +634,11 @@ export function withLayoutTables(bytes: ArrayBuffer, layout: LayoutTables): Arra
   if (layout.gpos.length > 0) out = withTable(out, "GPOS", layout.gpos);
   if (layout.gsub.length > 0) out = withTable(out, "GSUB", layout.gsub);
   if (layout.gdef.length > 0) out = withTable(out, "GDEF", layout.gdef);
+  // A stylistic set's name is a number in GSUB and the words in the name table.
+  if (layout.names.length > 0) {
+    const names = readTablesOf(out).find((t) => t.tag === "name")?.data ?? new Uint8Array();
+    out = withTable(out, "name", withNumberedNames(names, layout.names));
+  }
   return out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer;
 }
 

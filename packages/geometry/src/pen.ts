@@ -391,13 +391,21 @@ function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: n
     const here = samples[k]!;
     const thin = isBroad(penOn(previous.t)) && isBroad(penOn(here.t));
     if (thin && previous.side !== 0 && here.side !== 0 && previous.side !== here.side) {
-      runs.push([here]);
+      // Both runs end on the pinch itself, found between the two samples: there
+      // the nib lies along the path and the ink is the nib's own line, which the
+      // run before ends on and the run after starts from. Ending one run at one
+      // sample and starting the next at the one after left the stretch between
+      // them to neither, and two loose ends the union could not close.
+      const pinch = pinchBetween(curve, penOn, previous.t, here.t, previous.side);
+      runs[runs.length - 1]!.push(pinchSample(curve, penOn, pinch, previous.side));
+      runs.push([pinchSample(curve, penOn, pinch, here.side), here]);
     } else {
       runs[runs.length - 1]!.push(here);
     }
   }
 
-  const loops: Cubic[][] = [];
+  // Each run's two sides, fitted.
+  const sides: { left: Cubic[]; right: Cubic[] }[] = [];
   for (const run of runs) {
     if (run.length < 2) continue;
     const left = unfolded(run.map((s) => ({ point: s.left, along: s.along })));
@@ -421,17 +429,94 @@ function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: n
       edgeDirection(curve, penOn, last, -1, -1),
     );
     if (leftCurves.length === 0 || rightCurves.length === 0) continue;
-
-    const leftEnd = leftCurves[leftCurves.length - 1]!.b;
-    const rightEnd = rightCurves[rightCurves.length - 1]!.b;
-    loops.push([
-      ...leftCurves,
-      line(leftEnd, rightEnd),
-      ...[...rightCurves].reverse().map(reversed),
-      line(rightCurves[0]!.a, leftCurves[0]!.a),
-    ]);
+    sides.push({ left: leftCurves, right: rightCurves });
   }
-  return loops;
+
+  /** A band closed straight across its two ends. */
+  const band = (upper: Cubic[], lower: Cubic[]): Cubic[] => [
+    ...upper,
+    line(upper[upper.length - 1]!.b, lower[lower.length - 1]!.b),
+    ...[...lower].reverse().map(reversed),
+    line(lower[0]!.a, upper[0]!.a),
+  ];
+
+  // One loop through the pinches. At a pinch the nib lies along the path and the
+  // two sides swap: the side that was on the left arrives at one end of the nib,
+  // and it is the right side of the run after that leaves from there. So one
+  // edge of the ink is the left of the first run, the right of the second, the
+  // left of the third, and the other edge the rest — a single outline with a
+  // waist at each pinch, where a loop per run met the next along the nib's own
+  // line, a stretch the union has to recognise as buried with a sliver of ink
+  // either side of it, and did not always.
+  if (sides.length === runs.length && sides.length > 0) {
+    const upper = sides.flatMap((s, i) => (i % 2 === 0 ? s.left : s.right));
+    const lower = sides.flatMap((s, i) => (i % 2 === 0 ? s.right : s.left));
+    return [band(upper, lower)];
+  }
+  // A run too short to fit leaves the chain broken, and each run is a loop of its own.
+  return sides.map((s) => band(s.left, s.right));
+}
+
+/** Which side of the path a pen's own direction points at `t`: the sign that flips at a pinch. */
+function sideAt(curve: Cubic, penOn: (t: number) => PenShape, t: number): number {
+  const normal = leftNormal(curve, t);
+  if (normal === null) return 0;
+  const angle = (penOn(t).angle * Math.PI) / 180;
+  return Math.sign(normal.x * Math.cos(angle) + normal.y * Math.sin(angle));
+}
+
+/** Where between `from` and `to` a broad pen's side flips, by halving. */
+function pinchBetween(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  from: number,
+  to: number,
+  sideFrom: number,
+): number {
+  let lo = from;
+  let hi = to;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (sideAt(curve, penOn, mid) === sideFrom) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * The pen at a pinch, as the run on `side` of it has it: its two ends either side
+ * of the path's point, the one `side` favours on the left. Both runs meeting there
+ * have the same two points, each the other way round.
+ */
+function pinchSample(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  t: number,
+  side: number,
+): {
+  readonly t: number;
+  readonly at: Vec2;
+  readonly along: Vec2;
+  readonly left: Vec2;
+  readonly right: Vec2;
+  readonly side: number;
+} {
+  const pen = penOn(t);
+  const at = evaluate(curve, t);
+  const angle = (pen.angle * Math.PI) / 180;
+  const half = {
+    x: (Math.cos(angle) * pen.width * side) / 2,
+    y: (Math.sin(angle) * pen.width * side) / 2,
+  };
+  const along = tangent(curve, t) ?? endTangent(curve, t < 0.5 ? 0 : 1) ?? { x: 1, y: 0 };
+  return {
+    t,
+    at,
+    along,
+    left: { x: at.x + half.x, y: at.y + half.y },
+    right: { x: at.x - half.x, y: at.y - half.y },
+    side,
+  };
 }
 
 /**
