@@ -10,6 +10,7 @@ import {
 } from "@typewright/geometry";
 
 import { type Contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import { corneredContour, hasContinuousCorners } from "./corner.js";
 import { type CurvePiece, contourOfCurves } from "./curves.js";
 import { contourWinding } from "./direction.js";
 import type { IdFactory } from "./ids.js";
@@ -79,6 +80,8 @@ export function offsetContour(c: Contour, ids: IdFactory, options: OffsetOptions
   // A skeleton is a path, not the edge of the ink, and moving it outwards would be
   // moving the line the pen is drawn along. Its weight is the nib's.
   if (!c.closed || c.nodes.length < 2 || c.nib !== undefined) return null;
+  // Offset as drawn: a continuous corner's round is moved out with the rest.
+  if (hasContinuousCorners(c)) return offsetContour(corneredContour(c), ids, options);
   if (options.x === 0 && options.y === 0) return null;
   if (options.x * options.y < 0) return null;
   // One axis of nothing is a pen with no width in that direction, which is a

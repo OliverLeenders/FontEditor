@@ -691,3 +691,10 @@ export const EqualApproximatelyIcon: IconComponent = () => (
     <path d="M5 9a6.5 6.5 0 0 1 7 0 6.5 6.5 0 0 0 7 0" />
   </Glyph>
 );
+
+/** A continuous corner: Lucide's *squircle*, from lucide-static v1.48.0, which is the shape itself. */
+export const SquircleIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M12 3c7.2 0 9 1.8 9 9s-1.8 9-9 9-9-1.8-9-9 1.8-9 9-9" />
+  </Glyph>
+);

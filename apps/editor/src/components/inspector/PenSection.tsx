@@ -4,6 +4,7 @@ import {
   changePen,
   drawWithPen,
   selectedPenBlend,
+  selectedPenValue,
   selectedPointPen,
   selectionNib,
   setPenBlend,
@@ -46,8 +47,14 @@ export function PenSection(): React.JSX.Element {
 
   const selected = stroke !== null;
   const drawing = stroke !== null && stroke !== "none";
-  const known = pen !== null && pen !== "mixed";
-  const partly = pen === "mixed";
+  // Each number on its own, so a selection whose pens differ in width still shows
+  // the angle they share, and typing one number is not undone by the others.
+  const angle = useStoreValue((s) => selectedPenValue(s.session.editor, "angle"));
+  const width = useStoreValue((s) => selectedPenValue(s.session.editor, "width"));
+  const thickness = useStoreValue((s) => selectedPenValue(s.session.editor, "thickness"));
+  const number = (v: number | "mixed" | null): number | null => (typeof v === "number" ? v : null);
+  const dash = (v: number | "mixed" | null): string | undefined =>
+    v === "mixed" ? "—" : undefined;
 
   return (
     <Section
@@ -95,8 +102,8 @@ export function PenSection(): React.JSX.Element {
               className={styles.input}
               label="Pen angle"
               title="Degrees anticlockwise from level"
-              value={known ? pen.angle : null}
-              placeholder={partly ? "—" : undefined}
+              value={number(angle)}
+              placeholder={dash(angle)}
               bigStep={15}
               onCommit={(angle) => store.applyTool(changePen(store.editor, { angle }))}
             />
@@ -106,8 +113,8 @@ export function PenSection(): React.JSX.Element {
               className={styles.input}
               label="Pen width"
               title="Edge to edge, in design units"
-              value={known ? pen.width : null}
-              placeholder={partly ? "—" : undefined}
+              value={number(width)}
+              placeholder={dash(width)}
               bounds={{ min: 0 }}
               onCommit={(width) => store.applyTool(changePen(store.editor, { width }))}
             />
@@ -120,8 +127,8 @@ export function PenSection(): React.JSX.Element {
               className={styles.input}
               label="Pen thickness"
               title="Across the pen: 0 is a broad edge, the width is a round pen"
-              value={known ? (pen.thickness ?? 0) : null}
-              placeholder={partly ? "—" : undefined}
+              value={number(thickness)}
+              placeholder={dash(thickness)}
               bounds={{ min: 0 }}
               onCommit={(thickness) => store.applyTool(changePen(store.editor, { thickness }))}
             />

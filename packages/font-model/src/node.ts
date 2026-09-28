@@ -103,7 +103,17 @@ export type Node = {
    * both are linear.
    */
   readonly blend?: SegmentBlend;
+  /**
+   * A corner the drawn outline rounds with a curvature that ramps up from the
+   * sides instead of jumping: the squircle. `size` is how much of each side it
+   * spends, `smoothness` from nought — a plain circular round — to one, all ramp.
+   * Only on a corner or a tangent node; see `corneredContour`.
+   */
+  readonly continuous?: ContinuousCorner;
 };
+
+/** How a continuous corner is drawn. */
+export type ContinuousCorner = { readonly size: number; readonly smoothness: number };
 
 export type NodeInit = {
   readonly type?: NodeType;
@@ -114,6 +124,7 @@ export type NodeInit = {
   readonly harmonised?: boolean;
   readonly pen?: Nib;
   readonly blend?: SegmentBlend;
+  readonly continuous?: ContinuousCorner;
 };
 
 /** Read an init's lock, accepting the boolean the field used to be. */
@@ -134,6 +145,7 @@ export function node(id: NodeId, pt: Vec2, init: NodeInit = {}): Node {
     harmonised: init.harmonised ?? false,
     ...(init.pen === undefined ? {} : { pen: init.pen }),
     ...(init.blend === undefined ? {} : { blend: init.blend }),
+    ...(init.continuous === undefined ? {} : { continuous: init.continuous }),
   };
 }
 

@@ -130,6 +130,7 @@ export {
   convertStrokesToOutlines,
   drawWithPen,
   selectedPenBlend,
+  selectedPenValue,
   selectedPointPen,
   selectionNib,
   setPenBlend,
@@ -221,3 +222,10 @@ export {
 
 export type { TransformOrigin } from "./transform.js";
 export { BOX_CENTRE, transformOriginPoint, transformSelection } from "./transform.js";
+export {
+  type ContinuousState,
+  canBeContinuous,
+  changeContinuous,
+  selectedContinuous,
+  setContinuous,
+} from "./corners.js";

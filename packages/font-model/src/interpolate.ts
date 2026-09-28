@@ -239,6 +239,25 @@ function mixNode(
             weights,
             base.out,
           ),
+    // A continuous corner's size and smoothness interpolate with its point; a
+    // master whose point is not rounded counts as the base's, as a missing value
+    // always does, and the base decides whether the corner is rounded at all.
+    ...(base.continuous === undefined
+      ? {}
+      : {
+          continuous: {
+            size: mix(
+              others.map((n) => n?.continuous?.size ?? null),
+              weights,
+              base.continuous.size,
+            ),
+            smoothness: mix(
+              others.map((n) => n?.continuous?.smoothness ?? null),
+              weights,
+              base.continuous.smoothness,
+            ),
+          },
+        }),
     // A point's own pen interpolates with it, the way the contour's does. A master
     // whose point has no pen of its own counts as the base's here, as a missing
     // value always does.

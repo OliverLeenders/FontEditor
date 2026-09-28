@@ -61,7 +61,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 32    | More outline operations             | done: subtract, intersect, exclude, offset and simplify, beside the union and the extremes |
 | 33    | One answer to what a glyph is       | done: the union, the ruler, the gap measure and the knife see components                   |
 | 34    | Drawing with a pen                  | done: a broad edge exactly, an oval to within a fiftieth of a unit, on any contour         |
-| 35    | A node that holds its curvature     | half done: harmonising that stays; the squircle between a curve and a line is left         |
+| 35    | A node that holds its curvature     | done: harmonising that stays, and continuous corners drawn round without extra points      |
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
 
 ### What the table missed
@@ -1177,7 +1177,7 @@ carries through a point, and between two points the pen never passes either end,
 cannot overshoot, and a segment whose two pens agree stays that pen — which keeps the exact
 ink for it. A stroke can also be converted to the outlines it draws from the canvas menu.
 
-#### Phase 35 — A node that holds its own curvature — half done
+#### Phase 35 — A node that holds its own curvature — done
 
 Harmonising moves a node to where the curvature either side of it agrees, once, and the next
 drag of a handle undoes it. The arithmetic is closed and already written — the node slides
@@ -1201,6 +1201,27 @@ flattening the curve is to spend part of the line on the transition. That makes 
 carry more pieces than the contour stores — it is phase 33's seam reaching inside a single
 contour rather than around a whole shape — and it is the squircle, the corner every
 application icon has been drawn with for a decade.
+
+The second half is in, and it is a corner as much as a join. A corner or tangent point can be
+made continuous, with a size and a smoothness; the contour keeps the point, and the drawn outline
+— the one filled, exported, measured and joined — replaces that much of each side with a round.
+At a corner the round is the one the rounded rectangles of the last decade use: a ramp out of
+each side, a circular arc between, the ramps taking a share of the turn the smoothness sets. A
+ramp is a cubic whose first three control points lie on the side, which leaves the side with no
+curvature, and whose handle into the arc is sized so it arrives with the arc's; the circle is the
+plain round's, so a smoothness of nothing is exactly the plain round. At a tangent point, a curve
+running into a line, there is no corner, and one cubic replaces the last of the curve and the
+first of the line, with its handle lengths solved so it leaves the curve with the curve's
+curvature and arrives on the line with none. On a curved side a corner's round leaves the curve
+along its direction, which is tangent-continuous there rather than curvature-continuous; on a
+straight side, which is where it matters, it is exact.
+
+The round is worked out where a stroke's ink is, so everything that asks what a glyph draws sees
+it. The union, the set operations and the offset work on the round and leave ordinary points;
+where nothing crosses, the union hands the glyph back with its corners still continuous. A
+`.ufo` gets the round in the outline, and the contour as it is edited in the lib entry the
+strokes already use. On the canvas the round is the outline, the sharp corner a dashed line under
+it, and the ends of a selected corner's round are diamonds that drag its size along the sides.
 
 #### Parked
 

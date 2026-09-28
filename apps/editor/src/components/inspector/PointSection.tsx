@@ -4,8 +4,11 @@ import {
   begin,
   commit,
   editCurrentGlyph,
+  changeContinuous,
   moveCoordinateTo,
   result,
+  selectedContinuous,
+  setContinuous,
   selectedCanBeTangent,
   selectedCoordinate,
   selectedNode,
@@ -36,6 +39,13 @@ export function PointSection(): React.JSX.Element {
   );
   const pointType = useStoreValue(selectedPointType);
   const canTangent = useStoreValue((s) => selectedCanBeTangent(s.session.editor));
+  // The continuous corner, three scalars for the reason the coordinates below are:
+  // null where no selected point could be rounded.
+  const roundOn = useStoreValue((s) => selectedContinuous(s.session.editor)?.on ?? null);
+  const roundSize = useStoreValue((s) => selectedContinuous(s.session.editor)?.size ?? null);
+  const roundSmooth = useStoreValue(
+    (s) => selectedContinuous(s.session.editor)?.smoothness ?? null,
+  );
 
   // Three scalar selectors rather than one returning the position: an object
   // built in a selector is a new object every time and would re-render the panel
@@ -166,6 +176,62 @@ export function PointSection(): React.JSX.Element {
           </button>
         </div>
       </Field>
+
+      {/* A corner or tangent point with a side on each hand can be rounded in the
+            drawing: continuous, its curvature ramping up from the sides rather than
+            jumping. The point stays where it is; the outline around it is drawn
+            round. Size is how much of each side the round spends, smoothness how
+            much of it is ramp — nothing is a plain circular round. */}
+      {roundOn !== null && (
+        <Field label="Corner" group>
+          <div className={styles.segmented}>
+            <button
+              type="button"
+              aria-pressed={roundOn === false}
+              title="Drawn as a sharp corner"
+              onClick={() => store.applyTool(setContinuous(store.editor, false))}
+            >
+              Sharp
+            </button>
+            <button
+              type="button"
+              aria-pressed={roundOn === true}
+              title="Drawn rounded, the curvature ramping up from each side"
+              onClick={() => store.applyTool(setContinuous(store.editor, true))}
+            >
+              Continuous
+            </button>
+          </div>
+        </Field>
+      )}
+      {roundOn !== null && roundOn !== false && (
+        <>
+          <Field label="Size">
+            <NumberField
+              className={styles.input}
+              label="Corner size"
+              title="How much of each side the round spends, in design units"
+              value={typeof roundSize === "number" ? shown(roundSize) : null}
+              placeholder={roundSize === "mixed" ? "—" : undefined}
+              bounds={{ min: 1 }}
+              onCommit={(size) => store.applyTool(changeContinuous(store.editor, { size }))}
+            />
+          </Field>
+          <Field label="Smoothness">
+            <NumberField
+              className={styles.input}
+              label="Corner smoothness"
+              title="Per cent of the round that is ramp: 0 is a plain circular round"
+              value={typeof roundSmooth === "number" ? Math.round(roundSmooth * 100) : null}
+              placeholder={roundSmooth === "mixed" ? "—" : undefined}
+              bounds={{ min: 0, max: 100 }}
+              onCommit={(percent) =>
+                store.applyTool(changeContinuous(store.editor, { smoothness: percent / 100 }))
+              }
+            />
+          </Field>
+        </>
+      )}
 
       {/* Only for a single selection. A coordinate shown for six selected
             points would be one arbitrary point's, and typing into it would move

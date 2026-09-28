@@ -1,6 +1,7 @@
 import {
   type Anchor,
   type Component,
+  type ContinuousCorner,
   type Kerning,
   EMPTY_KERNING,
   type Contour,
@@ -31,6 +32,7 @@ import {
   hasMetricKeys,
   imageRef,
   node,
+  readContinuous,
   readSegmentBlend,
 } from "@typewright/font-model";
 import type { SegmentBlend, Vec2 } from "@typewright/geometry";
@@ -80,6 +82,8 @@ export type StoredNode = {
   readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
   /** How the pen changes along the segment leaving this point, where not linear. */
   readonly blend?: { readonly angle: string; readonly shape: string };
+  /** A continuous corner: how much of each side it spends, and how smoothly. */
+  readonly continuous?: { readonly size: number; readonly smoothness: number };
 };
 
 export type StoredContour = {
@@ -295,7 +299,9 @@ function encodeNode(n: Node): StoredNode {
     out: n.out === null ? null : point(n.out),
   };
   const pennedOnly = n.pen === undefined ? base : { ...base, pen: { ...n.pen } };
-  const penned = n.blend === undefined ? pennedOnly : { ...pennedOnly, blend: { ...n.blend } };
+  const blended = n.blend === undefined ? pennedOnly : { ...pennedOnly, blend: { ...n.blend } };
+  const penned =
+    n.continuous === undefined ? blended : { ...blended, continuous: { ...n.continuous } };
   const held = n.harmonised ? { ...penned, harmonised: true as const } : penned;
   if (n.hvLock.in && n.hvLock.out) return { ...held, hvLock: true };
   if (n.hvLock.in) return { ...held, hvLock: "in" };
@@ -564,6 +570,7 @@ function decodeNode(raw: unknown): Decoded<Node> {
       harmonised: raw["harmonised"] === true,
       ...penField(decodeNib(raw["pen"])),
       ...blendField(readSegmentBlend(raw["blend"])),
+      ...continuousField(readContinuous(raw["continuous"])),
     }),
   );
 }
@@ -596,6 +603,13 @@ function decodeContour(raw: unknown): Decoded<Contour> {
   const plain = contour(raw["id"], nodes, raw["closed"] === true);
   const nib = decodeNib(raw["nib"]);
   return ok(nib === null ? plain : { ...plain, nib });
+}
+
+/** A continuous corner as the optional field a node is built with. */
+function continuousField(corner: ContinuousCorner | undefined): {
+  readonly continuous?: ContinuousCorner;
+} {
+  return corner === undefined ? {} : { continuous: corner };
 }
 
 /** A blend as the optional field a node is built with. */

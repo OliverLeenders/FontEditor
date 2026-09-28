@@ -11,7 +11,7 @@ import { type Node, node } from "./node.js";
 export type CurvePiece = { readonly curve: Cubic; readonly line: boolean };
 
 /**
- * A closed contour out of a chain of curves.
+ * A contour out of a chain of curves, closed unless asked otherwise.
  *
  * The same job the union does after walking a boundary, and the same rule: the
  * node types are read back from the geometry, because a piece cut out of a curve
@@ -19,10 +19,15 @@ export type CurvePiece = { readonly curve: Cubic; readonly line: boolean };
  * line keeps its handles retracted, so a straight edge stays straight through a
  * save and a load.
  */
-export function contourOfCurves(chain: readonly CurvePiece[], ids: IdFactory): Contour {
+export function contourOfCurves(
+  chain: readonly CurvePiece[],
+  ids: IdFactory,
+  closed = true,
+): Contour {
   const nodes: Node[] = chain.map((piece, i) => {
-    const before = chain[(i - 1 + chain.length) % chain.length]!;
-    const incoming = before.line ? null : before.curve.c2;
+    // An open chain's first point has nothing before it.
+    const before = closed || i > 0 ? chain[(i - 1 + chain.length) % chain.length]! : null;
+    const incoming = before === null || before.line ? null : before.curve.c2;
     const outgoing = piece.line ? null : piece.curve.c1;
     return node(ids.node(), piece.curve.a, {
       type: smooth(piece.curve.a, incoming, outgoing) ? "smooth" : "corner",
@@ -30,7 +35,11 @@ export function contourOfCurves(chain: readonly CurvePiece[], ids: IdFactory): C
       out: outgoing,
     });
   });
-  return contour(ids.contour(), nodes, true);
+  const last = chain[chain.length - 1];
+  if (!closed && last !== undefined) {
+    nodes.push(node(ids.node(), last.curve.b, { in: last.line ? null : last.curve.c2 }));
+  }
+  return contour(ids.contour(), nodes, closed);
 }
 
 /** Whether two handles leave a point in one straight line, and opposite ways. */

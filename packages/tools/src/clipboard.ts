@@ -1,5 +1,6 @@
 import type { SegmentBlend, Vec2 } from "@typewright/geometry";
 import {
+  type ContinuousCorner,
   type Contour,
   type IdFactory,
   type Node,
@@ -7,6 +8,7 @@ import {
   addContour,
   contour,
   node,
+  readContinuous,
   readSegmentBlend,
   removeContour,
 } from "@typewright/font-model";
@@ -49,6 +51,7 @@ type StoredNode = {
   readonly harmonised?: boolean;
   readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
   readonly blend?: { readonly angle: string; readonly shape: string };
+  readonly continuous?: { readonly size: number; readonly smoothness: number };
 };
 
 type Payload = {
@@ -103,6 +106,7 @@ export function clipboardText(state: EditorState): string | null {
         ...(n.harmonised ? { harmonised: true } : {}),
         ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
         ...(n.blend === undefined ? {} : { blend: { ...n.blend } }),
+        ...(n.continuous === undefined ? {} : { continuous: { ...n.continuous } }),
       })),
       ...(c.nib === undefined ? {} : { nib: { ...c.nib } }),
     })),
@@ -225,6 +229,10 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
           ...((): { blend?: SegmentBlend } => {
             const blend = readSegmentBlend(rawNode["blend"]);
             return blend === undefined ? {} : { blend };
+          })(),
+          ...((): { continuous?: ContinuousCorner } => {
+            const continuous = readContinuous(rawNode["continuous"]);
+            return continuous === undefined ? {} : { continuous };
           })(),
         }),
       );

@@ -153,6 +153,26 @@ describe("the pen section", () => {
     expect(pen(store)).toEqual({ angle: 30, width: 70 });
   });
 
+  it("keeps what is typed when the points differ in another number", () => {
+    // Different widths, the same angle. Every keystroke goes in as it is typed,
+    // and the widths still differ after the angle has changed: a field reading the
+    // whole pen as mixed emptied itself after the first digit and lost the rest.
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    fireEvent.change(screen.getByLabelText("Pen width"), { target: { value: "60" } });
+    selectAll(store);
+
+    expect(screen.getByLabelText<HTMLInputElement>("Pen angle").value).toBe("30");
+    const angle = screen.getByLabelText<HTMLInputElement>("Pen angle");
+    fireEvent.focus(angle);
+    fireEvent.change(angle, { target: { value: "4" } });
+    expect(angle.value).toBe("4");
+    fireEvent.change(angle, { target: { value: "45" } });
+
+    expect(pointPens(store).map((p) => p?.angle ?? pen(store)!.angle)).toEqual([45, 45]);
+    expect(screen.getByLabelText<HTMLInputElement>("Pen width").placeholder).toBe("—");
+  });
+
   it("makes an oval of the pen when given a thickness", () => {
     const store = opened(withPath());
     fireEvent.click(screen.getByRole("button", { name: "Stroke" }));

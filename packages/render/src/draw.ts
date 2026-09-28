@@ -5,7 +5,10 @@ import {
   type Guide,
   type Node,
   type Segment,
+  continuousCuts,
+  corneredContour,
   filledContours,
+  hasContinuousCorners,
   guideDirection,
   parseMarkColor,
   segmentCubic,
@@ -78,6 +81,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawSnapGuides(ctx, s);
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
+    drawCornerSizes(ctx, s);
     // Under the nodes: the ring is round the first one and must not cover it.
     drawContourStarts(ctx, s);
     drawNodes(ctx, s);
@@ -392,11 +396,54 @@ export function drawOutline(ctx: Canvas2D, s: Scene): void {
   const drawable = s.glyph.contours.filter((c) => c.nodes.length >= 2);
   if (drawable.length === 0) return;
 
+  // A contour with continuous corners is drawn as it is rounded, and its sharp
+  // corners under it, faint, as the lines the points still sit on.
+  const rounded = drawable.filter(hasContinuousCorners);
+  if (rounded.length > 0) {
+    ctx.save();
+    ctx.beginPath();
+    for (const c of rounded) traceContour(ctx, s.view, c);
+    ctx.strokeStyle = s.palette.handleLine;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.beginPath();
-  for (const c of drawable) traceContour(ctx, s.view, c);
+  for (const c of drawable) traceContour(ctx, s.view, corneredContour(c));
   ctx.strokeStyle = s.palette.outline;
   ctx.lineWidth = s.metrics.outlineWidth;
   ctx.stroke();
+}
+
+/**
+ * The two ends of each selected continuous corner's round: small hollow diamonds
+ * on the outline, which drag along their sides to set how much the round spends.
+ */
+export function drawCornerSizes(ctx: Canvas2D, s: Scene): void {
+  const chosen = selectedKeys(s.selection);
+  const r = s.metrics.nodeRadius * 0.9;
+  for (const c of s.glyph.contours) {
+    for (const [index, cut] of continuousCuts(c)) {
+      const n = c.nodes[index]!;
+      if (!chosen.has(selectionKey({ contourId: c.id, nodeId: n.id, part: "point" }))) continue;
+      for (const at of [cut.before, cut.after]) {
+        const p = toScreen(s.view, at);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - r);
+        ctx.lineTo(p.x + r, p.y);
+        ctx.lineTo(p.x, p.y + r);
+        ctx.lineTo(p.x - r, p.y);
+        ctx.closePath();
+        ctx.fillStyle = s.palette.halo;
+        ctx.fill();
+        ctx.strokeStyle = s.palette.nodeSelected;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+    }
+  }
 }
 
 /**

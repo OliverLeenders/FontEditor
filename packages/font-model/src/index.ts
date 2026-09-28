@@ -21,7 +21,7 @@ export { anchor, isMarkAnchor, movedAnchor, pairedName, renamedAnchor } from "./
 export type { AnchorId, ComponentId, ContourId, GuideId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";
 
-export type { HandleLock, Node, NodeInit, NodeType } from "./node.js";
+export type { ContinuousCorner, HandleLock, Node, NodeInit, NodeType } from "./node.js";
 export {
   BOTH_LOCKED,
   NO_LOCK,
@@ -257,7 +257,24 @@ export { measureAngle, measureGap, measureNormal, sectionAcross } from "./measur
 export type { OverlapResult } from "./overlap.js";
 export type { OffsetJoin, OffsetOptions } from "./offset.js";
 export { offsetContour } from "./offset.js";
-export { DEFAULT_NIB, inkOf, inkRegions, isOval, samePen, withInk, withNib } from "./stroke.js";
+export {
+  DEFAULT_NIB,
+  inkOf,
+  inkRegions,
+  isDerived,
+  isOval,
+  samePen,
+  withInk,
+  withNib,
+} from "./stroke.js";
+export {
+  continuousAt,
+  continuousCuts,
+  continuousSizeAt,
+  corneredContour,
+  hasContinuousCorners,
+  readContinuous,
+} from "./corner.js";
 export { keptByPolicy, simplifyContour } from "./simplify.js";
 export type { CombineOutcome, SetOperation } from "./overlap.js";
 export { combineContours, contoursMeet, removeOverlap } from "./overlap.js";

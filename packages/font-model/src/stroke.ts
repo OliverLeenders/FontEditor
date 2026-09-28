@@ -10,6 +10,7 @@ import {
 import { type Contour, type Nib, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { type Glyph, glyph } from "./glyph.js";
 import { type IdFactory, counterIds } from "./ids.js";
+import { corneredContour, hasContinuousCorners } from "./corner.js";
 import { contourOfCurves } from "./curves.js";
 import { removeOverlap } from "./overlap.js";
 
@@ -42,7 +43,7 @@ export const DEFAULT_NIB: Nib = { angle: 30, width: 80 };
  * all, drawn entirely along the nib's own edge, draws nothing.
  */
 export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
-  if (c.nib === undefined) return [c];
+  if (c.nib === undefined) return [corneredContour(c)];
   const known = joinedInk.get(c);
   if (known !== undefined) return known;
 
@@ -84,7 +85,7 @@ const regionIds = counterIds("ink-");
  */
 export function inkRegions(c: Contour): readonly Contour[] {
   const nib = c.nib;
-  if (nib === undefined) return [c];
+  if (nib === undefined) return [corneredContour(c)];
   const known = regionsOf.get(c);
   if (known !== undefined) return known;
   if (!(nib.width > 0) || c.nodes.length < 2) {
@@ -182,8 +183,17 @@ export function blendNib(a: Nib, b: Nib, t: number): Nib {
  * caller that remembers answers by glyph keeps remembering them.
  */
 export function withInk(g: Glyph, ids: IdFactory): Glyph {
-  if (!g.contours.some((c) => c.nib !== undefined)) return g;
+  if (!g.contours.some(isDerived)) return g;
   return { ...g, contours: g.contours.flatMap((c) => inkOf(c, ids)) };
+}
+
+/**
+ * Whether what a contour draws is worked out from it rather than being it: a
+ * stroke, whose ink comes from its pen, or an outline with continuous corners,
+ * whose drawing rounds them.
+ */
+export function isDerived(c: Contour): boolean {
+  return c.nib !== undefined || hasContinuousCorners(c);
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   type ContourId,
   type Glyph,
   type NodeId,
+  continuousCuts,
   segmentCount,
   segmentCubic,
   segmentTunniStatus,
@@ -34,6 +35,7 @@ export type HitKind =
   | "component"
   | "tunniPoint"
   | "tunniLine"
+  | "cornerSize"
   | "segment"
   | "originLine"
   | "advanceLine";
@@ -79,6 +81,17 @@ export type HitTarget =
       readonly cubic: Cubic;
       readonly status: TunniStatus;
     }
+  /**
+   * One end of a continuous corner's round, on the side it is on: dragged along
+   * the side, it sets how much of each side the round spends.
+   */
+  | {
+      readonly kind: "cornerSize";
+      readonly contourId: ContourId;
+      readonly nodeId: NodeId;
+      readonly side: "in" | "out";
+      readonly point: Vec2;
+    }
   /** The vertical lines bounding the advance width. Full height, so only x matters. */
   | { readonly kind: "originLine" | "advanceLine"; readonly x: number };
 
@@ -93,6 +106,9 @@ export type HitTarget =
  */
 export const PICK_PRIORITY: Readonly<Record<HitKind, number>> = {
   tunniPoint: 0,
+  // Small and deliberate like the Tunni point, and sitting on the outline where a
+  // segment would otherwise win it.
+  cornerSize: 0,
   node: 1,
   // Level with a node rather than above it, so distance decides between the
   // two. An anchor usually floats clear of the outline, but a `bottom` sitting
@@ -230,6 +246,30 @@ export function buildHitIndex(
     }
   }
 
+  // The ends of a continuous corner's round, for the corners selected: only
+  // those draw them, and only something drawn may be grabbed.
+  const chosen = selectedNodeKeys(handles.selection);
+  for (const c of g.contours) {
+    for (const [index, cut] of continuousCuts(c)) {
+      const n = c.nodes[index]!;
+      if (!chosen.has(`${c.id}${String.fromCharCode(0)}${n.id}`)) continue;
+      targets.push({
+        kind: "cornerSize",
+        contourId: c.id,
+        nodeId: n.id,
+        side: "in",
+        point: cut.before,
+      });
+      targets.push({
+        kind: "cornerSize",
+        contourId: c.id,
+        nodeId: n.id,
+        side: "out",
+        point: cut.after,
+      });
+    }
+  }
+
   for (const c of g.contours) {
     for (const [nodeIndex, n] of c.nodes.entries()) {
       targets.push({ kind: "node", contourId: c.id, nodeId: n.id, point: n.pt });
@@ -362,6 +402,7 @@ export function distanceToTarget(
     case "handleOut":
     case "anchor":
     case "tunniPoint":
+    case "cornerSize":
       return distance(p, target.point);
     case "component":
       return distanceToOutlines(target.outlines, p);

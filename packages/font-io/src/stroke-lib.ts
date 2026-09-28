@@ -1,10 +1,12 @@
 import {
+  type ContinuousCorner,
   type Contour,
   type IdFactory,
   type Nib,
   type NodeType,
   contour,
   node,
+  readContinuous,
   readSegmentBlend,
 } from "@typewright/font-model";
 import type { SegmentBlend } from "@typewright/geometry";
@@ -43,7 +45,8 @@ const VERSION = 1;
 type StoredStroke = {
   readonly at: number;
   readonly closed: boolean;
-  readonly nib: Nib;
+  /** The pen, for a stroke; absent for an outline kept for its continuous corners. */
+  readonly nib?: Nib;
   readonly nodes: readonly StoredNode[];
 };
 
@@ -56,6 +59,7 @@ type StoredNode = {
   readonly harmonised?: true;
   readonly pen?: Nib;
   readonly blend?: SegmentBlend;
+  readonly continuous?: ContinuousCorner;
 };
 
 /** What was read out of a glyph's lib: the strokes, and what their ink should be. */
@@ -102,11 +106,12 @@ export function strokesEntry(
   skeletons: readonly { readonly at: number; readonly contour: Contour }[],
   inkPoints: readonly (readonly string[])[],
 ): XmlElement[] {
-  const strokes: StoredStroke[] = skeletons.flatMap(({ at, contour: c }) =>
-    c.nib === undefined
-      ? []
-      : [{ at, closed: c.closed, nib: { ...c.nib }, nodes: c.nodes.map(storedNode) }],
-  );
+  const strokes: StoredStroke[] = skeletons.map(({ at, contour: c }) => ({
+    at,
+    closed: c.closed,
+    ...(c.nib === undefined ? {} : { nib: { ...c.nib } }),
+    nodes: c.nodes.map(storedNode),
+  }));
 
   const text = (value: string) => ({ text: value });
   const pair = (key: string, value: XmlElement): XmlElement[] => [
@@ -152,6 +157,7 @@ function storedNode(n: Contour["nodes"][number]): StoredNode {
     ...(n.harmonised ? { harmonised: true as const } : {}),
     ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
     ...(n.blend === undefined ? {} : { blend: { ...n.blend } }),
+    ...(n.continuous === undefined ? {} : { continuous: { ...n.continuous } }),
   };
 }
 
@@ -216,12 +222,21 @@ function readStroke(raw: unknown): StoredStroke | null {
   const at = r["at"];
   const rawNib = r["nib"];
   if (typeof at !== "number" || !Number.isInteger(at) || at < 0) return null;
-  if (typeof rawNib !== "object" || rawNib === null) return null;
-  const nib = rawNib as Record<string, unknown>;
-  const angle = nib["angle"];
-  const width = nib["width"];
-  const thickness = nib["thickness"];
-  if (typeof angle !== "number" || typeof width !== "number" || !(width >= 0)) return null;
+  // No pen is an outline kept for its continuous corners; a pen that is there has
+  // to be one.
+  let nib: Nib | undefined;
+  if (rawNib !== undefined) {
+    if (typeof rawNib !== "object" || rawNib === null) return null;
+    const pen = rawNib as Record<string, unknown>;
+    const angle = pen["angle"];
+    const width = pen["width"];
+    const thickness = pen["thickness"];
+    if (typeof angle !== "number" || typeof width !== "number" || !(width >= 0)) return null;
+    nib =
+      typeof thickness === "number" && thickness > 0
+        ? { angle, width, thickness }
+        : { angle, width };
+  }
   if (!Array.isArray(r["nodes"])) return null;
 
   const nodes: StoredNode[] = [];
@@ -235,10 +250,7 @@ function readStroke(raw: unknown): StoredStroke | null {
   return {
     at,
     closed: r["closed"] === true,
-    nib:
-      typeof thickness === "number" && thickness > 0
-        ? { angle, width, thickness }
-        : { angle, width },
+    ...(nib === undefined ? {} : { nib }),
     nodes,
   };
 }
@@ -262,6 +274,10 @@ function readNode(raw: unknown): StoredNode | null {
     ...((): { readonly blend?: SegmentBlend } => {
       const blend = readSegmentBlend(r["blend"]);
       return blend === undefined ? {} : { blend };
+    })(),
+    ...((): { readonly continuous?: ContinuousCorner } => {
+      const continuous = readContinuous(r["continuous"]);
+      return continuous === undefined ? {} : { continuous };
     })(),
   };
 }
@@ -329,12 +345,13 @@ export function restoreStrokes(
               harmonised: n.harmonised === true,
               ...(n.pen === undefined ? {} : { pen: n.pen }),
               ...(n.blend === undefined ? {} : { blend: n.blend }),
+              ...(n.continuous === undefined ? {} : { continuous: n.continuous }),
             },
           ),
         ),
         stroke.closed,
       ),
-      nib: stroke.nib,
+      ...(stroke.nib === undefined ? {} : { nib: stroke.nib }),
     };
     restored.splice(Math.min(stroke.at, restored.length), 0, skeleton);
   }

@@ -358,6 +358,20 @@ the curves were drawn with are kept. A held point is drawn with a ring round it.
 between two curves can hold anything; a straight side has no curvature to agree with. Press
 **Hold** again to let go, and the point stays where it is.
 
+**Continuous corners.** A corner point — or a tangent point, where a curve runs into a straight
+line — can be drawn rounded without adding a point: select it and choose **Continuous** in the
+Point section's **Corner** row, or **Make corner continuous** on the menu. The point stays where
+it is and stays what you drag; the outline around it is drawn round, and that round is what is
+filled, exported, measured and joined. **Size** is how much of each side the round spends, and
+the two small diamonds on the outline at its ends drag it along the sides. **Smoothness** is how
+much of the round is a ramp: at 0 it is a plain circular round, which meets its sides with a
+jump in curvature the eye reads as a kink; above it, the curvature rises from nothing on the
+straight sides, the way the corners of application icons are drawn. At a tangent point there is
+no corner to round, and the curve instead settles into the line over the size given, arriving
+on it with no curvature. The sharp corner stays on the canvas as a faint dashed line. Joining
+outlines, subtracting and offsetting work on the drawn round, and a `.ufo` gets the round in its
+outline, with the corner kept in the glyph's lib so it comes back continuous.
+
 **Setting a line with the features on.** The Spacing bar and the Proof bar each have a
 **Features** panel: the first row applies the font's own rules or silences them, and under it
 is a switch for every feature the feature file defines. Each starts where a text renderer

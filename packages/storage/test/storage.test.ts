@@ -190,6 +190,30 @@ describe("serialization", () => {
     }
   });
 
+  it("keeps a continuous corner", () => {
+    const ids = counterIds("k");
+    const box = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { continuous: { size: 60, smoothness: 0.4 } }),
+        node(ids.node(), vec(300, 0)),
+        node(ids.node(), vec(300, 300)),
+      ],
+      true,
+    );
+    const decoded = decodeGlyph(
+      JSON.parse(JSON.stringify(encodeGlyph(addContour(glyph("o"), box)))) as unknown,
+    );
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) {
+      expect(decoded.value.contours[0]!.nodes.map((n) => n.continuous)).toEqual([
+        { size: 60, smoothness: 0.4 },
+        undefined,
+        undefined,
+      ]);
+    }
+  });
+
   it("keeps an oval pen's thickness", () => {
     const ids = counterIds("o");
     const stem = {

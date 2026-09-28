@@ -13,6 +13,7 @@ import {
 } from "@typewright/geometry";
 
 import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import { corneredContour, hasContinuousCorners } from "./corner.js";
 import type { Glyph } from "./glyph.js";
 import type { ContourId, IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
@@ -120,6 +121,15 @@ export function removeOverlap(
   // out elsewhere, and unioned there.
   const taken = (c: Contour): boolean =>
     c.closed && c.nodes.length >= 2 && c.nib === undefined && (only === null || only.has(c.id));
+
+  // Continuous corners are joined as they are drawn, rounded. Where nothing
+  // crosses, the glyph comes back as it was, corners and all: there was nothing to
+  // join, and rounding them into points would be an edit nobody asked for.
+  const drawn = withCornersDrawn(g, taken);
+  if (drawn !== g) {
+    const joined = removeOverlap(drawn, ids, only);
+    return joined === null || joined.crossings > 0 ? joined : { glyph: g, crossings: 0 };
+  }
 
   const closed = g.contours.filter(taken);
   if (closed.length === 0) return { glyph: g, crossings: 0 };
@@ -263,6 +273,9 @@ export function combineContours(
   tool: ReadonlySet<ContourId>,
 ): CombineOutcome {
   const taken = (c: Contour): boolean => c.closed && c.nodes.length >= 2 && c.nib === undefined;
+  // As drawn, continuous corners rounded; see removeOverlap.
+  const drawn = withCornersDrawn(g, taken);
+  if (drawn !== g) return combineContours(drawn, ids, op, tool);
   const closed = g.contours.filter(taken);
 
   const tools = closed.filter((c) => tool.has(c.id));
@@ -1097,4 +1110,16 @@ function polygon(c: Contour): Vec2[] {
     points.push(...flat.slice(0, -1));
   }
   return points;
+}
+
+/**
+ * The glyph with the continuous corners of the contours an operation takes drawn
+ * in, as ordinary points; the same glyph where there are none.
+ */
+function withCornersDrawn(g: Glyph, taken: (c: Contour) => boolean): Glyph {
+  if (!g.contours.some((c) => taken(c) && hasContinuousCorners(c))) return g;
+  return {
+    ...g,
+    contours: g.contours.map((c) => (taken(c) && hasContinuousCorners(c) ? corneredContour(c) : c)),
+  };
 }

@@ -1,5 +1,5 @@
 import { resolveGlyphComponents } from "./component.js";
-import { inkRegions, withInk } from "./stroke.js";
+import { inkRegions, isDerived, withInk } from "./stroke.js";
 import type { FontDocument } from "./document.js";
 import type { Glyph } from "./glyph.js";
 import { counterIds } from "./ids.js";
@@ -47,7 +47,7 @@ function resolvedWith(
   memo: WeakMap<FontDocument, WeakMap<Glyph, Glyph>>,
   joined: boolean,
 ): Glyph {
-  if (glyph.components.length === 0 && !glyph.contours.some((c) => c.nib !== undefined)) {
+  if (glyph.components.length === 0 && !glyph.contours.some(isDerived)) {
     return glyph;
   }
 
@@ -64,7 +64,7 @@ function resolvedWith(
   const ink = (g: Glyph): Glyph =>
     joined
       ? withInk(g, ids)
-      : g.contours.some((c) => c.nib !== undefined)
+      : g.contours.some(isDerived)
         ? { ...g, contours: g.contours.flatMap((c) => inkRegions(c)) }
         : g;
   // A glyph placed as a component draws what it draws, strokes included: the

@@ -181,3 +181,35 @@ describe("handles", () => {
     expect(Math.atan2(dy, dx)).toBeCloseTo(direction, 3);
   });
 });
+
+describe("a continuous corner", () => {
+  /** The first corner point of a closed contour in the starter font. */
+  const corner = () =>
+    selecting((nodes) => {
+      const found = nodes.find((it) => it.node.type === "corner");
+      return found === undefined ? [] : [found];
+    });
+
+  it("is offered on a corner, sharp until asked, and rounded when asked", () => {
+    const { store, picked } = corner();
+    render(<PointSection />, store);
+    const { contourId, node } = picked[0]!;
+
+    expect(screen.getByRole("button", { name: "Sharp" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByLabelText("Corner size")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continuous" }));
+    const rounded = nodeNow(store, contourId, node.id) as Node & {
+      continuous?: { size: number; smoothness: number };
+    };
+    expect(rounded.continuous?.smoothness).toBe(0.6);
+    expect(input("Corner smoothness").value).toBe("60");
+
+    fireEvent.change(input("Corner size"), { target: { value: "40" } });
+    fireEvent.change(input("Corner smoothness"), { target: { value: "30" } });
+    const changed = nodeNow(store, contourId, node.id) as Node & {
+      continuous?: { size: number; smoothness: number };
+    };
+    expect(changed.continuous).toEqual({ size: 40, smoothness: 0.3 });
+  });
+});

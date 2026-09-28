@@ -12,6 +12,7 @@ import {
   inLayer,
   counterIds,
   inkOf,
+  isDerived,
   isGroupKey,
   orderedGlyphs,
   segments,
@@ -219,10 +220,11 @@ export function glif(g: Glyph): string {
   // than the line it was drawn along. The ink goes after every outline, and the
   // stroke itself goes in the glyph's lib with a note of how many contours at the
   // end are its ink — which is how it comes back as a stroke; see stroke-lib.ts.
-  const outlines = g.contours.filter((c) => c.nib === undefined && c.nodes.length >= 2);
-  const skeletons = g.contours.flatMap((c, at) =>
-    c.nib === undefined ? [] : [{ at, contour: c }],
-  );
+  // An outline with continuous corners goes the same way: its drawing, corners
+  // rounded, is written with the ink, and the outline as it is edited is kept in
+  // the lib beside the strokes.
+  const outlines = g.contours.filter((c) => !isDerived(c) && c.nodes.length >= 2);
+  const skeletons = g.contours.flatMap((c, at) => (isDerived(c) ? [{ at, contour: c }] : []));
   const inkIds = counterIds(`ink-${g.name}-`);
   const ink = skeletons
     .flatMap(({ contour: c }) => inkOf(c, inkIds))

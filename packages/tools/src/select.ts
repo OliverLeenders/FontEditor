@@ -45,6 +45,7 @@ import {
   startBoxTransform,
   startMarquee,
   startSelectionDrag,
+  startCornerSizeDrag,
   startTunniDrag,
   translateSelection,
 } from "./gestures.js";
@@ -246,6 +247,8 @@ export function pointerDown(
       return startTunniDrag(base, input, "dragTunniPoint", target.segmentIndex, target.contourId);
     case "tunniLine":
       return startTunniDrag(base, input, "dragTunniLine", target.segmentIndex, target.contourId);
+    case "cornerSize":
+      return startCornerSizeDrag(base, input, target.contourId, target.nodeId, target.side);
     case "segment":
       return selectSegmentEnds(base, input, target);
     case "originLine":

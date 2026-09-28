@@ -763,6 +763,67 @@ describe("a node that holds its curvature", () => {
   });
 });
 
+describe("a continuous corner", () => {
+  const rounded = () => {
+    const ids = counterIds("round");
+    return contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { continuous: { size: 100, smoothness: 0.5 } }),
+        node(ids.node(), vec(400, 0)),
+        node(ids.node(), vec(400, 400)),
+        node(ids.node(), vec(0, 400)),
+      ],
+      true,
+    );
+  };
+  const drawn = (c: Contour, selected: boolean) =>
+    render({
+      ...base(c),
+      glyph: addContour(glyph("o", { advance: 400 }), c),
+      selection: selected ? [{ contourId: c.id, nodeId: c.nodes[0]!.id, part: "point" }] : [],
+    });
+
+  it("draws the sharp corner faint and dashed under the round", () => {
+    const ctx = drawn(rounded(), false);
+    const ghost = ctx.ops.filter(
+      (o) =>
+        o.op === "stroke" && o.strokeStyle === LIGHT_PALETTE.handleLine && o.lineDash.length > 0,
+    );
+    expect(ghost.length).toBeGreaterThan(0);
+    // The path stroked as the outline does not pass through the corner.
+    const corner = toScreen(VIEW, vec(0, 0));
+    const outlinePaths: (typeof ctx.ops)[] = [];
+    let path: typeof ctx.ops = [];
+    for (const o of ctx.ops) {
+      if (o.op === "beginPath") path = [];
+      else if (o.op === "stroke" && o.strokeStyle === LIGHT_PALETTE.outline)
+        outlinePaths.push(path);
+      else path.push(o);
+    }
+    expect(outlinePaths.length).toBeGreaterThan(0);
+    const through = outlinePaths
+      .flat()
+      .filter(
+        (o) =>
+          (o.op === "lineTo" || o.op === "moveTo") &&
+          Math.abs(o.args[0]! - corner.x) < 1e-6 &&
+          Math.abs(o.args[1]! - corner.y) < 1e-6,
+      );
+    expect(through).toHaveLength(0);
+  });
+
+  it("marks the two ends of its round when it is selected, and not otherwise", () => {
+    const diamonds = (ctx: RecordingContext) =>
+      ctx.ops.filter(
+        (o) =>
+          o.op === "stroke" && o.strokeStyle === LIGHT_PALETTE.nodeSelected && o.lineWidth === 1.5,
+      );
+    expect(diamonds(drawn(rounded(), true))).toHaveLength(2);
+    expect(diamonds(drawn(rounded(), false))).toHaveLength(0);
+  });
+});
+
 describe("where a contour starts", () => {
   /** A straight run along the x axis, from (0, 0) to (400, 0), open. */
   const run = (reversed = false) => {

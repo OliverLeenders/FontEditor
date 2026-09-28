@@ -114,6 +114,29 @@ describe("a stroke through a .glif", () => {
     expect(back.contours[0]!.nodes[0]!.blend).toEqual({ angle: "smooth", shape: "step" });
   });
 
+  it("writes a continuous corner drawn, and brings it back continuous", () => {
+    const box = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(0, 0), { continuous: { size: 100, smoothness: 0.6 } }),
+        node(ids.node(), vec(400, 0)),
+        node(ids.node(), vec(400, 400)),
+        node(ids.node(), vec(0, 400)),
+      ],
+      true,
+    );
+    const g = glyph("o", { advance: 400, contours: [box] });
+    // Another application sees the round, not the sharp corner.
+    expect(glif(g)).not.toContain('<point x="0" y="0"');
+
+    const { glyph: back, warnings } = throughGlif(g);
+    expect(warnings).toEqual([]);
+    expect(back.contours).toHaveLength(1);
+    expect(back.contours[0]!.nodes.map((n) => n.pt)).toEqual(box.nodes.map((n) => n.pt));
+    expect(back.contours[0]!.nodes[0]!.continuous).toEqual({ size: 100, smoothness: 0.6 });
+    expect(back.contours[0]!.nib).toBeUndefined();
+  });
+
   it("keeps an oval pen's thickness", () => {
     const { glyph: back } = throughGlif(glyph("s", { contours: [curl(20)] }));
     expect(back.contours[0]!.nib).toEqual({ angle: 30, width: 60, thickness: 20 });

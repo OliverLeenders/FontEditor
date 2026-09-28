@@ -63,6 +63,38 @@ export function drawWithPen(state: EditorState, on: boolean): ToolResult {
 }
 
 /**
+ * One number of the pen at the selected points of strokes: the one they share,
+ * `"mixed"` where they differ in it, `null` where no selected point is a stroke's.
+ *
+ * One number at a time because that is how a field shows it. Points whose pens
+ * differ in width but agree on the angle show the angle; and a field showing the
+ * whole pen as mixed would empty itself the moment a number typed into it had
+ * gone in, since the pens would still differ in the others — which ate every
+ * keystroke after the first.
+ */
+export function selectedPenValue(
+  state: EditorState,
+  field: "angle" | "width" | "thickness",
+): number | "mixed" | null {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return null;
+
+  let found: number | null = null;
+  for (const item of state.selection) {
+    if (item.part !== "point") continue;
+    const c = glyph.contours.find((each) => each.id === item.contourId);
+    if (c === undefined || c.nib === undefined) continue;
+    const n = c.nodes.find((each) => each.id === item.nodeId);
+    if (n === undefined) continue;
+    const pen = n.pen ?? c.nib;
+    const value = field === "thickness" ? (pen.thickness ?? 0) : pen[field];
+    if (found === null) found = value;
+    else if (found !== value) return "mixed";
+  }
+  return found;
+}
+
+/**
  * The pen at the selected points of strokes, as the Pen section's numbers show it.
  *
  * The pen is set point by point, and blends along each segment from one point's

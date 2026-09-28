@@ -86,6 +86,16 @@ export type Gesture =
       readonly moved: boolean;
     }
   | {
+      /** Dragging one end of a continuous corner's round along its side. */
+      readonly kind: "dragCornerSize";
+      readonly origin: Vec2;
+      readonly contourId: ContourId;
+      readonly nodeId: NodeId;
+      readonly side: "in" | "out";
+      readonly before: FontDocument;
+      readonly moved: boolean;
+    }
+  | {
       /**
        * Dragging one of the lines that bound the advance width.
        *

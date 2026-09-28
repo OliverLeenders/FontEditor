@@ -147,3 +147,10 @@ export {
 } from "./pen.js";
 
 export { fitCubics } from "./fit.js";
+export {
+  type ContinuousJoin,
+  type CornerShape,
+  type JoinPiece,
+  continuousJoin,
+  parameterAtDistance,
+} from "./corner.js";

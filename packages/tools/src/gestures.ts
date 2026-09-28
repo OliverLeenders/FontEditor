@@ -10,6 +10,7 @@ import {
   type Node,
   type Glyph,
   type NodeId,
+  continuousSizeAt,
   contourById,
   metricLines,
   movedComponent,
@@ -357,6 +358,31 @@ export function startGuideDrag(
       },
     },
     [begin("Move guide")],
+  );
+}
+
+/** Begin dragging one end of a continuous corner's round. */
+export function startCornerSizeDrag(
+  state: EditorState,
+  input: PointerInput,
+  contourId: ContourId,
+  nodeId: NodeId,
+  side: "in" | "out",
+): ToolResult {
+  return result(
+    {
+      ...state,
+      gesture: {
+        kind: "dragCornerSize",
+        origin: input.point,
+        contourId,
+        nodeId,
+        side,
+        before: state.document,
+        moved: false,
+      },
+    },
+    [begin("Corner size")],
   );
 }
 
@@ -1054,6 +1080,33 @@ const CONTINUE: Continuations = {
 
   dragTunniLine: (state, gesture, input, delta) =>
     continueTunni(state, gesture, input, delta, moveSegmentTunniLine),
+
+  dragCornerSize: (state, gesture, input, delta) => {
+    // The size is the distance along the side from the corner to where the
+    // pointer is nearest it, in whole units, measured on the contour as it was
+    // when the drag began: the side is what the pointer is read against, and it
+    // does not move.
+    const next = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
+      updateContour(g, gesture.contourId, (c) => {
+        const index = c.nodes.findIndex((n) => n.id === gesture.nodeId);
+        const corner = c.nodes[index]?.continuous;
+        if (corner === undefined) return null;
+        const size = Math.max(1, Math.round(continuousSizeAt(c, index, gesture.side, input.point)));
+        if (size === corner.size) return null;
+        return {
+          ...c,
+          nodes: c.nodes.map((n, i) =>
+            i === index ? { ...n, continuous: { ...corner, size } } : n,
+          ),
+        };
+      }),
+    );
+    return {
+      ...state,
+      document: next ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+    };
+  },
 
   dragMargin: (state, gesture, input, delta, options) => {
     // Only the grid applies: an advance is a measurement, not a position, and
