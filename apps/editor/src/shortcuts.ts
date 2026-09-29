@@ -39,6 +39,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "Ctrl-Z", what: "Undo" },
       { keys: "Ctrl-Shift-Z · Ctrl-Y", what: "Redo" },
       { keys: "Ctrl-S", what: "Save to the folder this font was opened from" },
+      { keys: "Ctrl-K", what: "Find a command by name, and run it" },
       { keys: "? · F1", what: "This list" },
     ],
   },
@@ -57,7 +58,10 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
     title: "The canvas",
     note: "Whichever tool is in hand.",
     items: [
-      { keys: "V P K R E L", what: "Select, pen, knife, rectangle, ellipse, ruler line" },
+      {
+        keys: "V P N R E K L",
+        what: "Select, pen, stroke, rectangle, ellipse, knife, ruler line",
+      },
       {
         keys: "M held",
         what: "Measure while it is down, and go back to drawing when it is let go",

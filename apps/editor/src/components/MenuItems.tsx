@@ -40,6 +40,14 @@ export type Item =
        */
       readonly note?: string | undefined;
       /**
+       * The key that does the same thing, where there is one: "Ctrl-S", "R".
+       *
+       * A column of its own, after the note, so a row can say both how many
+       * points it acts on and the key that would have done it — and so every
+       * key is written in the same place, where somebody learns to look.
+       */
+      readonly keys?: string;
+      /**
        * A sentence about the item, shown on hover rather than in the row.
        *
        * For what does not fit as a word. A sentence in the note column wraps,
@@ -92,6 +100,12 @@ export function MenuItems({
               <>
                 {" "}
                 <span className={styles.note}>{item.note}</span>
+              </>
+            )}
+            {item.keys === undefined ? null : (
+              <>
+                {" "}
+                <kbd className={styles.keys}>{item.keys}</kbd>
               </>
             )}
           </button>

@@ -6,7 +6,7 @@ import {
   pasteContours,
   selectAllPoints,
 } from "@typewright/tools";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 import { applyTheme } from "./scheme.js";
 
@@ -23,6 +23,7 @@ import { CloseWarning } from "./components/CloseWarning.js";
 import { UpdateNotice } from "./components/UpdateNotice.js";
 import { desktop } from "./desktop.js";
 import { SpacingView } from "./components/SpacingView.js";
+import { CommandPalette } from "./components/CommandPalette.js";
 import { Shortcuts } from "./components/Shortcuts.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TabBar, type ViewId } from "./components/TabBar.js";
@@ -64,6 +65,7 @@ export function App(): React.JSX.Element {
   // and a menu belongs to the canvas it was asked for on.
   const [menu, setMenu] = useState<(MenuRequest & { pane: PaneIndex }) | null>(null);
   const [keysShown, setKeysShown] = useState(false);
+  const [paletteShown, setPaletteShown] = useState(false);
   // The workspace the keyboard is in: the only one, or the active one of two.
   const view = activeView(panes);
   // Read by the window key handler, which is installed once and must not be
@@ -135,6 +137,12 @@ export function App(): React.JSX.Element {
       }
 
       const modified = event.ctrlKey || event.metaKey;
+      // Every command by name, from anywhere: the one key that finds the rest.
+      if (modified && !event.shiftKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setPaletteShown((shown) => !shown);
+        return;
+      }
       if (modified && event.key.toLowerCase() === "z") {
         event.preventDefault();
         if (event.shiftKey) store.redo();
@@ -347,6 +355,11 @@ export function App(): React.JSX.Element {
     };
   }, [store]);
 
+  /** A workspace in the pane the keyboard is in, as the command palette asks for one. */
+  const goToWorkspace = useCallback((id: ViewId): void => {
+    setPanes((current) => choosePane(current, current.active, id));
+  }, []);
+
   /** What a workspace shows, in whichever pane it is. */
   const workspace = (shown: ViewId, index: PaneIndex): React.JSX.Element => {
     // A glyph chosen here is drawn in the other pane if that one is drawing,
@@ -515,6 +528,13 @@ export function App(): React.JSX.Element {
       </main>
       <StatusBar workspace={view} onShortcuts={() => setKeysShown(true)} />
       {keysShown ? <Shortcuts onClose={() => setKeysShown(false)} /> : null}
+      {paletteShown ? (
+        <CommandPalette
+          workspace={view}
+          onWorkspace={goToWorkspace}
+          onClose={() => setPaletteShown(false)}
+        />
+      ) : null}
     </div>
   );
 }

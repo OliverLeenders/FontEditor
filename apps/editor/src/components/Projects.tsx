@@ -1,3 +1,4 @@
+import { canOpenFolders } from "@typewright/disk";
 import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -25,6 +26,7 @@ export function Projects(): React.JSX.Element {
   // The font whose Forget is being asked about, if one is.
   const [confirming, setConfirming] = useState<string | null>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
+  const [failed, setFailed] = useState<string | null>(null);
 
   useEffect(() => {
     continueRef.current?.focus();
@@ -172,6 +174,27 @@ export function Projects(): React.JSX.Element {
             >
               New font…
             </button>
+            {/* A font already on disk, as its .ufo folder. The same as File →
+                Open folder, here because this is where somebody arrives with
+                one. */}
+            {canOpenFolders() ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setFailed(null);
+                  void store
+                    .openFolder()
+                    .then((opened) => {
+                      if (opened !== null) store.showProjects(false);
+                    })
+                    .catch((error: unknown) => {
+                      setFailed(error instanceof Error ? error.message : String(error));
+                    });
+                }}
+              >
+                Open a .ufo…
+              </button>
+            ) : null}
             {current === null ? null : (
               <button
                 type="button"
@@ -183,6 +206,12 @@ export function Projects(): React.JSX.Element {
               </button>
             )}
           </div>
+        )}
+
+        {failed === null ? null : (
+          <p className={styles.failed} role="alert">
+            {failed}
+          </p>
         )}
 
         <label className={styles.skip}>

@@ -9,6 +9,19 @@ the spacing line or the proof, and the second pane's bar stacks the panes or clo
 The keyboard follows the pane you last pressed in; a glyph opened from the font's grid or
 the spacing line is drawn in the other pane when that pane is drawing.
 
+**Finding a command.** Ctrl-K opens a list of every command there is right now — the
+workspaces, the tools, what can be done to the glyph and to the selection, undo and redo,
+and the File menu's items — over whatever is on screen. Type part of a name to narrow it:
+the ones starting with what you typed come first. The arrows choose, Enter runs and Escape
+closes. Each row names the key that does the same thing, where there is one, as the menus
+do.
+
+**The bars at the edges.** The strip at the top of the window names the font, where it is
+kept on disk — or that it is not saved to disk yet — and marks it with a dot while there
+are changes not written there. The status bar at the bottom counts the selected points,
+gives the size of what is selected when there is more than one, and says where the pointer
+is on the canvas, in font units.
+
 **Two drawings at once.** The drawing is the one workspace a split window may show
 twice, since what each canvas shows is its own. Both draw the same glyph with the same
 camera; the inspector and the glyph strip stay single and follow the pane the keyboard is
@@ -110,7 +123,10 @@ first contour.
 point items — corner, smooth, tangent, harmonise, lock handles to axis, extract handles,
 delete — do the lot in one step, and say how many they will touch. Right-clicking something
 that is not in the selection selects it first, so the same menu on a single point reads as
-it always did: the items act on the thing you clicked. What is about a contour rather than
+it always did: the items act on the thing you clicked. Right-clicking empty canvas or a
+segment while points are selected offers the same point items at the top of the menu, so
+the node types and the handle lock are there without aiming at one of the points. What is
+about a contour rather than
 about a point — reverse, start the contour here, the ordering — stays with the contour under
 the pointer.
 
@@ -234,7 +250,10 @@ say and folds when it has not, with a word beside its title for what it is short
 _none_, _nothing selected_, _no segment_. Folding or opening one by hand is remembered,
 except while it is empty: a Point section held open by yesterday's click would be a column
 of dashes. Opening an empty section still works, which is how the buttons inside one are
-reached, and it lasts until the section fills or empties again.
+reached, and it lasts until the section fills or empties again. The sections about what is
+selected come first: with points selected the Point, Curve, Pen and Transform sections lead,
+with an anchor or a component its own section does, and with nothing selected the glyph's
+own sections are at the top.
 
 **Anchors and components.** Right-click empty canvas to put an anchor down; it is a
 small cross, named on hover, dragged like a point and snapped to the same lines. Both an
@@ -564,4 +583,5 @@ picker opens where you last kept a font, not inside the last font's own folder, 
 not save one font into another font's UFO. An empty folder whose name ends in `.ufo` is taken
 as the font's own, if you would rather make the folder yourself. **Open folder** is the other
 way round: there you pick the `.ufo` itself. The **Fonts** list names the UFO each font is
-kept in, or says it has not been saved to disk yet.
+kept in, or says it has not been saved to disk yet, and its **Open a .ufo** button opens a
+font kept anywhere on disk straight from the list.

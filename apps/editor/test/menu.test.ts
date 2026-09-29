@@ -93,6 +93,36 @@ describe("context menu", () => {
     ]);
   });
 
+  it("offers what the selected points can be, right-clicked beside them", () => {
+    // A selection is what the point items act on, so they are there wherever the
+    // menu is opened while points are selected — not only on one of them.
+    store.setEditor({
+      ...store.editor,
+      selection: [{ contourId, nodeId, part: "point" as const }],
+    });
+    const items = labels(store, null);
+    expect(items).toContain("Corner");
+    expect(items).toContain("Smooth");
+    expect(items).toContain("Lock handles to axis");
+    // And the canvas items after them.
+    expect(items).toContain("Select all points");
+  });
+
+  it("offers them on a segment too, when points are selected", () => {
+    store.setEditor({
+      ...store.editor,
+      selection: [{ contourId, nodeId, part: "point" as const }],
+    });
+    const items = labels(store, segment());
+    expect(items).toContain("Corner");
+    expect(items).toContain("Lock handles to axis");
+  });
+
+  it("does not offer them with nothing selected", () => {
+    store.setEditor({ ...store.editor, selection: [] });
+    expect(labels(store, null)).not.toContain("Corner");
+  });
+
   it("cannot round a selection when there is not one", () => {
     const items = itemsFor(store, { x: 0, y: 0, target: null, point: { x: 0, y: 0 } });
     const round = items.find((i) => i.kind === "item" && i.label === "Round selection");

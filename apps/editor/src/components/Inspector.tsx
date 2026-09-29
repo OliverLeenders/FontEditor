@@ -1,5 +1,5 @@
 import { renameCurrentGlyph, renameRefusal } from "@typewright/tools";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Inspector.module.css";
@@ -52,6 +52,15 @@ export function Inspector(): React.JSX.Element | null {
   const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
   // Every control in the transform section acts on the points selected, and is
   // dead without them — so with none, the section has nothing in it.
+  // What the selection is, which decides which sections come first: the ones
+  // about it, where the eye is, rather than below the glyph's own.
+  const focus = useStoreValue((s): Focus => {
+    const e = s.session.editor;
+    if (e.selectedComponent !== null) return "component";
+    if (e.selectedAnchor !== null) return "anchor";
+    if (e.selectedGuide !== null) return "guide";
+    return e.selection.some((item) => item.part === "point") ? "points" : "none";
+  });
   const selectedPoints = useStoreValue(
     (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
   );
@@ -247,26 +256,31 @@ export function Inspector(): React.JSX.Element | null {
       </datalist>
 
       <div className={styles.body}>
-        <GlyphSection />
-        <LayersSection />
-        <ComponentsSection />
-        <AnchorsSection />
-        <TracingSection />
-        <GuidesSection />
-        <PointSection />
-        <CurveSection />
-        <PenSection />
-
-        <Section
-          name="transform"
-          title="Transform"
-          icon={ScalingIcon}
-          relevant={false}
-          empty={selectedPoints === 0}
-          emptyNote="nothing selected"
-        >
-          <TransformPanel />
-        </Section>
+        {ordered(focus).map((key) => (
+          <Fragment key={key}>
+            {key === "glyph" ? <GlyphSection /> : null}
+            {key === "layers" ? <LayersSection /> : null}
+            {key === "components" ? <ComponentsSection /> : null}
+            {key === "anchors" ? <AnchorsSection /> : null}
+            {key === "tracing" ? <TracingSection /> : null}
+            {key === "guides" ? <GuidesSection /> : null}
+            {key === "point" ? <PointSection /> : null}
+            {key === "curve" ? <CurveSection /> : null}
+            {key === "pen" ? <PenSection /> : null}
+            {key === "transform" ? (
+              <Section
+                name="transform"
+                title="Transform"
+                icon={ScalingIcon}
+                relevant={false}
+                empty={selectedPoints === 0}
+                emptyNote="nothing selected"
+              >
+                <TransformPanel />
+              </Section>
+            ) : null}
+          </Fragment>
+        ))}
       </div>
     </aside>
   );
@@ -298,4 +312,45 @@ function edgeAt(clientX: number, inside: Element): "left" | "right" | null {
 function paneEdges(inside: Element): { left: number; right: number } {
   const pane = inside.closest("[data-pane]");
   return pane === null ? { left: 0, right: window.innerWidth } : pane.getBoundingClientRect();
+}
+
+type Focus = "points" | "component" | "anchor" | "guide" | "none";
+type SectionKey =
+  | "glyph"
+  | "layers"
+  | "components"
+  | "anchors"
+  | "tracing"
+  | "guides"
+  | "point"
+  | "curve"
+  | "pen"
+  | "transform";
+
+/** The glyph's own sections first, as they have always been, then the selection's. */
+const USUAL: readonly SectionKey[] = [
+  "glyph",
+  "layers",
+  "components",
+  "anchors",
+  "tracing",
+  "guides",
+  "point",
+  "curve",
+  "pen",
+  "transform",
+];
+
+/** The sections about each kind of selection, brought to the top while it is selected. */
+const LEADING: Readonly<Record<Focus, readonly SectionKey[]>> = {
+  points: ["point", "curve", "pen", "transform"],
+  component: ["components"],
+  anchor: ["anchors"],
+  guide: ["guides"],
+  none: [],
+};
+
+function ordered(focus: Focus): SectionKey[] {
+  const first = LEADING[focus];
+  return [...first, ...USUAL.filter((key) => !first.includes(key))];
 }

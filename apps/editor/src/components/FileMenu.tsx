@@ -124,7 +124,7 @@ export function FileMenu(): React.JSX.Element {
     icon: AppWindowIcon,
     // A browser keeps Ctrl-Shift-N for a private window and never passes it on,
     // so only the desktop application has the key to offer.
-    ...(desktop() === null ? {} : { note: "Ctrl-Shift-N" }),
+    ...(desktop() === null ? {} : { keys: "Ctrl-Shift-N" }),
     hint: "Another window, on the list of fonts: for a second font beside this one",
     run: () => {
       openWindow("fonts");
@@ -173,7 +173,7 @@ export function FileMenu(): React.JSX.Element {
       kind: "item",
       label: folder.name === null ? "Save…" : "Save",
       icon: SaveIcon,
-      note: "Ctrl-S",
+      keys: "Ctrl-S",
       hint:
         folder.name === null
           ? `Choose a folder to keep this font in, as ${ufo}`

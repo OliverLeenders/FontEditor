@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { ThemeChoice } from "../preferences.js";
+import { unsaved } from "../store/index.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { VERSION } from "../version.js";
 import styles from "./WindowBar.module.css";
-import { SettingsIcon } from "./icons.js";
+import { CircleDotIcon, SettingsIcon } from "./icons.js";
 
 /**
  * The strip along the top of the window: what is open, and the preferences.
@@ -31,6 +32,10 @@ export function WindowBar(): React.JSX.Element {
   const family = useStoreValue((s) => s.session.editor.document.info.familyName);
   const style = useStoreValue((s) => s.session.editor.document.info.styleName);
   const theme = useStoreValue((s) => s.theme);
+  // Where the font is kept, which is the question saving asks: said here, on
+  // every screen, rather than only in the File menu.
+  const folder = useStoreValue((s) => s.folder.name);
+  const dirty = useStoreValue((s) => unsaved(s.folder, s.session.editor.document));
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -70,6 +75,24 @@ export function WindowBar(): React.JSX.Element {
       <span className={styles.name}>
         {family}
         {style === "" ? "" : ` ${style}`}
+        <span
+          className={styles.where}
+          title={
+            folder === null
+              ? "Kept only in this browser until it is saved to a folder (Ctrl-S)"
+              : dirty
+                ? `Kept in ${folder}; changes not yet saved there (Ctrl-S)`
+                : `Kept in ${folder}`
+          }
+        >
+          {" · "}
+          {folder ?? "not saved to disk"}
+          {folder !== null && dirty ? (
+            <span className={styles.dirty} aria-label="unsaved changes">
+              <CircleDotIcon />
+            </span>
+          ) : null}
+        </span>
       </span>
 
       <div className={styles.holder} ref={ref}>

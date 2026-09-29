@@ -1,0 +1,101 @@
+/* Over everything, near the top, where the eye already is: a list that opens
+   in the middle of the window is a list somebody has to look for. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 1rem 1rem;
+  background: rgba(19, 25, 34, 0.2);
+}
+
+.palette {
+  display: flex;
+  flex-direction: column;
+  width: min(34rem, 100%);
+  max-height: 60vh;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-3);
+}
+.search svg {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+.list {
+  margin: 0;
+  padding: 0.2rem;
+  list-style: none;
+  overflow-y: auto;
+}
+
+/* The rows of the editor's menus: a step lighter under the pointer, not a slab
+   of accent. */
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--ink);
+}
+.row[aria-selected="true"] {
+  background: var(--surface-2);
+}
+
+.group {
+  flex: none;
+  width: 4.5rem;
+  color: var(--ink-3);
+  font-size: 0.74rem;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.keys {
+  flex: none;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+}
+
+.none {
+  margin: 0;
+  padding: 0.8rem;
+  font-size: 0.82rem;
+  color: var(--ink-3);
+}

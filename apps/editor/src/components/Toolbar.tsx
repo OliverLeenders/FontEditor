@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { ToolId } from "@typewright/tools";
 
 import { usePane } from "../pane.js";
@@ -24,6 +25,11 @@ import { Reshape } from "./Reshape.js";
 import styles from "./Toolbar.module.css";
 
 type ToolButton = {
+  /**
+   * Which kind of tool: choosing, drawing a path, drawing a shape, cutting and
+   * measuring. The bar puts a separator between kinds.
+   */
+  readonly group: "choose" | "draw" | "shape" | "cut";
   readonly id: ToolId | null;
   readonly key: string;
   readonly label: string;
@@ -41,17 +47,25 @@ type ToolButton = {
  * have learned all six.
  */
 const TOOLS: readonly ToolButton[] = [
-  { id: "select", key: "V", label: "Select", hint: "Select and edit  (V)", icon: SelectIcon },
-  { id: "pen", key: "P", label: "Pen", hint: "Draw contours  (P)", icon: PenIcon },
   {
+    group: "choose",
+    id: "select",
+    key: "V",
+    label: "Select",
+    hint: "Select and edit  (V)",
+    icon: SelectIcon,
+  },
+  { group: "draw", id: "pen", key: "P", label: "Pen", hint: "Draw contours  (P)", icon: PenIcon },
+  {
+    group: "draw",
     id: "stroke",
     key: "N",
     label: "Stroke",
     hint: "Draw strokes with the last pen set  (N)",
     icon: BrushIcon,
   },
-  { id: "knife", key: "K", label: "Knife", hint: "Cut across the outline  (K)", icon: KnifeIcon },
   {
+    group: "shape",
     id: "rect",
     key: "R",
     label: "Rectangle",
@@ -59,6 +73,7 @@ const TOOLS: readonly ToolButton[] = [
     icon: RectIcon,
   },
   {
+    group: "shape",
     id: "ellipse",
     key: "E",
     label: "Ellipse",
@@ -70,6 +85,15 @@ const TOOLS: readonly ToolButton[] = [
   // while drawing; a line laid across the letter is something you then work
   // under, so it has a switch of its own.
   {
+    group: "cut",
+    id: "knife",
+    key: "K",
+    label: "Knife",
+    hint: "Cut across the outline  (K)",
+    icon: KnifeIcon,
+  },
+  {
+    group: "cut",
     id: "section",
     key: "L",
     label: "Ruler",
@@ -77,6 +101,9 @@ const TOOLS: readonly ToolButton[] = [
     icon: MeasureIcon,
   },
 ];
+
+/** The tools as the command palette offers them. */
+export const TOOL_BUTTONS: readonly ToolButton[] = TOOLS;
 
 export function Toolbar(): React.JSX.Element {
   const store = useEditorStore();
@@ -91,19 +118,23 @@ export function Toolbar(): React.JSX.Element {
   return (
     <div className={styles.bar}>
       <div className={styles.group} role="group" aria-label="Tools">
-        {TOOLS.map((tool) => (
-          <button
-            key={tool.key}
-            type="button"
-            className={styles.tool}
-            aria-pressed={tool.id !== null && tool.id === activeTool}
-            disabled={tool.id === null}
-            title={tool.hint}
-            aria-label={tool.label}
-            onClick={() => tool.id !== null && store.setTool(tool.id)}
-          >
-            <tool.icon />
-          </button>
+        {TOOLS.map((tool, i) => (
+          <Fragment key={tool.key}>
+            {i > 0 && TOOLS[i - 1]!.group !== tool.group ? (
+              <div className={styles.divider} aria-hidden="true" />
+            ) : null}
+            <button
+              type="button"
+              className={styles.tool}
+              aria-pressed={tool.id !== null && tool.id === activeTool}
+              disabled={tool.id === null}
+              title={tool.hint}
+              aria-label={tool.label}
+              onClick={() => tool.id !== null && store.setTool(tool.id)}
+            >
+              <tool.icon />
+            </button>
+          </Fragment>
         ))}
       </div>
 

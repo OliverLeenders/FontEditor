@@ -170,10 +170,17 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
 
   if (target === null) {
     return [
+      // A selection is what the points' items act on, wherever the menu was
+      // opened: pressing on an empty stretch beside the points gathered is as
+      // good a way to reach them as pressing on one of them.
+      ...(selectedNodeCount(editor) > 0
+        ? [...selectionPointItems(store, editor), { kind: "separator" as const }]
+        : []),
       {
         kind: "item",
         label: "Select all points",
         icon: SelectAllIcon,
+        keys: "Ctrl-A",
         run: () => store.applyTool(selectAllPoints(editor)),
       },
       // Placed where the click was, which is the only thing "here" can mean —
@@ -217,10 +224,6 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
     // gathered several, and then as "the ones I gathered".
     const acting = actingOn(editor, { contourId, nodeId, part: "point" });
     const many = selectedNodeCount(acting);
-    const harmonises = selectionCanHarmonise(acting);
-    const holding = selectionHoldsCurvature(acting) ?? (harmonises ? false : null);
-    const lockedBoth = selectionHvLocked(acting, "both");
-    const continuous = selectedContinuous(acting);
 
     items.push(
       {
@@ -230,102 +233,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         run: () => store.applyTool(selectContour(editor, contourId)),
       },
       { kind: "separator" },
-      {
-        kind: "item",
-        label: "Corner",
-        icon: CornerPointIcon,
-        note: counted(many),
-        run: () => store.applyTool(setPointType(acting, "corner")),
-      },
-      {
-        kind: "item",
-        label: "Smooth",
-        icon: PointIcon,
-        note: counted(many),
-        run: () => store.applyTool(setPointType(acting, "smooth")),
-      },
-      // Offered only where it would be true of every one of them, which is the
-      // rule the model refuses on and the one the inspector's button uses. A
-      // menu item that did nothing to half of what it named would teach nothing.
-      ...(selectedCanBeTangent(acting)
-        ? [
-            {
-              kind: "item" as const,
-              label: "Tangent",
-              icon: PointIcon,
-              note: counted(many),
-              run: () => store.applyTool(setPointType(acting, "tangent")),
-            },
-          ]
-        : []),
-      // Offered where a point could be rounded: a corner or tangent point with a
-      // side on each hand, on an outline. The label says what pressing it does.
-      ...(continuous !== null
-        ? [
-            {
-              kind: "item" as const,
-              label: continuous.on === true ? "Make corner sharp" : "Make corner continuous",
-              icon: SquircleIcon,
-              note: counted(many),
-              run: () => store.applyTool(setContinuous(acting, continuous.on !== true)),
-            },
-          ]
-        : []),
-      // Offered only where it would move the point. A join between anything but
-      // two curves has no two curvatures to reconcile, and one already
-      // harmonious is already where this would put it.
-      ...(harmonises
-        ? [
-            {
-              kind: "item" as const,
-              label: "Harmonise",
-              icon: ClefTrebleIcon,
-              note: counted(many),
-              run: () => store.applyTool(harmoniseSelection(acting)),
-            },
-          ]
-        : []),
-      // The same, told to stay. Offered wherever a join could hold its
-      // curvature, which includes one already harmonious: holding is about the
-      // next drag, not this one.
-      ...(holding !== null
-        ? [
-            {
-              kind: "item" as const,
-              label: holding ? "Let go of curvature" : "Hold curvature",
-              icon: MusicIcon,
-              note: counted(many),
-              run: () => store.applyTool(holdCurvatureInSelection(acting, !holding)),
-            },
-          ]
-        : []),
-      { kind: "separator" },
-    );
-
-    // Only where there is something to pull out. A control point that sits on
-    // its anchor cannot be seen or clicked, so this is the only way back to it.
-    if (selectionHasMissingHandle(acting)) {
-      items.push({
-        kind: "item",
-        label: "Extract handles",
-        icon: MaximizeIcon,
-        note: counted(many),
-        run: () => store.applyTool(extractSelectedHandles(acting)),
-      });
-    }
-
-    items.push(
-      {
-        kind: "item",
-        label: "Lock handles to axis",
-        icon: LockIcon,
-        note: counted(many),
-        // Checked only when both handles of every one of them are, since that is
-        // what this item sets. A node with one handle locked shows unchecked,
-        // and using it locks the pair.
-        checked: lockedBoth,
-        run: () => store.applyTool(setSelectedHvLock(acting, "both", !lockedBoth)),
-      },
+      ...selectionPointItems(store, acting),
       { kind: "separator" },
       // Where a closed contour begins is where interpolation begins pairing its
       // points with another master's, so on a font with two masters this is a
@@ -344,6 +252,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: "Reverse contour",
         icon: IterationCcwIcon,
+        keys: "R",
         run: () => store.applyTool(reverseContourAt(editor, contourId)),
       },
       ...strokeItems(store, editor, contourId),
@@ -351,6 +260,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: many > 1 ? "Delete points" : "Delete point",
         icon: TrashIcon,
+        keys: "Backspace",
         note: counted(many),
         run: () => store.applyTool(deleteSelectedPoints(acting)),
       },
@@ -445,6 +355,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
         kind: "item",
         label: "Reverse contour",
         icon: IterationCcwIcon,
+        keys: "R",
         run: () => store.applyTool(reverseContourAt(editor, contourId)),
       },
       ...strokeItems(store, editor, contourId),
@@ -526,6 +437,10 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       ? { contourId: target.contourId, segmentIndex: target.segmentIndex }
       : null;
   if (segment === null) return items;
+
+  if (selectedNodeCount(editor) > 0) {
+    items.push(...selectionPointItems(store, editor), { kind: "separator" });
+  }
 
   items.push(
     {
@@ -634,6 +549,7 @@ export function itemsFor(store: EditorStore, request: MenuRequest): Item[] {
       kind: "item",
       label: "Reverse contour",
       icon: IterationCcwIcon,
+      keys: "R",
       run: () => store.applyTool(reverseContourAt(editor, segment.contourId)),
     },
     ...strokeItems(store, editor, segment.contourId),
@@ -698,6 +614,119 @@ function actingOn(editor: EditorState, item: SelectionItem): EditorState {
  * a count for several, because "Smooth" over eleven points is an edit worth
  * knowing the size of before pressing it.
  */
+/**
+ * What can be done to the selected points: their type, a continuous corner, the
+ * curvature either side, their handles. On the selection in `acting`, however
+ * the menu came to be opened — on a point, on the empty canvas beside them, on a
+ * segment — since the selection is what they act on.
+ */
+function selectionPointItems(store: EditorStore, acting: EditorState): Item[] {
+  const items: Item[] = [];
+  const many = selectedNodeCount(acting);
+  const harmonises = selectionCanHarmonise(acting);
+  const holding = selectionHoldsCurvature(acting) ?? (harmonises ? false : null);
+  const lockedBoth = selectionHvLocked(acting, "both");
+  const continuous = selectedContinuous(acting);
+
+  items.push(
+    {
+      kind: "item",
+      label: "Corner",
+      icon: CornerPointIcon,
+      note: counted(many),
+      run: () => store.applyTool(setPointType(acting, "corner")),
+    },
+    {
+      kind: "item",
+      label: "Smooth",
+      icon: PointIcon,
+      note: counted(many),
+      run: () => store.applyTool(setPointType(acting, "smooth")),
+    },
+    // Offered only where it would be true of every one of them, which is the
+    // rule the model refuses on and the one the inspector's button uses. A
+    // menu item that did nothing to half of what it named would teach nothing.
+    ...(selectedCanBeTangent(acting)
+      ? [
+          {
+            kind: "item" as const,
+            label: "Tangent",
+            icon: PointIcon,
+            note: counted(many),
+            run: () => store.applyTool(setPointType(acting, "tangent")),
+          },
+        ]
+      : []),
+    // Offered where a point could be rounded: a corner or tangent point with a
+    // side on each hand, on an outline. The label says what pressing it does.
+    ...(continuous !== null
+      ? [
+          {
+            kind: "item" as const,
+            label: continuous.on === true ? "Make corner sharp" : "Make corner continuous",
+            icon: SquircleIcon,
+            note: counted(many),
+            run: () => store.applyTool(setContinuous(acting, continuous.on !== true)),
+          },
+        ]
+      : []),
+    // Offered only where it would move the point. A join between anything but
+    // two curves has no two curvatures to reconcile, and one already
+    // harmonious is already where this would put it.
+    ...(harmonises
+      ? [
+          {
+            kind: "item" as const,
+            label: "Harmonise",
+            icon: ClefTrebleIcon,
+            note: counted(many),
+            run: () => store.applyTool(harmoniseSelection(acting)),
+          },
+        ]
+      : []),
+    // The same, told to stay. Offered wherever a join could hold its
+    // curvature, which includes one already harmonious: holding is about the
+    // next drag, not this one.
+    ...(holding !== null
+      ? [
+          {
+            kind: "item" as const,
+            label: holding ? "Let go of curvature" : "Hold curvature",
+            icon: MusicIcon,
+            note: counted(many),
+            run: () => store.applyTool(holdCurvatureInSelection(acting, !holding)),
+          },
+        ]
+      : []),
+    { kind: "separator" },
+  );
+
+  // Only where there is something to pull out. A control point that sits on
+  // its anchor cannot be seen or clicked, so this is the only way back to it.
+  if (selectionHasMissingHandle(acting)) {
+    items.push({
+      kind: "item",
+      label: "Extract handles",
+      icon: MaximizeIcon,
+      note: counted(many),
+      run: () => store.applyTool(extractSelectedHandles(acting)),
+    });
+  }
+
+  items.push({
+    kind: "item",
+    label: "Lock handles to axis",
+    icon: LockIcon,
+    note: counted(many),
+    // Checked only when both handles of every one of them are, since that is
+    // what this item sets. A node with one handle locked shows unchecked,
+    // and using it locks the pair.
+    checked: lockedBoth,
+    run: () => store.applyTool(setSelectedHvLock(acting, "both", !lockedBoth)),
+  });
+  return items;
+}
+
 function counted(nodes: number): string | undefined {
   return nodes > 1 ? `${String(nodes)} points` : undefined;
 }

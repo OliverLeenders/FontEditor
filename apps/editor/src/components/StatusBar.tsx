@@ -1,12 +1,13 @@
 import { measureAngle } from "@typewright/font-model";
-import { shownMeasurement } from "@typewright/tools";
+import { currentGlyph, shownMeasurement } from "@typewright/tools";
+import { selectionBounds } from "@typewright/view";
 
 import { measurableNeighbours } from "../scene.js";
 import { useStoreValue } from "../useStore.js";
 import styles from "./StatusBar.module.css";
 import type { AutosaveStatus } from "@typewright/storage";
 
-import type { StorageState } from "../store/index.js";
+import type { StorageState, StoreState } from "../store/index.js";
 import type { ViewId } from "./TabBar.js";
 import {
   CircleCheckIcon,
@@ -35,7 +36,16 @@ export function StatusBar({
   /** Opens the sheet of every key, which the status bar is where you look for. */
   onShortcuts: () => void;
 }): React.JSX.Element {
-  const selection = useStoreValue((s) => s.session.editor.selection.length);
+  // Points, not handles: what "selected" means to somebody reading it.
+  const selection = useStoreValue(
+    (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
+  );
+  // How big what is selected is, in units, and where the pointer is: the
+  // numbers somebody otherwise opens the inspector to read.
+  const selectedWidth = useStoreValue((s) => boundsOf(s)?.width ?? null);
+  const selectedHeight = useStoreValue((s) => boundsOf(s)?.height ?? null);
+  const pointerX = useStoreValue((s) => s.session.editor.cursor?.x ?? null);
+  const pointerY = useStoreValue((s) => s.session.editor.cursor?.y ?? null);
   const tool = useStoreValue((s) => s.session.editor.activeTool);
   const saveStatus = useStoreValue((s) => s.saveStatus);
   const storage = useStoreValue((s) => s.storage);
@@ -96,7 +106,17 @@ export function StatusBar({
       </span>
       {editing ? (
         <span>
-          <b>{selection}</b> selected
+          <b>{selection}</b> {selection === 1 ? "point" : "points"}
+        </span>
+      ) : null}
+      {editing && selection > 1 && selectedWidth !== null && selectedHeight !== null ? (
+        <span title="The size of what is selected, in units">
+          <b>{units(selectedWidth)}</b> × <b>{units(selectedHeight)}</b>
+        </span>
+      ) : null}
+      {editing && pointerX !== null && pointerY !== null ? (
+        <span title="Where the pointer is, in units">
+          <b>{units(pointerX)}</b>, <b>{units(pointerY)}</b>
         </span>
       ) : null}
       {editing ? <span>{tool}</span> : null}
@@ -202,4 +222,19 @@ function filesToGo(done: number | null, total: number | null): string {
   if (total === null || done === null) return "saving…";
   if (total === 0) return "saving…";
   return `saving ${String(done)} of ${String(total)} files`;
+}
+
+/** The selection's box in the open glyph, as a width and a height; null with no points selected. */
+function boundsOf(s: StoreState): { width: number; height: number } | null {
+  const e = s.session.editor;
+  const glyph = currentGlyph(e);
+  if (glyph === null) return null;
+  const box = selectionBounds(glyph, e.selection);
+  return box === null ? null : { width: box.maxX - box.minX, height: box.maxY - box.minY };
+}
+
+/** A number of units as the canvas would say it: whole, or to a tenth where it is not. */
+function units(value: number): string {
+  const tenth = Math.round(value * 10) / 10;
+  return Number.isInteger(tenth) ? String(tenth) : tenth.toFixed(1);
 }

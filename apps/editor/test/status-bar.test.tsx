@@ -53,11 +53,11 @@ describe("what the status bar says the keys do", () => {
 describe("what the status bar counts", () => {
   it("counts the selection only where there is a canvas to select on", () => {
     render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />);
-    expect(screen.getByText("selected")).toBeTruthy();
+    expect(screen.getByText("points")).toBeTruthy();
 
     cleanup();
     render(<StatusBar workspace="font" onShortcuts={() => undefined} />);
-    expect(screen.queryByText("selected")).toBeNull();
+    expect(screen.queryByText("points")).toBeNull();
   });
 });
 

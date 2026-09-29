@@ -25,6 +25,21 @@
   white-space: nowrap;
 }
 
+/* Where the font is kept, quieter than its name. */
+.where {
+  color: var(--ink-3);
+}
+.dirty {
+  display: inline-flex;
+  margin-left: 0.3rem;
+  vertical-align: -0.1rem;
+}
+.dirty svg {
+  width: 0.7rem;
+  height: 0.7rem;
+  color: var(--warn);
+}
+
 .holder {
   position: relative;
   display: flex;
