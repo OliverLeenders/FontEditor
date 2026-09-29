@@ -20,6 +20,7 @@ export {
   DEFAULT_LIMIT,
   canRedo,
   canUndo,
+  glyphsChanged,
   history,
   pendingRedo,
   pendingUndo,
@@ -27,6 +28,7 @@ export {
   redoLabel,
   stepBack,
   stepForward,
+  stepTo,
   undoLabel,
 } from "./history.js";
 
@@ -35,6 +37,7 @@ export {
   apply,
   canRedoSession,
   canUndoSession,
+  goToStep,
   redo,
   redoLabelOf,
   session,

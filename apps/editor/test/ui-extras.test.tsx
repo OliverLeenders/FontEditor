@@ -130,7 +130,9 @@ describe("going to a glyph from the command palette", () => {
 
 describe("the window bar", () => {
   it("says a font is not saved to disk until it is", () => {
-    render(<WindowBar />);
+    render(
+      <WindowBar historyOpen={false} onHistory={() => undefined} onOpenGlyph={() => undefined} />,
+    );
     expect(screen.getByText(/not saved to disk/)).toBeTruthy();
   });
 });

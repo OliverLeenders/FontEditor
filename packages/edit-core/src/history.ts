@@ -147,3 +147,45 @@ export function stepBack(h: History): History {
 export function stepForward(h: History): History {
   return canRedo(h) ? { ...h, index: h.index + 1 } : h;
 }
+
+/**
+ * The history with `index` steps applied, however far that is from here —
+ * held to the stack, so a number from a list drawn a moment ago cannot point
+ * past its end.
+ */
+export function stepTo(h: History, index: number): History {
+  const at = Math.max(0, Math.min(h.entries.length, Math.round(index)));
+  return at === h.index ? h : { ...h, index: at };
+}
+
+const touched = new WeakMap<HistoryEntry, readonly string[]>();
+
+/**
+ * The glyphs a step changed, in the font's order after the step: those whose
+ * glyph is not the same object either side of it, and those added or removed.
+ * Empty for a step that changed only what is not a glyph — the kerning, the
+ * feature file, the font's info.
+ *
+ * By reference, which is exact because the model is persistent: a glyph the
+ * step did not touch is the very same object before and after. Worked out once
+ * per step and kept, since a list of two hundred steps is drawn again whenever
+ * the history moves.
+ */
+export function glyphsChanged(entry: HistoryEntry): readonly string[] {
+  const known = touched.get(entry);
+  if (known !== undefined) return known;
+
+  const before = entry.before.glyphs;
+  const after = entry.after.glyphs;
+  const out: string[] = [];
+  if (before !== after) {
+    for (const name of entry.after.glyphOrder) {
+      if (before[name] !== after[name]) out.push(name);
+    }
+    for (const name of entry.before.glyphOrder) {
+      if (after[name] === undefined && before[name] !== undefined) out.push(name);
+    }
+  }
+  touched.set(entry, out);
+  return out;
+}

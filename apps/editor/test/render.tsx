@@ -68,6 +68,8 @@ export function installDomStubs(): void {
     element["hasPointerCapture"] = function (): boolean {
       return false;
     };
+    // jsdom lays nothing out, so there is nowhere to scroll to.
+    element["scrollIntoView"] = function (): void {};
   }
 
   // A canvas in jsdom has no context, and asking for one prints a page of

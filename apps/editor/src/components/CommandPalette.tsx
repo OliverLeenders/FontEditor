@@ -63,6 +63,7 @@ export function commandsFor(
   store: EditorStore,
   workspace: ViewId,
   goTo: (view: ViewId) => void,
+  showHistory?: () => void,
 ): Command[] {
   const out: Command[] = [];
 
@@ -126,6 +127,11 @@ export function commandsFor(
   out.push(
     { group: "Edit", label: "Undo", keys: "Ctrl-Z", run: () => store.undo() },
     { group: "Edit", label: "Redo", keys: "Ctrl-Shift-Z", run: () => store.redo() },
+  );
+  if (showHistory !== undefined) {
+    out.push({ group: "Edit", label: "Undo history…", keys: "Ctrl-Shift-H", run: showHistory });
+  }
+  out.push(
     { group: "File", label: "Fonts…", run: () => store.showProjects(true) },
     { group: "File", label: "New window", run: () => openWindow("fonts") },
   );
@@ -218,11 +224,13 @@ export function CommandPalette({
   workspace,
   onWorkspace,
   onOpenGlyph,
+  onShowHistory,
   onClose,
 }: {
   readonly workspace: ViewId;
   readonly onWorkspace: (view: ViewId) => void;
   readonly onOpenGlyph: (name: string) => void;
+  readonly onShowHistory?: () => void;
   readonly onClose: () => void;
 }): React.JSX.Element {
   const store = useEditorStore();
@@ -231,8 +239,8 @@ export function CommandPalette({
   const input = useRef<HTMLInputElement>(null);
 
   const commands = useMemo(
-    () => commandsFor(store, workspace, onWorkspace),
-    [store, workspace, onWorkspace],
+    () => commandsFor(store, workspace, onWorkspace, onShowHistory),
+    [store, workspace, onWorkspace, onShowHistory],
   );
   // The Unicode names, for a search that could be one for a name: unpacked
   // the first time one is typed, as the glyph browser does, and the list

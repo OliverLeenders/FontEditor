@@ -39,6 +39,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "Ctrl-Z", what: "Undo" },
       { keys: "Ctrl-Shift-Z · Ctrl-Y", what: "Redo" },
       { keys: "Ctrl-S", what: "Save to the folder this font was opened from" },
+      { keys: "Ctrl-Shift-H", what: "The undo history: go straight to any step" },
       { keys: "Ctrl-K", what: "Find a command or a glyph by name, and run or open it" },
       { keys: "? · F1", what: "This list" },
     ],

@@ -28,7 +28,10 @@ afterEach(() => {
 describe("what the bar says", () => {
   it("names the font, which was visible in one workspace before", () => {
     const store = freshStore();
-    render(<WindowBar />, store);
+    render(
+      <WindowBar historyOpen={false} onHistory={() => undefined} onOpenGlyph={() => undefined} />,
+      store,
+    );
     const { familyName, styleName } = store.editor.document.info;
 
     expect(screen.getByText(`${familyName} ${styleName}`)).toBeTruthy();
@@ -38,7 +41,10 @@ describe("what the bar says", () => {
 describe("which editor this is", () => {
   it("says the version, which a bug report begins with", () => {
     const store = freshStore();
-    render(<WindowBar />, store);
+    render(
+      <WindowBar historyOpen={false} onHistory={() => undefined} onOpenGlyph={() => undefined} />,
+      store,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Preferences" }));
 
     // The number itself is written in by the build; what is asked here is that
@@ -49,13 +55,18 @@ describe("which editor this is", () => {
 
 describe("the preferences", () => {
   const open = (store = freshStore()) => {
-    const shown = render(<WindowBar />, store);
+    const shown = render(
+      <WindowBar historyOpen={false} onHistory={() => undefined} onOpenGlyph={() => undefined} />,
+      store,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Preferences" }));
     return shown;
   };
 
   it("is shut until it is asked for", () => {
-    render(<WindowBar />);
+    render(
+      <WindowBar historyOpen={false} onHistory={() => undefined} onOpenGlyph={() => undefined} />,
+    );
     const button = screen.getByRole("button", { name: "Preferences" });
     expect(button.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByRole("group", { name: "Preferences" })).toBeNull();
@@ -65,7 +76,9 @@ describe("the preferences", () => {
   });
 
   it("opens and closes on Ctrl-comma, as everywhere else does", () => {
-    render(<WindowBar />);
+    render(
+      <WindowBar historyOpen={false} onHistory={() => undefined} onOpenGlyph={() => undefined} />,
+    );
 
     fireEvent.keyDown(window, { key: ",", ctrlKey: true });
     expect(screen.getByRole("group", { name: "Preferences" })).toBeTruthy();

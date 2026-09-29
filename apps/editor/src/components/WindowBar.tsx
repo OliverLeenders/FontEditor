@@ -6,6 +6,7 @@ import { useEditorStore, useStoreValue } from "../useStore.js";
 import { VERSION } from "../version.js";
 import styles from "./WindowBar.module.css";
 import { CircleDotIcon, SettingsIcon } from "./icons.js";
+import { UndoHistory } from "./UndoHistory.js";
 
 /**
  * The strip along the top of the window: what is open, and the preferences.
@@ -27,7 +28,16 @@ const THEMES: readonly { readonly id: ThemeChoice; readonly label: string }[] = 
   { id: "dark", label: "Dark" },
 ];
 
-export function WindowBar(): React.JSX.Element {
+export function WindowBar({
+  historyOpen,
+  onHistory,
+  onOpenGlyph,
+}: {
+  /** Whether the undo history is open: held by the window, which Ctrl-Shift-H reaches. */
+  readonly historyOpen: boolean;
+  readonly onHistory: (open: boolean) => void;
+  readonly onOpenGlyph: (name: string) => void;
+}): React.JSX.Element {
   const store = useEditorStore();
   const family = useStoreValue((s) => s.session.editor.document.info.familyName);
   const style = useStoreValue((s) => s.session.editor.document.info.styleName);
@@ -95,60 +105,63 @@ export function WindowBar(): React.JSX.Element {
         </span>
       </span>
 
-      <div className={styles.holder} ref={ref}>
-        <button
-          type="button"
-          className={styles.button}
-          aria-expanded={open}
-          aria-label="Preferences"
-          title="Preferences  (Ctrl-,)"
-          onClick={() => setOpen((was) => !was)}
-        >
-          <SettingsIcon />
-        </button>
+      <div className={styles.tools}>
+        <UndoHistory open={historyOpen} onOpen={onHistory} onOpenGlyph={onOpenGlyph} />
+        <div className={styles.holder} ref={ref}>
+          <button
+            type="button"
+            className={styles.button}
+            aria-expanded={open}
+            aria-label="Preferences"
+            title="Preferences  (Ctrl-,)"
+            onClick={() => setOpen((was) => !was)}
+          >
+            <SettingsIcon />
+          </button>
 
-        {open ? (
-          <div className={styles.panel} role="group" aria-label="Preferences">
-            <div className={styles.row}>
-              <span className={styles.label}>Theme</span>
-              <div className={styles.choices} role="group" aria-label="Theme">
-                {THEMES.map((choice) => (
-                  <button
-                    key={choice.id}
-                    type="button"
-                    className={styles.choice}
-                    aria-pressed={theme === choice.id}
-                    onClick={() => store.setTheme(choice.id)}
-                  >
-                    {choice.label}
-                  </button>
-                ))}
+          {open ? (
+            <div className={styles.panel} role="group" aria-label="Preferences">
+              <div className={styles.row}>
+                <span className={styles.label}>Theme</span>
+                <div className={styles.choices} role="group" aria-label="Theme">
+                  {THEMES.map((choice) => (
+                    <button
+                      key={choice.id}
+                      type="button"
+                      className={styles.choice}
+                      aria-pressed={theme === choice.id}
+                      onClick={() => store.setTheme(choice.id)}
+                    >
+                      {choice.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            {/* Which editor this is. Not decoration: a bug report begins with
+              {/* Which editor this is. Not decoration: a bug report begins with
                 the version, and until now the only way to know it was to look
                 at where the installer came from. */}
-            <div className={styles.row}>
-              <span className={styles.label}>Version</span>
-              <span className={styles.version}>Typewright {VERSION}</span>
-            </div>
+              <div className={styles.row}>
+                <span className={styles.label}>Version</span>
+                <span className={styles.version}>Typewright {VERSION}</span>
+              </div>
 
-            <div className={styles.footer}>
-              <span className={styles.note}>
-                Kept in this browser, not in the font. What each canvas shows is in its own View
-                menu.
-              </span>
-              <button
-                type="button"
-                className={styles.reset}
-                onClick={() => store.setTheme("system")}
-              >
-                Reset
-              </button>
+              <div className={styles.footer}>
+                <span className={styles.note}>
+                  Kept in this browser, not in the font. What each canvas shows is in its own View
+                  menu.
+                </span>
+                <button
+                  type="button"
+                  className={styles.reset}
+                  onClick={() => store.setTheme("system")}
+                >
+                  Reset
+                </button>
+              </div>
             </div>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </header>
   );

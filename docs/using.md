@@ -25,6 +25,18 @@ are changes not written there. The status bar at the bottom counts the selected 
 gives the size of what is selected when there is more than one, and says where the pointer
 is on the canvas, in font units.
 
+**The undo history.** The arrow beside the gear at the top right, or Ctrl-Shift-H from
+anywhere, lists every step Ctrl-Z can take back, newest at the top, each named with the
+glyph it changed and how long ago — a width set on the spacing line and a rule typed in
+the feature file are steps of the same list as a point moved in the drawing. Press a step
+to go straight to the font as it was after it; the steps above it stay in the list,
+fainter, to go forward to again, until the next edit lets them go. **As opened**, at the
+bottom, is the font before the first step. Going to a step that changed another glyph opens
+that glyph, in the drawing or the glyph grid; on the spacing line and in the proof it
+becomes the current glyph without turning the pane into a drawing. The list holds the last
+two hundred steps, for as long as the font is open; the copies of the whole font kept as
+you work are under **History** in the Font workspace.
+
 **Two drawings at once.** The drawing is the one workspace a split window may show
 twice, since what each canvas shows is its own. Both draw the same glyph with the same
 camera; the inspector and the glyph strip stay single and follow the pane the keyboard is

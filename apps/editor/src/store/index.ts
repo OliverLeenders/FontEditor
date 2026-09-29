@@ -9,6 +9,7 @@ import {
 import {
   canRedoSession,
   canUndoSession,
+  goToStep as goToSessionStep,
   redo,
   redoLabelOf,
   undo,
@@ -430,6 +431,12 @@ export class EditorStore {
 
   redo(): void {
     this.patch({ session: redo(this.state.session) });
+    this.disk.commit(this.state.session.editor.document);
+  }
+
+  /** Straight to the state after `index` steps of the history, as the undo history's list asks. */
+  goToStep(index: number): void {
+    this.patch({ session: goToSessionStep(this.state.session, index) });
     this.disk.commit(this.state.session.editor.document);
   }
 

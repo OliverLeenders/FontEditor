@@ -66,6 +66,7 @@ export function App(): React.JSX.Element {
   const [menu, setMenu] = useState<(MenuRequest & { pane: PaneIndex }) | null>(null);
   const [keysShown, setKeysShown] = useState(false);
   const [paletteShown, setPaletteShown] = useState(false);
+  const [historyShown, setHistoryShown] = useState(false);
   // The workspace the keyboard is in: the only one, or the active one of two.
   const view = activeView(panes);
   // Read by the window key handler, which is installed once and must not be
@@ -141,6 +142,12 @@ export function App(): React.JSX.Element {
       if (modified && !event.shiftKey && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPaletteShown((shown) => !shown);
+        return;
+      }
+      // The undo history, from anywhere: it is the font's, not a pane's.
+      if (modified && event.shiftKey && event.key.toLowerCase() === "h") {
+        event.preventDefault();
+        setHistoryShown((shown) => !shown);
         return;
       }
       if (modified && event.key.toLowerCase() === "z") {
@@ -369,6 +376,25 @@ export function App(): React.JSX.Element {
     [store],
   );
 
+  /**
+   * A glyph a step of the undo history changed, opened so what the step did is
+   * on screen: drawn where the keyboard is when that pane draws or lists the
+   * glyphs, and otherwise only made the current glyph — the spacing line and the
+   * proof mark it, and turning them into a drawing would lose the place.
+   */
+  const openGlyphFromHistory = useCallback(
+    (name: string): void => {
+      store.setCurrentGlyph(name);
+      setPanes((current) => {
+        const shown = viewIn(current, current.active);
+        return shown === "glyph" || shown === "font"
+          ? openGlyphFrom(current, current.active)
+          : current;
+      });
+    },
+    [store],
+  );
+
   /** What a workspace shows, in whichever pane it is. */
   const workspace = (shown: ViewId, index: PaneIndex): React.JSX.Element => {
     // A glyph chosen here is drawn in the other pane if that one is drawing,
@@ -512,7 +538,11 @@ export function App(): React.JSX.Element {
           </button>
         </div>
       ) : null}
-      <WindowBar />
+      <WindowBar
+        historyOpen={historyShown}
+        onHistory={setHistoryShown}
+        onOpenGlyph={openGlyphFromHistory}
+      />
       <UpdateNotice />
       <CloseWarning />
       {showChooser ? (
@@ -542,6 +572,7 @@ export function App(): React.JSX.Element {
           workspace={view}
           onWorkspace={goToWorkspace}
           onOpenGlyph={openGlyphFromPalette}
+          onShowHistory={() => setHistoryShown(true)}
           onClose={() => setPaletteShown(false)}
         />
       ) : null}

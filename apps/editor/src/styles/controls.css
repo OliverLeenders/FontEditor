@@ -107,9 +107,10 @@ input[type="number"]::-webkit-inner-spin-button {
  * same drawing at the same weight, as an image a token gives per theme, since a
  * select cannot hold the icon itself. Where the browser draws the select as a
  * page may (Chromium), the image is the select's own picker icon, which is its
- * glyph replaced; elsewhere it is the select's background, over the browser's
- * arrow turned off. As a background it did not show in every Chromium build
- * that draws the select itself.
+ * glyph replaced and given a place of its own in the row; elsewhere it is the
+ * select's background, over the browser's arrow turned off. The image is a
+ * file of the application's own (see tokens.css), which the content security
+ * policy allows where it refuses a data: URL.
  *
  * Open: where the browser lets a page draw the list — Chromium, which the
  * desktop application runs on — it is the editor's menu, the same surface,

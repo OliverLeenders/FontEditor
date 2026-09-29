@@ -14,6 +14,7 @@ import {
   redoLabel,
   stepBack,
   stepForward,
+  stepTo,
   undoLabel,
 } from "./history.js";
 
@@ -191,6 +192,36 @@ export function redo(s: EditSession): EditSession {
       boxFrame: null,
     },
     history: stepForward(s.history),
+    pending: null,
+  };
+}
+
+/**
+ * Go to the state after `index` committed steps — `0` is the font as it was
+ * before the first step kept — as that many undos or redos would, in one move.
+ *
+ * The document and the selection are the ones recorded at that boundary, and
+ * the gesture and the box's frame are dropped, as for {@link undo}. Refused
+ * while a gesture is in flight, for the same reason.
+ */
+export function goToStep(s: EditSession, index: number): EditSession {
+  if (s.pending !== null) return s;
+  const next = stepTo(s.history, index);
+  if (next === s.history) return s;
+
+  const first = next.entries[0];
+  const last = next.index === 0 ? null : next.entries[next.index - 1]!;
+  if (first === undefined) return s;
+
+  return {
+    editor: {
+      ...s.editor,
+      document: last === null ? first.before : last.after,
+      selection: last === null ? first.selectionBefore : last.selectionAfter,
+      gesture: null,
+      boxFrame: null,
+    },
+    history: next,
     pending: null,
   };
 }

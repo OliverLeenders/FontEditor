@@ -40,6 +40,13 @@
   color: var(--warn);
 }
 
+/* The buttons at the right end: the undo history, then the preferences. */
+.tools {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
 .holder {
   position: relative;
   display: flex;

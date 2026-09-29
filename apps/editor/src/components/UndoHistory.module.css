@@ -1,0 +1,147 @@
+/* Hung from the window bar beside the preferences, and dressed as they are. */
+.holder {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.button {
+  width: 1.5rem;
+  height: 1.5rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+.button:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+.button[aria-expanded="true"] {
+  background: var(--surface);
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+.button svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: 19rem;
+  max-height: 65vh;
+  padding: 0.35rem 0.25rem 0.5rem;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.head {
+  padding: 0.2rem 0.5rem 0.35rem;
+  color: var(--ink-2);
+  font-size: 0.74rem;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+/* A menu row: a step lighter under the pointer, the step the font is at marked
+   by the accent at its edge rather than a slab of it. */
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.3rem 0.5rem;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 2px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
+  cursor: pointer;
+}
+.row:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.row:disabled {
+  cursor: default;
+}
+.row[aria-current="step"] {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+/* Undone, and there to be redone until the next edit lets them go. */
+.row[data-undone="true"] {
+  color: var(--ink-3);
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glyph {
+  flex: none;
+  max-width: 6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--ink-2);
+}
+
+.when {
+  flex: none;
+  width: 2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  color: var(--ink-3);
+}
+
+/* The state before every step, below them: a boundary rather than an edit. */
+.start {
+  margin-top: 0.15rem;
+  border-top: 1px solid var(--rule);
+  border-radius: 0;
+  font-style: italic;
+  color: var(--ink-2);
+}
+
+.empty {
+  margin: 0;
+  padding: 0.4rem 0.5rem 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ink-3);
+}
+
+.note {
+  margin: 0.4rem 0.5rem 0;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--rule);
+  font-size: 0.7rem;
+  color: var(--ink-3);
+}
