@@ -27,4 +27,11 @@ export {
   setCounts,
 } from "./query.js";
 
-export { loadUnicodeNames, unicodeName, unicodeNamesReady } from "./unicode-names.js";
+export {
+  codePointsNamed,
+  loadUnicodeNames,
+  nameMatches,
+  nameWords,
+  unicodeName,
+  unicodeNamesReady,
+} from "./unicode-names.js";

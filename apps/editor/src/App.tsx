@@ -360,6 +360,15 @@ export function App(): React.JSX.Element {
     setPanes((current) => choosePane(current, current.active, id));
   }, []);
 
+  /** A glyph opened from the command palette, drawn as one chosen in the pane with the keyboard. */
+  const openGlyphFromPalette = useCallback(
+    (name: string): void => {
+      store.setCurrentGlyph(name);
+      setPanes((current) => openGlyphFrom(current, current.active));
+    },
+    [store],
+  );
+
   /** What a workspace shows, in whichever pane it is. */
   const workspace = (shown: ViewId, index: PaneIndex): React.JSX.Element => {
     // A glyph chosen here is drawn in the other pane if that one is drawing,
@@ -532,6 +541,7 @@ export function App(): React.JSX.Element {
         <CommandPalette
           workspace={view}
           onWorkspace={goToWorkspace}
+          onOpenGlyph={openGlyphFromPalette}
           onClose={() => setPaletteShown(false)}
         />
       ) : null}

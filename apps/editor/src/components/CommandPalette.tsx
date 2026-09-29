@@ -1,7 +1,14 @@
-import type { ToolId } from "@typewright/tools";
-import { useEffect, useMemo, useRef, useState } from "react";
-
+import {
+  catalog,
+  listCatalog,
+  loadUnicodeNames,
+  nameWords,
+  unicodeName,
+  unicodeNamesReady,
+} from "@typewright/catalog";
 import { canOpenFolders } from "@typewright/disk";
+import { type ToolId, createGlyphs } from "@typewright/tools";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { EditorStore } from "../store/index.js";
 import { useEditorStore } from "../useStore.js";
@@ -24,6 +31,10 @@ import { TOOL_BUTTONS } from "./Toolbar.js";
  * from — the canvas menu for what can be done to the selection, the tools'
  * own list — so a command offered here is one offered there, and says the key
  * that does it where there is one.
+ *
+ * It also goes to a glyph: typed as its name, its character, its code point or
+ * what the standard calls it — the glyph browser's search, answered here. A
+ * glyph the font has not got is offered to be made, and opened.
  */
 
 export type Command = {
@@ -31,8 +42,13 @@ export type Command = {
   /** Which kind of command, shown beside it: "Go to", "Tool", "Selection"… */
   readonly group: string;
   readonly keys?: string;
+  /** Said after the label, quieter: a glyph's character and what it is called. */
+  readonly detail?: string;
   readonly run: () => void;
 };
+
+/** How many glyphs a search lists at most: the palette is for going somewhere. */
+const GLYPHS_LISTED = 8;
 
 const WORKSPACES: readonly { readonly id: ViewId; readonly label: string }[] = [
   { id: "font", label: "Font" },
@@ -85,6 +101,13 @@ export function commandsFor(
       });
     }
     out.push(
+      { group: "Go to", label: "Next glyph", keys: "PageDown", run: () => store.stepGlyph(1) },
+      {
+        group: "Go to",
+        label: "Previous glyph",
+        keys: "PageUp",
+        run: () => store.stepGlyph(-1),
+      },
       {
         group: "View",
         label: "Fit the glyph in the window",
@@ -116,6 +139,66 @@ export function commandsFor(
   return out;
 }
 
+/**
+ * The glyphs a search names, as commands to open them: the glyph browser's own
+ * search over the whole font, in the font's order, and then the characters it
+ * has not got that the search names, each offered to be made.
+ *
+ * `exact` are the ones typed in full — the name, the character, the code
+ * point — which go above every command, since somebody who typed `a` in a
+ * font with an `a` is more likely after the letter than after Add anchor.
+ */
+export function glyphCommands(
+  store: EditorStore,
+  typed: string,
+  openGlyph: (name: string) => void,
+): { readonly exact: Command[]; readonly rest: Command[] } {
+  const q = typed.trim();
+  if (q === "") return { exact: [], rest: [] };
+
+  const document = store.editor.document;
+  const found = listCatalog(catalog(document), { set: "all", search: q, order: "font" }).slice(
+    0,
+    GLYPHS_LISTED,
+  );
+  const explicit = /^(?:u\+|0x)([0-9a-f]{1,6})$/i.exec(q);
+  const asked = explicit === null ? null : Number.parseInt(explicit[1]!, 16);
+
+  const exact: Command[] = [];
+  const rest: Command[] = [];
+  for (const entry of found) {
+    const code = entry.codePoint;
+    const character = code === null ? "" : String.fromCodePoint(code);
+    const said = code === null ? null : unicodeName(code);
+    const detail = [character, said?.toLowerCase() ?? ""].filter((s) => s !== "").join("  ");
+    const command: Command = entry.inFont
+      ? {
+          group: "Open",
+          label: entry.name,
+          ...(detail === "" ? {} : { detail }),
+          run: () => openGlyph(entry.name),
+        }
+      : {
+          group: "Make",
+          label: entry.name,
+          ...(detail === "" ? {} : { detail }),
+          run: () => {
+            if (code === null) return;
+            const advance = Math.round(document.info.unitsPerEm / 2);
+            store.applyTool(
+              createGlyphs(store.editor, [{ name: entry.name, unicodes: [code] }], advance),
+            );
+            openGlyph(entry.name);
+          },
+        };
+    const whole =
+      entry.name.toLowerCase() === q.toLowerCase() ||
+      (code !== null && (character === q || code === asked));
+    (whole ? exact : rest).push(command);
+  }
+  return { exact, rest };
+}
+
 /** The commands matching what is typed: those starting with it first, then the rest. */
 export function matching(commands: readonly Command[], typed: string): Command[] {
   const q = typed.trim().toLowerCase();
@@ -134,10 +217,12 @@ export function matching(commands: readonly Command[], typed: string): Command[]
 export function CommandPalette({
   workspace,
   onWorkspace,
+  onOpenGlyph,
   onClose,
 }: {
   readonly workspace: ViewId;
   readonly onWorkspace: (view: ViewId) => void;
+  readonly onOpenGlyph: (name: string) => void;
   readonly onClose: () => void;
 }): React.JSX.Element {
   const store = useEditorStore();
@@ -149,7 +234,28 @@ export function CommandPalette({
     () => commandsFor(store, workspace, onWorkspace),
     [store, workspace, onWorkspace],
   );
-  const shown = useMemo(() => matching(commands, typed), [commands, typed]);
+  // The Unicode names, for a search that could be one for a name: unpacked
+  // the first time one is typed, as the glyph browser does, and the list
+  // made again once they are there.
+  const [named, setNamed] = useState(unicodeNamesReady);
+  const wantsNames = !named && nameWords(typed) !== null;
+  useEffect(() => {
+    if (!wantsNames) return;
+    let watching = true;
+    void loadUnicodeNames().then(() => {
+      if (watching) setNamed(true);
+    });
+    return () => {
+      watching = false;
+    };
+  }, [wantsNames]);
+
+  const shown = useMemo(() => {
+    const glyphs = glyphCommands(store, typed, onOpenGlyph);
+    return [...glyphs.exact, ...matching(commands, typed), ...glyphs.rest];
+    // `named` is not read here, but the glyphs found depend on it: the search
+    // asks the table of names, which is empty until it turns true.
+  }, [store, commands, typed, onOpenGlyph, named]);
 
   useEffect(() => {
     input.current?.focus();
@@ -175,7 +281,7 @@ export function CommandPalette({
             ref={input}
             className={styles.input}
             value={typed}
-            placeholder="Type a command"
+            placeholder="Type a command, or a glyph"
             aria-label="Command"
             onChange={(event) => {
               setTyped(event.target.value);
@@ -213,7 +319,12 @@ export function CommandPalette({
                 onClick={() => run(command)}
               >
                 <span className={styles.group}>{command.group}</span>
-                <span className={styles.label}>{command.label}</span>
+                <span className={styles.label}>
+                  {command.label}
+                  {command.detail === undefined ? null : (
+                    <span className={styles.detail}>{command.detail}</span>
+                  )}
+                </span>
                 {command.keys === undefined ? null : (
                   <kbd className={styles.keys}>{command.keys}</kbd>
                 )}

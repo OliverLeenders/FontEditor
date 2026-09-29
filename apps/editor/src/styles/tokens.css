@@ -19,6 +19,10 @@
   --ink: #131922;
   --ink-2: #55616f;
   --ink-3: #7c8896;
+  /* ChevronDownIcon as an image, for the one control that cannot hold the icon
+     itself: a select. In the secondary ink, which is where the chevron beside a
+     bar menu's label lands at its opacity. */
+  --chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2355616f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --rule: #dce3ea;
   --rule-strong: #c2cdd8;
   --accent: #2c6daf;
@@ -86,6 +90,7 @@
     --ink: #e5ebf2;
     --ink-2: #98a6b6;
     --ink-3: #74828f;
+    --chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a6b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --rule: #232d38;
     --rule-strong: #33404e;
     --accent: #74aee2;
@@ -112,6 +117,7 @@
   --ink: #e5ebf2;
   --ink-2: #98a6b6;
   --ink-3: #74828f;
+  --chevron-down: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2398a6b6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --rule: #232d38;
   --rule-strong: #33404e;
   --accent: #74aee2;

@@ -2,6 +2,7 @@ import { glyphNameForCodePoint } from "@typewright/font-model";
 
 import { UNICODE_BLOCKS, blockOf } from "./blocks.js";
 import type { CatalogEntry } from "./catalog.js";
+import { codePointsNamed, nameMatches, nameWords, unicodeName } from "./unicode-names.js";
 
 /**
  * A named group of glyphs, for the browser's filter list.
@@ -112,15 +113,25 @@ export const DEFAULT_QUERY: CatalogQuery = { set: "all", search: "", order: "cod
 /**
  * Work out what the user meant by what they typed.
  *
- * Three things get typed into a glyph search and they want different matches:
- * a name or part of one, a code point in any of the notations people write, and
- * the character itself. Guessing between them is the difference between a search
- * box that feels obvious and one you have to learn.
+ * Four things get typed into a glyph search and they want different matches:
+ * a name or part of one, a code point in any of the notations people write, the
+ * character itself, and what the standard calls it — `dotless` for ı and ȷ,
+ * whatever this font named them. Guessing between them is the difference
+ * between a search box that feels obvious and one you have to learn.
+ *
+ * The standard's names are matched once their table has been loaded, which the
+ * caller asks for; until then a search finds by the other three.
  */
 type Search =
   | { readonly kind: "empty" }
   | { readonly kind: "codePoint"; readonly value: number }
-  | { readonly kind: "text"; readonly value: string; readonly codePoint: number | null };
+  | {
+      readonly kind: "text";
+      readonly value: string;
+      readonly codePoint: number | null;
+      /** The words to look for among the Unicode names, or `null` for a search too short. */
+      readonly words: readonly string[] | null;
+    };
 
 function parseSearch(raw: string): Search {
   const text = raw.trim();
@@ -138,7 +149,7 @@ function parseSearch(raw: string): Search {
   // an o. Match either, rather than choosing wrong half the time.
   const characters = [...text];
   const single = characters.length === 1 ? (characters[0]?.codePointAt(0) ?? null) : null;
-  return { kind: "text", value: text.toLowerCase(), codePoint: single };
+  return { kind: "text", value: text.toLowerCase(), codePoint: single, words: nameWords(text) };
 }
 
 function matches(entry: CatalogEntry, search: Search): boolean {
@@ -146,8 +157,24 @@ function matches(entry: CatalogEntry, search: Search): boolean {
   if (search.kind === "codePoint") return entry.unicodes.includes(search.value);
 
   if (search.codePoint !== null && entry.unicodes.includes(search.codePoint)) return true;
-  return entry.name.toLowerCase().includes(search.value);
+  if (entry.name.toLowerCase().includes(search.value)) return true;
+  const words = search.words;
+  if (words === null) return false;
+  return entry.unicodes.some((code) => {
+    const name = unicodeName(code);
+    return name !== null && nameMatches(name, words);
+  });
 }
+
+/**
+ * How many characters the font has not got a search by name offers at most.
+ *
+ * `latin` names over a thousand of them; a grid of a thousand empty cells
+ * answers nothing, and the few a person was after are among the first by code
+ * point more often than not. The glyphs the font has are all listed, whatever
+ * their number.
+ */
+const NAMED_MISSING = 100;
 
 /**
  * Order for display.
@@ -246,6 +273,13 @@ export function listCatalog(entries: readonly CatalogEntry[], query: CatalogQuer
   const asked =
     search.kind === "codePoint" ? search.value : search.kind === "text" ? search.codePoint : null;
   if (asked !== null && !held.has(asked)) wanted.add(asked);
+  // Characters named by what was typed, within the set showing: a search for
+  // `dotless` in Latin Extended-A is after the ı there, not the Arabic ones.
+  if (search.kind === "text" && search.words !== null) {
+    const keep = (code: number): boolean =>
+      !held.has(code) && (set === null || set.includes(absentEntry(code)));
+    for (const code of codePointsNamed(search.words, NAMED_MISSING, keep)) wanted.add(code);
+  }
 
   const missing = [...wanted]
     .sort((a, b) => a - b)

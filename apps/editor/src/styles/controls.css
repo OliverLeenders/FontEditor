@@ -103,8 +103,10 @@ input[type="number"]::-webkit-inner-spin-button {
  * Lists to choose from, drawn as the rest of the controls are.
  *
  * Closed: the height of everything else in a bar, the rule colour, the corner
- * radius, and a chevron drawn from two gradients in the text's own colour so it
- * follows the theme without an image per theme.
+ * radius, and the chevron the bar menus and steppers point down with — the
+ * same drawing at the same weight, as an image a token gives per theme, since a
+ * select cannot hold the icon itself. The browser's own arrow is hidden rather
+ * than restyled: it is a different shape in every browser.
  *
  * Open: where the browser lets a page draw the list — Chromium, which the
  * desktop application runs on — it is the editor's menu, the same surface,
@@ -118,13 +120,9 @@ select {
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
   background-color: var(--canvas);
-  background-image:
-    linear-gradient(45deg, transparent 50%, var(--ink-3) 50%),
-    linear-gradient(135deg, var(--ink-3) 50%, transparent 50%);
-  background-position:
-    calc(100% - 0.8rem) 52%,
-    calc(100% - 0.55rem) 52%;
-  background-size: 0.25rem 0.25rem;
+  background-image: var(--chevron-down);
+  background-position: calc(100% - 0.4rem) 50%;
+  background-size: 0.8rem 0.8rem;
   background-repeat: no-repeat;
   color: var(--ink);
   font: inherit;
@@ -153,13 +151,9 @@ select:disabled {
   select {
     display: inline-flex;
     align-items: center;
-    background-image: none;
-    padding-right: 0.45rem;
   }
   select::picker-icon {
-    color: var(--ink-3);
-    font-size: 0.7rem;
-    margin-left: 0.35rem;
+    display: none;
   }
   ::picker(select) {
     margin-top: 0.3rem;

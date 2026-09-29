@@ -86,6 +86,12 @@
   white-space: nowrap;
 }
 
+/* A glyph's character and what the standard calls it, after its name. */
+.detail {
+  margin-left: 0.6rem;
+  color: var(--ink-3);
+}
+
 .keys {
   flex: none;
   color: var(--ink-3);

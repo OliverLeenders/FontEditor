@@ -4,6 +4,8 @@ import {
   catalog,
   listCatalog,
   loadUnicodeNames,
+  nameWords,
+  unicodeNamesReady,
   setCounts,
   unicodeName,
 } from "@typewright/catalog";
@@ -146,7 +148,31 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   // has not got — see `listCatalog`. The second kind is a cell to be made
   // rather than one to open, and is left out of everything that acts on a
   // glyph: it has no name in the font to act on.
-  const shown = useMemo(() => listCatalog(entries, query), [entries, query]);
+  //
+  // A search is also looked for among the Unicode names — `dotless` finds ı
+  // and ȷ whatever the font calls them — once the table of names has been
+  // unpacked. That happens on the first search long enough to be one for a
+  // name, or the first hover, and never in a session that does neither: it is
+  // four hundred kilobytes, and nothing else in the editor wants it. `named`
+  // turning true is what lists the search again with the names in it.
+  const [named, setNamed] = useState(unicodeNamesReady);
+  const wantsNames = !named && nameWords(query.search) !== null;
+  useEffect(() => {
+    if (!wantsNames) return;
+    let watching = true;
+    void loadUnicodeNames().then(() => {
+      if (watching) setNamed(true);
+    });
+    return () => {
+      watching = false;
+    };
+  }, [wantsNames]);
+  const shown = useMemo(
+    () => listCatalog(entries, query),
+    // `named` is not read here, but the list depends on it all the same:
+    // listCatalog asks the table, which is empty until it turns true.
+    [entries, query, named],
+  );
   const toMake = useMemo(() => shown.filter((entry) => !entry.inFont).length, [shown]);
   const inFont = (index: number): string | null => {
     const entry = shown[index];
@@ -291,10 +317,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
    * pointer moves inside one cell is harder to read than one that stays put.
    */
   const [hovered, setHovered] = useState<{ index: number; top: number; left: number } | null>(null);
-  // Set once the table of Unicode names has been unpacked, which happens on the
-  // first hover and never in a session that does not hover a cell: it is four
-  // hundred kilobytes, and nothing else in the editor wants it.
-  const [named, setNamed] = useState(false);
+  // The tip names the character too, so a hover unpacks the names as well.
   useEffect(() => {
     if (hovered === null || named) return;
     let watching = true;
@@ -697,7 +720,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               <input
                 type="search"
                 className={styles.search}
-                placeholder="Name, U+0041, or a character"
+                placeholder="Name, U+0041, a character, or what it is"
                 value={query.search}
                 aria-label="Search glyphs"
                 onChange={(event) => store.setCatalogQuery({ search: event.target.value })}

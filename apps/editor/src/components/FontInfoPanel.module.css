@@ -75,11 +75,6 @@ select.input {
   background-color: var(--ground);
   font-family: inherit;
 }
-@supports (appearance: base-select) {
-  select.input {
-    padding-right: 0.45rem;
-  }
-}
 .input[data-wrong="true"] {
   border-color: var(--warn);
 }

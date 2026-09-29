@@ -14,7 +14,10 @@ workspaces, the tools, what can be done to the glyph and to the selection, undo 
 and the File menu's items — over whatever is on screen. Type part of a name to narrow it:
 the ones starting with what you typed come first. The arrows choose, Enter runs and Escape
 closes. Each row names the key that does the same thing, where there is one, as the menus
-do.
+do. It goes to a glyph as well: type its name, its character, its code point or what it is
+called — `dotless` — and the glyphs found are listed with the commands, the one typed in
+full above them all. A character the font has not got is offered to be made, and opened.
+Next glyph and Previous glyph are there too, as PageDown and PageUp are.
 
 **The bars at the edges.** The strip at the top of the window names the font, where it is
 kept on disk — or that it is not saved to disk yet — and marks it with a dot while there
@@ -525,7 +528,11 @@ block reads as a chart with gaps; in font order they follow the glyphs, a glyph 
 has not got having no place in the order the font declares. The order is chosen from the
 sort menu at the right of the bar, beside the field the glass marks as the search. Searching does the same for one
 character: type a `ǧ` the font has not got and it is offered rather than answered with an
-empty grid. **Double-click one, or press Enter on it, to make that glyph and open it**;
+empty grid. A search of three letters or more also looks among what the standard calls the
+characters: `dotless` finds ı and ȷ whatever the font named them, and `dotless j` only
+the second; each word has to begin a word of the name. The characters so named that the
+font has not got are offered too, within the set showing and a hundred at most.
+**Double-click one, or press Enter on it, to make that glyph and open it**;
 its menu adds it without opening. They are offers and not glyphs, so they are not picked,
 not counted among the glyphs, and nothing that acts on a glyph — deleting, renaming,
 marking — acts on them. **Add missing** still makes the whole block at once.

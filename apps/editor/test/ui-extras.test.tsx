@@ -7,8 +7,9 @@ import { freshStore, installDomStubs, render } from "./render.js";
 
 installBrowserGlobals();
 
-const { CommandPalette, commandsFor, matching } =
+const { CommandPalette, commandsFor, glyphCommands, matching } =
   await import("../src/components/CommandPalette.js");
+const { loadUnicodeNames } = await import("@typewright/catalog");
 const { WindowBar } = await import("../src/components/WindowBar.js");
 const { StatusBar } = await import("../src/components/StatusBar.js");
 const { Inspector } = await import("../src/components/Inspector.js");
@@ -82,6 +83,7 @@ describe("the command palette", () => {
         onWorkspace={(id) => {
           went = id;
         }}
+        onOpenGlyph={() => undefined}
         onClose={() => {
           closed = true;
         }}
@@ -93,6 +95,36 @@ describe("the command palette", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     expect(went).toBe("proof");
     expect(closed).toBe(true);
+  });
+});
+
+describe("going to a glyph from the command palette", () => {
+  it("puts the glyph typed in full above every command", () => {
+    const store = freshStore();
+    const name = store.editor.document.glyphOrder.find((n) => n.length === 1)!;
+    const opened: string[] = [];
+    const found = glyphCommands(store, name, (n) => opened.push(n));
+    expect(found.exact.map((c) => c.label)).toEqual([name]);
+    found.exact[0]!.run();
+    expect(opened).toEqual([name]);
+  });
+
+  it("finds by what a character is called, and offers to make one the font has not got", async () => {
+    await loadUnicodeNames();
+    const store = freshStore();
+    const found = glyphCommands(store, "dotless j", () => undefined);
+    const make = [...found.exact, ...found.rest].find((c) => c.group === "Make");
+    expect(make?.detail).toMatch(/dotless j/);
+    act(() => {
+      make!.run();
+    });
+    expect(store.editor.document.glyphs[make!.label]?.unicodes).toEqual([0x237]);
+  });
+
+  it("offers the next and previous glyph", () => {
+    const labels = commandsFor(withSelection(), "glyph", () => undefined).map((c) => c.label);
+    expect(labels).toContain("Next glyph");
+    expect(labels).toContain("Previous glyph");
   });
 });
 

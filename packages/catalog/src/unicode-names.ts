@@ -29,6 +29,52 @@ export function unicodeName(codePoint: number): string | null {
   return names?.get(codePoint) ?? null;
 }
 
+/**
+ * The words of a search, when it is one to look for among the names.
+ *
+ * Only from three letters on. Every name is written in capitals out of a
+ * vocabulary of a few thousand words, so one or two letters are the start of a
+ * word in most of the fifty-five thousand, and a search for `o` — somebody
+ * after the letter o — would bury it under every OGONEK and OPEN.
+ */
+export function nameWords(typed: string): string[] | null {
+  const text = typed.trim().toLowerCase();
+  if (text.length < 3) return null;
+  const words = text.split(/\s+/).filter((w) => w !== "");
+  return words.length === 0 ? null : words;
+}
+
+/**
+ * Whether a name has every word of a search, each at the start of one of its
+ * own: `dotless` finds LATIN SMALL LETTER DOTLESS I and `dotless j` only the
+ * j, while `less` finds neither. The start of a word rather than anywhere in
+ * the name, since a name is words and a search is for one of them.
+ */
+export function nameMatches(name: string, words: readonly string[]): boolean {
+  const lower = name.toLowerCase();
+  return words.every(
+    (w) => lower.startsWith(w) || lower.includes(` ${w}`) || lower.includes(`-${w}`),
+  );
+}
+
+/**
+ * The code points whose names have every word of a search, lowest first, and
+ * no more than `limit` of those `keep` agrees to — or none before the table
+ * has been loaded.
+ */
+export function codePointsNamed(
+  words: readonly string[],
+  limit: number,
+  keep: (codePoint: number) => boolean = () => true,
+): number[] {
+  if (names === null) return [];
+  const out: number[] = [];
+  for (const [codePoint, name] of names) {
+    if (nameMatches(name, words) && keep(codePoint)) out.push(codePoint);
+  }
+  return out.sort((a, b) => a - b).slice(0, limit);
+}
+
 /** Whether the table is there, so a caller can decide whether to wait. */
 export function unicodeNamesReady(): boolean {
   return names !== null;
