@@ -44,6 +44,7 @@ import {
   panelPane,
   viewIn,
 } from "./layout.js";
+import { keyTarget } from "./keyTarget.js";
 import { PaneContext } from "./pane.js";
 import { useEditorStore, useStoreValue } from "./useStore.js";
 import { openWindow } from "./windows.js";
@@ -120,8 +121,9 @@ export function App(): React.JSX.Element {
   // the canvas, which only receives them while it has focus.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
-      const typing =
-        event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement;
+      // A textarea is typed in too — the proof's text and the feature file are
+      // both one, and leaving them out took their "?" for the list of keys.
+      const { typing, ownUndo, onControl } = keyTarget(event.target);
 
       // Undo is not a drawing shortcut. Every workspace that edits the document
       // needs it, and gating it on the glyph view left spacing edits with no way
@@ -148,6 +150,13 @@ export function App(): React.JSX.Element {
       if (modified && event.shiftKey && event.key.toLowerCase() === "h") {
         event.preventDefault();
         setHistoryShown((shown) => !shown);
+        return;
+      }
+      if (
+        modified &&
+        ownUndo &&
+        (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y")
+      ) {
         return;
       }
       if (modified && event.key.toLowerCase() === "z") {
@@ -184,6 +193,14 @@ export function App(): React.JSX.Element {
         return;
       }
 
+      // The proof's waterfall back to its own sizes, as the drawing's Ctrl-0
+      // fits the glyph: the undoing of what Ctrl and the wheel did there.
+      if (modified && event.key === "0" && viewRef.current === "proof") {
+        event.preventDefault();
+        store.setProofZoom(1);
+        return;
+      }
+
       // The rest belong to the drawing canvas and mean nothing elsewhere.
       if (viewRef.current !== "glyph") return;
 
@@ -201,7 +218,7 @@ export function App(): React.JSX.Element {
         return;
       }
 
-      if (event.code === "Space" && !typing) {
+      if (event.code === "Space" && !typing && !onControl) {
         event.preventDefault();
         store.setPreviewing(true);
         return;
@@ -236,6 +253,9 @@ export function App(): React.JSX.Element {
     const onKeyUp = (event: KeyboardEvent): void => {
       if (event.code === "Space") store.setPreviewing(false);
     };
+    // A key let go of in another window is never heard here: Space held while
+    // switching away left the preview on until Space was pressed again.
+    const onBlur = (): void => store.setPreviewing(false);
     /**
      * On the way out: settle the working copy, and speak up about the folder.
      *
@@ -257,11 +277,13 @@ export function App(): React.JSX.Element {
 
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
     window.addEventListener("beforeunload", onUnload);
     window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
       window.removeEventListener("beforeunload", onUnload);
       window.removeEventListener("resize", onResize);
     };
@@ -279,10 +301,7 @@ export function App(): React.JSX.Element {
    * or the spacing string means the text, not the outline.
    */
   useEffect(() => {
-    const typingIn = (target: EventTarget | null): boolean =>
-      target instanceof HTMLInputElement ||
-      target instanceof HTMLTextAreaElement ||
-      target instanceof HTMLSelectElement;
+    const typingIn = (target: EventTarget | null): boolean => keyTarget(target).typing;
 
     const onCopy = (event: ClipboardEvent): void => {
       if (typingIn(event.target) || viewRef.current !== "glyph") return;

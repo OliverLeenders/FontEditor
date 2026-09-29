@@ -51,6 +51,9 @@ export const MIN_SPACING_SIZE = 24;
 export const MAX_SPACING_SIZE = 320;
 export const MIN_PROOF_SIZE = 8;
 export const MAX_PROOF_SIZE = 140;
+/** How far Ctrl and the wheel zoom a waterfall, which is a view of its sizes. */
+export const MIN_PROOF_ZOOM = 0.25;
+export const MAX_PROOF_ZOOM = 4;
 
 /**
  * The size the feature source is set at, in pixels.

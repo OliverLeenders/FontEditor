@@ -9,7 +9,7 @@ installBrowserGlobals();
 
 const { ProofView } = await import("../src/components/ProofView.js");
 const { PROOF_SPECIMENS } = await import("../src/specimens.js");
-const { PROOF_LADDER } = await import("../src/proof-blocks.js");
+const { PROOF_LADDER, drawnSize } = await import("../src/proof-blocks.js");
 const { EMPTY_KERNING, setKern } = await import("@typewright/font-model");
 
 /**
@@ -193,6 +193,11 @@ describe("the waterfall", () => {
     });
   };
 
+  /** Press the chip of the `n`th size, which puts its field and features after the chips. */
+  const chooseSize = (n: number): void => {
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(`^Size ${String(n)}:`) }));
+  };
+
   it("fills in the ladder when it is chosen, because an empty one is a blank page", () => {
     const { store } = render(<ProofView />);
 
@@ -208,6 +213,7 @@ describe("the waterfall", () => {
     chooseWaterfall();
 
     expect(screen.queryByLabelText("Type size")).toBeNull();
+    chooseSize(1);
     expect(screen.getByLabelText("Size of block 1")).toBeTruthy();
   });
 
@@ -225,6 +231,7 @@ describe("the waterfall", () => {
   it("takes a block's size from its own field", () => {
     const { store } = render(<ProofView />);
     chooseWaterfall();
+    chooseSize(2);
 
     fireEvent.change(screen.getByLabelText("Size of block 2"), { target: { value: "30" } });
 
@@ -236,6 +243,7 @@ describe("the waterfall", () => {
   it("holds a size nobody could set the proof at", () => {
     const { store } = render(<ProofView />);
     chooseWaterfall();
+    chooseSize(1);
 
     fireEvent.change(screen.getByLabelText("Size of block 1"), { target: { value: "4000" } });
 
@@ -247,7 +255,7 @@ describe("the waterfall", () => {
     chooseWaterfall();
     const before = store.getState().proofBlocks.length;
 
-    fireEvent.click(screen.getByLabelText("Remove block 1"));
+    fireEvent.click(screen.getByLabelText("Remove size 1"));
 
     const after = store.getState().proofBlocks;
     expect(after).toHaveLength(before - 1);
@@ -258,7 +266,7 @@ describe("the waterfall", () => {
     const { store } = render(<ProofView />);
     chooseWaterfall();
 
-    fireEvent.click(screen.getByRole("button", { name: "Add block" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add a size" }));
 
     const sizes = store.getState().proofBlocks.map((b) => b.size);
     expect(sizes).toHaveLength(PROOF_LADDER.length + 1);
@@ -271,10 +279,11 @@ describe("the waterfall", () => {
     render(<ProofView />, store);
     chooseWaterfall();
 
-    // The bar has one of these too, and it comes first; the blocks follow in the
-    // order they are set on the page.
+    // The bar has one of these too, and it comes first; the chosen size's is
+    // the second.
+    chooseSize(2);
     const panels = screen.getAllByRole("button", { name: "Features" });
-    fireEvent.click(panels[2]!);
+    fireEvent.click(panels[1]!);
     fireEvent.click(screen.getByLabelText("ss01"));
 
     const blocks = store.getState().proofBlocks;
@@ -282,5 +291,43 @@ describe("the waterfall", () => {
     expect(blocks[0]?.settings.features).toEqual({});
     // The bar is not a block, and switching one block is not switching the page.
     expect(store.getState().proofTextSettings.features).toEqual({});
+    // And the chip says so, for when it is not the one chosen.
+    expect(screen.getByRole("button", { name: /^Size 2: .*its own features/ })).toBeTruthy();
+  });
+
+  it("zooms the page without touching the sizes, and says so until it is reset", () => {
+    const { store } = render(<ProofView />);
+    chooseWaterfall();
+
+    act(() => {
+      store.setProofZoom(1.5);
+    });
+    expect(store.getState().proofBlocks.map((b) => b.size)).toEqual([...PROOF_LADDER]);
+    const zoom = screen.getByRole("button", { name: "Zoom 150%" });
+
+    fireEvent.click(zoom);
+    expect(store.getState().proofZoom).toBe(1);
+    expect(screen.queryByRole("button", { name: /^Zoom/ })).toBeNull();
+  });
+
+  it("fills the page from another ladder", () => {
+    const { store } = render(<ProofView />);
+    chooseWaterfall();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Ladder/ }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /^Display sizes/ }));
+
+    expect(store.getState().proofBlocks.map((b) => b.size)).toEqual([
+      18, 24, 30, 36, 48, 60, 72, 96,
+    ]);
+  });
+});
+
+describe("drawnSize", () => {
+  it("scales a size by the zoom, held inside the proof's sizes and never rounded", () => {
+    expect(drawnSize(12, 1.25)).toBe(15);
+    expect(drawnSize(11, 1.1)).toBeCloseTo(12.1);
+    expect(drawnSize(72, 4)).toBe(140);
+    expect(drawnSize(8, 0.5)).toBe(8);
   });
 });

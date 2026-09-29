@@ -63,8 +63,12 @@ export function UndoHistory({
     const onDown = (event: MouseEvent): void => {
       if (ref.current !== null && !ref.current.contains(event.target as Node)) onOpen(false);
     };
+    // Escape closes the list and goes no further: opened by its key from the
+    // canvas, the canvas still has the keyboard and would drop the selection.
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") onOpen(false);
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      onOpen(false);
     };
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("keydown", onKey, true);

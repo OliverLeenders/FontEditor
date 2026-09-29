@@ -6,7 +6,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { palette } from "../scene.js";
 import { PROOF_SPECIMENS, specimenNamed } from "../specimens.js";
 import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingModule } from "../shaping.js";
-import { type ProofBlock, blockCaption, heldSize, ladderBlocks } from "../proof-blocks.js";
+import {
+  type ProofBlock,
+  blockCaption,
+  drawnSize,
+  heldSize,
+  ladderBlocks,
+} from "../proof-blocks.js";
 import { MAX_PROOF_SIZE, MIN_PROOF_SIZE } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { instanceDocument } from "../instance.js";
@@ -62,6 +68,7 @@ export function ProofView(): React.JSX.Element {
   const size = useStoreValue((s) => s.proofSize);
   const leading = useStoreValue((s) => s.proofLeading);
   const blocks = useStoreValue((s) => s.proofBlocks);
+  const zoom = useStoreValue((s) => s.proofZoom);
   /** Whether the page is set as blocks, which is what the rules are drawn for. */
   const waterfall = blocks.length > 0;
 
@@ -102,9 +109,15 @@ export function ProofView(): React.JSX.Element {
    * and the scene itself then have one case to handle, and the size slider goes
    * on meaning what it always meant.
    */
+  //
+  // A waterfall is drawn at its sizes times the zoom, which Ctrl and the wheel
+  // set; the sizes themselves are left as they are.
   const pageBlocks: readonly ProofBlock[] = useMemo(
-    () => (waterfall ? blocks : [{ id: "block-1", size, settings }]),
-    [waterfall, blocks, size, settings],
+    () =>
+      waterfall
+        ? blocks.map((b) => ({ ...b, size: drawnSize(b.size, zoom) }))
+        : [{ id: "block-1", size, settings }],
+    [waterfall, blocks, size, settings, zoom],
   );
 
   /**
@@ -194,8 +207,10 @@ export function ProofView(): React.JSX.Element {
   const wantedScroll = useRef<number | null>(null);
 
   // The document too, for the components each glyph is drawn with.
-  const frame = useRef({ page, document, rtl, waterfall, settings });
-  frame.current = { page, document, rtl, waterfall, settings };
+  // The blocks as they are, for the rules: a rule says the size a block is,
+  // not the size the zoom draws it at.
+  const frame = useRef({ page, document, rtl, waterfall, settings, blocks });
+  frame.current = { page, document, rtl, waterfall, settings, blocks };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -230,7 +245,10 @@ export function ProofView(): React.JSX.Element {
           // size it would say what the slider says.
           caption: state.waterfall
             ? {
-                text: blockCaption(laid.block, state.settings),
+                text: blockCaption(
+                  state.blocks.find((b) => b.id === laid.block.id) ?? laid.block,
+                  state.settings,
+                ),
                 y: laid.top - CAPTION_LIFT - scrollTop,
                 left: MARGIN,
                 right: Math.max(MARGIN, viewport.width - MARGIN),
@@ -281,7 +299,10 @@ export function ProofView(): React.JSX.Element {
    *
    * A waterfall is zoomed as a whole, every block by the same factor, because
    * the ladder is a set of proportions and zooming one rung of it would be
-   * editing the ladder rather than looking at it.
+   * editing the ladder rather than looking at it. And it is zoomed as a view:
+   * the sizes are drawn larger and kept as they are. Scaling the sizes
+   * themselves rounded each one and pinned the ends at the proof's limits, a
+   * notch at a time, until zooming back out no longer gave the ladder back.
    *
    * Non-passive, and only for the ctrl case: a plain wheel is handed straight
    * back to the scroller, which is better at scrolling than this would be.
@@ -295,12 +316,11 @@ export function ProofView(): React.JSX.Element {
       if (intent.kind !== "zoom") return;
       event.preventDefault();
 
-      const held = store.getState().proofBlocks;
-      if (held.length > 0) {
-        const before = held[0]?.size ?? 0;
-        store.setProofBlocks(held.map((b) => ({ ...b, size: b.size * intent.factor })));
-        const after = store.getState().proofBlocks[0]?.size ?? 0;
-        if (after === before || before === 0) return;
+      if (store.getState().proofBlocks.length > 0) {
+        const before = store.getState().proofZoom;
+        store.setProofZoom(before * intent.factor);
+        const after = store.getState().proofZoom;
+        if (after === before) return;
         wantedScroll.current = scroller.scrollTop * (after / before);
         return;
       }
@@ -323,7 +343,7 @@ export function ProofView(): React.JSX.Element {
 
   return (
     <div className={styles.proof}>
-      <div className={styles.bar}>
+      <div className={styles.bar} data-above-blocks={waterfall ? "true" : undefined}>
         <LocationBar />
         <span className={styles.separator} aria-hidden="true" />
 
@@ -416,6 +436,8 @@ export function ProofView(): React.JSX.Element {
           blocks={blocks}
           settings={settings}
           size={heldSize(size)}
+          zoom={zoom}
+          onZoomReset={() => store.setProofZoom(1)}
           document={document}
           applyFeatures={applyFeatures}
           canShape={hasFeatures}
@@ -444,6 +466,7 @@ export function ProofView(): React.JSX.Element {
         className={styles.text}
         value={text}
         aria-label="Proof text"
+        data-own-undo=""
         title="Text to set, with any glyph by name after a slash: /a.001, /uni0301"
         spellCheck={false}
         rows={3}

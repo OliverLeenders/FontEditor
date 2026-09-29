@@ -22,6 +22,12 @@
   z-index: 2;
   box-shadow: var(--shadow);
 }
+/* With the blocks panel under it the shadow is the panel's: the two bars are
+   one stack of controls, and a shadow cast across the rows of sizes made them
+   read as sitting in a trench. */
+.bar[data-above-blocks="true"] {
+  box-shadow: none;
+}
 
 .sizeLabel {
   display: flex;

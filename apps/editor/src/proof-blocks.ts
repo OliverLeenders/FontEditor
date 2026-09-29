@@ -38,6 +38,27 @@ export type ProofBlock = {
  */
 export const PROOF_LADDER: readonly number[] = [8, 9, 10, 11, 12, 14, 18, 24, 36, 48, 72];
 
+/**
+ * The ladders the waterfall can be filled from: the classic one, and the two
+ * halves of it a text face and a display face are each judged by.
+ */
+export const LADDERS: readonly { readonly label: string; readonly sizes: readonly number[] }[] = [
+  { label: "Classic ladder", sizes: PROOF_LADDER },
+  { label: "Text sizes", sizes: [8, 9, 10, 11, 12, 13, 14, 16] },
+  { label: "Display sizes", sizes: [18, 24, 30, 36, 48, 60, 72, 96] },
+];
+
+/**
+ * A size as a waterfall is drawn at it: the block's own, times the zoom, held
+ * inside what the proof can be set at. Not rounded and never stored — the
+ * ladder keeps its sizes whatever the zoom, so zooming back out gives it back.
+ */
+export function drawnSize(size: number, zoom: number): number {
+  const scaled = size * zoom;
+  if (!Number.isFinite(scaled)) return MIN_PROOF_SIZE;
+  return Math.min(MAX_PROOF_SIZE, Math.max(MIN_PROOF_SIZE, scaled));
+}
+
 /** A size held inside what the proof can be set at, rounded to a whole point. */
 export function heldSize(size: number): number {
   if (!Number.isFinite(size)) return MIN_PROOF_SIZE;

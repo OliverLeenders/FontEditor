@@ -56,8 +56,11 @@ export function WindowBar({
     const onDown = (event: MouseEvent): void => {
       if (ref.current !== null && !ref.current.contains(event.target as Node)) setOpen(false);
     };
+    // Escape closes the panel and goes no further, as the undo history's does.
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpen(false);
     };
     window.addEventListener("pointerdown", onDown, true);
     window.addEventListener("keydown", onKey, true);

@@ -1,14 +1,19 @@
-/* A second row under the proof's bar, present only while the page is set as
-   blocks. Wraps rather than scrolls: a ladder is eleven rungs and a bar that
-   scrolled sideways would hide the one being edited. */
+/* A second row under the proof's bar, present only while the page is a
+   waterfall: the sizes as chips, what the chosen one is set with, and the
+   ladders at the end. Wraps only when a window is too narrow for a ladder. */
 .blocks {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem 0.9rem;
+  gap: 0.4rem 0.9rem;
   padding: 0.4rem 0.7rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
+  /* The last of the controls above the page, so the shadow onto the page is
+     this panel's rather than the bar's. Under the bar, over the page. */
+  position: relative;
+  z-index: 1;
+  box-shadow: var(--shadow);
 }
 
 .heading {
@@ -19,29 +24,130 @@
   color: var(--ink-2);
 }
 
-.list {
+.chips {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.4rem 0.8rem;
+  gap: 0.2rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.row {
+/* A chip: the size, and a × that shows on hover or focus. One border round
+   both, so the pair reads as one thing. */
+.chip {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.15rem 0.3rem;
+  height: 1.5rem;
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--ground);
 }
+.chip:hover {
+  border-color: var(--rule-strong);
+}
+.chip[data-chosen="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
 
-/* Wide enough for three digits, because the sizes are read as a column down the
-   panel and a field that resized with its number would make a ragged one. */
 .size {
+  position: relative;
+  min-width: 1.7rem;
+  height: 100%;
+  padding: 0 0.4rem;
+  border: none;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.chip[data-chosen="true"] .size {
+  color: var(--accent-ink);
+}
+.size:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Features of its own: a dot at the chip's corner, in the accent. */
+.dot {
+  position: absolute;
+  top: 0.18rem;
+  right: 0.12rem;
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Takes no room until it is wanted, so a ladder of eleven stays one line. */
+.remove {
+  display: none;
+  height: 100%;
+  padding: 0 0.3rem 0 0.1rem;
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.chip:hover .remove,
+.chip:focus-within .remove {
+  display: block;
+}
+.remove:hover {
+  color: var(--ink);
+}
+.remove:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.add {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px dashed var(--rule-strong);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.add:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+.add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* What the chosen size is set with, after a rule. */
+.detail {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--rule-strong);
+}
+
+.hint {
+  padding-left: 0.9rem;
+  border-left: 1px solid var(--rule-strong);
+  font-size: 0.74rem;
+  color: var(--ink-3);
+}
+
+.field {
   width: 3.2rem;
 }
 
@@ -50,42 +156,26 @@
   color: var(--ink-2);
 }
 
-.remove {
-  padding: 0 0.25rem;
-  border: none;
+/* The ladders, and the zoom while there is one, at the far end. */
+.end {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.zoom {
+  height: 1.5rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--accent);
   border-radius: var(--radius);
-  background: none;
-  color: var(--ink-2);
-  font-size: 0.95rem;
-  line-height: 1;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
-
-.remove:hover {
-  color: var(--ink);
-  background: var(--surface-2);
-}
-
-.remove:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-.action {
-  padding: 0.28rem 0.5rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink);
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.action:hover {
-  background: var(--surface-2);
-}
-
-.action:focus-visible {
+.zoom:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }

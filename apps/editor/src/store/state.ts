@@ -147,6 +147,12 @@ export type StoreState = {
    * for when the list is cleared again.
    */
   readonly proofBlocks: readonly ProofBlock[];
+  /**
+   * How much larger than their sizes the blocks are drawn, from Ctrl and the
+   * wheel. A view of the waterfall, like the drawing's camera: not remembered,
+   * and never written into the sizes.
+   */
+  readonly proofZoom: number;
   /** The size the feature source is set at, in pixels. */
   readonly featureSize: number;
   /** Line spacing as a multiple of the em, which is how type is set. */
@@ -310,6 +316,7 @@ export function initialState(preferences: Preferences): StoreState {
     proofTextSettings: preferences.proofTextSettings,
     proofSize: preferences.proofSize,
     proofBlocks: preferences.proofBlocks,
+    proofZoom: 1,
     featureSize: preferences.featureSize,
     proofLeading: preferences.proofLeading,
     previewing: false,

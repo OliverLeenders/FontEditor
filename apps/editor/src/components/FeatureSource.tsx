@@ -663,6 +663,7 @@ function FindBar({
           ref={field}
           className={styles.findField}
           aria-label="Find"
+          data-own-undo=""
           placeholder="Find"
           spellCheck={false}
           value={find.query}
@@ -745,6 +746,7 @@ function FindBar({
           <input
             className={styles.findField}
             aria-label="Replace with"
+            data-own-undo=""
             placeholder="Replace with"
             spellCheck={false}
             value={find.replacement}

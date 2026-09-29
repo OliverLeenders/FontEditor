@@ -723,6 +723,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
                 placeholder="Name, U+0041, a character, or what it is"
                 value={query.search}
                 aria-label="Search glyphs"
+                data-own-undo=""
                 onChange={(event) => store.setCatalogQuery({ search: event.target.value })}
               />
             </div>
@@ -892,6 +893,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               being renamed should not be something you have to remember. */}
           {renamingBox === null || renaming === null ? null : (
             <input
+              data-own-undo=""
               className={styles.rename}
               style={{
                 left: `${String(renamingBox.x)}px`,

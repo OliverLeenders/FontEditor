@@ -237,6 +237,7 @@ export function CommandPalette({
   const [typed, setTyped] = useState("");
   const [index, setIndex] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const list = useRef<HTMLUListElement>(null);
 
   const commands = useMemo(
     () => commandsFor(store, workspace, onWorkspace, onShowHistory),
@@ -269,6 +270,11 @@ export function CommandPalette({
     input.current?.focus();
   }, []);
 
+  // The row the arrows choose stays in view as they go past the list's edge.
+  useEffect(() => {
+    list.current?.children[index]?.scrollIntoView({ block: "nearest" });
+  }, [index]);
+
   const run = (command: Command | undefined): void => {
     if (command === undefined) return;
     onClose();
@@ -291,6 +297,7 @@ export function CommandPalette({
             value={typed}
             placeholder="Type a command, or a glyph"
             aria-label="Command"
+            data-own-undo=""
             onChange={(event) => {
               setTyped(event.target.value);
               setIndex(0);
@@ -316,7 +323,7 @@ export function CommandPalette({
         {shown.length === 0 ? (
           <p className={styles.none}>No command by that name</p>
         ) : (
-          <ul className={styles.list} role="listbox" aria-label="Commands">
+          <ul ref={list} className={styles.list} role="listbox" aria-label="Commands">
             {shown.map((command, i) => (
               <li
                 key={`${command.group}-${command.label}`}

@@ -498,15 +498,20 @@ have taken for you.
 **A waterfall, and two settings on one page.** The Proof bar begins with a choice between
 **One size** and **Waterfall**. A waterfall sets the same text as several blocks, each with
 its own size and its own **Features** panel, and choosing it fills in the sizes a specimen
-sheet is set at — 8 through 14, then 18, 24, 36, 48 and 72. Each block's row holds its size
-and its features; **Add block** puts another at the last one's size, and the × takes one away.
-On the page, a rule above each block gives its size, and names the features that block has
+sheet is set at — 8 through 14, then 18, 24, 36, 48 and 72. The sizes are a row of chips
+under the bar. Press one to choose it: its size field and its **Features** panel appear after
+the chips, and a dot on a chip says that size has features of its own. The × on a chip, or
+Delete while it has the keyboard, takes it away; **+** adds a size at the last one's. **Ladder**
+fills the page afresh — the classic ladder, the text sizes up to 16 or the display sizes from
+18 to 96. On the page, a rule above each block gives its size, and names the features that block has
 switched where they differ from the bar — so two blocks at one size with a stylistic set on in
 the second are a comparison the page itself labels. Leading stays one number for the whole
 page, because it is a multiple of the em and already means the same proportions at every size,
 and the text, the specimen and the way the line runs are shared for the same reason: a
 comparison needs one thing to be different at a time. Ctrl and the wheel zoom the whole
-ladder, every block by the same factor. Going back to **One size** puts the page back at the
+page, every block by the same factor, and leave the sizes as they are: the row then says
+**Zoom 125%**, the rules still give each block's own size, and pressing the zoom, or Ctrl-0,
+goes back to 100%. Going back to **One size** puts the page back at the
 slider's size and forgets the blocks.
 
 **Old Macintosh fonts.** A `.sit` file — a StuffIt archive, which is how a font from the

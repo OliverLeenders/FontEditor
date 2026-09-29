@@ -401,6 +401,17 @@ export function GlyphCanvas({
 
         onContextMenu({ x: event.clientX, y: event.clientY, target, point });
       }}
+      onBlur={() => {
+        // A held key let go of after the canvas lost the keyboard is never
+        // heard here, and the tool it borrowed stayed in hand. Given back now,
+        // as letting go of it would.
+        store.applyTool(
+          keyUp(store.editor, {
+            key: "m",
+            modifiers: { shift: false, alt: false, ctrl: false, meta: false },
+          }),
+        );
+      }}
       onKeyUp={(event) => {
         // Held tool keys are given back here — see `keyHold` in the tools.
         store.applyTool(

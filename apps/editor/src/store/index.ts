@@ -64,11 +64,13 @@ import {
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
   MAX_PROOF_SIZE,
+  MAX_PROOF_ZOOM,
   MAX_SPACING_SIZE,
   MIN_FEATURE_SIZE,
   MIN_OUTLINE_WIDTH,
   MIN_PROOF_LEADING,
   MIN_PROOF_SIZE,
+  MIN_PROOF_ZOOM,
   MIN_SPACING_SIZE,
 } from "../limits.js";
 import type { PaneIndex } from "../layout.js";
@@ -1026,6 +1028,16 @@ export class EditorStore {
    */
   setProofBlocks(blocks: readonly ProofBlock[]): void {
     this.remember({ proofBlocks: blocks.map((b) => ({ ...b, size: heldSize(b.size) })) });
+  }
+
+  /** How much larger than its sizes a waterfall is drawn: a view, not the ladder. */
+  setProofZoom(proofZoom: number): void {
+    const held = within(proofZoom, MIN_PROOF_ZOOM, MAX_PROOF_ZOOM);
+    if (held === null) return;
+    // Back to exactly 100% when a few notches out and in land close to it, so
+    // the zoom's button goes away rather than saying 99%.
+    const zoom = Math.abs(held - 1) < 0.02 ? 1 : held;
+    if (zoom !== this.state.proofZoom) this.patch({ proofZoom: zoom });
   }
 
   setProofLeading(proofLeading: number): void {
