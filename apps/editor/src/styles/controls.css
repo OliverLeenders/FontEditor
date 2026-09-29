@@ -105,8 +105,11 @@ input[type="number"]::-webkit-inner-spin-button {
  * Closed: the height of everything else in a bar, the rule colour, the corner
  * radius, and the chevron the bar menus and steppers point down with — the
  * same drawing at the same weight, as an image a token gives per theme, since a
- * select cannot hold the icon itself. The browser's own arrow is hidden rather
- * than restyled: it is a different shape in every browser.
+ * select cannot hold the icon itself. Where the browser draws the select as a
+ * page may (Chromium), the image is the select's own picker icon, which is its
+ * glyph replaced; elsewhere it is the select's background, over the browser's
+ * arrow turned off. As a background it did not show in every Chromium build
+ * that draws the select itself.
  *
  * Open: where the browser lets a page draw the list — Chromium, which the
  * desktop application runs on — it is the editor's menu, the same surface,
@@ -151,9 +154,18 @@ select:disabled {
   select {
     display: inline-flex;
     align-items: center;
+    gap: 0.3rem;
+    padding-right: 0.4rem;
+    background-image: none;
   }
   select::picker-icon {
-    display: none;
+    content: "";
+    display: block;
+    flex: none;
+    width: 0.8rem;
+    height: 0.8rem;
+    margin: 0;
+    background: var(--chevron-down) center / contain no-repeat;
   }
   ::picker(select) {
     margin-top: 0.3rem;

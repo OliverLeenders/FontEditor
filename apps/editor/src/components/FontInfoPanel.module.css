@@ -75,6 +75,12 @@ select.input {
   background-color: var(--ground);
   font-family: inherit;
 }
+/* The chevron is the picker icon here, with a place of its own; see controls.css. */
+@supports (appearance: base-select) {
+  select.input {
+    padding-right: 0.4rem;
+  }
+}
 .input[data-wrong="true"] {
   border-color: var(--warn);
 }
