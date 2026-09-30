@@ -31,6 +31,7 @@ export function BarMenu({
   onOpen,
   openOn,
   closeOnOutside = true,
+  look = "bar",
   children,
 }: {
   readonly label: string;
@@ -60,6 +61,13 @@ export function BarMenu({
    * press outside is part of the work rather than a way of leaving.
    */
   readonly closeOnOutside?: boolean;
+  /**
+   * How the button is drawn. "bar" is a control with words, for the bars above
+   * a workspace. "tool" is the drawing toolbar's square icon button, for a
+   * panel opened from a row of tools: the word goes into the tooltip, and a
+   * small chevron at the icon's corner still says it opens something.
+   */
+  readonly look?: "bar" | "tool";
   /** A panel's contents, given the way to close it. */
   readonly children?: React.ReactNode | ((close: () => void) => React.ReactNode) | undefined;
 }): React.JSX.Element {
@@ -119,25 +127,43 @@ export function BarMenu({
 
   return (
     <div className={menu.holder} ref={holder}>
-      <button
-        type="button"
-        className={open.button}
-        aria-expanded={shown}
-        aria-haspopup={items === undefined ? "dialog" : "menu"}
-        disabled={disabled}
-        title={title}
-        onClick={() => setShown((was) => !was)}
-      >
-        {Icon === undefined ? null : <Icon />}
-        {label}
-        {badge}
-        {/* The same chevron the rest of the interface points down with, rather
+      {look === "tool" ? (
+        <button
+          type="button"
+          className={menu.tool}
+          aria-expanded={shown}
+          aria-haspopup={items === undefined ? "dialog" : "menu"}
+          aria-label={label}
+          disabled={disabled}
+          title={title === undefined ? label : `${label}: ${title}`}
+          onClick={() => setShown((was) => !was)}
+        >
+          {Icon === undefined ? null : <Icon />}
+          <span className={menu.toolCaret} aria-hidden="true">
+            <ChevronDownIcon />
+          </span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          className={open.button}
+          aria-expanded={shown}
+          aria-haspopup={items === undefined ? "dialog" : "menu"}
+          disabled={disabled}
+          title={title}
+          onClick={() => setShown((was) => !was)}
+        >
+          {Icon === undefined ? null : <Icon />}
+          {label}
+          {badge}
+          {/* The same chevron the rest of the interface points down with, rather
             than a triangle drawn out of borders: one drawing of "there is more
             under this", at one weight, wherever it appears. */}
-        <span className={menu.caret} aria-hidden="true">
-          <ChevronDownIcon />
-        </span>
-      </button>
+          <span className={menu.caret} aria-hidden="true">
+            <ChevronDownIcon />
+          </span>
+        </button>
+      )}
 
       {shown ? (
         <div

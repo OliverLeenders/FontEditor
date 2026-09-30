@@ -5,7 +5,7 @@ import { glyphsTracing } from "../store/images.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import styles from "./Tracing.module.css";
-import { ImageIcon } from "./icons.js";
+import { ImageIcon, XIcon } from "./icons.js";
 
 /** What the picker offers. Whatever a browser will decode, and nothing else. */
 const ACCEPT = "image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif";
@@ -148,7 +148,7 @@ export function Tracing(): React.JSX.Element {
                   aria-label={`Delete ${entry.name}`}
                   onClick={() => void store.removeImage(entry.name)}
                 >
-                  ×
+                  <XIcon />
                 </button>
               </li>
             );

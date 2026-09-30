@@ -54,7 +54,7 @@
   color: var(--ink);
 }
 .add:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 
@@ -139,7 +139,7 @@
   color: var(--ink);
 }
 .go:disabled {
-  opacity: 0.4;
+  opacity: var(--disabled);
   cursor: default;
   border-color: var(--rule);
 }
@@ -163,7 +163,7 @@
   color: var(--danger);
 }
 .drop:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 

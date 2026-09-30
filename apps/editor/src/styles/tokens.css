@@ -77,6 +77,24 @@
   /* The height of every control that sits in a bar — a field, a list, a button
      with words in it — so a row of them lines up along the top and the bottom. */
   --control: 1.75rem;
+  /* A button that is only an icon — a tool, a menu opened from a bar, a row's
+     action — square, a step smaller than a control with words in it. */
+  --tool: 1.6rem;
+  /*
+   * The icons, at the sizes Lucide is drawn to be read at. The root is 13px,
+   * and Lucide is a 2px stroke on a 24px box: below about 14px the stroke comes
+   * out near a pixel and blurs, which is where the inspector's had drifted.
+   *   --icon-tool    the drawing toolbar's, 17px
+   *   --icon         alone in a button, 16px
+   *   --icon-inline  beside a word, 14px
+   *   --icon-small   a chevron, a grip, a × inside a chip: 12px, simple shapes
+   */
+  --icon-tool: 1.3rem;
+  --icon: 1.25rem;
+  --icon-inline: 1.1rem;
+  --icon-small: 0.92rem;
+  /* How far anything that cannot be pressed now fades, everywhere. */
+  --disabled: 0.38;
   --radius: 3px;
 
   /*

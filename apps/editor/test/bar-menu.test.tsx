@@ -144,3 +144,21 @@ describe("a menu rather than a panel", () => {
     expect(screen.queryByRole("menuitemcheckbox", { name: "Something" })).toBeNull();
   });
 });
+
+describe("the drawing toolbar's look", () => {
+  it("is an icon button named in its tooltip, and opens the same panel", () => {
+    render(
+      <BarMenu label="Offset" title="Move the outlines outwards or inwards" look="tool">
+        <p>inside</p>
+      </BarMenu>,
+    );
+    const button = screen.getByRole("button", { name: "Offset" });
+    // The word is the button's name and its tooltip's start, not text on it.
+    expect(button.textContent).toBe("");
+    expect(button.getAttribute("title")).toBe("Offset: Move the outlines outwards or inwards");
+
+    fireEvent.click(button);
+    expect(screen.getByText("inside")).toBeTruthy();
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+  });
+});

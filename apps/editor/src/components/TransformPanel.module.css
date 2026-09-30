@@ -41,7 +41,7 @@
   border-color: var(--accent);
 }
 .anchor:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 
@@ -99,7 +99,7 @@
 }
 .places button:disabled,
 .buttons button:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 
@@ -133,8 +133,8 @@
   flex: none;
 }
 .mark svg {
-  width: 0.88rem;
-  height: 0.88rem;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
 }
 
 /*
@@ -152,14 +152,14 @@
 
 /* Beside a word, so sized to stand with it rather than over it. */
 .places button svg {
-  width: 1.05rem;
-  height: 1.05rem;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
 }
 
 /* Alone in the button, so it may have nearly what the toolbar's have. */
 .buttons button svg {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: var(--icon);
+  height: var(--icon);
 }
 
 .input {
@@ -174,7 +174,7 @@
   font-variant-numeric: tabular-nums;
 }
 .input:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
 }
 
 .buttons {

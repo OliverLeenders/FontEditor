@@ -21,8 +21,8 @@
 }
 
 .tool {
-  width: 1.6rem;
-  height: 1.6rem;
+  width: var(--tool);
+  height: var(--tool);
   display: grid;
   place-items: center;
   border: 1px solid transparent;
@@ -37,8 +37,8 @@
    stroke lands near a whole pixel on an ordinary screen. Smaller and the round
    ends start to blur into the ink. */
 .tool svg {
-  width: 1.3rem;
-  height: 1.3rem;
+  width: var(--icon-tool);
+  height: var(--icon-tool);
 }
 .tool:hover:not(:disabled) {
   background: var(--surface-2);
@@ -56,14 +56,15 @@
 }
 
 .tool:disabled {
-  opacity: 0.3;
+  opacity: var(--disabled);
   cursor: default;
 }
 
 .divider {
   width: 1px;
   height: 1.1rem;
-  background: var(--rule);
+  /* The same rule as the spacing and proof bars draw between their groups. */
+  background: var(--rule-strong);
   margin: 0 0.2rem;
 }
 .spacer {

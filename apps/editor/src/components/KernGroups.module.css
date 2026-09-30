@@ -29,7 +29,7 @@
   color: var(--surface);
 }
 .open:disabled {
-  opacity: 0.5;
+  opacity: var(--disabled);
   cursor: default;
 }
 
@@ -152,7 +152,7 @@
   border-color: var(--ink-3);
 }
 .action:disabled {
-  opacity: 0.45;
+  opacity: var(--disabled);
   cursor: default;
 }
 /* The one button here that takes something away with it. */
@@ -215,6 +215,13 @@
   font-size: 0.8rem;
   line-height: 1;
 }
+/* The Lucide X, as every other close and remove mark is, at the small size. */
+.drop svg {
+  display: block;
+  width: var(--icon-small);
+  height: var(--icon-small);
+}
+
 .drop:hover {
   color: var(--warn);
 }

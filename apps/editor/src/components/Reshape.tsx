@@ -71,6 +71,7 @@ export function Reshape(): React.JSX.Element {
       <BarMenu
         label="Offset"
         icon={OffsetIcon}
+        look="tool"
         title={
           reading
             ? "Another tab is saving this project"

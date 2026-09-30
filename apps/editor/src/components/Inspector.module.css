@@ -92,8 +92,8 @@
   color: var(--ink-3);
 }
 .gripMark svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: var(--icon-small);
+  height: var(--icon-small);
 }
 
 .title {
@@ -104,8 +104,8 @@
 }
 
 .dock {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: var(--tool);
+  height: var(--tool);
   display: grid;
   place-items: center;
   border: 0;
@@ -117,8 +117,8 @@
   line-height: 1;
 }
 .dock svg {
-  width: 0.95rem;
-  height: 0.95rem;
+  width: var(--icon);
+  height: var(--icon);
 }
 .dock:hover {
   background: var(--surface-2);
@@ -129,8 +129,8 @@
 }
 
 .dismiss {
-  width: 1.2rem;
-  height: 1.2rem;
+  width: var(--tool);
+  height: var(--tool);
   display: grid;
   place-items: center;
   border: 0;
@@ -142,8 +142,8 @@
   line-height: 1;
 }
 .dismiss svg {
-  width: 0.95rem;
-  height: 0.95rem;
+  width: var(--icon);
+  height: var(--icon);
 }
 .dismiss:hover {
   background: var(--surface-2);
@@ -224,8 +224,8 @@
   transition: transform 0.12s ease;
 }
 .chevron svg {
-  width: 0.8rem;
-  height: 0.8rem;
+  width: var(--icon-small);
+  height: var(--icon-small);
 }
 .chevron[data-open] {
   transform: rotate(90deg);
@@ -244,8 +244,8 @@
   color: var(--ink-3);
 }
 .sectionIcon svg {
-  width: 0.88rem;
-  height: 0.88rem;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
 }
 
 .sectionTitle {
@@ -328,7 +328,7 @@
   color: var(--surface);
 }
 .segmented button:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 
@@ -382,8 +382,8 @@
   display: grid;
   place-items: center;
   flex: none;
-  width: 1.15rem;
-  height: 1.15rem;
+  width: var(--tool);
+  height: var(--tool);
   padding: 0;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius);
@@ -392,12 +392,12 @@
   cursor: pointer;
   line-height: 1;
 }
-/* Small, because the row it ends is four fields wide and the button is the
-   least important thing in it — until it is the thing you want. */
+/* Alone in its button, so the size an icon alone is read at: smaller, and the
+   stroke of a 24px drawing came out near a pixel and blurred. */
 .componentRemove svg,
 .rowAction svg {
-  width: 0.8rem;
-  height: 0.8rem;
+  width: var(--icon);
+  height: var(--icon);
 }
 .componentRemove:hover {
   color: var(--danger);
@@ -503,7 +503,7 @@
   margin: 0;
 }
 .slider:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 
@@ -614,7 +614,7 @@
   color: var(--ink);
 }
 .align:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 /* A button that says what it does in words and in an icon, the icon first. */
@@ -625,8 +625,8 @@
   gap: 0.3rem;
 }
 .labelled svg {
-  width: 0.9rem;
-  height: 0.9rem;
+  width: var(--icon-inline);
+  height: var(--icon-inline);
   flex: none;
 }
 
@@ -691,7 +691,7 @@
   color: var(--ink);
 }
 .layerAddButton:disabled {
-  opacity: 0.4;
+  opacity: var(--disabled);
   cursor: default;
 }
 .layerRemove {

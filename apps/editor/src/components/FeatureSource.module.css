@@ -251,7 +251,7 @@
   color: var(--ink);
 }
 .findButton:disabled {
-  opacity: 0.4;
+  opacity: var(--disabled);
   cursor: default;
 }
 .findButton[aria-pressed="true"] {

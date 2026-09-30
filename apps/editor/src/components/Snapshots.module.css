@@ -67,7 +67,7 @@
   color: var(--ink);
 }
 .keep:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 
@@ -126,7 +126,7 @@
   color: var(--ink);
 }
 .restore:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 

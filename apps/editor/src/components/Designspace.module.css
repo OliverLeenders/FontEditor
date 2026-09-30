@@ -201,7 +201,7 @@
 }
 .add:disabled,
 .small:disabled {
-  opacity: 0.38;
+  opacity: var(--disabled);
   cursor: default;
 }
 

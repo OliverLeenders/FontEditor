@@ -35,7 +35,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  height: 1.5rem;
+  height: var(--control);
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--ground);
@@ -93,6 +93,13 @@
   line-height: 1;
   cursor: pointer;
 }
+/* The Lucide X, as every other close and remove mark is, at the small size. */
+.remove svg {
+  display: block;
+  width: var(--icon-small);
+  height: var(--icon-small);
+}
+
 .chip:hover .remove,
 .chip:focus-within .remove {
   display: block;
@@ -106,8 +113,8 @@
 }
 
 .add {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--control);
+  height: var(--control);
   padding: 0;
   border: 1px dashed var(--rule-strong);
   border-radius: var(--radius);
@@ -160,7 +167,7 @@
 }
 
 .zoom {
-  height: 1.5rem;
+  height: var(--control);
   padding: 0 0.5rem;
   border: 1px solid var(--accent);
   border-radius: var(--radius);

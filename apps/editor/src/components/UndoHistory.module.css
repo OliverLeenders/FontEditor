@@ -6,8 +6,8 @@
 }
 
 .button {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: var(--tool);
+  height: var(--tool);
   display: grid;
   place-items: center;
   padding: 0;
@@ -27,8 +27,8 @@
   color: var(--ink);
 }
 .button svg {
-  width: 1.05rem;
-  height: 1.05rem;
+  width: var(--icon);
+  height: var(--icon);
 }
 
 .panel {

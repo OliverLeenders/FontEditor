@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./KernGroups.module.css";
+import { XIcon } from "./icons.js";
 
 /**
  * The kerning groups, and what is in them.
@@ -189,7 +190,7 @@ function Side({
                   store.applyTool(takeGlyphFromKernGroup(store.editor, side, chosen, name))
                 }
               >
-                ×
+                <XIcon />
               </button>
             </span>
           ))}

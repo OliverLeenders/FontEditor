@@ -14,6 +14,7 @@ import {
   withBlockSize,
 } from "../proof-blocks.js";
 import { BarMenu } from "./BarMenu.js";
+import { XIcon } from "./icons.js";
 import { FeatureSwitches } from "./FeatureSwitches.js";
 import { NumberField } from "./NumberField.js";
 import styles from "./ProofBlocks.module.css";
@@ -118,7 +119,7 @@ export function ProofBlocks({
                 aria-label={`Remove size ${String(index + 1)}`}
                 onClick={() => remove(block)}
               >
-                ×
+                <XIcon />
               </button>
             </li>
           );
