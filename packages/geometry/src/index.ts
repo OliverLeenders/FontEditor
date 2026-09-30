@@ -135,13 +135,14 @@ export {
   runsAlongNib,
 } from "./nib.js";
 
-export type { PenBlend, PenProfile, PenShape, SegmentBlend } from "./pen.js";
+export type { PenBlend, PenProfile, PenShape, SegmentBlend, StrokeParts } from "./pen.js";
 export {
   blendPen,
   isBroad,
   ovalPathStroke,
   ovalStroke,
   penPathStroke,
+  penPathStrokeParts,
   penProfiles,
   penSupport,
   samePenShape,

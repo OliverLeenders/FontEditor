@@ -2,8 +2,9 @@ import {
   type Cubic,
   type PenShape,
   blendPen,
+  evaluate,
   loopArea,
-  penPathStroke,
+  penPathStrokeParts,
   reverseLoop,
 } from "@typewright/geometry";
 
@@ -51,7 +52,7 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   // Slivers left out: where the path runs along the nib's own edge a stretch of
   // ink can be a hair thin, less ink than anything shows, and its two long sides
   // lying all but on each other are more than the union can tell apart.
-  const regions = inkRegions(c).filter((r) => thickness(r) >= SLIVER);
+  const regions = joinedParts(c, ids).filter((r) => thickness(r) >= SLIVER);
   // One outline out of the regions. The union may decline a boundary it cannot
   // close; the regions are still the right ink by the non-zero rule, only
   // overlapping, so they are drawn as they are rather than not at all.
@@ -61,9 +62,15 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
     joined === null ? regions : joined.glyph.contours.filter((r) => thickness(r) >= SLIVER);
   // The union of curves can be fooled by edges lying all but on top of each other
   // — the legs of a stroke at a sharp corner — into handing back loops that still
-  // overlap, or meet along an edge. Checked, and joined as polygons where they do.
-  if (joined !== null && answer.length > 1 && joinsFurther(answer)) {
-    answer = unionByPolygons(regions, ids) ?? answer;
+  // overlap, or meet along an edge, or into refusing altogether. Joined as polygons
+  // where it refused, and where what it gave back still joins further. Refusing
+  // used to hand back the pieces as they were, which is a stroke that converted
+  // into a pile of outlines to be joined by hand.
+  if (regions.length > 1 && (joined === null || (answer.length > 1 && joinsFurther(answer)))) {
+    // Sliver-thin rings left out of this answer as of the union's: a hole a unit
+    // long and a fraction wide, where two parts all but met, is a pinhole in the
+    // letter, not a counter.
+    answer = (unionByPolygons(regions, ids) ?? answer).filter((r) => thickness(r) >= SLIVER);
   }
   joinedInk.set(c, answer);
   return answer;
@@ -73,11 +80,21 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
 const SLIVER = 0.25;
 
 /**
- * How thick a region is on average: its area over half its perimeter, from its
- * points — rough, and only ever asked whether it is next to nothing.
+ * How thick a region is on average: its area over half its perimeter — rough, and
+ * only ever asked whether it is next to nothing.
+ *
+ * Measured along its curves, a few points each, not between its nodes alone: a
+ * round counter drawn with two curves has two nodes, which enclose nothing, and
+ * was thrown away as a sliver.
  */
 function thickness(c: Contour): number {
-  const pts = c.nodes.map((n) => n.pt);
+  const pts: { x: number; y: number }[] = [];
+  for (let i = 0; i < segmentCount(c); i++) {
+    const s = segmentAt(c, i);
+    if (s === null) continue;
+    const curve = segmentCubic(s);
+    for (let k = 0; k < 8; k++) pts.push(evaluate(curve, k / 8));
+  }
   let area = 0;
   let perimeter = 0;
   for (let i = 0; i < pts.length; i++) {
@@ -100,6 +117,10 @@ function thickness(c: Contour): number {
  */
 const joinedInk = new WeakMap<Contour, readonly Contour[]>();
 const regionsOf = new WeakMap<Contour, readonly Contour[]>();
+const partsOf = new WeakMap<
+  Contour,
+  { readonly pieces: readonly Contour[]; readonly folds: readonly (readonly Contour[])[] }
+>();
 
 /** Ids for the regions of a stroke's ink: nothing selects them, they are drawn. */
 const regionIds = counterIds("ink-");
@@ -115,13 +136,38 @@ const regionIds = counterIds("ink-");
  * where one outline is what is asked for: the font, the `.ufo`, the ruler.
  */
 export function inkRegions(c: Contour): readonly Contour[] {
-  const nib = c.nib;
-  if (nib === undefined) return [corneredContour(c)];
+  if (c.nib === undefined) return [corneredContour(c)];
   const known = regionsOf.get(c);
   if (known !== undefined) return known;
-  if (!(nib.width > 0) || c.nodes.length < 2) {
-    regionsOf.set(c, []);
-    return [];
+  const parts = strokeParts(c);
+  const regions = [...parts.pieces, ...parts.folds.flat()];
+  regionsOf.set(c, regions);
+  return regions;
+}
+
+/**
+ * A stroke's ink in its two kinds of part: the bands, wedges and caps, and each
+ * fold's chain of steps — the pen swept from one position to the next where the
+ * sides fold back and are not the edge of the ink.
+ *
+ * Apart because they are wanted differently. The canvas fills them all as they
+ * are: turned the same way round, the non-zero rule fills them as their union, and
+ * the steps are straight-edged, so the curvature comb has nothing to say about
+ * their edges. The outline — for the font, the `.ufo`, a conversion — joins each
+ * chain into the one region it is first, so the union meets a shape where it would
+ * have met a hundred; that join is too dear to make on every move of a drag.
+ */
+function strokeParts(c: Contour): {
+  readonly pieces: readonly Contour[];
+  readonly folds: readonly (readonly Contour[])[];
+} {
+  const known = partsOf.get(c);
+  if (known !== undefined) return known;
+  const nib = c.nib;
+  if (nib === undefined || !(nib.width > 0) || c.nodes.length < 2) {
+    const none = { pieces: [], folds: [] };
+    partsOf.set(c, none);
+    return none;
   }
 
   const curves: Cubic[] = [];
@@ -134,7 +180,7 @@ export function inkRegions(c: Contour): readonly Contour[] {
   // contour's where it does not; along each segment it blends from one to the
   // next. Where a segment's two pens are the same, its ink is worked out as it
   // always was — exactly, for a broad edge.
-  const pieces = penPathStroke(
+  const parts = penPathStrokeParts(
     curves,
     pensOf(c),
     c.closed,
@@ -145,15 +191,30 @@ export function inkRegions(c: Contour): readonly Contour[] {
   // Every piece the same way round — anticlockwise, which is how an outline's
   // outer contour is turned for the fill — or two that overlap with opposite
   // turns cancel where they cross and leave a hole in the stroke.
-  const loops = pieces.map((loop) => (loopArea(loop) < 0 ? reverseLoop(loop) : loop));
-  const regions = loops.map((loop) =>
+  const region = (loop: readonly Cubic[]): Contour =>
     contourOfCurves(
-      loop.map((curve) => ({ curve, line: straight(curve) })),
+      (loopArea(loop) < 0 ? reverseLoop(loop) : loop).map((curve) => ({
+        curve,
+        line: straight(curve),
+      })),
       regionIds,
-    ),
-  );
-  regionsOf.set(c, regions);
-  return regions;
+    );
+  const found = {
+    pieces: parts.loops.map(region),
+    folds: parts.sweeps.map((chain) => chain.map(region)),
+  };
+  partsOf.set(c, found);
+  return found;
+}
+
+/** Each part of a stroke's ink, with every fold's chain of steps joined into one region. */
+function joinedParts(c: Contour, ids: IdFactory): readonly Contour[] {
+  const parts = strokeParts(c);
+  // Where the join fails the steps are kept as they are: they fill the same.
+  return [
+    ...parts.pieces,
+    ...parts.folds.flatMap((steps) => unionByPolygons(steps, ids, false) ?? steps),
+  ];
 }
 
 /**

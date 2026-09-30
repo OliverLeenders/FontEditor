@@ -1,4 +1,4 @@
-import { evaluate } from "@typewright/geometry";
+import { arcCubics, evaluate } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -22,6 +22,8 @@ import { node } from "../src/node.js";
 import { offsetContour } from "../src/offset.js";
 import { removeOverlap } from "../src/overlap.js";
 import { rectContour } from "../src/shapes.js";
+import { contourOfCurves } from "../src/curves.js";
+import { unionByPolygons } from "../src/polygon-union.js";
 import { DEFAULT_NIB, inkOf, inkRegions, isOval, withInk, withNib } from "../src/stroke.js";
 import { interpolateGlyph } from "../src/interpolate.js";
 import { cutGlyph } from "../src/knife.js";
@@ -189,6 +191,128 @@ describe("a contour's ink", () => {
         ids,
       ),
     ).toHaveLength(0);
+  });
+});
+
+describe("a stroke drawn in use", () => {
+  /**
+   * A hook drawn in the editor with an oval pen, every corner point with its
+   * handles pulled onto it (0.1.54). Each curve then turns through most of its
+   * direction in a hair of its length, so each counts as folding; the folds were
+   * crossed straight, the pieces no longer met, the union refused, and the
+   * stroke converted into seven outlines to be joined by hand.
+   */
+  const hook = (): Contour => {
+    const at = (x: number, y: number) => ({ x, y });
+    return {
+      ...contour(
+        ids.contour(),
+        [
+          node(ids.node(), at(29.041972630460503, 263.97260813645914)),
+          node(ids.node(), at(183.09128720995406, 418.0219227159527), {
+            type: "smooth",
+            in: at(16.717991358797292, 414.9409556053055),
+            out: at(349.46458306111083, 421.10288982659995),
+          }),
+          node(ids.node(), at(343.3025360107422, 224.9467802719331)),
+          node(ids.node(), at(257.0350055963221, 151.00311830010213), {
+            type: "smooth",
+            in: at(380.27447982573176, 145.86815431084432),
+            out: at(133.79553136691243, 156.13808228935994),
+          }),
+          node(ids.node(), at(146.11945622403857, 240.35172865424357)),
+        ],
+        false,
+      ),
+      nib: { angle: 30, width: 80, thickness: 20 },
+    };
+  };
+
+  it("converts a J with a sharp corner into one outline, with no gap past the corner", () => {
+    const at = (x: number, y: number) => ({ x, y });
+    const j: Contour = {
+      ...contour(
+        ids.contour(),
+        [
+          node(ids.node(), at(23.173736658481445, 262.013663582845), {
+            type: "smooth",
+            in: at(23.173736658481445, 257.4043034506394),
+            out: at(23.173736658481445, 266.62302371505064),
+          }),
+          node(ids.node(), at(228.29026254163028, 369.18128665662505), {
+            type: "smooth",
+            in: at(99.22817883987369, 370.3336266896764),
+            out: at(357.3523462433869, 368.0289466235737),
+          }),
+          node(ids.node(), at(391.9225472349288, 248.18558318622829), {
+            in: at(390.7702072018774, 317.32598516931216),
+            out: at(317.4184872609663, 246.9438488533289),
+          }),
+          node(ids.node(), at(222.52856237637332, 25.78395680730845), {
+            type: "smooth",
+            in: at(368.87574657390087, 24.63161677425705),
+            out: at(76.18137817884576, 26.936296840359848),
+          }),
+          node(ids.node(), at(62.35329778222898, 123.73285961667729), {
+            type: "smooth",
+            in: at(61.20095774917758, 67.26819799715878),
+            out: at(63.50563781528037, 180.1975212361958),
+          }),
+        ],
+        false,
+      ),
+      nib: { angle: 30, width: 80, thickness: 20 },
+    };
+    const ink = inkOf(j, ids);
+    expect(ink).toHaveLength(1);
+    // Just past the corner, where the gap was.
+    expect(covers(ink, { x: 377, y: 221 })).toBe(true);
+    expect(covers(ink, { x: 230, y: 200 })).toBe(false);
+  });
+
+  it("converts into one outline", () => {
+    const ink = inkOf(hook(), ids);
+    expect(ink).toHaveLength(1);
+    // Inside the ink along the path, and not in the hook's open middle.
+    expect(covers(ink, { x: 183, y: 418 })).toBe(true);
+    expect(covers(ink, { x: 343, y: 225 })).toBe(true);
+    expect(covers(ink, { x: 230, y: 300 })).toBe(false);
+  });
+});
+
+describe("the union as polygons", () => {
+  it("gives back a shape whose outline has a single sharp point", () => {
+    // A teardrop: an arc and two straight sides meeting it smoothly, so the only
+    // corner is the tip. A ring with one corner was walked from the corner to
+    // itself in no steps, and came back as nothing.
+    const centre = { x: 0, y: 0 };
+    const tip = { x: 0, y: 200 };
+    const r = 60;
+    const s = Math.sqrt(200 * 200 - r * r);
+    const sin = r / 200;
+    const cos = s / 200;
+    // The two points where the sides touch the circle.
+    const left = { x: -r * cos, y: r * sin };
+    const right = { x: r * cos, y: r * sin };
+    const straightLine = (a: { x: number; y: number }, b: { x: number; y: number }) => ({
+      a,
+      c1: { x: a.x + (b.x - a.x) / 3, y: a.y + (b.y - a.y) / 3 },
+      c2: { x: a.x + ((b.x - a.x) * 2) / 3, y: a.y + ((b.y - a.y) * 2) / 3 },
+      b,
+    });
+    const drop = contourOfCurves(
+      [
+        { curve: straightLine(tip, left), line: true },
+        ...arcCubics(centre, left, right, true).map((curve) => ({ curve, line: false })),
+        { curve: straightLine(right, tip), line: true },
+      ],
+      ids,
+    );
+    const joined = unionByPolygons([drop], ids);
+    expect(joined).not.toBeNull();
+    expect(joined).toHaveLength(1);
+    expect(covers(joined!, { x: 0, y: 0 })).toBe(true);
+    expect(covers(joined!, { x: 0, y: 150 })).toBe(true);
   });
 });
 

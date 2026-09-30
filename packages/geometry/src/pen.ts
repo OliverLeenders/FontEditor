@@ -1,4 +1,4 @@
-import { type Cubic, arcLength, cubic, endTangent, evaluate, tangent } from "./cubic.js";
+import { type Cubic, arcLength, cubic, curvature, endTangent, evaluate, tangent } from "./cubic.js";
 import { fitCubics } from "./fit.js";
 import { halfNib, nibStroke, ovalBands, ovalCap, ovalFolds, ovalWedge } from "./nib.js";
 import { OFFSET_TOLERANCE, leftNormal } from "./offset.js";
@@ -273,8 +273,39 @@ export function penPathStroke(
   tolerance: number = OFFSET_TOLERANCE,
   blends?: readonly (SegmentBlend | undefined)[],
 ): Cubic[][] {
+  const parts = penPathStrokeParts(curves, pens, closed, tolerance, blends);
+  return [...parts.loops, ...parts.sweeps.flat()];
+}
+
+/**
+ * What a pen leaves along a path, in its parts: the bands, wedges and caps, and
+ * apart from them each fold's chain of swept steps (see {@link sweptSteps}).
+ *
+ * The chains are handed over apart because they are many small pieces that are
+ * one region between them, and whoever keeps the ink — the model, which can join
+ * polygons — is better joining each chain into one than filling and measuring a
+ * hundred pieces.
+ */
+export type StrokeParts = {
+  readonly loops: Cubic[][];
+  readonly sweeps: Cubic[][][];
+};
+
+export function penPathStrokeParts(
+  curves: readonly Cubic[],
+  pens: readonly PenShape[],
+  closed: boolean,
+  tolerance: number = OFFSET_TOLERANCE,
+  blends?: readonly (SegmentBlend | undefined)[],
+): StrokeParts {
   const count = curves.length;
-  if (count === 0 || pens.length < (closed ? count : count + 1)) return [];
+  const sweeps: Cubic[][][] = [];
+  if (count === 0 || pens.length < (closed ? count : count + 1)) return { loops: [], sweeps };
+  const bandsOf = (curve: Cubic, penOn: (t: number) => PenShape): Cubic[][] => {
+    const found = varyingBands(curve, penOn, tolerance);
+    sweeps.push(...found.sweeps);
+    return found.bands;
+  };
   const penAt = (i: number): PenShape => pens[closed ? i % count : i]!;
   const profiles = penProfiles(curves, pens, closed, blends);
 
@@ -296,11 +327,11 @@ export function penPathStroke(
             // that changes is: the edge sampled, the folded samples left out, and
             // fitted — one band for the curve.
             ovalFolds(curve, pen)
-            ? varyingBands(curve, () => pen, tolerance)
+            ? bandsOf(curve, () => pen)
             : ovalBands(curve, pen, tolerance)),
       );
     } else {
-      loops.push(...varyingBands(curve, profile.at, tolerance));
+      loops.push(...bandsOf(curve, profile.at));
     }
   }
 
@@ -330,11 +361,32 @@ export function penPathStroke(
     }
   }
 
-  return loops;
+  return { loops, sweeps };
 }
 
 /** How many points a varying curve's sides are sampled at, before fitting. */
 const SAMPLES = 48;
+
+/**
+ * Where along a curve its sides are sampled: evenly, and closer together towards
+ * each end.
+ *
+ * A curve whose handle is pulled onto its end point turns through most of its
+ * direction in the last hair of its length — its curvature all but unbounded
+ * there — and the edge of the ink swings round the pen in that hair. Samples
+ * spaced evenly step over it, and the fold it makes on the inside is then
+ * guessed at rather than found.
+ */
+function sampleParams(): number[] {
+  const near = [1e-4, 3e-4, 1e-3, 3e-3, 6e-3, 1e-2, 1.5e-2];
+  const ts = new Set<number>();
+  for (let k = 0; k <= SAMPLES; k++) ts.add(k / SAMPLES);
+  for (const t of near) {
+    ts.add(t);
+    ts.add(1 - t);
+  }
+  return [...ts].sort((a, b) => a - b);
+}
 
 /**
  * The bands a pen leaves along one curve over which it changes.
@@ -349,12 +401,20 @@ const SAMPLES = 48;
  * by the nib itself, as a constant broad edge is.
  *
  * And the inside of a bend tighter than the pen folds back over itself, which is
- * found where the side runs backwards against the path. The samples in a fold are
- * left out and the fit crosses the gap straight, for the reason a constant oval's
- * fold is drawn straight across: the pen's ends either side of it overlap the whole
- * of the fold, and a side that looped back would fill with a hole in it.
+ * found where the side runs backwards against the path. There the side is not the
+ * edge of the ink, and the stretch is swept instead: the pen stood at positions
+ * close together, the ink between each two the smallest convex shape round both
+ * (see {@link sweptSteps}), handed back apart from the bands as the fold's chain.
+ * The samples of a fold used to be left out and the gap crossed straight, and
+ * where the side came back past itself — an oval pen leaving a sharp corner, a
+ * handle pulled onto its point — that straight line ran through ink and left a
+ * notch.
  */
-function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: number): Cubic[][] {
+function varyingBands(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  tolerance: number,
+): { bands: Cubic[][]; sweeps: Cubic[][][] } {
   type Sample = {
     readonly t: number;
     readonly at: Vec2;
@@ -365,8 +425,7 @@ function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: n
   };
 
   const samples: Sample[] = [];
-  for (let k = 0; k <= SAMPLES; k++) {
-    const t = k / SAMPLES;
+  for (const t of sampleParams()) {
     const along =
       t === 0 ? endTangent(curve, 0) : t === 1 ? endTangent(curve, 1) : tangent(curve, t);
     const normal = leftNormal(curve, t);
@@ -387,7 +446,7 @@ function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: n
       side,
     });
   }
-  if (samples.length < 2) return [];
+  if (samples.length < 2) return { bands: [], sweeps: [] };
 
   // Runs between pinches. A pen with thickness does not pinch — its sides are
   // continuous however it is turned — so only a pen thin enough to be a broad edge
@@ -411,41 +470,41 @@ function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: n
     }
   }
 
-  // Each run's two sides, fitted.
-  const sides: { left: Cubic[]; right: Cubic[] }[] = [];
+  // Each run cut into stretches: where neither side folds, a band between the two
+  // sides, fitted; where one does, the pen swept from one position to the next.
+  // A run with no fold anywhere is kept whole, so the runs can still be chained
+  // through their pinches into one outline.
+  const whole: { left: Cubic[]; right: Cubic[] }[] = [];
+  const pieces: Cubic[][] = [];
+  const sweeps: Cubic[][][] = [];
+  let broken = false;
   for (const run of runs) {
-    if (run.length < 2) continue;
-    const left = unfolded(run.map((s) => ({ point: s.left, along: s.along })));
-    const right = unfolded(run.map((s) => ({ point: s.right, along: s.along })));
-    // The directions each side leaves and arrives by, read a hair's breadth along
-    // it rather than guessed from the first two samples, which would be the chord
-    // between them — a little off the side's own direction, and enough off that the
-    // fit splits to make up for it and writes points nobody needs.
-    const first = run[0]!.t;
-    const last = run[run.length - 1]!.t;
-    const leftCurves = fitCubics(
-      left,
-      tolerance,
-      edgeDirection(curve, penOn, first, 1, 1),
-      edgeDirection(curve, penOn, last, 1, -1),
-    );
-    const rightCurves = fitCubics(
-      right,
-      tolerance,
-      edgeDirection(curve, penOn, first, -1, 1),
-      edgeDirection(curve, penOn, last, -1, -1),
-    );
-    if (leftCurves.length === 0 || rightCurves.length === 0) continue;
-    sides.push({ left: leftCurves, right: rightCurves });
+    if (run.length < 2) {
+      broken = true;
+      continue;
+    }
+    const folding = foldingSteps(run);
+    if (!folding.some(Boolean)) {
+      const fitted = fittedSides(curve, penOn, run, tolerance);
+      if (fitted === null) broken = true;
+      else whole.push(fitted);
+      continue;
+    }
+    broken = true;
+    for (const stretch of stretchesOf(run, folding)) {
+      if (stretch.folds) {
+        const chain = sweptSteps(
+          curve,
+          penOn,
+          stretch.samples.map((s) => s.t),
+        );
+        if (chain.length > 0) sweeps.push(chain);
+      } else {
+        const fitted = fittedSides(curve, penOn, stretch.samples, tolerance);
+        if (fitted !== null) pieces.push(band(fitted.left, fitted.right));
+      }
+    }
   }
-
-  /** A band closed straight across its two ends. */
-  const band = (upper: Cubic[], lower: Cubic[]): Cubic[] => [
-    ...upper,
-    line(upper[upper.length - 1]!.b, lower[lower.length - 1]!.b),
-    ...[...lower].reverse().map(reversed),
-    line(lower[0]!.a, upper[0]!.a),
-  ];
 
   // One loop through the pinches. At a pinch the nib lies along the path and the
   // two sides swap: the side that was on the left arrives at one end of the nib,
@@ -455,13 +514,245 @@ function varyingBands(curve: Cubic, penOn: (t: number) => PenShape, tolerance: n
   // waist at each pinch, where a loop per run met the next along the nib's own
   // line, a stretch the union has to recognise as buried with a sliver of ink
   // either side of it, and did not always.
-  if (sides.length === runs.length && sides.length > 0) {
-    const upper = sides.flatMap((s, i) => (i % 2 === 0 ? s.left : s.right));
-    const lower = sides.flatMap((s, i) => (i % 2 === 0 ? s.right : s.left));
-    return [band(upper, lower)];
+  if (!broken && whole.length > 0) {
+    const upper = whole.flatMap((s, i) => (i % 2 === 0 ? s.left : s.right));
+    const lower = whole.flatMap((s, i) => (i % 2 === 0 ? s.right : s.left));
+    return { bands: [band(upper, lower)], sweeps };
   }
-  // A run too short to fit leaves the chain broken, and each run is a loop of its own.
-  return sides.map((s) => band(s.left, s.right));
+  // A run too short to fit, or one with a fold, leaves the chain broken, and each
+  // run is loops of its own.
+  return { bands: [...whole.map((s) => band(s.left, s.right)), ...pieces], sweeps };
+}
+
+/** A band closed straight across its two ends. */
+function band(upper: readonly Cubic[], lower: readonly Cubic[]): Cubic[] {
+  return [
+    ...upper,
+    line(upper[upper.length - 1]!.b, lower[lower.length - 1]!.b),
+    ...[...lower].reverse().map(reversed),
+    line(lower[0]!.a, upper[0]!.a),
+  ];
+}
+
+/** A sample of the pen along a curve: where it is, and how far it reaches either side. */
+type SideSample = {
+  readonly t: number;
+  readonly along: Vec2;
+  readonly left: Vec2;
+  readonly right: Vec2;
+};
+
+/**
+ * The two sides of a stretch, fitted — or `null` where one of them will not fit.
+ *
+ * The directions each side leaves and arrives by are read a hair's breadth along
+ * it rather than guessed from the first two samples, which would be the chord
+ * between them — a little off the side's own direction, and enough off that the
+ * fit splits to make up for it and writes points nobody needs.
+ */
+function fittedSides(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  samples: readonly SideSample[],
+  tolerance: number,
+): { left: Cubic[]; right: Cubic[] } | null {
+  const first = samples[0]!.t;
+  const last = samples[samples.length - 1]!.t;
+  const left = fitCubics(
+    samples.map((s) => s.left),
+    tolerance,
+    edgeDirection(curve, penOn, first, 1, 1),
+    edgeDirection(curve, penOn, last, 1, -1),
+  );
+  const right = fitCubics(
+    samples.map((s) => s.right),
+    tolerance,
+    edgeDirection(curve, penOn, first, -1, 1),
+    edgeDirection(curve, penOn, last, -1, -1),
+  );
+  return left.length === 0 || right.length === 0 ? null : { left, right };
+}
+
+/**
+ * Which steps between samples fold: where either side runs backwards against
+ * the path.
+ *
+ * On the inside of a bend tighter than the pen, the side — the path plus the
+ * pen's furthest reach across it — runs on past where the ink ends and back
+ * again. For a round pen it crosses itself and leaves a swallowtail; for an oval
+ * it need not cross at all, and runs out and back past itself, so there is no
+ * crossing to cut the fold at. Either way the side is not the edge of the ink
+ * there, and no fitting of it is.
+ */
+function foldingSteps(samples: readonly SideSample[]): boolean[] {
+  const back = (from: Vec2, to: Vec2, along: Vec2): boolean =>
+    (to.x - from.x) * along.x + (to.y - from.y) * along.y < 0;
+  const out: boolean[] = [];
+  for (let k = 0; k + 1 < samples.length; k++) {
+    const here = samples[k]!;
+    const next = samples[k + 1]!;
+    out.push(back(here.left, next.left, next.along) || back(here.right, next.right, next.along));
+  }
+  return out;
+}
+
+/** How many samples either side of a fold are taken into it, so it is swept whole. */
+const FOLD_MARGIN = 1;
+
+/**
+ * A run cut at its folds into stretches that fold and stretches that do not, each
+ * sharing its end sample with the next, so the pieces meet.
+ */
+function stretchesOf(
+  samples: readonly SideSample[],
+  folding: readonly boolean[],
+): { folds: boolean; samples: SideSample[] }[] {
+  const n = samples.length;
+  const inFold: boolean[] = Array.from({ length: n }, () => false);
+  folding.forEach((folds, k) => {
+    if (!folds) return;
+    for (let j = Math.max(0, k - FOLD_MARGIN); j <= Math.min(n - 1, k + 1 + FOLD_MARGIN); j++) {
+      inFold[j] = true;
+    }
+  });
+  const out: { folds: boolean; samples: SideSample[] }[] = [];
+  let k = 0;
+  while (k < n) {
+    const folds = inFold[k]!;
+    const from = Math.max(0, k - 1);
+    let to = k;
+    while (to + 1 < n && inFold[to + 1] === folds) to++;
+    // Each stretch starts on the last sample of the one before, so they meet.
+    const stretch = samples.slice(out.length === 0 ? k : from, to + 1);
+    if (stretch.length >= 2) out.push({ folds, samples: stretch });
+    k = to + 1;
+  }
+  return out;
+}
+
+/**
+ * How far along the path the pen may move between two of its positions in a fold:
+ * at most as far as keeps the straight step within `SWEEP_SAG` of the curve, and
+ * never less than `SWEEP_STEP` nor more than `SWEEP_MOST`.
+ */
+const SWEEP_STEP = 3;
+const SWEEP_MOST = 20;
+const SWEEP_SAG = 0.25;
+/** How far the pen may turn between two positions in a fold, in degrees. */
+const SWEEP_TURN = 3;
+/** How finely a fold is walked, looking for where to stand the pen, per whole curve. */
+const FOLD_GRID = 400;
+/** How many sides the pen's outline is drawn with in a fold. */
+const OUTLINE_SIDES = 32;
+
+/**
+ * The ink of a fold: the pen stood at positions close together along it, and the
+ * ink between two neighbouring positions taken as the smallest convex shape round
+ * the pen at both.
+ *
+ * The pen is convex, and between two positions a step apart it moves all but in a
+ * straight line and turns all but not at all, so what it covers is all but that
+ * shape. It is the slow, sure way the stroke is checked against in the tests, and
+ * it is used only where the fast way — two sides and a band between them — has no
+ * sides to give. The pieces overlap their neighbours and are all turned the same
+ * way, so the non-zero rule fills them as their union.
+ */
+function sweptSteps(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  ts: readonly number[],
+): Cubic[][] {
+  // Placed by how far the pen has gone and turned since the last position, walked
+  // along a fine grid of the curve, rather than one or more per sample: the samples
+  // crowd towards the curve's ends, and a step per sample drew a fold in dozens of
+  // pieces where a handful covers it as well.
+  const from = ts[0]!;
+  const to = ts[ts.length - 1]!;
+  const fine = Math.max(2, Math.ceil((to - from) * FOLD_GRID));
+  const poses: number[] = [from];
+  let lastAngle = penOn(from).angle;
+  let gone = 0;
+  let previous = evaluate(curve, from);
+  for (let i = 1; i <= fine; i++) {
+    const t = from + ((to - from) * i) / fine;
+    const here = evaluate(curve, t);
+    gone += Math.hypot(here.x - previous.x, here.y - previous.y);
+    previous = here;
+    if (i === fine) break;
+    // A chord of length L across a bend of radius R strays L²/8R from it.
+    const k = Math.abs(curvature(curve, t) ?? 0);
+    const allowed =
+      k === 0
+        ? SWEEP_MOST
+        : Math.min(SWEEP_MOST, Math.max(SWEEP_STEP, Math.sqrt((8 * SWEEP_SAG) / k)));
+    if (gone >= allowed || Math.abs(penOn(t).angle - lastAngle) >= SWEEP_TURN) {
+      poses.push(t);
+      lastAngle = penOn(t).angle;
+      gone = 0;
+    }
+  }
+  poses.push(to);
+
+  const outlines = poses.map((t) => penOutline(penOn(t), evaluate(curve, t)));
+  const out: Cubic[][] = [];
+  for (let i = 0; i + 1 < outlines.length; i++) {
+    const hull = convexHull([...outlines[i]!, ...outlines[i + 1]!]);
+    if (hull.length < 3) continue;
+    out.push(hull.map((p, j) => line(p, hull[(j + 1) % hull.length]!)));
+  }
+  return out;
+}
+
+/**
+ * The pen's outline at a place, as a polygon drawn round it rather than inside it,
+ * so the polygon never leaves out a sliver of what the pen covers. A broad edge is
+ * its two ends.
+ */
+function penOutline(pen: PenShape, at: Vec2): Vec2[] {
+  if (isBroad(pen)) {
+    const a = (pen.angle * Math.PI) / 180;
+    const half = { x: (Math.cos(a) * pen.width) / 2, y: (Math.sin(a) * pen.width) / 2 };
+    return [
+      { x: at.x + half.x, y: at.y + half.y },
+      { x: at.x - half.x, y: at.y - half.y },
+    ];
+  }
+  const out: Vec2[] = [];
+  const grow = 1 / Math.cos(Math.PI / OUTLINE_SIDES);
+  for (let k = 0; k < OUTLINE_SIDES; k++) {
+    const u = (k / OUTLINE_SIDES) * Math.PI * 2;
+    const reach = penSupport(pen, { x: Math.cos(u), y: Math.sin(u) });
+    out.push({ x: at.x + reach.x * grow, y: at.y + reach.y * grow });
+  }
+  return out;
+}
+
+/** The convex hull of some points, anticlockwise, by Andrew's monotone chain. */
+function convexHull(points: readonly Vec2[]): Vec2[] {
+  const pts = [...points].sort((p, q) => p.x - q.x || p.y - q.y);
+  if (pts.length < 3) return pts;
+  const cross = (o: Vec2, p: Vec2, q: Vec2): number =>
+    (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const lower: Vec2[] = [];
+  for (const p of pts) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= 0) {
+      lower.pop();
+    }
+    lower.push(p);
+  }
+  const upper: Vec2[] = [];
+  for (let i = pts.length - 1; i >= 0; i--) {
+    const p = pts[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= 0) {
+      upper.pop();
+    }
+    upper.push(p);
+  }
+  const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  return hull.filter((p, i) => {
+    const q = hull[(i + 1) % hull.length]!;
+    return Math.hypot(q.x - p.x, q.y - p.y) > 1e-6;
+  });
 }
 
 /** Which side of the path a pen's own direction points at `t`: the sign that flips at a pinch. */
@@ -558,23 +849,6 @@ function edgeDirection(
   const dy = b.y - a.y;
   const len = Math.hypot(dx, dy);
   return len === 0 || !Number.isFinite(len) ? undefined : { x: dx / len, y: dy / len };
-}
-
-/**
- * A side's samples with the folds taken out: the ones that run backwards against
- * the path. The first and last are always kept, so the side still meets the lines
- * across the ends of the band.
- */
-function unfolded(samples: readonly { readonly point: Vec2; readonly along: Vec2 }[]): Vec2[] {
-  const out: Vec2[] = [samples[0]!.point];
-  for (let k = 1; k < samples.length - 1; k++) {
-    const here = samples[k]!;
-    const last = out[out.length - 1]!;
-    const step = { x: here.point.x - last.x, y: here.point.y - last.y };
-    if (step.x * here.along.x + step.y * here.along.y > 0) out.push(here.point);
-  }
-  out.push(samples[samples.length - 1]!.point);
-  return out;
 }
 
 function line(from: Vec2, to: Vec2): Cubic {
