@@ -114,6 +114,8 @@ export {
   kernGroupHolding,
   kernGroupPairs,
   kernGroupProblem,
+  kernGroupNameFrom,
+  newKernGroupFrom,
   kerningFor,
   nudgeKern,
   putGlyphInKernGroup,

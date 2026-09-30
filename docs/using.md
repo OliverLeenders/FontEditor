@@ -240,6 +240,17 @@ is kept in the source and resolved where the font is compiled, so what comes out
 ordinary font. A rule that cannot be followed leaves the glyph as drawn and is reported,
 in the export warnings and in the preflight check.
 
+**Kerning groups.** Letters whose sides have the same shape share a group, and one kerning
+value then covers all of them: `D`, `O` and `Q` end in the same round, so they share a group
+for their **right side**, used when the letter stands before a gap; `C`, `G`, `O` and `Q`
+begin round, and share one for their **left side**, used after a gap. A letter is in at most
+one group per side, so `O` is usually in two. **Groups** in the Spacing bar opens on the
+pair in front of you — for `no`, the right side of `n` and the left side of `o` — with the
+group each is in: choose another from its list, or **No group** to kern it as itself, and
+**New group from o** starts a group named after the letter with the letter in it, in one
+step. **All groups** below lists every group by right sides and left sides, where groups are
+renamed, emptied, filled by name and deleted.
+
 The inspector transforms whatever is selected by a number rather than by dragging: move,
 scale, rotate, slant, flip. It turns about any of the nine points of the selection's box,
 or about the glyph's own origin — which is what slanting an italic has to use, since

@@ -139,8 +139,20 @@ export function BarMenu({
           onClick={() => setShown((was) => !was)}
         >
           {Icon === undefined ? null : <Icon />}
+          {/* Drawn for the 7 by 4 pixels it is shown at. Lucide's chevron,
+              scaled that far down, was a 2px stroke on a 24px box come out
+              near half a pixel: there, and not seen. */}
           <span className={menu.toolCaret} aria-hidden="true">
-            <ChevronDownIcon />
+            <svg
+              viewBox="0 0 7 4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M.8.8 3.5 3.2 6.2.8" />
+            </svg>
           </span>
         </button>
       ) : (

@@ -249,6 +249,47 @@ export function takeGlyphFromKernGroup(
   );
 }
 
+/**
+ * A name for a group started from a glyph: the glyph's own, made one a group
+ * may have, and not one already taken on that side — `o`, then `o-2`.
+ */
+export function kernGroupNameFrom(kerning: Kerning, side: KernSide, glyphName: GlyphName): string {
+  const groups = side === "first" ? kerning.firstGroups : kerning.secondGroups;
+  const legal = glyphName.replace(/[^A-Za-z0-9._-]/g, "_").replace(/^[^A-Za-z0-9]+/, "");
+  const base = legal === "" ? "group" : legal;
+  let name = base;
+  for (let n = 2; name in groups; n++) name = `${base}-${String(n)}`;
+  return name;
+}
+
+/**
+ * Start a group from a glyph, with the glyph in it, in one step.
+ *
+ * The way a group is usually begun: looking at a pair, deciding this letter's
+ * side is a shape others share. Asking for a name first, and then for the
+ * letter, was two steps and a naming decision before anything could be kerned;
+ * the name is the letter's, and renaming is there for when the group has grown
+ * into something better named. The glyph leaves whichever group on that side
+ * held it, as putting it into any group does.
+ */
+export function newKernGroupFrom(
+  state: EditorState,
+  side: KernSide,
+  glyphName: GlyphName,
+): ToolResult {
+  if (!(glyphName in state.document.glyphs)) return result(state);
+  const before = state.document.kerning;
+  const name = kernGroupNameFrom(before, side, glyphName);
+  const held = kernGroupOf(before, side, glyphName);
+  const freed = held === null ? before : removeFromKernGroup(before, side, held, glyphName);
+  const kerning = setKernGroup(freed, side, name, [glyphName]);
+  return done(
+    state,
+    { ...state, document: setKerning(state.document, kerning) },
+    `New group ${name} from ${glyphName}`,
+  );
+}
+
 /** Which group holds a glyph on one side, for an interface that says so. */
 export function kernGroupHolding(
   state: EditorState,

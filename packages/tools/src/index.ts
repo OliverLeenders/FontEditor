@@ -118,6 +118,8 @@ export {
   kernGroupHolding,
   kernGroupPairs,
   kernGroupProblem,
+  kernGroupNameFrom,
+  newKernGroupFrom,
   putGlyphInKernGroup,
   renameKernGroupTo,
   takeGlyphFromKernGroup,

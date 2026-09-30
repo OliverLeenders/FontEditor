@@ -42,8 +42,10 @@ function panel(store: Store, onOpenChange = vi.fn()) {
   return { first, second, onOpenChange };
 }
 
-/** One column of the panel, by the heading it is under. */
-function side(title: "Before the gap" | "After the gap"): HTMLElement {
+/** One column of the panel, by the heading it is under, opening the lists if they are shut. */
+function side(title: "Right sides" | "Left sides"): HTMLElement {
+  const lists = screen.getByRole("button", { name: "All groups" });
+  if (lists.getAttribute("aria-expanded") !== "true") fireEvent.click(lists);
   const found = screen.getByRole("heading", { name: title }).closest("section");
   if (found === null) throw new Error(`no column for ${title}`);
   return found;
@@ -78,9 +80,54 @@ describe("the panel", () => {
   it("has a column for each side of the gap", () => {
     panel(freshStore());
 
-    expect(side("Before the gap")).toBeTruthy();
-    expect(side("After the gap")).toBeTruthy();
-    expect(within(side("Before the gap")).getByText("No groups on this side yet")).toBeTruthy();
+    expect(side("Right sides")).toBeTruthy();
+    expect(side("Left sides")).toBeTruthy();
+    expect(within(side("Right sides")).getByText("No groups on this side yet")).toBeTruthy();
+  });
+});
+
+describe("the pair on screen", () => {
+  it("leads with the two letters, and keeps the lists a press away", () => {
+    const store = freshStore();
+    const { first, second } = panel(store);
+
+    expect(screen.getByLabelText(`Group for the right side of ${first}`)).toBeTruthy();
+    expect(screen.getByLabelText(`Group for the left side of ${second}`)).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Right sides" })).toBeNull();
+    expect(screen.getByRole("button", { name: "All groups" }).getAttribute("aria-expanded")).toBe(
+      "false",
+    );
+  });
+
+  it("opens on the lists when there is no pair to start from", () => {
+    render(<KernGroups open onOpenChange={vi.fn()} first={null} second={null} />, freshStore());
+    expect(screen.getByRole("heading", { name: "Right sides" })).toBeTruthy();
+  });
+
+  it("starts a group from a letter in one press, named after it and holding it", () => {
+    const store = freshStore();
+    const { first } = panel(store);
+
+    fireEvent.click(screen.getByRole("button", { name: `New group from ${first}` }));
+
+    const groups = store.editor.document.kerning.firstGroups;
+    expect(Object.values(groups)).toEqual([[first]]);
+    expect(
+      screen.getByLabelText<HTMLSelectElement>(`Group for the right side of ${first}`).value,
+    ).toBe(Object.keys(groups)[0]);
+  });
+
+  it("moves a letter between groups, and out of all of them, from its list", () => {
+    const store = freshStore();
+    const { second } = panel(store);
+    fireEvent.click(screen.getByRole("button", { name: `New group from ${second}` }));
+    const made = Object.keys(store.editor.document.kerning.secondGroups)[0]!;
+
+    fireEvent.change(screen.getByLabelText(`Group for the left side of ${second}`), {
+      target: { value: "" },
+    });
+
+    expect(store.editor.document.kerning.secondGroups[made]).toEqual([]);
   });
 });
 
@@ -88,7 +135,7 @@ describe("naming a group", () => {
   it("refuses a name a group cannot have, before writing anything", () => {
     const store = freshStore();
     panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
 
     fireEvent.click(within(column).getByRole("button", { name: "New group" }));
     fireEvent.change(within(column).getByLabelText("Name for the new group"), {
@@ -108,7 +155,7 @@ describe("naming a group", () => {
     const store = freshStore();
     panel(store);
 
-    newGroup(side("Before the gap"), "O_round");
+    newGroup(side("Right sides"), "O_round");
 
     expect(store.editor.document.kerning.firstGroups["O_round"]).toEqual([]);
     expect(store.editor.document.kerning.secondGroups["O_round"]).toBeUndefined();
@@ -117,7 +164,7 @@ describe("naming a group", () => {
   it("refuses a second group of the same name on the same side", () => {
     const store = freshStore();
     panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
     newGroup(column, "O_round");
 
     fireEvent.click(within(column).getByRole("button", { name: "New group" }));
@@ -133,7 +180,7 @@ describe("naming a group", () => {
   it("gives up the name, and not the panel, on Escape", () => {
     const store = freshStore();
     const { onOpenChange } = panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
 
     fireEvent.click(within(column).getByRole("button", { name: "New group" }));
     fireEvent.keyDown(within(column).getByLabelText("Name for the new group"), { key: "Escape" });
@@ -147,7 +194,7 @@ describe("filling a group", () => {
   it("offers the letter in front of you as one press", () => {
     const store = freshStore();
     const { first } = panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
     newGroup(column, "O_round");
 
     fireEvent.click(within(column).getByRole("button", { name: `Add ${first}` }));
@@ -158,7 +205,7 @@ describe("filling a group", () => {
   it("says so when a letter would move out of another group", () => {
     const store = freshStore();
     const { first } = panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
     newGroup(column, "A_left");
     fireEvent.click(within(column).getByRole("button", { name: `Add ${first}` }));
     newGroup(column, "B_left");
@@ -174,7 +221,7 @@ describe("filling a group", () => {
   it("will not add a glyph the font does not have", () => {
     const store = freshStore();
     panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
     newGroup(column, "O_round");
 
     fireEvent.change(within(column).getByLabelText("Glyph to add to O_round"), {
@@ -187,7 +234,7 @@ describe("filling a group", () => {
   it("takes a member out again", () => {
     const store = freshStore();
     const { first } = panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
     newGroup(column, "O_round");
     fireEvent.click(within(column).getByRole("button", { name: `Add ${first}` }));
 
@@ -201,7 +248,7 @@ describe("deleting a group", () => {
   it("removes it, and is one step of undo", () => {
     const store = freshStore();
     panel(store);
-    const column = side("Before the gap");
+    const column = side("Right sides");
     newGroup(column, "O_round");
 
     fireEvent.click(within(column).getByRole("button", { name: "Delete" }));

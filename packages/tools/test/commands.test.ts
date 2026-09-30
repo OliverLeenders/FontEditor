@@ -74,7 +74,9 @@ import {
   kernGroupHolding,
   kernGroupPairs,
   kernGroupProblem,
+  kernGroupNameFrom,
   kerningFor,
+  newKernGroupFrom,
   putGlyphInKernGroup,
   renameKernGroupTo,
   takeGlyphFromKernGroup,
@@ -1649,6 +1651,22 @@ describe("kerning groups", () => {
     expect(groups(after, "first")["O"]).toContain("T");
     expect(groups(after, "first")["T"]).toEqual([]);
     expect(kernGroupHolding(after, "first", "T")).toBe("O");
+  });
+
+  it("starts a group from a letter, named after it and holding it, in one step", () => {
+    const outcome = newKernGroupFrom(spaced(), "first", "Q");
+    expect(groups(outcome.state, "first")["Q"]).toEqual(["Q"]);
+    // Out of the group that held it, as putting it in any group does.
+    expect(groups(outcome.state, "first")["O"]).not.toContain("Q");
+    expect(outcome.effects.filter((e) => e.kind === "commitTransaction")).toHaveLength(1);
+  });
+
+  it("names a group from a letter so it is legal and not taken", () => {
+    const k = spaced().document.kerning;
+    expect(kernGroupNameFrom(k, "first", "O")).toBe("O-2");
+    expect(kernGroupNameFrom(k, "second", "O")).toBe("O");
+    expect(kernGroupNameFrom(k, "first", ".notdef")).toBe("notdef");
+    expect(kernGroupNameFrom(k, "first", "_")).toBe("group");
   });
 
   it("will not put a glyph that does not exist into a group", () => {

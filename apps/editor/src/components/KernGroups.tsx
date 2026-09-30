@@ -5,6 +5,7 @@ import {
   deleteKernGroup,
   kernGroupPairs,
   kernGroupProblem,
+  newKernGroupFrom,
   putGlyphInKernGroup,
   renameKernGroupTo,
   takeGlyphFromKernGroup,
@@ -13,7 +14,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./KernGroups.module.css";
-import { XIcon } from "./icons.js";
+import { ChevronRightIcon, XIcon } from "./icons.js";
 
 /**
  * The kerning groups, and what is in them.
@@ -27,6 +28,15 @@ import { XIcon } from "./icons.js";
  * Controlled by the view around it, because there are two ways in: the button in
  * the bar, and the pair readout at the foot, which opens it on the two letters
  * you are looking at.
+ *
+ * Named by the side of the letter, and led by the pair. A group is about one
+ * flank of a letter — O's right side is round, and so is D's — and which flank
+ * is the one facing the gap. The two columns were headed "before the gap" and
+ * "after the gap", which is the file format's "first" and "second" put into
+ * words: true, and no help in deciding where O goes. So the panel opens on the
+ * two letters in front of you, each with the group its facing side is in and a
+ * way to start one from it, and the full lists, by right sides and left sides,
+ * are a press further down.
  */
 export function KernGroups({
   open,
@@ -42,6 +52,10 @@ export function KernGroups({
 }): React.JSX.Element {
   const reading = useStoreValue((s) => s.ownership === "reading");
   const ref = useRef<HTMLDivElement>(null);
+  const hasPair = first !== null && second !== null;
+  // The lists are the answer when there is no pair to start from, and the
+  // second thing to look at when there is.
+  const [listsShown, setListsShown] = useState(!hasPair);
 
   useEffect(() => {
     if (!open) return;
@@ -85,13 +99,136 @@ export function KernGroups({
 
       {open ? (
         <div ref={ref} className={styles.panel} role="group" aria-label="Kerning groups">
-          {/* Named for the gap rather than for the file formats' "first" and
-              "second": what is being chosen is whether the group describes a
-              letter's trailing flank or its leading one. */}
-          <Side side="first" title="Before the gap" glyph={first} />
-          <Side side="second" title="After the gap" glyph={second} />
+          <p className={styles.lead}>
+            Letters whose sides have the same shape share a group, and one kerning value then covers
+            all of them.
+          </p>
+
+          {first !== null && second !== null ? (
+            <section className={styles.pair} aria-label="The pair on screen">
+              <div className={styles.pairShown} aria-hidden="true">
+                <span>{first}</span>
+                <span className={styles.gap} />
+                <span>{second}</span>
+              </div>
+              <PairSide side="first" glyph={first} />
+              <PairSide side="second" glyph={second} />
+            </section>
+          ) : (
+            <p className={styles.note}>Choose a gap on the spacing line to group its letters.</p>
+          )}
+
+          <button
+            type="button"
+            className={styles.disclosure}
+            aria-expanded={listsShown}
+            onClick={() => setListsShown((shown) => !shown)}
+          >
+            <ChevronRightIcon />
+            All groups
+          </button>
+          {listsShown ? (
+            <div className={styles.columns}>
+              <Side
+                side="first"
+                title="Right sides"
+                note="Used when the letter is before a gap"
+                glyph={first}
+              />
+              <Side
+                side="second"
+                title="Left sides"
+                note="Used when the letter is after a gap"
+                glyph={second}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** Which flank of a letter a side's groups describe. */
+const FLANK: Readonly<Record<KernSide, "right" | "left">> = { first: "right", second: "left" };
+
+/**
+ * A letter's side as a drawing: the letter a block, the gap a line, the flank
+ * that faces it in the accent — so "right sides" is seen as well as read.
+ */
+function FlankMark({ side }: { readonly side: KernSide }): React.JSX.Element {
+  const right = FLANK[side] === "right";
+  return (
+    <svg className={styles.flank} viewBox="0 0 18 12" aria-hidden="true">
+      <rect x={right ? 1 : 8} y={1} width={9} height={10} rx={1} className={styles.flankLetter} />
+      <rect x={right ? 9 : 8} y={1} width={1.5} height={10} className={styles.flankEdge} />
+      <line
+        x1={right ? 14.5 : 3.5}
+        y1={0}
+        x2={right ? 14.5 : 3.5}
+        y2={12}
+        className={styles.flankGap}
+      />
+    </svg>
+  );
+}
+
+/**
+ * One letter of the pair on screen: the group its side facing the gap is in,
+ * changed by choosing another, and a group started from it in one press.
+ */
+function PairSide({
+  side,
+  glyph,
+}: {
+  readonly side: KernSide;
+  readonly glyph: string;
+}): React.JSX.Element {
+  const store = useEditorStore();
+  const kerning = useStoreValue((s) => s.session.editor.document.kerning);
+  const groups = side === "first" ? kerning.firstGroups : kerning.secondGroups;
+  const names = useMemo(() => Object.keys(groups), [groups]);
+  const holding = names.find((name) => groups[name]?.includes(glyph)) ?? null;
+  const flank = FLANK[side];
+
+  return (
+    <div className={styles.pairSide} data-side={side}>
+      <span className={styles.pairLabel}>
+        <FlankMark side={side} />
+        <span>
+          <b>{glyph}</b>, {flank} side
+        </span>
+      </span>
+      <select
+        className={styles.pairGroup}
+        aria-label={`Group for the ${flank} side of ${glyph}`}
+        value={holding ?? ""}
+        onChange={(event) => {
+          const chosen = event.target.value;
+          if (chosen === "") {
+            if (holding !== null) {
+              store.applyTool(takeGlyphFromKernGroup(store.editor, side, holding, glyph));
+            }
+          } else {
+            store.applyTool(putGlyphInKernGroup(store.editor, side, chosen, glyph));
+          }
+        }}
+      >
+        <option value="">No group: kerned as itself</option>
+        {names.map((name) => (
+          <option key={name} value={name}>
+            {name} ({groups[name]?.length ?? 0})
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className={styles.action}
+        title={`A group named after ${glyph}, with ${glyph} in it; rename it once it has grown`}
+        onClick={() => store.applyTool(newKernGroupFrom(store.editor, side, glyph))}
+      >
+        New group from {glyph}
+      </button>
     </div>
   );
 }
@@ -100,10 +237,13 @@ export function KernGroups({
 function Side({
   side,
   title,
+  note,
   glyph,
 }: {
   readonly side: KernSide;
   readonly title: string;
+  /** When the side's groups are used, in words. */
+  readonly note: string;
   /** The letter in front of you on this side, offered as a member. */
   readonly glyph: string | null;
 }): React.JSX.Element {
@@ -128,7 +268,11 @@ function Side({
 
   return (
     <section className={styles.side}>
-      <h3 className={styles.title}>{title}</h3>
+      <h3 className={styles.title}>
+        <FlankMark side={side} />
+        {title}
+      </h3>
+      <p className={styles.note}>{note}</p>
 
       <ul className={styles.groups}>
         {names.map((name) => (
