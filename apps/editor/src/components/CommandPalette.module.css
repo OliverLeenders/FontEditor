@@ -8,7 +8,7 @@
   justify-content: center;
   align-items: flex-start;
   padding: 12vh 1rem 1rem;
-  background: rgba(19, 25, 34, 0.2);
+  background: var(--scrim);
 }
 
 .palette {
@@ -44,7 +44,7 @@
   background: none;
   color: var(--ink);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: var(--text-l);
   outline: none;
 }
 
@@ -64,7 +64,7 @@
   padding: 0.35rem 0.5rem;
   border-radius: 2px;
   cursor: pointer;
-  font-size: 0.82rem;
+  font-size: var(--text-m);
   color: var(--ink);
 }
 .row[aria-selected="true"] {
@@ -75,7 +75,7 @@
   flex: none;
   width: 4.5rem;
   color: var(--ink-3);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
 }
 
 .label {
@@ -96,12 +96,12 @@
   flex: none;
   color: var(--ink-3);
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
 }
 
 .none {
   margin: 0;
   padding: 0.8rem;
-  font-size: 0.82rem;
+  font-size: var(--text-m);
   color: var(--ink-3);
 }

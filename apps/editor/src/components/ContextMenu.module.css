@@ -23,7 +23,7 @@
   background: none;
   cursor: pointer;
   text-align: left;
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   color: var(--ink);
 }
 /*

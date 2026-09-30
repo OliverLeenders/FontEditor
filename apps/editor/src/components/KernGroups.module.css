@@ -18,7 +18,7 @@
   color: var(--ink-2);
   cursor: pointer;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: var(--text-s);
 }
 .open:hover:not(:disabled) {
   color: var(--ink);
@@ -38,7 +38,7 @@
    one while the other is out of sight is how they drift apart. */
 .panel {
   position: absolute;
-  top: calc(100% + 0.4rem);
+  top: calc(100% + var(--popover-gap));
   left: 0.7rem;
   right: 0.7rem;
   z-index: 20;
@@ -58,7 +58,7 @@
 /* One line of what a group is for, above everything else. */
 .lead {
   margin: 0;
-  font-size: 0.76rem;
+  font-size: var(--text-s);
   color: var(--ink-2);
 }
 
@@ -80,7 +80,7 @@
   justify-content: center;
   gap: 0.6rem;
   font-family: var(--font-mono);
-  font-size: 1.05rem;
+  font-size: var(--text-xl);
   color: var(--ink);
 }
 .gap {
@@ -102,7 +102,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  font-size: 0.76rem;
+  font-size: var(--text-s);
   color: var(--ink-2);
 }
 .pairLabel b {
@@ -142,7 +142,7 @@
   background: none;
   color: var(--ink-2);
   font: inherit;
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 .disclosure svg {
@@ -178,9 +178,9 @@
   align-items: center;
   gap: 0.35rem;
   margin: 0;
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -211,7 +211,7 @@
   color: var(--ink-2);
   cursor: pointer;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   text-align: left;
 }
 .group:hover {
@@ -233,7 +233,7 @@
 .count {
   flex: none;
   font-variant-numeric: tabular-nums;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   opacity: 0.75;
 }
 
@@ -247,18 +247,7 @@
 }
 
 .action {
-  padding: 0.15rem 0.5rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: none;
-  color: var(--ink-2);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.74rem;
-}
-.action:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--ink-3);
+  composes: small from "./Button.module.css";
 }
 .action:disabled {
   opacity: var(--disabled);
@@ -279,7 +268,7 @@
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
 }
 .input[data-wrong="true"] {
   border-color: var(--warn);
@@ -305,7 +294,7 @@
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.76rem;
+  font-size: var(--text-s);
 }
 
 .drop {
@@ -321,7 +310,7 @@
   color: var(--ink-3);
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   line-height: 1;
 }
 /* The Lucide X, as every other close and remove mark is, at the small size. */
@@ -342,12 +331,12 @@
 .empty,
 .note {
   margin: 0;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 
 .problem {
   flex-basis: 100%;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--warn);
 }

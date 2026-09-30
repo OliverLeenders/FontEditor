@@ -13,7 +13,7 @@
  */
 .panel {
   position: absolute;
-  top: calc(100% + 0.4rem);
+  top: calc(100% + var(--popover-gap));
   right: 0;
   z-index: 20;
   min-width: 12rem;
@@ -37,8 +37,8 @@
 }
 
 .name {
-  font-size: 0.76rem;
-  letter-spacing: 0.04em;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-2);
 }
@@ -53,7 +53,7 @@
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   font-variant-numeric: tabular-nums;
 }
 .field:focus-visible {
@@ -76,25 +76,10 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.82rem;
+  font-size: var(--text-m);
   color: var(--ink);
 }
 
 .apply {
-  padding: 0.35rem 0.5rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink);
-  font-size: 0.82rem;
-  cursor: pointer;
-}
-
-.apply:hover {
-  background: var(--surface-2);
-}
-
-.apply:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  composes: large from "./Button.module.css";
 }

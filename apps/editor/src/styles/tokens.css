@@ -11,6 +11,14 @@
  * So the dark media query is guarded against an explicit light choice, and the
  * dark stamp repeats the same tokens to win over a light machine.
  */
+
+/*
+ * The cascade's layers, lowest first: the element defaults below, then the
+ * shared secondary button (Button.module.css). Everything a component writes is
+ * outside any layer and so wins over both, whichever stylesheet loads first.
+ */
+@layer base, button;
+
 :root {
   --ground: #f6f8fa;
   --surface: #ffffff;
@@ -32,6 +40,12 @@
      rules: --rule is too faint against a sunk canvas's shadow, --rule-strong a
      step too heavy for a line that runs the width of the window. */
   --rule-frame: #cfd8e1;
+  /* What dims the window behind a dialog. */
+  --scrim: rgba(19, 25, 34, 0.28);
+  /* The strip that says this tab is only reading. */
+  --warn-surface: #fbefd6;
+  --warn-ink: #5a410e;
+  --warn-rule: #e6cb8e;
   --accent: #2c6daf;
   --accent-ink: #1f548a;
   --accent-soft: #e4eef8;
@@ -93,6 +107,28 @@
   --icon: 1.25rem;
   --icon-inline: 1.1rem;
   --icon-small: 0.92rem;
+  /*
+   * The type scale. The root is 13px; these are the sizes the interface is set
+   * in, where there had been twenty-two, five of them within a pixel of each
+   * other.
+   *   --text-2xs  0.68rem  uppercase headings, the smallest notes
+   *   --text-xs   0.72rem  notes, counts, small buttons
+   *   --text-s    0.78rem  labels and most controls
+   *   --text-m    0.84rem  values read closely, a panel's title
+   *   --text-l    0.95rem  the odd larger word
+   *   --text-xl   1.1rem   a sample set large
+   */
+  --text-2xs: 0.68rem;
+  --text-xs: 0.72rem;
+  --text-s: 0.78rem;
+  --text-m: 0.84rem;
+  --text-l: 0.95rem;
+  --text-xl: 1.1rem;
+  /* A row under the pointer, and the row that is chosen, in a list. */
+  --hover: var(--surface-2);
+  --selected: var(--accent-soft);
+  /* How far below its button a popover hangs. */
+  --popover-gap: 0.35rem;
   /* How far anything that cannot be pressed now fades, everywhere. */
   --disabled: 0.38;
   --radius: 3px;
@@ -119,6 +155,10 @@
     --rule: #232d38;
     --rule-strong: #33404e;
     --rule-frame: #2b3643;
+    --scrim: rgba(0, 0, 0, 0.5);
+    --warn-surface: #4a3a14;
+    --warn-ink: #f2e3c4;
+    --warn-rule: #6b5520;
     --accent: #74aee2;
     --accent-ink: #a6ccee;
     --accent-soft: #142838;
@@ -147,6 +187,10 @@
   --rule: #232d38;
   --rule-strong: #33404e;
   --rule-frame: #2b3643;
+  --scrim: rgba(0, 0, 0, 0.5);
+  --warn-surface: #4a3a14;
+  --warn-ink: #f2e3c4;
+  --warn-rule: #6b5520;
   --accent: #74aee2;
   --accent-ink: #a6ccee;
   --accent-soft: #142838;
@@ -191,14 +235,18 @@ body {
   overflow: hidden;
 }
 
-button {
-  font: inherit;
-  color: inherit;
-}
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+/* In the lowest layer, so a button a component or the shared button styles
+   keeps its own type and colour. */
+@layer base {
+  button {
+    font: inherit;
+    color: inherit;
+  }
+  button:focus-visible,
+  input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
 }
 
 /*

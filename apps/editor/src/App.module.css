@@ -116,7 +116,7 @@
   border-radius: var(--radius);
   background: var(--surface);
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   color: var(--ink-2);
 }
 .reveal:hover {
@@ -132,10 +132,10 @@
   align-items: center;
   gap: 0.8rem;
   padding: 0.45rem 0.8rem;
-  background: var(--warn-surface, #4a3a14);
-  color: var(--warn-ink, #f2e3c4);
-  border-bottom: 1px solid var(--warn-rule, #6b5520);
-  font-size: 0.8rem;
+  background: var(--warn-surface);
+  color: var(--warn-ink);
+  border-bottom: 1px solid var(--warn-rule);
+  font-size: var(--text-s);
 }
 
 .readOnly button {
@@ -147,10 +147,11 @@
   color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
 }
+/* A tint of the strip's own ink, which reads in either theme. */
 .readOnly button:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, currentColor 12%, transparent);
 }
 
 /*

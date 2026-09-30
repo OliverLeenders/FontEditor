@@ -27,7 +27,7 @@
 
 .title {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: var(--text-l);
   font-weight: 600;
   overflow-wrap: anywhere;
 }
@@ -35,14 +35,14 @@
 .body {
   margin: 0;
   color: var(--ink-2);
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   line-height: 1.5;
 }
 
 .failed {
   margin: 0;
   color: var(--danger);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
 }
 
 .actions {
@@ -54,17 +54,7 @@
 }
 
 .button {
-  padding: 0.3rem 0.65rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--canvas);
-  color: var(--ink);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.78rem;
-}
-.button:hover:not(:disabled) {
-  background: var(--surface-2);
+  composes: large from "./Button.module.css";
 }
 .button:disabled {
   opacity: var(--disabled);

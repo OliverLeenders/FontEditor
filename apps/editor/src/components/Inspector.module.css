@@ -99,7 +99,7 @@
 .title {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 0.84rem;
+  font-size: var(--text-m);
   color: var(--ink);
 }
 
@@ -113,7 +113,7 @@
   background: none;
   cursor: pointer;
   color: var(--ink-3);
-  font-size: 0.9rem;
+  font-size: var(--text-l);
   line-height: 1;
 }
 .dock svg {
@@ -138,7 +138,7 @@
   background: none;
   cursor: pointer;
   color: var(--ink-3);
-  font-size: 0.95rem;
+  font-size: var(--text-l);
   line-height: 1;
 }
 .dismiss svg {
@@ -209,8 +209,8 @@
   text-align: left;
   color: var(--ink-2);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.09em;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .sectionToggle:hover {
@@ -281,8 +281,8 @@
 
 .label {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.09em;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -295,13 +295,13 @@
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.84rem;
+  font-size: var(--text-m);
   font-variant-numeric: tabular-nums;
 }
 
 .readonly {
   font-family: var(--font-mono);
-  font-size: 0.82rem;
+  font-size: var(--text-m);
   color: var(--ink-2);
 }
 
@@ -316,7 +316,7 @@
   border-radius: var(--radius);
   background: var(--ground);
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   color: var(--ink-2);
 }
 .segmented button:hover:not(:disabled) {
@@ -366,13 +366,13 @@
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: var(--font-mono);
-  font-size: 0.84rem;
+  font-size: var(--text-m);
   color: var(--ink);
 }
 
 .componentAt {
   flex: none;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   font-variant-numeric: tabular-nums;
   color: var(--ink-2);
 }
@@ -455,7 +455,7 @@
 
 .side {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 
@@ -537,7 +537,7 @@
 .imageName {
   overflow: hidden;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--ink-2);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -549,7 +549,7 @@
   border-radius: var(--radius);
   background: var(--ground);
   color: var(--ink-2);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 .imageFit:hover {
@@ -575,7 +575,7 @@
   background: var(--ground);
   color: var(--ink-3);
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: var(--text-2xs);
   cursor: pointer;
 }
 .guideScope[aria-pressed="true"] {
@@ -591,7 +591,7 @@
   background: none;
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   text-align: left;
   cursor: pointer;
   overflow: hidden;
@@ -607,7 +607,7 @@
   border-radius: var(--radius);
   background: var(--ground);
   color: var(--ink-2);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   cursor: pointer;
 }
 .align:hover:not(:disabled) {
@@ -661,7 +661,7 @@
 .layerName {
   min-width: 0;
   overflow: hidden;
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ink);
@@ -677,25 +677,15 @@
   min-width: 0;
 }
 .layerAddButton {
+  composes: small from "./Button.module.css";
   flex: none;
-  padding: 0.12rem 0.4rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink-2);
-  font: inherit;
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-.layerAddButton:hover:not(:disabled) {
-  color: var(--ink);
 }
 .layerAddButton:disabled {
   opacity: var(--disabled);
   cursor: default;
 }
 .layerRemove {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 .layerRemove summary {

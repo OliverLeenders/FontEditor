@@ -13,7 +13,7 @@
   padding: 0.5rem 0.7rem;
   border-bottom: 1px solid var(--rule-frame);
   background: var(--surface);
-  font-size: 0.76rem;
+  font-size: var(--text-s);
   color: var(--ink-2);
 }
 
@@ -94,14 +94,14 @@
   overflow-y: auto;
   padding: 0.8rem 1rem;
   background: var(--surface);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   color: var(--ink-2);
   line-height: 1.5;
 }
 
 .heading {
   margin: 0 0 0.4rem;
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-2);

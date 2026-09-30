@@ -16,7 +16,7 @@
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--text-s);
 }
 
 /* Wide content scrolls inside its own box; the page never scrolls sideways. */

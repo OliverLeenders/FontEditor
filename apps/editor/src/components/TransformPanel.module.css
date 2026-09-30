@@ -5,8 +5,8 @@
 
 .label {
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.09em;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -61,7 +61,7 @@
   color: var(--ink-2);
   cursor: pointer;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: var(--text-s);
 }
 
 /*
@@ -121,7 +121,7 @@
   align-items: center;
   gap: 0.22rem;
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: var(--text-2xs);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -170,7 +170,7 @@
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   font-variant-numeric: tabular-nums;
 }
 .input:disabled {

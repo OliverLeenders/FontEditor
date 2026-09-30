@@ -13,7 +13,7 @@
   display: grid;
   place-items: center;
   padding: 2rem 1rem;
-  background: rgba(19, 25, 34, 0.35);
+  background: var(--scrim);
 }
 
 .sheet {
@@ -39,7 +39,7 @@
 
 .title {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--text-m);
   font-weight: 600;
   color: var(--ink);
 }
@@ -57,7 +57,7 @@
   background: var(--ground);
   color: var(--ink);
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: var(--text-s);
 }
 .filter:focus-visible {
   border-color: var(--accent);
@@ -113,7 +113,7 @@
   background: none;
   color: var(--ink-2);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   text-align: left;
   cursor: pointer;
 }
@@ -144,7 +144,7 @@
 .placeCount {
   color: var(--ink-3);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -158,21 +158,21 @@
 
 .pageTitle {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   font-weight: 600;
   color: var(--ink);
 }
 
 .pageNote {
   margin: 0.1rem 0 0;
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 
 .nothing {
   margin: 0;
   color: var(--ink-3);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
 }
 
 /* One grid for the whole page, so every description on it starts at the same
@@ -182,7 +182,7 @@
   grid-template-columns: minmax(7rem, auto) 1fr;
   gap: 0.34rem 0.9rem;
   margin: 0.7rem 0 0;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
 }
 
 /* The key and what it does are one row of the grid, so the pair is transparent
@@ -216,19 +216,19 @@
   background: var(--ground);
   color: var(--ink);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.5;
   white-space: nowrap;
 }
 
 .saying {
   color: var(--ink-2);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
 }
 
 .or {
   color: var(--ink-3);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
 }
 
 .what {

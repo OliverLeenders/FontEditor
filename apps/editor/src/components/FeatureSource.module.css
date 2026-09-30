@@ -15,7 +15,7 @@
   border-right: 1px solid var(--rule);
   background: var(--canvas);
   font-family: var(--font-mono);
-  font-size: 0.84rem;
+  font-size: var(--text-m);
   line-height: 1.6;
 }
 
@@ -163,7 +163,7 @@
   border: 1px solid var(--rule);
   border-radius: var(--radius);
   background: var(--surface);
-  box-shadow: 0 6px 18px rgb(0 0 0 / 28%);
+  box-shadow: var(--shadow);
   list-style: none;
 }
 
@@ -197,7 +197,7 @@
   padding: 0.35rem 0.6rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   line-height: 1.4;
 }
 

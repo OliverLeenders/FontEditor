@@ -168,6 +168,7 @@ export function Projects(): React.JSX.Element {
           <div className={styles.actions}>
             <button
               type="button"
+              className={styles.go}
               onClick={() => {
                 setNaming(true);
               }}
@@ -180,6 +181,7 @@ export function Projects(): React.JSX.Element {
             {canOpenFolders() ? (
               <button
                 type="button"
+                className={styles.go}
                 onClick={() => {
                   setFailed(null);
                   void store
@@ -198,6 +200,7 @@ export function Projects(): React.JSX.Element {
             {current === null ? null : (
               <button
                 type="button"
+                className={styles.go}
                 onClick={() => {
                   store.showProjects(false);
                 }}

@@ -19,7 +19,7 @@
  */
 .panel {
   position: absolute;
-  top: calc(100% + 0.4rem);
+  top: calc(100% + var(--popover-gap));
   right: 0;
   z-index: 20;
   min-width: 17rem;
@@ -42,7 +42,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   color: var(--ink);
   cursor: pointer;
 }
@@ -65,12 +65,12 @@
    first, with the name after it as the gloss it is. */
 .tag {
   font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   color: var(--ink);
 }
 
 .name {
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 
@@ -96,22 +96,12 @@
 
 .note {
   margin: 0;
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
   color: var(--ink-3);
 }
 
 .reset {
-  padding: 0.12rem 0.45rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink-2);
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-.reset:hover:not(:disabled) {
-  color: var(--ink);
-  border-color: var(--accent);
+  composes: small from "./Button.module.css";
 }
 .reset:disabled {
   opacity: var(--disabled);

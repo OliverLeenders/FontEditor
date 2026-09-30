@@ -10,7 +10,7 @@
 
 .panel {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  top: calc(100% + var(--popover-gap));
   left: 0;
   z-index: 30;
   width: min(46rem, 80vw);
@@ -27,28 +27,19 @@
   gap: 0.6rem;
   margin-bottom: 0.45rem;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--ink-2);
 }
 
 .hint {
   flex: 1;
   color: var(--ink-3);
-  font-family: var(--font-sans, inherit);
-  font-size: 0.74rem;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
 }
 
 .close {
-  padding: 0.12rem 0.45rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink-2);
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-.close:hover {
-  color: var(--ink);
+  composes: small from "./Button.module.css";
 }
 
 .sheet {
@@ -75,7 +66,7 @@
   margin: 0;
   padding: 2rem 1rem;
   color: var(--ink-3);
-  font-size: 0.8rem;
+  font-size: var(--text-s);
   text-align: center;
 }
 

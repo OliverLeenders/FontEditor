@@ -12,7 +12,7 @@
 
 .panel {
   position: absolute;
-  top: calc(100% + 0.35rem);
+  top: calc(100% + var(--popover-gap));
   left: 0;
   z-index: 20;
   width: 20rem;
@@ -30,8 +30,8 @@
   gap: 0.5rem;
   margin-bottom: 0.45rem;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.09em;
+  font-size: var(--text-2xs);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-3);
 }
@@ -48,33 +48,21 @@
 .keep svg,
 .restore svg {
   flex: none;
-  width: 0.8rem;
-  height: 0.8rem;
+  width: var(--icon-small);
+  height: var(--icon-small);
 }
 
+/* The shared secondary button (Button.module.css). */
 .keep {
-  padding: 0.15rem 0.4rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink-2);
-  font-size: 0.72rem;
+  composes: small from "./Button.module.css";
   letter-spacing: 0;
   text-transform: none;
-  cursor: pointer;
-}
-.keep:hover:not(:disabled) {
-  color: var(--ink);
-}
-.keep:disabled {
-  opacity: var(--disabled);
-  cursor: default;
 }
 
 .empty {
   margin: 0;
   color: var(--ink-3);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   line-height: 1.4;
 }
 
@@ -102,36 +90,24 @@
 }
 
 .when {
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   color: var(--ink);
 }
 
 .size {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
 }
 
+/* The shared secondary button (Button.module.css). */
 .restore {
-  padding: 0.12rem 0.4rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--ground);
-  color: var(--ink-2);
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-.restore:hover:not(:disabled) {
-  color: var(--ink);
-}
-.restore:disabled {
-  opacity: var(--disabled);
-  cursor: default;
+  composes: small from "./Button.module.css";
 }
 
 .said {
   margin: 0.45rem 0 0;
   color: var(--ink-2);
-  font-size: 0.78rem;
+  font-size: var(--text-s);
 }

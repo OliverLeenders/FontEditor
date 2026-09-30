@@ -25,7 +25,7 @@
 
 .title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -52,14 +52,14 @@
 }
 
 .resumeWhat {
-  font-size: 0.95rem;
+  font-size: var(--text-l);
 }
 
 .resumeWhere,
 .where {
   color: var(--ink-3);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: var(--text-xs);
 }
 
 .list {
@@ -96,7 +96,7 @@
 }
 
 .name {
-  font-size: 0.85rem;
+  font-size: var(--text-m);
 }
 
 .forget {
@@ -105,7 +105,7 @@
   border-radius: var(--radius);
   background: none;
   color: var(--ink-3);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   cursor: pointer;
 }
 
@@ -140,23 +140,9 @@
   gap: 0.4rem;
 }
 
-.actions button,
+/* The shared secondary button (Button.module.css), at a dialog's size. */
 .go {
-  padding: 0.35rem 0.7rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  cursor: pointer;
-}
-
-.actions button:hover,
-.go:hover:not(:disabled) {
-  background: var(--surface-2);
-}
-
-.go:disabled {
-  color: var(--ink-3);
-  cursor: default;
+  composes: large from "./Button.module.css";
 }
 
 .field {
@@ -174,7 +160,7 @@
   align-items: center;
   margin-top: 0.2rem;
   color: var(--ink-2);
-  font-size: 0.75rem;
+  font-size: var(--text-s);
 }
 
 /*
@@ -196,32 +182,22 @@
 .confirmText {
   flex: 1;
   color: var(--ink-2);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
 }
 
-.small,
-.danger {
-  padding: 0.22rem 0.55rem;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-
-.small:hover {
-  background: var(--surface-2);
+.small {
+  composes: small from "./Button.module.css";
 }
 
 /* Deleting the only copy of a font gets the colour for things that cannot be undone. */
 .danger {
+  composes: small from "./Button.module.css";
   border-color: var(--danger);
   color: var(--danger);
 }
 
 .failed {
   margin: 0;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   color: var(--danger);
 }

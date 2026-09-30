@@ -130,7 +130,7 @@ select {
   background-repeat: no-repeat;
   color: var(--ink);
   font: inherit;
-  font-size: 0.78rem;
+  font-size: var(--text-s);
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
@@ -180,7 +180,7 @@ select:disabled {
     padding: 0.25rem 0.5rem;
     border-radius: 2px;
     color: var(--ink);
-    font-size: 0.8rem;
+    font-size: var(--text-s);
     cursor: pointer;
   }
   /* A step lighter than the menu under the pointer, as a menu row is; the one
