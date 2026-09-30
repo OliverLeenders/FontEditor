@@ -22,7 +22,10 @@ asked to — and a second font opens in a window of its own. The grid lists what
 not got as well as what it has, and a glyph is made from the hole where it belongs. A line
 can be set with any of the font's own features switched on, so a stylistic set is judged
 where it is drawn. A Macintosh bitmap font in a StuffIt archive opens as outlines. The
-desktop application installs from a release, updates itself, and says which version it is.
+desktop application installs from a release, updates itself, and says which version it is,
+and the browser build is served at [typewright.io](https://typewright.io) from every release.
+Every command and every glyph is a Ctrl-K away, by name, character, code point or what the
+standard calls it, and the undo history can be walked to any step in one press.
 
 | Phase |                                     | Status                                                                                     |
 | ----- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -36,7 +39,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 7     | Spacing and kerning                 | done                                                                                       |
 | 8     | OpenType features                   | most of `.fea` compiles to GSUB and GPOS, and anchors to marks                             |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools        |
-| 10    | Production polish                   | lint, format and about 2,700 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and about 3,750 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                       |
 | 12    | Not losing what was opened          | done                                                                                       |
 | 13    | The family, named                   | done                                                                                       |
@@ -50,7 +53,7 @@ desktop application installs from a release, updates itself, and says which vers
 | 21    | Two fonts side by side              | done: a window per font                                                                    |
 | 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools       |
 | 23    | Right-to-left text                  | done: bidi runs, and direction, script and language chosen in each bar                     |
-| 24    | The web build, hosted               | later                                                                                      |
+| 24    | The web build, hosted               | done: typewright.io, published to Cloudflare Pages from every release                      |
 | 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                        |
 | 26    | The last interface tests            | done: every panel and control is rendered by a test                                        |
 | 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried           |
@@ -64,6 +67,8 @@ desktop application installs from a release, updates itself, and says which vers
 | 35    | A node that holds its curvature     | done: harmonising that stays, and continuous corners drawn round without extra points      |
 | 36    | Named alternates                    | done: set and variant names from the feature file, and aalt as written or gathered         |
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
+| —     | Finding one's way                   | done, unplanned: a command palette, the undo history, search by name, groups by side       |
+| —     | One look                            | done, unplanned: sunk canvases, one type scale, one button, one set of icon sizes          |
 
 ### What the table missed
 
@@ -598,11 +603,14 @@ Mirroring — the brackets that face the other way — is HarfBuzz's own doing f
 told runs right to left, and doing it here as well turned every bracket back as it went in.
 That is a test now.
 
-#### Phase 24 — The web build, hosted
+#### Phase 24 — The web build, hosted — done
 
-The browser build runs anywhere a folder of files can be served, and is served nowhere.
-Choosing a host decides how the content security policy reaches it — a header, or a meta tag
-where the host cannot send one — and gives the README somewhere to link to.
+The browser build is served at [typewright.io](https://typewright.io), published to
+Cloudflare Pages by the Web workflow from every tagged release — the same bundle the desktop
+installers embed. The host sends the content security policy as a header, from a `_headers`
+file the build writes out of the one policy the desktop window uses, and a `_redirects` file
+answers a deep link with the application rather than a 404. See docs/development.md, "The
+browser build, hosted".
 
 #### Phase 25 — The feature source, further — done
 
@@ -1270,6 +1278,52 @@ to a fiftieth of a unit, snapped to a fine grid so edges meant to be one are one
 polygon-clipping (Martinez–Rueda, MIT), and cubics fitted back through the result with its
 corners kept. It is used where the union of curves gives up, and for a stroke's ink where that
 union's answer would still join further.
+
+#### After phase 36 — What the releases carried — done
+
+Not a phase: what 0.1.44 to 0.1.54 carried, found by using the editor day to day, and most of
+it about finding one's way round rather than about the font.
+
+- **A font kept as a UFO of its own.** Saving asks for the folder to keep the font _in_ — a
+  fonts folder, or a project's — and makes `Family-Style.ufo` there, never writing over
+  another font's UFO; a same-named one is kept beside it as `-2`. The picker used to open
+  inside the last font's UFO, and Save as accepted it, so a second font could be saved over
+  the first.
+- **Every command by name.** Ctrl-K lists the workspaces, the tools, what the canvas menu can
+  do to the selection, and the File menu, narrowed by typing, each with its key. It goes to a
+  glyph as well — by name, character, code point, or what the standard calls it — and offers
+  to make one the font has not got.
+- **Glyphs found by what they are.** A search of three letters or more in the glyph grid also
+  looks among the Unicode names: `dotless` finds ı and ȷ whatever the font called them, and
+  the characters so named that the font has not got are offered as cells to make.
+- **The undo history, walked in one press.** Beside the preferences, or Ctrl-Shift-H: every
+  step undo and redo can reach, named, with the glyph it changed and how long ago; pressing
+  one goes straight there, and a step that changed another glyph opens it.
+- **The menu on a selection.** Right-clicking empty canvas or a segment while points are
+  selected offers the node types and the handle lock for all of them, where before only a
+  right-click on one of the points did.
+- **Bars that say more.** The window bar says where the font is kept, and marks unsaved
+  changes; the status bar gives the selection's size and where the pointer is; the inspector
+  leads with the sections about what is selected; menus name their keys in a column of
+  their own.
+- **Keys that meant something else.** `?` can be typed in the proof's text and the feature
+  file; a search or the proof's text keeps its own Ctrl-Z rather than taking back an edit to
+  the font out of sight; the Space preview and a held tool are given back when focus leaves;
+  Escape that closes a popover goes no further.
+- **A waterfall that zooms without losing its ladder.** Ctrl and the wheel scale the page as
+  a view, where they had rewritten every size, rounded and pinned at the ends; the sizes are a
+  row of chips, the chosen one's features after them, and ladders to fill the page from.
+- **Kerning groups by the side of the letter.** The panel opens on the pair in front of you —
+  `n`'s right side, `o`'s left — with the group each is in, and a group started from a
+  letter in one press. The lists behind it are headed Right sides and Left sides, where they
+  were "before the gap" and "after the gap".
+- **One look.** The canvases are sunk into the window with an inset shadow, the bars around
+  them lie flat, and only what floats casts a shadow; the lines framing the regions are one
+  colour. One type scale of six sizes where there were twenty-two, one set of icon sizes at
+  which Lucide's stroke stays crisp, one secondary button composed by twenty that had each
+  been written out, one faded state, one scrim, one focus ring. Two colours the grid's list
+  of sets used had never been defined, so it had shown no hover and no chosen set, and a
+  select's chevron was a `data:` image the content security policy refused.
 
 #### Parked
 
