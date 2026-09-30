@@ -1,4 +1,13 @@
-import { type Cubic, arcLength, cubic, curvature, endTangent, evaluate, tangent } from "./cubic.js";
+import {
+  type Cubic,
+  arcLength,
+  cubic,
+  curvature,
+  derivative,
+  endTangent,
+  evaluate,
+  tangent,
+} from "./cubic.js";
 import { fitCubics } from "./fit.js";
 import { halfNib, nibStroke, ovalBands, ovalCap, ovalFolds, ovalWedge } from "./nib.js";
 import { OFFSET_TOLERANCE, leftNormal } from "./offset.js";
@@ -483,7 +492,7 @@ function varyingBands(
       broken = true;
       continue;
     }
-    const folding = foldingSteps(run);
+    const folding = foldingSteps(run, curve, penOn);
     if (!folding.some(Boolean)) {
       const fitted = fittedSides(curve, penOn, run, tolerance);
       if (fitted === null) broken = true;
@@ -584,17 +593,71 @@ function fittedSides(
  * crossing to cut the fold at. Either way the side is not the edge of the ink
  * there, and no fitting of it is.
  */
-function foldingSteps(samples: readonly SideSample[]): boolean[] {
+function foldingSteps(
+  samples: readonly SideSample[],
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+): boolean[] {
   const back = (from: Vec2, to: Vec2, along: Vec2): boolean =>
     (to.x - from.x) * along.x + (to.y - from.y) * along.y < 0;
+  const pivots = samples.map((s) => pivoting(curve, penOn, s.t));
   const out: boolean[] = [];
   for (let k = 0; k + 1 < samples.length; k++) {
     const here = samples[k]!;
     const next = samples[k + 1]!;
-    out.push(back(here.left, next.left, next.along) || back(here.right, next.right, next.along));
+    out.push(
+      back(here.left, next.left, next.along) ||
+        back(here.right, next.right, next.along) ||
+        pivots[k]! ||
+        pivots[k + 1]!,
+    );
   }
   return out;
 }
+
+/**
+ * Whether a broad nib that is turning pivots on itself at `t`: some point of it
+ * other than its ends moving along the nib rather than across it.
+ *
+ * A broad nib's ink is bounded by the paths its two ends trace, and the sides of
+ * a band are those two paths — which holds while the whole nib moves one way
+ * across itself. A nib that only moves swaps its sides where the path runs along
+ * it, at its centre. A nib that also turns does not: every point of it moves
+ * across the nib at a rate that changes linearly from one end to the other, and
+ * where that rate is nothing, somewhere between the ends, the nib pivots — the
+ * two ends swing opposite ways, and the ink there is bounded by where the nib
+ * pivots, which neither end's path is. That point walks from one end to the other
+ * over a stretch of the curve, and the stretch is swept like a fold.
+ *
+ * The rate across the nib at the point `s` of the way from its centre to an end
+ * is the cross product of the path's velocity plus `s` times the half-nib's with
+ * the half-nib, so it is nothing at `s* = −(P′ × h) / (h′ × h)`.
+ */
+function pivoting(curve: Cubic, penOn: (t: number) => PenShape, t: number): boolean {
+  const pen = penOn(t);
+  if (!isBroad(pen)) return false;
+  const half = (u: number): Vec2 => {
+    const p = penOn(u);
+    const a = (p.angle * Math.PI) / 180;
+    return { x: (Math.cos(a) * p.width) / 2, y: (Math.sin(a) * p.width) / 2 };
+  };
+  const step = 1e-4;
+  const before = half(Math.max(0, t - step));
+  const after = half(Math.min(1, t + step));
+  const span = Math.min(1, t + step) - Math.max(0, t - step);
+  const h = half(t);
+  const turning = { x: (after.x - before.x) / span, y: (after.y - before.y) / span };
+  const velocity = derivative(curve, t);
+  const cross = (a: Vec2, b: Vec2): number => a.x * b.y - a.y * b.x;
+  const d = cross(turning, h);
+  const size = Math.hypot(h.x, h.y) * Math.hypot(velocity.x, velocity.y);
+  if (size === 0 || Math.abs(d) <= size * 1e-9) return false;
+  const s = -cross(velocity, h) / d;
+  return Math.abs(s) <= 1 + PIVOT_MARGIN;
+}
+
+/** How far beyond its ends a nib's pivot still counts, as a share of half the nib. */
+const PIVOT_MARGIN = 0.05;
 
 /** How many samples either side of a fold are taken into it, so it is swept whole. */
 const FOLD_MARGIN = 1;
@@ -696,11 +759,44 @@ function sweptSteps(
   const outlines = poses.map((t) => penOutline(penOn(t), evaluate(curve, t)));
   const out: Cubic[][] = [];
   for (let i = 0; i + 1 < outlines.length; i++) {
-    const hull = convexHull([...outlines[i]!, ...outlines[i + 1]!]);
-    if (hull.length < 3) continue;
-    out.push(hull.map((p, j) => line(p, hull[(j + 1) % hull.length]!)));
+    const a = outlines[i]!;
+    const b = outlines[i + 1]!;
+    const shapes = a.length === 2 && b.length === 2 ? nibBetween(a, b) : [convexHull([...a, ...b])];
+    for (const shape of shapes) {
+      if (shape.length < 3) continue;
+      out.push(shape.map((p, j) => line(p, shape[(j + 1) % shape.length]!)));
+    }
   }
   return out;
+}
+
+/**
+ * What a broad nib covers going from one position to the next, near enough.
+ *
+ * Where the two positions cross, the nib turned about the crossing and covered
+ * the two triangles either side of it — not the four-sided shape round both
+ * positions, which would add two thin wedges of ink it never laid. Where they do
+ * not cross, it is that four-sided shape.
+ */
+function nibBetween(first: readonly Vec2[], second: readonly Vec2[]): Vec2[][] {
+  const [a1, b1] = first as [Vec2, Vec2];
+  const [a2, b2] = second as [Vec2, Vec2];
+  const rx = b1.x - a1.x;
+  const ry = b1.y - a1.y;
+  const sx = b2.x - a2.x;
+  const sy = b2.y - a2.y;
+  const denom = rx * sy - ry * sx;
+  if (Math.abs(denom) > 1e-12) {
+    const qx = a2.x - a1.x;
+    const qy = a2.y - a1.y;
+    const t = (qx * sy - qy * sx) / denom;
+    const u = (qx * ry - qy * rx) / denom;
+    if (t > 0 && t < 1 && u > 0 && u < 1) {
+      const pivot = { x: a1.x + rx * t, y: a1.y + ry * t };
+      return [convexHull([a1, a2, pivot]), convexHull([b1, b2, pivot])];
+    }
+  }
+  return [convexHull([a1, b1, a2, b2])];
 }
 
 /**

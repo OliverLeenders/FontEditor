@@ -27,6 +27,7 @@ describe("a stroke's ink, against the pen swept along it", () => {
     [
       "a drawn hook with retracted handles",
       "a drawn J with a sharp corner",
+      "a broad nib turning along a curve",
       "an oval pen round a sharp V",
       "a round pen round a hairpin",
     ].map(named),
@@ -58,6 +59,22 @@ describe("a stroke's ink, against the pen swept along it", () => {
       expect(d.extra).toEqual([]);
     },
   );
+
+  it("leaves no sliver where a turning broad nib pivots on itself", { timeout: 120_000 }, () => {
+    // Where the nib turned from level to upright along an arch: the sides were
+    // swapped where the path ran along the nib, as for a nib that only moves, and
+    // the ink the nib laid pivoting between its ends was left out.
+    const c = named("a broad nib turning along a curve");
+    const d = disagreement(filled(c), sweep(c.curves, c.pens, c.closed, c.blends), 60, 0.7, {
+      minX: 80,
+      minY: 90,
+      maxX: 120,
+      maxY: 125,
+    });
+    expect(d.checked).toBeGreaterThan(200);
+    expect(d.missing).toEqual([]);
+    expect(d.extra).toEqual([]);
+  });
 
   it(
     "leaves no gap just past a sharp corner where the next curve bends tighter than the pen",
