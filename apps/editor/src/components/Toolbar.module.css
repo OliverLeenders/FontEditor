@@ -10,7 +10,7 @@
   height: var(--bar);
   padding: 0 0.5rem;
   background: var(--surface);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-frame);
   /* Flat: the canvas below is sunk into the window instead (see .drawing in
      App.module.css), and only what floats casts a shadow. */
 }

@@ -33,6 +33,8 @@
   border-radius: 0;
   border-top: 0;
   border-bottom: 0;
+  /* The resizer's side of it, framed as the bars are. */
+  border-color: var(--rule-frame);
   /* Docked, it lies flat beside the drawing, which is sunk under it; only
      the floating panel casts a shadow. */
   box-shadow: none;

@@ -13,7 +13,7 @@
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.15rem 0.4rem 0.15rem 0.6rem;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-frame);
   background: var(--surface-2);
 }
 

@@ -11,7 +11,7 @@
   align-items: center;
   gap: 1rem;
   padding: 0.5rem 0.7rem;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-frame);
   background: var(--surface);
   font-size: 0.76rem;
   color: var(--ink-2);

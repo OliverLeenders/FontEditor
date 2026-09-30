@@ -3,7 +3,7 @@
   align-items: stretch;
   gap: 0;
   background: var(--surface-2);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-frame);
   padding: 0 0.35rem;
   /* Measured, so a pane too narrow for the labels can put them away. */
   container-type: inline-size;

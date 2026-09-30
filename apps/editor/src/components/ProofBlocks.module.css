@@ -7,7 +7,7 @@
   flex-wrap: wrap;
   gap: 0.4rem 0.9rem;
   padding: 0.4rem 0.7rem;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-frame);
   background: var(--surface);
 }
 

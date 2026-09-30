@@ -27,6 +27,11 @@
   --chevron-down: url("/icons/chevron-down-light.svg");
   --rule: #dce3ea;
   --rule-strong: #c2cdd8;
+  /* The lines that frame the window's regions — where a bar meets a canvas, and
+     the resizers between panes and beside a docked inspector. Between the two
+     rules: --rule is too faint against a sunk canvas's shadow, --rule-strong a
+     step too heavy for a line that runs the width of the window. */
+  --rule-frame: #cfd8e1;
   --accent: #2c6daf;
   --accent-ink: #1f548a;
   --accent-soft: #e4eef8;
@@ -95,6 +100,7 @@
     --chevron-down: url("/icons/chevron-down-dark.svg");
     --rule: #232d38;
     --rule-strong: #33404e;
+    --rule-frame: #2b3643;
     --accent: #74aee2;
     --accent-ink: #a6ccee;
     --accent-soft: #142838;
@@ -122,6 +128,7 @@
   --chevron-down: url("/icons/chevron-down-dark.svg");
   --rule: #232d38;
   --rule-strong: #33404e;
+  --rule-frame: #2b3643;
   --accent: #74aee2;
   --accent-ink: #a6ccee;
   --accent-soft: #142838;

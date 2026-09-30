@@ -15,7 +15,7 @@
   align-items: center;
   gap: 1.2rem;
   padding: 0.5rem 0.7rem;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-frame);
   background: var(--surface);
   /* A layer of its own, so its popovers hang over the page below it. */
   position: relative;
@@ -96,7 +96,7 @@
   flex: none;
   padding: 0.5rem 0.7rem;
   border: none;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--rule-frame);
   background: var(--surface);
   color: var(--ink);
   font-family: var(--font-mono);

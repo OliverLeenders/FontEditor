@@ -7,7 +7,7 @@
 .divider {
   position: relative;
   flex: none;
-  background: var(--rule-strong);
+  background: var(--rule-frame);
   touch-action: none;
 }
 .divider[data-orientation="row"] {
