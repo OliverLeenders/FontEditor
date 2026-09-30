@@ -9,11 +9,6 @@
   padding: 0.4rem 0.7rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
-  /* The last of the controls above the page, so the shadow onto the page is
-     this panel's rather than the bar's. Under the bar, over the page. */
-  position: relative;
-  z-index: 1;
-  box-shadow: var(--shadow);
 }
 
 .heading {

@@ -63,7 +63,7 @@
   --shadow: 0 2px 4px rgba(19, 25, 34, 0.06), 0 10px 28px -14px rgba(19, 25, 34, 0.3);
   /* The same softness thrown sideways, for a panel docked at the edge of the
      canvas: it sits above the drawing as the floating one does. */
-  --shadow-side: 0 0 4px rgba(19, 25, 34, 0.06), 0 0 24px -8px rgba(19, 25, 34, 0.32);
+  --shadow-inset: inset 0 1px 2px rgba(19, 25, 34, 0.06), inset 0 0 18px -8px rgba(19, 25, 34, 0.3);
 
   --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
@@ -106,7 +106,7 @@
     --syntax-class: #eab26a;
     --syntax-number: #6fc3f0;
     --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
-    --shadow-side: 0 0 4px rgba(0, 0, 0, 0.35), 0 0 24px -8px rgba(0, 0, 0, 0.8);
+    --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 18px -8px rgba(0, 0, 0, 0.85);
     color-scheme: dark;
   }
 }
@@ -133,7 +133,7 @@
   --syntax-class: #eab26a;
   --syntax-number: #6fc3f0;
   --shadow: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 28px -14px rgba(0, 0, 0, 0.8);
-  --shadow-side: 0 0 4px rgba(0, 0, 0, 0.35), 0 0 24px -8px rgba(0, 0, 0, 0.8);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 0 18px -8px rgba(0, 0, 0, 0.85);
   color-scheme: dark;
 }
 

@@ -11,9 +11,8 @@
   padding: 0 0.5rem;
   background: var(--surface);
   border-bottom: 1px solid var(--rule);
-  /* The menus' own shadow, so the canvas reads as lying under the bar rather
-     than beside it. */
-  box-shadow: var(--shadow);
+  /* Flat: the canvas below is sunk into the window instead (see .drawing in
+     App.module.css), and only what floats casts a shadow. */
 }
 
 .group {

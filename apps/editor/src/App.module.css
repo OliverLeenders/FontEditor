@@ -86,12 +86,29 @@
   min-width: 0;
 }
 
+/* The canvas sunk into the window: an inset shadow round its edges, under the
+   bars and panels that lie flat around it. On an overlay rather than on this
+   box, since a canvas filling the box paints over an inset shadow of the box's
+   own; above the canvas, below anything that floats over it, and never in the
+   way of the pointer. */
+.drawing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow: var(--shadow-inset);
+}
+
 .editing[data-dock="left"] {
   flex-direction: row-reverse;
 }
 
+/* Floats over the drawing, so it casts a shadow, above the drawing's inset. */
 .reveal {
   position: absolute;
+  z-index: 2;
+  box-shadow: var(--shadow);
   top: 0.6rem;
   right: 0.6rem;
   padding: 0.25rem 0.6rem;

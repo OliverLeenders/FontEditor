@@ -17,16 +17,9 @@
   padding: 0.5rem 0.7rem;
   border-bottom: 1px solid var(--rule);
   background: var(--surface);
-  /* Lifted off what it sets, as the drawing's toolbar is. */
+  /* A layer of its own, so its popovers hang over the page below it. */
   position: relative;
   z-index: 2;
-  box-shadow: var(--shadow);
-}
-/* With the blocks panel under it the shadow is the panel's: the two bars are
-   one stack of controls, and a shadow cast across the rows of sizes made them
-   read as sitting in a trench. */
-.bar[data-above-blocks="true"] {
-  box-shadow: none;
 }
 
 .sizeLabel {
@@ -64,6 +57,20 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+/* The canvas sunk into the window: an inset shadow round its edges, under the
+   bars and panels that lie flat around it. On an overlay rather than on this
+   box, since a canvas filling the box paints over an inset shadow of the box's
+   own; above the canvas, below anything that floats over it, and never in the
+   way of the pointer. */
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow: var(--shadow-inset);
 }
 
 .canvas {
@@ -124,4 +131,12 @@
   width: 1px;
   height: 1.1rem;
   background: var(--rule-strong);
+}
+
+/* The location bar is nothing for a font with one master, and the rule written
+   after it then stood at the start of the bar or beside another rule. A rule
+   is only drawn between two things. */
+.separator:first-child,
+.separator + .separator {
+  display: none;
 }

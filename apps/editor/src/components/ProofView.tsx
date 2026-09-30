@@ -343,7 +343,7 @@ export function ProofView(): React.JSX.Element {
 
   return (
     <div className={styles.proof}>
-      <div className={styles.bar} data-above-blocks={waterfall ? "true" : undefined}>
+      <div className={styles.bar}>
         <LocationBar />
         <span className={styles.separator} aria-hidden="true" />
 
