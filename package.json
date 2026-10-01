@@ -13,6 +13,7 @@
     "dev": "pnpm --filter @typewright/editor dev",
     "test": "pnpm --filter \"./packages/*\" --filter @typewright/editor test",
     "test:watch": "pnpm --filter @typewright/geometry test:watch",
+    "screenshots": "pnpm --filter @typewright/editor screenshots",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

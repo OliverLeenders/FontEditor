@@ -17,6 +17,10 @@ Thumbs.db
 # And the checks import a module of their own, which Python compiles beside it.
 __pycache__/
 
+# Pictures of the editor taken by apps/editor/scripts/screenshots.mjs, to look
+# at rather than to keep.
+apps/editor/screenshots/
+
 *.log
 npm-debug.log*
 pnpm-debug.log*

@@ -92,6 +92,28 @@ pnpm typecheck
 The same checks run on every push, with fontTools and FreeType reading and drawing what the
 exporter writes; see `.github/workflows/ci.yml`.
 
+### Pictures of the editor
+
+A change to a stylesheet passes every test whether or not it looks right. To look instead:
+
+```bash
+pnpm screenshots
+```
+
+This serves the editor on port 4317, opens it in a headless Chromium with an empty profile,
+and writes the start page and each workspace, light and dark, to `apps/editor/screenshots/`,
+which git ignores. Name workspaces to take only those, and add `--light`, `--dark` or a size
+such as `1280x800`: `pnpm screenshots glyph proof --dark`. Nothing is compared against a
+stored picture. It never touches a font open in `pnpm dev`, which is another origin with its
+own storage.
+
+The Chromium is Playwright's own, kept inside `node_modules` rather than in a cache shared
+across the machine, and is fetched once after `pnpm install`:
+
+```bash
+PLAYWRIGHT_BROWSERS_PATH=0 pnpm --filter @typewright/editor exec playwright install chromium --only-shell
+```
+
 ## The browser build, hosted
 
 The editor is a folder of static files with no server behind it, so hosting it is serving
