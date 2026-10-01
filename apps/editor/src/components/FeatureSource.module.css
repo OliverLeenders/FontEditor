@@ -12,7 +12,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid var(--rule);
+  border-right: 1px solid var(--rule-frame);
   background: var(--canvas);
   font-family: var(--font-mono);
   font-size: var(--text-m);
@@ -20,10 +20,25 @@
 }
 
 .panes {
+  position: relative;
   display: grid;
   flex: 1;
   grid-template-columns: auto 1fr;
   min-height: 0;
+}
+
+/* The text sunk into the window as the other canvases are: an inset shadow
+   round its edges, under the bar and the find bar that lie flat above it. On an
+   overlay, since the text box filling the pane paints over an inset shadow of
+   the pane's own; below the completion list, and never in the way of the
+   pointer. */
+.panes::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow: var(--shadow-inset);
 }
 
 .gutter {
@@ -195,7 +210,7 @@
   flex-direction: column;
   gap: 0.3rem;
   padding: 0.35rem 0.6rem;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule-frame);
   background: var(--surface);
   font-size: var(--text-s);
   line-height: 1.4;
