@@ -170,7 +170,11 @@ export function documentOf(snapshot: StoredSnapshot): {
   }
 
   const read = decodeFontInfo(snapshot.info);
-  let document = fontDocument(glyphs, read.info);
+  let document = {
+    ...fontDocument(glyphs, read.info),
+    grid: read.grid,
+    fixedWidth: read.fixedWidth,
+  };
   if (read.glyphOrder.length > 0) document = setGlyphOrder(document, read.glyphOrder);
   document = setKerning(document, decodeKerning(snapshot.kerning));
 

@@ -1,5 +1,10 @@
 import { codePointsOfSet, glyphSet } from "@typewright/catalog";
-import { compositePlan, glyphNameForCodePoint, randomIds } from "@typewright/font-model";
+import {
+  compositePlan,
+  glyphNameForCodePoint,
+  newGlyphAdvance,
+  randomIds,
+} from "@typewright/font-model";
 import { type NewGlyph as GlyphSpec, buildComposites, createGlyphs } from "@typewright/tools";
 import { useMemo, useState } from "react";
 
@@ -55,7 +60,7 @@ export function NewGlyph(): React.JSX.Element {
   const document = useStoreValue((s) => s.session.editor.document);
   const [text, setText] = useState("");
 
-  const advance = Math.round(document.info.unitsPerEm / 2);
+  const advance = newGlyphAdvance(document);
 
   const create = (): void => {
     const wanted = parseGlyphRequest(text);

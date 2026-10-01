@@ -2,6 +2,7 @@ import {
   type FontDocument,
   type FontInfo,
   type Glyph,
+  type Grid,
   type IdFactory,
   type Guide,
   type Kerning,
@@ -9,9 +10,11 @@ import {
   type PlainValue,
   type StyleMapStyle,
   DEFAULT_FONT_INFO,
+  DEFAULT_GRID,
   EMPTY_KERNING,
   drawingOf,
   fontDocument,
+  grid,
   hasMetricKeys,
   groupKey,
   guide,
@@ -164,7 +167,14 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
   const keptLib =
     libSource === null
       ? {}
-      : unmodelled(parsePlistDict(libSource), ["public.glyphOrder", METRIC_KEYS, OLD_METRIC_KEYS]);
+      : unmodelled(parsePlistDict(libSource), [
+          "public.glyphOrder",
+          METRIC_KEYS,
+          OLD_METRIC_KEYS,
+          GRID_KEY,
+          FIXED_WIDTH_KEY,
+        ]);
+  const drawnOn = drawingSettings(libSource);
 
   // Where a glyph's spacing comes from, which neither UFO nor OpenType has a
   // field for. Written under this editor's own name, and read back onto the
@@ -195,12 +205,15 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
     images,
     layers,
     document: layersIntoDocument(
-      setKept(
-        setGuides(
-          setFeatures(setKerning(fontDocument(spacedGlyphs, info), kerning), features),
-          guides,
+      withDrawingSettings(
+        setKept(
+          setGuides(
+            setFeatures(setKerning(fontDocument(spacedGlyphs, info), kerning), features),
+            guides,
+          ),
+          { fontInfo: keptInfo, lib: keptLib },
         ),
-        { fontInfo: keptInfo, lib: keptLib },
+        drawnOn,
       ),
       layers,
       ids,
@@ -371,6 +384,7 @@ function readFontInfo(
     versionMajor: number("versionMajor"),
     versionMinor: number("versionMinor"),
     italicAngle: number("italicAngle"),
+    postscriptIsFixedPitch: dict["postscriptIsFixedPitch"] === true,
 
     copyright: text("copyright"),
     trademark: text("trademark"),
@@ -585,6 +599,36 @@ export function looksLikeArchive(fileName: string): boolean {
 
 /** Where a glyph's spacing comes from, in a lib key of this editor's own. */
 const METRIC_KEYS = "org.typewright.metricKeys";
+
+/** The grid the font is drawn on, as `{ step, major }`; see `grid.ts` in the model. */
+const GRID_KEY = "org.typewright.grid";
+
+/** The width of a fixed-width font, in units; see `fixed-width.ts` in the model. */
+const FIXED_WIDTH_KEY = "org.typewright.fixedWidth";
+
+type DrawingSettings = { readonly grid: Grid; readonly fixedWidth: number | null };
+
+/**
+ * The grid and the fixed width, from the lib. A grid that cannot be one — a
+ * step of nothing, a string — is read as the default rather than refused: it
+ * is a setting for drawing, and a font is still a font without it.
+ */
+function drawingSettings(lib: string | null): DrawingSettings {
+  if (lib === null) return { grid: DEFAULT_GRID, fixedWidth: null };
+  const dict = parsePlistDict(lib);
+  const said = dict[GRID_KEY];
+  const step = isDict(said) ? plistNumber(said, "step") : null;
+  const major = isDict(said) ? (plistNumber(said, "major") ?? 0) : 0;
+  const width = plistNumber(dict, FIXED_WIDTH_KEY);
+  return {
+    grid: (step === null ? null : grid(step, major)) ?? DEFAULT_GRID,
+    fixedWidth: width !== null && width > 0 ? Math.round(width) : null,
+  };
+}
+
+function withDrawingSettings(document: FontDocument, settings: DrawingSettings): FontDocument {
+  return { ...document, grid: settings.grid, fixedWidth: settings.fixedWidth };
+}
 
 /**
  * The same key, under the name the editor had before it was named.

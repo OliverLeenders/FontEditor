@@ -3,9 +3,8 @@ import {
   NO_METRIC_KEYS,
   resolvedMetrics,
   setAdvance,
-  setLeftSidebearing,
-  setRightSidebearing,
   sidebearings,
+  withSidebearing,
 } from "@typewright/font-model";
 import { begin, commit, editCurrentGlyph, result, setMetricKey } from "@typewright/tools";
 
@@ -100,15 +99,13 @@ export function GlyphSection(): React.JSX.Element {
    * Both sidebearings commit the same way, and each is one undo step.
    *
    * Sidebearings are derived, so these write through to the advance and the
-   * outline; see `setLeftSidebearing` for why the left one moves the advance
-   * with it.
+   * outline; see `withSidebearing` for which moves what, in a proportional
+   * font and in a fixed-width one.
    */
   const commitBearing = (side: "left" | "right", value: number): void => {
     if (!Number.isFinite(value)) return;
     const font = store.editor.document;
-    const document = editCurrentGlyph(store.editor, (g) =>
-      side === "left" ? setLeftSidebearing(g, value, font) : setRightSidebearing(g, value, font),
-    );
+    const document = editCurrentGlyph(store.editor, (g) => withSidebearing(g, side, value, font));
     if (document === null) return;
     store.applyTool(
       result({ ...store.editor, document }, [

@@ -1,5 +1,7 @@
 import type { FontDocument, GlyphName } from "@typewright/font-model";
 import {
+  fitsFixedWidth,
+  fixedWidthOf,
   groupNameOf,
   isGroupKey,
   isMarkAnchor,
@@ -25,7 +27,31 @@ export function fontFindings(document: FontDocument): Finding[] {
     ...kerningFindings(document),
     ...markFindings(document),
     ...metricKeyFindings(document),
+    ...fixedWidthFindings(document),
   ];
+}
+
+/**
+ * The glyphs a fixed-width font's width does not allow. Measured as the font
+ * will be compiled, with its spacing keys followed, so a glyph whose width key
+ * says the right thing is not reported for the number it was drawn with.
+ */
+function fixedWidthFindings(document: FontDocument): Finding[] {
+  const width = fixedWidthOf(document);
+  if (width === null) return [];
+  const compiled = withResolvedMetrics(document).document;
+  const out: Finding[] = [];
+  for (const g of orderedGlyphs(compiled)) {
+    if (fitsFixedWidth(g.advance, width)) continue;
+    out.push(
+      finding(
+        "off-width",
+        g.name,
+        `It is ${String(g.advance)} wide, in a font where every glyph is ${String(width)}.`,
+      ),
+    );
+  }
+  return out;
 }
 
 function notdefFindings(document: FontDocument): Finding[] {

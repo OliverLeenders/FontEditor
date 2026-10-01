@@ -1,4 +1,13 @@
-import { type FontInfo, setFontInfo } from "@typewright/font-model";
+import {
+  type FontInfo,
+  type Grid,
+  fitToFixedWidth,
+  fixedWidthOf,
+  grid as soundGrid,
+  scaledFont,
+  setFixedPitch,
+  setFontInfo,
+} from "@typewright/font-model";
 import { type ToolResult, result } from "../effects.js";
 import type { EditorState } from "../state.js";
 import { done } from "./shared.js";
@@ -17,8 +26,8 @@ import { done } from "./shared.js";
  *
  * The em is *not* applied to the drawings. Changing it after a glyph is drawn
  * changes what the numbers mean rather than where the outlines are, which is
- * the honest reading of an editable field — rescaling a font is a different
- * operation, and one nobody would expect from typing in a box.
+ * one honest reading of an editable field; the other is {@link scaleFontTo},
+ * and the field asks which was meant.
  */
 export function setInfo(state: EditorState, patch: Partial<FontInfo>): ToolResult {
   const info = { ...state.document.info, ...patch };
@@ -107,6 +116,59 @@ export function infoProblem(info: FontInfo): string | null {
     return "A font has one embedding level: editable, preview and print, or restricted.";
   }
   return null;
+}
+
+/**
+ * Move the font to another em, and the drawing with it, so every glyph stays
+ * the size it was. One undo step, however many glyphs it touches. See
+ * `scaledFont` for what is scaled and what is not.
+ */
+export function scaleFontTo(state: EditorState, unitsPerEm: number): ToolResult {
+  const wanted = Math.round(unitsPerEm);
+  const problem = infoProblem({ ...state.document.info, unitsPerEm: wanted });
+  if (problem !== null || wanted === state.document.info.unitsPerEm) return result(state);
+  const document = scaledFont(state.document, wanted);
+  return done(state, { ...state, document }, `Scale to ${String(wanted)} units`);
+}
+
+/**
+ * The grid the font is drawn on. Refused for one that cannot be a grid; see
+ * `grid` in the model for what that is.
+ */
+export function setGrid(state: EditorState, step: number, major: number): ToolResult {
+  const next: Grid | null = soundGrid(step, major);
+  if (next === null) return result(state);
+  const now = state.document.grid;
+  if (now.step === next.step && now.major === next.major) return result(state);
+  return done(state, { ...state, document: { ...state.document, grid: next } }, "Grid");
+}
+
+/**
+ * Say whether the font is fixed-width, and at what width.
+ *
+ * Only says so: the glyphs are left as they are, so that a font can be made
+ * fixed and then looked over before anything is moved — {@link fitToWidth}
+ * moves them. A width is a whole number of units above nothing.
+ */
+export function setFixedWidth(state: EditorState, fixed: boolean, width?: number): ToolResult {
+  const wanted = width === undefined ? state.document.fixedWidth : Math.round(width);
+  // Also what refuses a width that is not a number at all.
+  if (wanted !== null && !(wanted > 0)) return result(state);
+  const document = setFixedPitch(state.document, fixed, wanted);
+  if (document === state.document) return result(state);
+  return done(state, { ...state, document }, fixed ? "Fixed width" : "Proportional width");
+}
+
+/**
+ * Give every glyph the fixed width that does not have it, its drawing centred.
+ * Marks keep no width and wide glyphs twice it; see `fitToFixedWidth`.
+ */
+export function fitToWidth(state: EditorState): ToolResult {
+  const width = fixedWidthOf(state.document);
+  if (width === null) return result(state);
+  const document = fitToFixedWidth(state.document, width);
+  if (document === state.document) return result(state);
+  return done(state, { ...state, document }, "Fit to the fixed width");
 }
 
 /**

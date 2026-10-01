@@ -106,3 +106,40 @@ select.input {
   justify-self: start;
   margin: 0;
 }
+
+/* What a new em means, asked under the box it was typed in. */
+.ask {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--ground);
+}
+
+.question {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ink);
+}
+
+.answers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.button {
+  composes: small from "./Button.module.css";
+}
+
+/* A sentence about the fields above, with the one thing to do about it. */
+.caveat {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.caveat .button {
+  margin-left: 0.15rem;
+}

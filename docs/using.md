@@ -168,6 +168,25 @@ away from it, which is what stops it flickering between two candidates a unit ap
 Ctrl to switch it off for a drag, and turn **Snap to points** off in the View menu to leave
 only the font's own lines.
 
+**The font's grid.** What a drag lands on when it catches on nothing is the font's grid:
+whole units unless you say otherwise, in the **Grid** section of Font info. Pick a preset —
+a 16, 20, 24, 32 or 48 pixel icon, or a 24 pixel one in half pixels — or type a **step** in
+units and how many steps apart the **major** lines are. Press `G` (or **Show grid** in the
+View menu) to draw it: fine lines at every step, stronger ones at the major steps, the fine
+ones fading as you zoom out until only the major ones are left. The grid is kept in the
+font's source, so it is the same wherever the font is opened; whether it is drawn is a
+setting of each pane. Where a preset's step is not a whole number of units — 24 pixels on a
+1000 unit em is 41.67 — the panel says so and offers the em that divides it, 960 here.
+
+**Changing the em.** Typing a new **Units per em** asks what you mean by it before anything
+changes. **Scale the font** grows or shrinks everything counted in units with it —
+outlines, pens, components, anchors, guides, advances, kerning, the font's measurements, a
+tracing picture, the grid and the numbers in spacing rules — on whole units, as one undo
+step, so every glyph stays the size it was. **Keep the numbers** changes only the em, so
+every glyph sets at a new size, which is what you want after typing it wrong. Numbers in
+the feature file are left as they are either way, and the question says so when there are
+any.
+
 **Lines at an angle.** A slanted design has nothing upright or level to align to, so a drag
 also catches on the line **square to** the segment beyond the point next to it, on the line
 **parallel** to it, on the **italic angle** through that point, and on any
@@ -238,7 +257,19 @@ field is grey, and the line on the canvas does not take hold — and typing a pl
 into the spacing line's field is how you take the rule off and keep the number. The rule
 is kept in the source and resolved where the font is compiled, so what comes out is an
 ordinary font. A rule that cannot be followed leaves the glyph as drawn and is reported,
-in the export warnings and in the preflight check.
+in the export warnings and in the preflight check. A rule can also be a number of units,
+written with an equals sign: `=600` as the width keeps the glyph 600 wide whatever is drawn
+in it.
+
+**A fixed-width font.** Tick **Fixed width** under Metrics in Font info for a code font, a
+terminal font or an icon font, and say the **Width**; it starts at the width most of the
+glyphs already have. Nothing moves when you tick it: the panel counts the glyphs of another
+width, and **Fit to** gives each the width with its drawing centred in it, in one step. A
+mark with no width and a wide character at twice the width are allowed, and left alone. New
+glyphs are made at the width, and in a fixed-width font a sidebearing you set slides the
+drawing across its cell rather than changing the advance. The preflight check lists any
+glyph of another width, and the exported font says it is fixed-width where terminals and
+operating systems look: `post`, the PANOSE proportion and the average width.
 
 **Kerning groups.** Letters whose sides have the same shape share a group, and one kerning
 value then covers all of them: `D`, `O` and `Q` end in the same round, so they share a group

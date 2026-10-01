@@ -7,6 +7,7 @@ import {
   unicodeNamesReady,
 } from "@typewright/catalog";
 import { canOpenFolders } from "@typewright/disk";
+import { newGlyphAdvance } from "@typewright/font-model";
 import { type ToolId, createGlyphs } from "@typewright/tools";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -190,7 +191,7 @@ export function glyphCommands(
           ...(detail === "" ? {} : { detail }),
           run: () => {
             if (code === null) return;
-            const advance = Math.round(document.info.unitsPerEm / 2);
+            const advance = newGlyphAdvance(document);
             store.applyTool(
               createGlyphs(store.editor, [{ name: entry.name, unicodes: [code] }], advance),
             );

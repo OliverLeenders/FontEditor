@@ -14,6 +14,7 @@ import {
   node,
   setKern,
   setKernGroup,
+  setFixedPitch,
   setKerning,
 } from "@typewright/font-model";
 import { vec } from "@typewright/geometry";
@@ -166,6 +167,26 @@ describe("names, advances and characters", () => {
   it("says when there is no .notdef", () => {
     const document = fontDocument([glyph("a", { advance: 500 })], DEFAULT_FONT_INFO);
     expect(tripped(document).has("no-notdef")).toBe(true);
+  });
+
+  it("finds a glyph of another width in a fixed-width font, and allows none and twice", () => {
+    const document = setFixedPitch(
+      font(
+        glyph("a", { advance: 500 }),
+        glyph("m", { advance: 640 }),
+        glyph("acutecomb", { advance: 0 }),
+        glyph("wide", { advance: 1000 }),
+        glyph("n", { advance: 400, metricKeys: { left: "", right: "", width: "a" } }),
+      ),
+      true,
+      500,
+    );
+
+    const off = preflight(document).filter((f) => f.check === "off-width");
+    // The `n` is drawn narrow and keyed to the `a`, so it compiles at the width.
+    expect(off.map((f) => f.glyph)).toEqual(["m"]);
+    expect(off[0]?.message).toContain("640");
+    expect(tripped(setFixedPitch(document, false)).has("off-width")).toBe(false);
   });
 });
 

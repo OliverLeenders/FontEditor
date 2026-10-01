@@ -9,6 +9,7 @@ import {
   glyphFileName,
   groupNameOf,
   hasMetricKeys,
+  isDefaultGrid,
   inLayer,
   counterIds,
   inkOf,
@@ -334,6 +335,7 @@ function fontInfoPairs(document: FontDocument): Array<readonly [string, string]>
   number("versionMajor", info.versionMajor);
   number("versionMinor", info.versionMinor);
   if (info.italicAngle !== 0) pairs.push(["italicAngle", real(info.italicAngle)]);
+  if (info.postscriptIsFixedPitch) pairs.push(["postscriptIsFixedPitch", "<true/>"]);
 
   text("copyright", info.copyright);
   text("trademark", info.trademark);
@@ -482,6 +484,10 @@ const number = (n: number): string => String(Math.round(n * 1000) / 1000);
 /** Where a glyph's spacing comes from, in a lib key of this editor's own. */
 const METRIC_KEYS = "org.typewright.metricKeys";
 
+/** The grid the font is drawn on, and the width of a fixed-width font: the model's own. */
+const GRID_KEY = "org.typewright.grid";
+const FIXED_WIDTH_KEY = "org.typewright.fixedWidth";
+
 export function ufoFiles(
   document: FontDocument,
   images: ReadonlyMap<string, Uint8Array> = new Map(),
@@ -615,11 +621,27 @@ export function ufoFiles(
   }
   if (spacing.length > 0) lib.push([METRIC_KEYS, dict(spacing)]);
 
+  // The grid and the fixed width, only where the font has one: the default grid
+  // is whole units, which every font is drawn on without saying so.
+  if (!isDefaultGrid(document.grid)) {
+    const said: Array<readonly [string, string]> = [["step", real(document.grid.step)]];
+    if (document.grid.major > 0) said.push(["major", int(document.grid.major)]);
+    lib.push([GRID_KEY, dict(said)]);
+  }
+  if (document.fixedWidth !== null) lib.push([FIXED_WIDTH_KEY, int(document.fixedWidth)]);
+
   // Everything else somebody put in the lib, back where they put it. A lib is
   // where every tool keeps what the format has no field for, so it is the one
   // file where writing only what we understand does the most damage.
   for (const [key, value] of Object.entries(document.kept.lib)) {
-    if (key === "public.glyphOrder" || key === METRIC_KEYS) continue;
+    if (
+      key === "public.glyphOrder" ||
+      key === METRIC_KEYS ||
+      key === GRID_KEY ||
+      key === FIXED_WIDTH_KEY
+    ) {
+      continue;
+    }
     // The key this used to be written under. Dropped rather than carried, so
     // that saving a font once moves it over instead of leaving both.
     if (key === "org.fonteditor.metricKeys") continue;

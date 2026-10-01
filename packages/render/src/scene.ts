@@ -1,5 +1,5 @@
 import type { Affine, Cubic, Rect, Vec2 } from "@typewright/geometry";
-import type { AnchorId, Contour, Glyph, Guide, GuideId } from "@typewright/font-model";
+import type { AnchorId, Contour, Glyph, Grid, Guide, GuideId } from "@typewright/font-model";
 import type { BoxFrame, Comb, Selection, SegmentRef, ViewTransform } from "@typewright/view";
 
 import type { RenderPalette } from "./palette.js";
@@ -178,6 +178,8 @@ export type Scene = {
   readonly metrics: RenderMetrics;
   readonly options: RenderOptions;
   readonly metricLines: readonly MetricLine[];
+  /** The font's grid, where it is shown, or `null`. */
+  readonly grid: Grid | null;
   /**
    * The lines the designer put there: the font's and this glyph's together.
    *
@@ -384,6 +386,7 @@ export type SceneInit = {
   readonly shapePreview?: Contour | null;
   readonly knifeStroke?: readonly [Vec2, Vec2] | null;
   readonly measurement?: Scene["measurement"];
+  readonly grid?: Grid | null;
 };
 
 export function scene(init: SceneInit): Scene {
@@ -395,6 +398,7 @@ export function scene(init: SceneInit): Scene {
     metrics: init.metrics ?? DEFAULT_METRICS,
     options: { ...DEFAULT_OPTIONS, ...init.options },
     metricLines: init.metricLines ?? [],
+    grid: init.grid ?? null,
     image: init.image ?? null,
     instance: init.instance ?? [],
     behind: init.behind ?? [],

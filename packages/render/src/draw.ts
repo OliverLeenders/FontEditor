@@ -29,6 +29,7 @@ import {
   screenTolerance,
   selectedKeys,
   selectionKey,
+  toDesign,
   toScreen,
 } from "@typewright/view";
 
@@ -56,6 +57,9 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   clearBackground(ctx, s);
   // Under everything, because it is what everything else is drawn against.
   drawTracingImage(ctx, s);
+  // Over the picture, which is traced on the grid, and under the metric lines,
+  // which say more.
+  drawGrid(ctx, s);
   drawMetricLines(ctx, s);
   drawDesignGuides(ctx, s);
   // Neighbours and margins sit under the glyph being edited: they are context,
@@ -106,6 +110,68 @@ export function clearBackground(ctx: Canvas2D, s: Scene): void {
   ctx.beginPath();
   ctx.rect(0, 0, s.viewport.width, s.viewport.height);
   ctx.fill();
+}
+
+/**
+ * How far apart grid lines are on screen, in pixels, before they begin to fade,
+ * and where they are gone. Closer than this they are a grey wash rather than a
+ * grid, and say nothing a point snapping to them does not.
+ */
+const GRID_FADE_FROM = 12;
+const GRID_GONE_AT = 6;
+
+/** How strongly lines this many pixels apart are drawn: from nothing to all of it. */
+export function gridStrength(apart: number): number {
+  return Math.min(1, Math.max(0, (apart - GRID_GONE_AT) / (GRID_FADE_FROM - GRID_GONE_AT)));
+}
+
+/**
+ * The font's grid, over the whole canvas.
+ *
+ * The finest lines at every step and stronger ones every `major` steps, each
+ * fading out as zooming out packs them together: the finest go first, then the
+ * stronger ones, so a grid seen from far off is the coarse one and never a
+ * grey sheet. The lines run through the origin, where the glyph is drawn from.
+ */
+export function drawGrid(ctx: Canvas2D, s: Scene): void {
+  const grid = s.grid;
+  if (grid === null) return;
+  const apart = grid.step * s.view.scale;
+  const minor = gridStrength(apart);
+  const major = grid.major > 0 ? gridStrength(apart * grid.major) : 0;
+  if (minor === 0 && major === 0) return;
+
+  const corner = toDesign(s.view, { x: 0, y: 0 });
+  const far = toDesign(s.view, { x: s.viewport.width, y: s.viewport.height });
+  const first = { x: Math.ceil(corner.x / grid.step), y: Math.ceil(far.y / grid.step) };
+  const last = { x: Math.floor(far.x / grid.step), y: Math.floor(corner.y / grid.step) };
+
+  ctx.save();
+  ctx.lineWidth = 1;
+  // Two passes, the fine lines under the strong ones, so a strong line is
+  // never covered by a fine one drawn after it.
+  for (const strong of [false, true]) {
+    const alpha = strong ? major : minor;
+    if (alpha === 0) continue;
+    const isMajor = (i: number): boolean => grid.major > 0 && i % grid.major === 0;
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = strong ? s.palette.gridMajor : s.palette.gridLine;
+    ctx.beginPath();
+    for (let i = first.x; i <= last.x; i++) {
+      if (isMajor(i) !== strong) continue;
+      const x = Math.round(toScreen(s.view, { x: i * grid.step, y: 0 }).x) + 0.5;
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, s.viewport.height);
+    }
+    for (let j = first.y; j <= last.y; j++) {
+      if (isMajor(j) !== strong) continue;
+      const y = Math.round(toScreen(s.view, { x: 0, y: j * grid.step }).y) + 0.5;
+      ctx.moveTo(0, y);
+      ctx.lineTo(s.viewport.width, y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** How near two labels may come, in pixels, before the lower one is dropped. */

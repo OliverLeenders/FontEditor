@@ -37,6 +37,7 @@ export type CheckId =
   | "glyph-name"
   | "no-notdef"
   | "negative-advance"
+  | "off-width"
   | "kern-missing-glyph"
   | "empty-kern-group"
   | "unnamed-anchor"
@@ -109,6 +110,12 @@ export const CHECKS: readonly Check[] = [
     severity: "error",
     title: "Advance width below zero",
     why: "A negative advance moves the pen backwards. Some rasterisers refuse the font and others draw the next letter on top of this one.",
+  },
+  {
+    id: "off-width",
+    severity: "warning",
+    title: "A glyph of another width in a fixed-width font",
+    why: "The font says every glyph is one width, and a terminal or a code editor takes it at its word: a glyph of another width overlaps its neighbour or leaves a gap, and some software decides the font is not fixed-width after all. No width and twice the width are allowed, for marks and for wide characters.",
   },
   {
     id: "open-contour",

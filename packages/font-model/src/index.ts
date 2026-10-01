@@ -243,6 +243,31 @@ export {
 
 export { UNIT_GRID, roundFont, roundGlyph, unroundedGlyphs } from "./round.js";
 
+export type { Grid } from "./grid.js";
+export {
+  DEFAULT_GRID,
+  MIN_GRID_STEP,
+  grid,
+  iconEm,
+  iconGrid,
+  isDefaultGrid,
+  isWholeStep,
+} from "./grid.js";
+
+export {
+  commonAdvance,
+  fitToFixedWidth,
+  fitsFixedWidth,
+  fittedToWidth,
+  fixedWidthOf,
+  newGlyphAdvance,
+  offWidthGlyphs,
+  setFixedPitch,
+  withSidebearing,
+} from "./fixed-width.js";
+
+export { FEATURES_NOT_SCALED, scaledFont } from "./scale.js";
+
 export { KAPPA, ellipseContour, rectContour } from "./shapes.js";
 
 export type { KnifeCut } from "./knife.js";

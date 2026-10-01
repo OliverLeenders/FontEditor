@@ -41,6 +41,7 @@ export function ViewMenu(): React.JSX.Element {
   const anchors = useStoreValue((s) => viewOf(s, pane).showAnchors);
   const curvature = useStoreValue((s) => viewOf(s, pane).showCurvature);
   const numbers = useStoreValue((s) => viewOf(s, pane).showPointNumbers);
+  const showGrid = useStoreValue((s) => viewOf(s, pane).showGrid);
   const controls = useStoreValue((s) => viewOf(s, pane).controlSize);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -138,6 +139,12 @@ export function ViewMenu(): React.JSX.Element {
             hint="The places accents attach, named on hover"
             on={anchors}
             onChange={() => store.toggleAnchors(pane)}
+          />
+          <Switch
+            label="Show grid"
+            hint="The font's grid, which drags snap to either way  (G)"
+            on={showGrid}
+            onChange={() => store.toggleGrid(pane)}
           />
           <Switch
             label="Curvature comb"

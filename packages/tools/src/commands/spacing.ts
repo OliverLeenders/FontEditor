@@ -6,10 +6,9 @@ import {
   parseMetricKey,
   resolvedMetrics,
   setAdvance,
-  setLeftSidebearing,
-  setRightSidebearing,
   sidebearings,
   updateGlyph,
+  withSidebearing,
 } from "@typewright/font-model";
 import { type ToolResult, begin, commit, result } from "../effects.js";
 import { type EditorState, editCurrentGlyph } from "../state.js";
@@ -74,9 +73,7 @@ export function nudgeSidebearing(
   const document = updateGlyph(state.document, glyphName, (g) => {
     const current = sidebearings(g, state.document);
     if (current === null) return null;
-    return side === "left"
-      ? setLeftSidebearing(g, current.left + delta, state.document)
-      : setRightSidebearing(g, current.right + delta, state.document);
+    return withSidebearing(g, side, current[side] + delta, state.document);
   });
   if (document === null) return result(state);
 
@@ -112,10 +109,8 @@ export function setSidebearing(
   const document = updateGlyph(state.document, glyphName, (g) => {
     const current = sidebearings(g, state.document);
     if (current === null) return null;
-    if ((side === "left" ? current.left : current.right) === wanted) return null;
-    return side === "left"
-      ? setLeftSidebearing(g, wanted, state.document)
-      : setRightSidebearing(g, wanted, state.document);
+    if (current[side] === wanted) return null;
+    return withSidebearing(g, side, wanted, state.document);
   });
   if (document === null) return result(state);
 

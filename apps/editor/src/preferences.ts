@@ -134,6 +134,14 @@ export type ViewSettings = {
    */
   readonly showPointNumbers: boolean;
   /**
+   * Draw the font's grid.
+   *
+   * Off by default. Only whether it is drawn: the grid itself is the font's,
+   * and a drag snaps to it whether or not it is shown, as it snaps to whole
+   * units in a font that has no other.
+   */
+  readonly showGrid: boolean;
+  /**
    * How big the points, handles and Tunni controls are drawn.
    *
    * A preference about eyes and pointers rather than about the font: a dense
@@ -151,6 +159,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   showAnchors: true,
   showCurvature: false,
   showPointNumbers: false,
+  showGrid: false,
   controlSize: "normal",
 };
 
@@ -457,6 +466,7 @@ function view(raw: Record<string, unknown>, fallback: ViewSettings): ViewSetting
     showAnchors: boolean(raw["showAnchors"], fallback.showAnchors),
     showCurvature: boolean(raw["showCurvature"], fallback.showCurvature),
     showPointNumbers: boolean(raw["showPointNumbers"], fallback.showPointNumbers),
+    showGrid: boolean(raw["showGrid"], fallback.showGrid),
     controlSize: isControlSize(raw["controlSize"]) ? raw["controlSize"] : fallback.controlSize,
   };
 }

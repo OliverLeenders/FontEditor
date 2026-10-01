@@ -121,7 +121,12 @@ export async function saveDocument(
   // The index is small and cheap; rewriting it whenever anything moved keeps it
   // honest about which glyphs exist and in what order.
   const orderChanged = previous === null || !sameOrder(previous.glyphOrder, document.glyphOrder);
-  const infoChanged = previous === null || previous.info !== document.info;
+  // The grid and the fixed width are written into the same file as the info.
+  const infoChanged =
+    previous === null ||
+    previous.info !== document.info ||
+    previous.grid !== document.grid ||
+    previous.fixedWidth !== document.fixedWidth;
   if (changed.length > 0 || orderChanged || infoChanged) {
     await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   }
@@ -289,7 +294,9 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
   // is appended, so a glyph file that appeared without the index being rewritten
   // still shows up rather than vanishing.
   const rawInfo = await store.read(FONT_INFO_PATH);
-  const { info, glyphOrder, features, guides, kept, layers } = decodeFontInfo(parseOrNull(rawInfo));
+  const { info, glyphOrder, features, guides, kept, layers, grid, fixedWidth } = decodeFontInfo(
+    parseOrNull(rawInfo),
+  );
   const kerning = decodeKerning(parseOrNull(await store.read(KERNING_PATH)));
 
   const ordered: Glyph[] = [];
@@ -311,7 +318,7 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
         setFeatures(
           setKerning(
             setGlyphOrder(
-              fontDocument(ordered, info),
+              { ...fontDocument(ordered, info), grid, fixedWidth },
               ordered.map((g) => g.name),
             ),
             kerning,

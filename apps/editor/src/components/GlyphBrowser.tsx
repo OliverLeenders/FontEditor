@@ -33,6 +33,7 @@ import {
   NOTDEF,
   layerLabel,
   drawableGlyph,
+  newGlyphAdvance,
   sameMarkColor,
 } from "@typewright/font-model";
 import {
@@ -590,7 +591,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
     const entry = shown[index];
     if (entry === undefined || entry.inFont || entry.codePoint === null) return;
 
-    const advance = Math.round(document.info.unitsPerEm / 2);
+    const advance = newGlyphAdvance(document);
     store.applyTool(
       createGlyphs(store.editor, [{ name: entry.name, unicodes: [entry.codePoint] }], advance),
     );

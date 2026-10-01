@@ -1,12 +1,29 @@
 import {
+  type FontDocument,
   type FontInfo,
+  type Grid,
   type VerticalMetrics,
+  DEFAULT_GRID,
+  FEATURES_NOT_SCALED,
   STYLE_MAP_STYLES,
   USE_TYPO_METRICS_BIT,
+  commonAdvance,
   derivedVerticalMetrics,
+  fixedWidthOf,
+  iconEm,
+  iconGrid,
+  isWholeStep,
+  offWidthGlyphs,
 } from "@typewright/font-model";
-import { infoProblem, setInfo } from "@typewright/tools";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  fitToWidth,
+  infoProblem,
+  scaleFontTo,
+  setFixedWidth,
+  setGrid,
+  setInfo,
+} from "@typewright/tools";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FontInfoPanel.module.css";
@@ -118,7 +135,7 @@ const SECTIONS: readonly { readonly title: string; readonly fields: readonly Fie
         key: "unitsPerEm",
         label: "Units per em",
         kind: "number",
-        hint: "The grid the design is drawn on. Changing it does not rescale the drawings.",
+        hint: "The units everything is measured in. Changing it asks whether the drawing grows with it.",
       },
       { key: "ascender", label: "Ascender", kind: "number", hint: "Top of a d, an h, an l" },
       { key: "descender", label: "Descender", kind: "number", hint: "Bottom of a g, a p, a y" },
@@ -319,6 +336,8 @@ export function FontInfoPanel(): React.JSX.Element {
   // every glyph, so it is worked out once per document rather than per field.
   const derived = useMemo(() => derivedVerticalMetrics(document), [document]);
   const reading = useStoreValue((s) => s.ownership === "reading");
+  /** An em typed in and not yet applied, while the panel asks what it means. */
+  const [asking, setAsking] = useState<number | null>(null);
 
   return (
     <BarMenu
@@ -330,18 +349,54 @@ export function FontInfoPanel(): React.JSX.Element {
       panelLabel="Font info"
     >
       {SECTIONS.map((section) => (
-        <section key={section.title} className={styles.section}>
-          <h3 className={styles.heading}>{section.title}</h3>
-          {section.fields.map((field) => (
-            <Field
-              key={field.label}
-              field={field}
-              info={info}
-              store={store}
-              derived={derivedFor(field, derived)}
-            />
-          ))}
-        </section>
+        <Fragment key={section.title}>
+          <section className={styles.section}>
+            <h3 className={styles.heading}>{section.title}</h3>
+            {section.fields.map((field) =>
+              field.key === "unitsPerEm" ? (
+                <Fragment key={field.label}>
+                  <Field
+                    field={field}
+                    info={info}
+                    store={store}
+                    derived={null}
+                    asking={asking}
+                    onAsk={setAsking}
+                  />
+                  {asking === null ? null : (
+                    <EmQuestion
+                      from={info.unitsPerEm}
+                      to={asking}
+                      hasFeatures={document.features.trim() !== ""}
+                      onScale={() => {
+                        store.applyTool(scaleFontTo(store.editor, asking));
+                        setAsking(null);
+                      }}
+                      onKeep={() => {
+                        store.applyTool(setInfo(store.editor, { unitsPerEm: asking }));
+                        setAsking(null);
+                      }}
+                      onCancel={() => setAsking(null)}
+                    />
+                  )}
+                </Fragment>
+              ) : (
+                <Field
+                  key={field.label}
+                  field={field}
+                  info={info}
+                  store={store}
+                  derived={derivedFor(field, derived)}
+                />
+              ),
+            )}
+            {section.title === "Metrics" ? (
+              <FixedWidthFields document={document} store={store} />
+            ) : null}
+          </section>
+          {/* Beside the em, which its step is counted in and which it may ask to change. */}
+          {section.title === "Metrics" ? <GridSection document={document} store={store} /> : null}
+        </Fragment>
       ))}
       <p className={styles.note}>
         {info.familyName} {info.styleName} &middot; {info.unitsPerEm} units per em
@@ -362,12 +417,18 @@ function Field({
   info,
   store,
   derived,
+  asking = null,
+  onAsk,
 }: {
   field: Field;
   info: FontInfo;
   store: ReturnType<typeof useEditorStore>;
   /** For an override: what an empty box comes out as. */
   derived: number | null;
+  /** For the em: a value waiting on the question of what it means, shown in the box. */
+  asking?: number | null;
+  /** For the em: asked with a new value instead of applying it. */
+  onAsk?: (value: number) => void;
 }): React.JSX.Element {
   const current = info[field.key];
   const settled = current === null ? "" : String(current);
@@ -387,10 +448,11 @@ function Field({
    */
   const abandoning = useRef(false);
 
-  // An undo, or a font opened while the panel is up, has to reach the box.
+  // An undo, or a font opened while the panel is up, has to reach the box —
+  // and an em being asked about stays in it until it is answered.
   useEffect(() => {
-    if (!editing) setDraft(settled);
-  }, [settled, editing]);
+    if (!editing) setDraft(asking === null ? settled : String(asking));
+  }, [settled, editing, asking]);
 
   const commit = (): void => {
     setEditing(false);
@@ -418,6 +480,10 @@ function Field({
       setDraft(settled);
       return;
     }
+    if (onAsk !== undefined && typeof value === "number") {
+      onAsk(value);
+      return;
+    }
     store.applyTool(setInfo(store.editor, patch));
   };
 
@@ -443,9 +509,9 @@ function Field({
   const step = (next: number): void => {
     setDraft(String(next));
     const patch = { [field.key]: next } as Partial<FontInfo>;
-    if (infoProblem({ ...info, ...patch }) === null) {
-      store.applyTool(setInfo(store.editor, patch));
-    }
+    if (infoProblem({ ...info, ...patch }) !== null) return;
+    if (onAsk !== undefined) onAsk(next);
+    else store.applyTool(setInfo(store.editor, patch));
   };
 
   const stepped = (input: React.JSX.Element): React.JSX.Element =>
@@ -601,6 +667,320 @@ function Field({
           {problem}
         </span>
       ) : null}
+    </label>
+  );
+}
+
+/**
+ * What a new em means, asked where it was typed.
+ *
+ * Both answers are things people mean. An em typed wrong and put right wants
+ * the numbers kept; a font moved to an em its grid divides — an icon font from
+ * 1000 to 960 — wants everything to grow or shrink with it, so nothing on the
+ * page changes size. Guessing either would be wrong half the time, and the
+ * wrong one is a font whose every glyph is a different size or in the wrong
+ * place.
+ */
+function EmQuestion({
+  from,
+  to,
+  hasFeatures,
+  onScale,
+  onKeep,
+  onCancel,
+}: {
+  readonly from: number;
+  readonly to: number;
+  readonly hasFeatures: boolean;
+  readonly onScale: () => void;
+  readonly onKeep: () => void;
+  readonly onCancel: () => void;
+}): React.JSX.Element {
+  return (
+    <div className={styles.ask} role="group" aria-label="Change the em">
+      <p className={styles.question}>
+        From {from} to {to} units per em. Scale the drawing with it?
+      </p>
+      <div className={styles.answers}>
+        <button
+          type="button"
+          className={styles.button}
+          title="Outlines, spacing, kerning, guides and metrics grow or shrink with the em, so nothing changes size"
+          onClick={onScale}
+        >
+          Scale the font
+        </button>
+        <button
+          type="button"
+          className={styles.button}
+          title="Only the em changes, so every glyph sets at a new size"
+          onClick={onKeep}
+        >
+          Keep the numbers
+        </button>
+        <button type="button" className={styles.button} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+      {hasFeatures ? <p className={styles.caveat}>{FEATURES_NOT_SCALED}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * Whether every glyph is one width, and which.
+ *
+ * Saying so changes nothing drawn — the glyphs that are another width are
+ * counted, and fitted only when asked, since a font is often made fixed-width
+ * before it has been looked over. See `fixed-width.ts` in the model.
+ */
+function FixedWidthFields({
+  document,
+  store,
+}: {
+  readonly document: FontDocument;
+  readonly store: ReturnType<typeof useEditorStore>;
+}): React.JSX.Element {
+  const width = fixedWidthOf(document);
+  const off = useMemo(
+    () => (width === null ? 0 : offWidthGlyphs(document, width).length),
+    [document, width],
+  );
+  return (
+    <>
+      <label className={styles.field}>
+        <span className={styles.label}>Fixed width</span>
+        <input
+          type="checkbox"
+          className={styles.check}
+          checked={width !== null}
+          title="Every glyph one width: a code font, a terminal font, an icon font"
+          aria-label="Fixed width"
+          onChange={(event) => store.applyTool(setFixedWidth(store.editor, event.target.checked))}
+        />
+      </label>
+      <UnitsField
+        label="Width"
+        hint="The width of every glyph. Marks may have none, and wide characters twice it."
+        value={document.fixedWidth ?? commonAdvance(document)}
+        disabled={width === null}
+        onCommit={(next) => store.applyTool(setFixedWidth(store.editor, true, next))}
+      />
+      {width !== null && off > 0 ? (
+        <p className={styles.caveat}>
+          {off === 1 ? "One glyph is" : `${String(off)} glyphs are`} another width.{" "}
+          <button
+            type="button"
+            className={styles.button}
+            title="Give each the width with its drawing centred in it. Marks and wide glyphs are left alone."
+            onClick={() => store.applyTool(fitToWidth(store.editor))}
+          >
+            Fit to {width}
+          </button>
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+/** Grids by the size an icon is drawn at, and whole units, which every font has. */
+const GRID_PRESETS: readonly {
+  readonly id: string;
+  readonly label: string;
+  readonly pixels: number | null;
+  readonly parts: number;
+}[] = [
+  { id: "units", label: "Whole units", pixels: null, parts: 1 },
+  { id: "16", label: "16 px icon", pixels: 16, parts: 1 },
+  { id: "20", label: "20 px icon", pixels: 20, parts: 1 },
+  { id: "24", label: "24 px icon", pixels: 24, parts: 1 },
+  { id: "24-half", label: "24 px icon, half pixels", pixels: 24, parts: 2 },
+  { id: "32", label: "32 px icon", pixels: 32, parts: 1 },
+  { id: "48", label: "48 px icon", pixels: 48, parts: 1 },
+];
+
+type GridPreset = (typeof GRID_PRESETS)[number];
+
+function presetGrid(preset: GridPreset, unitsPerEm: number): Grid | null {
+  return preset.pixels === null ? DEFAULT_GRID : iconGrid(unitsPerEm, preset.pixels, preset.parts);
+}
+
+/** The preset a grid is, on this em, or `null` for one somebody set by hand. */
+function presetOf(grid: Grid, unitsPerEm: number): GridPreset | null {
+  return (
+    GRID_PRESETS.find((preset) => {
+      const made = presetGrid(preset, unitsPerEm);
+      return made !== null && Math.abs(made.step - grid.step) < 1e-9 && made.major === grid.major;
+    }) ?? null
+  );
+}
+
+/** A step as it is read: whole where it is whole, and to a hundredth where not. */
+const stepText = (step: number): string => String(Math.round(step * 100) / 100);
+
+/**
+ * The grid the font is drawn on: what a drag snaps to, and what the canvas
+ * draws when the grid is shown (G).
+ *
+ * A preset for the common case, an icon drawn at a size in pixels, and the step
+ * and the major spacing for anything else. Where a preset's step does not come
+ * out whole on this em, the panel says so and offers the em it would.
+ */
+function GridSection({
+  document,
+  store,
+}: {
+  readonly document: FontDocument;
+  readonly store: ReturnType<typeof useEditorStore>;
+}): React.JSX.Element {
+  const { grid, info } = document;
+  const preset = presetOf(grid, info.unitsPerEm);
+  const suggested =
+    preset === null || preset.pixels === null ? null : iconEm(info.unitsPerEm, preset.pixels);
+
+  return (
+    <section className={styles.section}>
+      <h3 className={styles.heading}>Grid</h3>
+      <label className={styles.field}>
+        <span className={styles.label}>Preset</span>
+        <select
+          className={styles.input}
+          value={preset?.id ?? "custom"}
+          title="What the font is drawn on. Drags snap to it, and G shows it."
+          aria-label="Grid preset"
+          onChange={(event) => {
+            const chosen = GRID_PRESETS.find((p) => p.id === event.target.value);
+            const next = chosen === undefined ? null : presetGrid(chosen, info.unitsPerEm);
+            if (next !== null) store.applyTool(setGrid(store.editor, next.step, next.major));
+          }}
+        >
+          {GRID_PRESETS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+          {preset === null ? <option value="custom">Custom</option> : null}
+        </select>
+      </label>
+      <UnitsField
+        label="Step"
+        hint="Units between two lines: what a point snaps to"
+        value={grid.step}
+        onCommit={(next) => store.applyTool(setGrid(store.editor, next, grid.major))}
+      />
+      <UnitsField
+        label="Major every"
+        hint="Every how many steps a line is drawn stronger. 0 for none."
+        value={grid.major}
+        onCommit={(next) => store.applyTool(setGrid(store.editor, grid.step, next))}
+      />
+      {isWholeStep(grid) ? null : (
+        <p className={styles.caveat}>
+          A step of {stepText(grid.step)} units puts points between units, which are rounded when
+          the font is compiled.{" "}
+          {suggested !== null && suggested !== info.unitsPerEm ? (
+            <button
+              type="button"
+              className={styles.button}
+              title="Scale the whole font to an em this grid divides into whole units"
+              onClick={() => store.applyTool(scaleFontTo(store.editor, suggested))}
+            >
+              Scale the font to {suggested}
+            </button>
+          ) : null}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * A number of units that is not one of the font's facts — the fixed width, the
+ * grid — committed on Enter or on leaving the box, as the fields above are.
+ */
+function UnitsField({
+  label,
+  hint,
+  value,
+  disabled = false,
+  onCommit,
+}: {
+  readonly label: string;
+  readonly hint: string;
+  readonly value: number | null;
+  readonly disabled?: boolean;
+  readonly onCommit: (next: number) => void;
+}): React.JSX.Element {
+  const settled = value === null ? "" : stepText(value);
+  const [draft, setDraft] = useState(settled);
+  const [editing, setEditing] = useState(false);
+  /** Set by Escape, read by the blur it causes; see `Field`. */
+  const abandoning = useRef(false);
+
+  useEffect(() => {
+    if (!editing) setDraft(settled);
+  }, [settled, editing]);
+
+  const commit = (): void => {
+    setEditing(false);
+    if (abandoning.current) {
+      abandoning.current = false;
+      setDraft(settled);
+      return;
+    }
+    const number = Number(draft);
+    if (draft === settled || draft.trim() === "" || !Number.isFinite(number)) {
+      setDraft(settled);
+      return;
+    }
+    onCommit(number);
+  };
+
+  const current = Number.isFinite(Number(draft)) && draft.trim() !== "" ? Number(draft) : value;
+
+  return (
+    <label className={styles.field}>
+      <span className={styles.label}>{label}</span>
+      <Stepper
+        value={disabled ? null : current}
+        label={label}
+        step={1}
+        bigStep={10}
+        disabled={disabled}
+        onStep={(next) => {
+          setDraft(stepText(next));
+          onCommit(next);
+        }}
+      >
+        <input
+          className={styles.input}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          spellCheck={false}
+          value={draft}
+          disabled={disabled}
+          title={hint}
+          aria-label={label}
+          onFocus={() => setEditing(true)}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit();
+              event.currentTarget.blur();
+            }
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              abandoning.current = true;
+              setDraft(settled);
+              setEditing(false);
+              event.currentTarget.blur();
+            }
+          }}
+        />
+      </Stepper>
     </label>
   );
 }

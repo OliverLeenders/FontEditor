@@ -351,6 +351,34 @@ describe("showControls", () => {
   });
 });
 
+describe("the grid", () => {
+  // At half scale over 800 by 600 from (200, 400), the canvas shows x from -400
+  // to 1200 and y from -400 to 800.
+  const lines = (ctx: RecordingContext, colour: string) =>
+    ctx.all("moveTo").filter((o) => o.strokeStyle === colour);
+
+  it("draws every step, the major ones in their own colour, across the canvas", () => {
+    const ctx = render({ ...base(ring()), grid: { step: 40, major: 4 } });
+    // 41 upright lines and 31 level ones, every fourth of each major.
+    expect(lines(ctx, LIGHT_PALETTE.gridMajor)).toHaveLength(10 + 8);
+    expect(lines(ctx, LIGHT_PALETTE.gridLine)).toHaveLength(31 + 23);
+    expect(ctx.strokedIn(LIGHT_PALETTE.gridLine)[0]?.globalAlpha).toBe(1);
+  });
+
+  it("lets the fine lines go when they crowd, and fades the major ones", () => {
+    // Four units is two pixels here, gone; sixteen is eight, a third of the way in.
+    const ctx = render({ ...base(ring()), grid: { step: 4, major: 4 } });
+    expect(lines(ctx, LIGHT_PALETTE.gridLine)).toHaveLength(0);
+    expect(ctx.strokedIn(LIGHT_PALETTE.gridMajor)[0]?.globalAlpha).toBeCloseTo(1 / 3, 6);
+  });
+
+  it("draws nothing where the grid is not shown", () => {
+    const ctx = render(base(ring()));
+    expect(ctx.strokedIn(LIGHT_PALETTE.gridLine)).toHaveLength(0);
+    expect(ctx.strokedIn(LIGHT_PALETTE.gridMajor)).toHaveLength(0);
+  });
+});
+
 describe("guides", () => {
   it("draws one line per guide, spanning the viewport", () => {
     const ctx = render({

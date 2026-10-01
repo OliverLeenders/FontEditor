@@ -85,6 +85,8 @@ export type SourceFont = {
   readonly layout?: LayoutTables | null;
   /** The legacy `kern` table's pairs, for a font whose GPOS has no kerning. */
   readonly kernTable?: SourceKerning;
+  /** `post.isFixedPitch`: whether the font says every glyph is one width. */
+  readonly isFixedPitch?: boolean;
 };
 
 export class FontParseError extends Error {
@@ -245,6 +247,7 @@ export function parseFont(bytes: ArrayBuffer): SourceFont {
     kerning: readKerning(font),
     layout: readLayoutTables(bytes, font.glyphs.length),
     kernTable: kerningFromKernTable(font.kerningPairs),
+    isFixedPitch: (font.tables.post?.isFixedPitch ?? 0) !== 0,
   };
 }
 

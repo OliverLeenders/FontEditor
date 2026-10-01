@@ -12,6 +12,7 @@ import {
   type HandleLock,
   type ImageRef,
   type Kept,
+  type Grid,
   type LayerInfo,
   type MetricKeys,
   type PlainValue,
@@ -19,6 +20,7 @@ import {
   type NodeType,
   BOTH_LOCKED,
   DEFAULT_FONT_INFO,
+  DEFAULT_GRID,
   NO_LOCK,
   NOTHING_KEPT,
   NO_METRIC_KEYS,
@@ -28,8 +30,10 @@ import {
   contour,
   drawingOf,
   glyph,
+  grid,
   guide,
   hasMetricKeys,
+  isDefaultGrid,
   imageRef,
   node,
   readContinuous,
@@ -208,6 +212,10 @@ export type StoredFontInfo = {
   readonly kept?: { readonly fontInfo: PlainRecord; readonly lib: PlainRecord };
   /** The font's layers other than the main drawing. Omitted when there are none. */
   readonly layers?: readonly LayerInfo[];
+  /** The grid the font is drawn on. Omitted for whole units, which every font has. */
+  readonly grid?: { readonly step: number; readonly major: number };
+  /** The width of a fixed-width font. Omitted when none has been chosen. */
+  readonly fixedWidth?: number;
 };
 
 type PlainRecord = Readonly<Record<string, PlainValue>>;
@@ -317,6 +325,8 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
     ...(document.guides.length === 0 ? {} : { guides: document.guides.map(encodeGuide) }),
     ...(nothingKept(document.kept) ? {} : { kept: document.kept }),
     ...(document.layers.length === 0 ? {} : { layers: document.layers }),
+    ...(isDefaultGrid(document.grid) ? {} : { grid: document.grid }),
+    ...(document.fixedWidth === null ? {} : { fixedWidth: document.fixedWidth }),
   };
   return document.features === "" ? base : { ...base, features: document.features };
 }
@@ -380,6 +390,8 @@ export function decodeFontInfo(raw: unknown): {
   guides: readonly Guide[];
   kept: Kept;
   layers: readonly LayerInfo[];
+  grid: Grid;
+  fixedWidth: number | null;
 } {
   if (!isRecord(raw)) {
     return {
@@ -389,6 +401,8 @@ export function decodeFontInfo(raw: unknown): {
       guides: [],
       kept: NOTHING_KEPT,
       layers: [],
+      grid: DEFAULT_GRID,
+      fixedWidth: null,
     };
   }
 
@@ -401,7 +415,19 @@ export function decodeFontInfo(raw: unknown): {
     guides: readGuides(raw["guides"]),
     kept: readKept(raw["kept"]),
     layers: readLayers(raw["layers"]),
+    grid: readGrid(raw["grid"]),
+    fixedWidth:
+      typeof raw["fixedWidth"] === "number" && raw["fixedWidth"] > 0
+        ? Math.round(raw["fixedWidth"])
+        : null,
   };
+}
+
+/** The grid, or whole units where there is none that can be one. */
+function readGrid(raw: unknown): Grid {
+  if (!isRecord(raw) || typeof raw["step"] !== "number") return DEFAULT_GRID;
+  const major = typeof raw["major"] === "number" ? raw["major"] : 0;
+  return grid(raw["step"], major) ?? DEFAULT_GRID;
 }
 
 /** The list of layers, believing nothing about it. */
@@ -447,6 +473,9 @@ function readInfo(raw: Record<string, unknown>): FontInfo {
     // and every override a font set was dropped the next time it was opened.
     if (typeof fallback === "number" || fallback === null) {
       if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
+    } else if (typeof fallback === "boolean") {
+      // The one flag, whether the font is fixed-width.
+      if (typeof value === "boolean") out[key] = value;
     } else if (Array.isArray(fallback)) {
       // The one list, of `fsSelection` bit numbers.
       if (Array.isArray(value)) {

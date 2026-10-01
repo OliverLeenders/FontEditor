@@ -244,6 +244,11 @@ export function App(): React.JSX.Element {
         store.toggleSnapPoints(drawingRef.current);
         return;
       }
+      // "G" shows the font's grid, which drags snap to whether or not it is shown.
+      if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "g") {
+        store.toggleGrid(drawingRef.current);
+        return;
+      }
       // "B" draws in the background, and again draws in the letter. Adding the
       // background layer the first time, as an undoable step of its own.
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "b") {

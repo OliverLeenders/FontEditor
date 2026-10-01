@@ -22,7 +22,7 @@ import {
   segments,
   segmentIndexForHandle,
   setHandle,
-  setLeftSidebearing,
+  withSidebearing,
   setSegmentTunniPoint,
   sidebearings,
   translateNodes,
@@ -640,7 +640,8 @@ export function snappingFor(
     enter: screenTolerance(state.view, pixels),
     stay: screenTolerance(state.view, options.snapStayPixels ?? SNAP_STAY_PIXELS),
     stickiness: options.snapStickiness ?? SNAP_STICKINESS,
-    grid: 1,
+    // The font's own grid: whole units unless it is drawn on a coarser one.
+    grid: state.document.grid.step,
   };
 }
 
@@ -1129,8 +1130,9 @@ const CONTINUE: Continuations = {
         : gesture.startLeft === null
           ? null
           : updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
-              setLeftSidebearing(
+              withSidebearing(
                 g,
+                "left",
                 toGrid((gesture.startLeft ?? 0) + delta.x, snapping),
                 gesture.before,
               ),

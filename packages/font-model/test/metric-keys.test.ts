@@ -94,15 +94,35 @@ describe("following a key", () => {
 
 describe("what a key can say", () => {
   it("reads a name, a bar for the other side, and whole offsets", () => {
-    expect(parseMetricKey("o")).toEqual({ glyph: "o", opposite: false, offset: 0 });
-    expect(parseMetricKey("=|b+10")).toEqual({ glyph: "b", opposite: true, offset: 10 });
-    expect(parseMetricKey("n - 5")).toEqual({ glyph: "n", opposite: false, offset: -5 });
-    expect(parseMetricKey("n+10-3")).toEqual({ glyph: "n", opposite: false, offset: 7 });
-    expect(parseMetricKey("|")).toEqual({ glyph: "", opposite: true, offset: 0 });
+    expect(parseMetricKey("o")).toEqual({ glyph: "o", opposite: false, offset: 0, units: null });
+    expect(parseMetricKey("=|b+10")).toEqual({
+      glyph: "b",
+      opposite: true,
+      offset: 10,
+      units: null,
+    });
+    expect(parseMetricKey("n - 5")).toEqual({
+      glyph: "n",
+      opposite: false,
+      offset: -5,
+      units: null,
+    });
+    expect(parseMetricKey("n+10-3")).toEqual({
+      glyph: "n",
+      opposite: false,
+      offset: 7,
+      units: null,
+    });
+    expect(parseMetricKey("|")).toEqual({ glyph: "", opposite: true, offset: 0, units: null });
   });
 
   it("keeps a hyphen that is not followed by a number as part of the name", () => {
-    expect(parseMetricKey("a-cy")).toEqual({ glyph: "a-cy", opposite: false, offset: 0 });
+    expect(parseMetricKey("a-cy")).toEqual({
+      glyph: "a-cy",
+      opposite: false,
+      offset: 0,
+      units: null,
+    });
   });
 
   it("reads nothing out of an empty key, or one with a space in its name", () => {

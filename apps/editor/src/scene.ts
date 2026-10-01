@@ -250,6 +250,8 @@ export function sceneFor(
     // one set of marks and a pointer sized for one is sized for all.
     metrics: controlMetrics(shows.controlSize, shows.outlineWidth),
     // The names come with the lines; the renderer writes them at the edge.
+    // The font's grid where this pane shows it, and never while space is held.
+    grid: shows.showGrid && !state.previewing ? editor.document.grid : null,
     metricLines: metricLines(editor.document.info).map((line) => ({
       y: line.y,
       // Spread rather than assigned: an absent `emphasis` and one set to

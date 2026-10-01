@@ -19,6 +19,12 @@ export type RenderPalette = {
    * cannot be read at all.
    */
   readonly guideLabel: string;
+  /**
+   * The font's grid: its finest lines, and the stronger ones every few steps.
+   * Fainter than the metric lines, which are fewer and say more.
+   */
+  readonly gridLine: string;
+  readonly gridMajor: string;
   /** The lines the designer put there, as against the font's own metrics. */
   /** An instance between the masters: a reading, not a drawing. */
   readonly instance: string;
@@ -119,6 +125,8 @@ export const LIGHT_PALETTE: RenderPalette = {
   background: "#FFFFFF",
   guide: "#E8EDF3",
   guideEmphasis: "#C2CDD8",
+  gridLine: "#F1F4F8",
+  gridMajor: "#E2E8EF",
   guideLabel: "#7C8896",
   instance: "#B9A2D8",
   behind: "#8FA3B8",
@@ -161,6 +169,8 @@ export const DARK_PALETTE: RenderPalette = {
   background: "#10171F",
   guide: "#1E2833",
   guideEmphasis: "#33404E",
+  gridLine: "#161E28",
+  gridMajor: "#212C38",
   guideLabel: "#8B99A8",
   instance: "#6E5A8C",
   behind: "#5C6F83",

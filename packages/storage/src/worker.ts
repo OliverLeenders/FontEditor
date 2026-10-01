@@ -171,7 +171,9 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
       }
       // The stored order is authoritative: `fontDocument` would otherwise
       // order by the array it was handed, losing the font's own arrangement.
-      const { info, glyphOrder, features, guides, kept, layers } = decodeFontInfo(request.info);
+      const { info, glyphOrder, features, guides, kept, layers, grid, fixedWidth } = decodeFontInfo(
+        request.info,
+      );
       // Everything the document carries, not only its glyphs: `replaceDocument`
       // writes every file the project has, so whatever is left out here is
       // written over as empty.
@@ -184,7 +186,7 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
           setGuides(
             setFeatures(
               setKerning(
-                setGlyphOrder(fontDocument(glyphs, info), glyphOrder),
+                setGlyphOrder({ ...fontDocument(glyphs, info), grid, fixedWidth }, glyphOrder),
                 decodeKerning(request.kerning),
               ),
               features,

@@ -101,6 +101,7 @@ declare module "opentype.js" {
         readonly descender: number;
         readonly lineGap: number;
       };
+      readonly post?: { readonly isFixedPitch?: number };
       /** Parsed GPOS, typed as loosely and for the same reason as GSUB below. */
       readonly gpos?: {
         readonly features: readonly { readonly tag: string }[];
@@ -159,7 +160,15 @@ declare module "opentype.js" {
     weightClass?: number;
     widthClass?: number;
     fsSelection?: number;
-    tables?: { os2?: OtOS2Init };
+    tables?: { os2?: OtOS2Init; post?: OtPostInit };
+  }
+
+  /**
+   * What `post` is told. The table writer reads the font's `post` for these
+   * and takes a default for each it does not find.
+   */
+  export interface OtPostInit {
+    isFixedPitch?: number;
   }
 
   /**
@@ -179,6 +188,9 @@ declare module "opentype.js" {
     usWinAscent?: number;
     usWinDescent?: number;
     fsType?: number;
+    xAvgCharWidth?: number;
+    bFamilyType?: number;
+    bProportion?: number;
   }
 
   /** One name record's translations. Only English is ever written here. */

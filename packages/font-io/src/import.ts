@@ -6,6 +6,7 @@ import {
   type Glyph,
   type IdFactory,
   DEFAULT_FONT_INFO,
+  commonAdvance,
   derivedVerticalMetrics,
   fontDocument,
   EMPTY_KERNING,
@@ -13,6 +14,7 @@ import {
   component,
   glyph,
   groupKey,
+  setFixedPitch,
   setFontInfo,
   setKern,
   setFeatures,
@@ -195,7 +197,13 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
     setKerning(fontDocument(glyphs, info), kerningFrom(kerning, names)),
     layout?.features ?? "",
   );
-  return { document: withLineMetrics(document, source), warnings };
+  // A font that says it is fixed is read as fixed, at the width it mostly is:
+  // the file records the flag and not the width, which is every glyph's.
+  const fixed =
+    source.isFixedPitch === true
+      ? setFixedPitch(document, true, commonAdvance(document))
+      : document;
+  return { document: withLineMetrics(fixed, source), warnings };
 }
 
 /**

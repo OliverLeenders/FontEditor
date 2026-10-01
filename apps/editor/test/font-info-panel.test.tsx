@@ -62,13 +62,13 @@ describe("the font info panel", () => {
 
   it("commits when the field is left", () => {
     const { store } = openPanel();
-    const em = screen.getByLabelText<HTMLInputElement>("Units per em");
+    const x = screen.getByLabelText<HTMLInputElement>("x-height");
 
-    fireEvent.focus(em);
-    fireEvent.change(em, { target: { value: "2048" } });
-    fireEvent.blur(em);
+    fireEvent.focus(x);
+    fireEvent.change(x, { target: { value: "512" } });
+    fireEvent.blur(x);
 
-    expect(store.editor.document.info.unitsPerEm).toBe(2048);
+    expect(store.editor.document.info.xHeight).toBe(512);
   });
 
   it("commits on Enter, without waiting to be left", () => {
@@ -134,18 +134,141 @@ describe("the font info panel", () => {
 
   it("shows what an undo did, rather than the number that was typed", () => {
     const { store } = openPanel();
-    const em = screen.getByLabelText<HTMLInputElement>("Units per em");
-    const before = store.editor.document.info.unitsPerEm;
+    const x = screen.getByLabelText<HTMLInputElement>("x-height");
+    const before = store.editor.document.info.xHeight;
 
-    fireEvent.focus(em);
-    fireEvent.change(em, { target: { value: "2048" } });
-    fireEvent.blur(em);
+    fireEvent.focus(x);
+    fireEvent.change(x, { target: { value: "512" } });
+    fireEvent.blur(x);
     // Outside React's own events, so the flush has to be asked for.
     act(() => {
       store.undo();
     });
 
+    expect(screen.getByLabelText<HTMLInputElement>("x-height").value).toBe(String(before));
+  });
+});
+
+/**
+ * A new em, which means one of two things, so the panel asks which: the whole
+ * font scaled to it, or the numbers kept and every glyph set at a new size.
+ */
+describe("changing the em", () => {
+  const typeEm = (value: string) => {
+    const em = screen.getByLabelText<HTMLInputElement>("Units per em");
+    fireEvent.focus(em);
+    fireEvent.change(em, { target: { value } });
+    fireEvent.blur(em);
+  };
+
+  it("asks before it changes anything", () => {
+    const { store } = openPanel();
+    const before = store.editor.document.info.unitsPerEm;
+    typeEm("2000");
+
+    expect(store.editor.document.info.unitsPerEm).toBe(before);
+    expect(screen.getByRole("group", { name: "Change the em" })).toBeTruthy();
+    // The box holds the em being asked about until it is answered.
+    expect(screen.getByLabelText<HTMLInputElement>("Units per em").value).toBe("2000");
+  });
+
+  it("scales the font when asked to, so the drawing keeps its size", () => {
+    const { store } = openPanel();
+    const ascender = store.editor.document.info.ascender;
+    typeEm("2000");
+    fireEvent.click(screen.getByRole("button", { name: "Scale the font" }));
+
+    expect(store.editor.document.info.unitsPerEm).toBe(2000);
+    expect(store.editor.document.info.ascender).toBe(ascender * 2);
+    expect(screen.queryByRole("group", { name: "Change the em" })).toBeNull();
+  });
+
+  it("keeps the numbers when asked to", () => {
+    const { store } = openPanel();
+    const ascender = store.editor.document.info.ascender;
+    typeEm("2000");
+    fireEvent.click(screen.getByRole("button", { name: "Keep the numbers" }));
+
+    expect(store.editor.document.info.unitsPerEm).toBe(2000);
+    expect(store.editor.document.info.ascender).toBe(ascender);
+  });
+
+  it("changes nothing on Cancel, and puts the box back", () => {
+    const { store } = openPanel();
+    const before = store.editor.document.info.unitsPerEm;
+    typeEm("2000");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(store.editor.document.info.unitsPerEm).toBe(before);
     expect(screen.getByLabelText<HTMLInputElement>("Units per em").value).toBe(String(before));
+  });
+});
+
+/** A fixed width, said and then fitted to. */
+describe("a fixed width", () => {
+  it("is off until it is ticked, and then takes the width typed", () => {
+    const { store } = openPanel();
+    const width = screen.getByLabelText<HTMLInputElement>("Width");
+    expect(width.disabled).toBe(true);
+
+    fireEvent.click(screen.getByLabelText<HTMLInputElement>("Fixed width"));
+    expect(store.editor.document.info.postscriptIsFixedPitch).toBe(true);
+
+    fireEvent.focus(width);
+    fireEvent.change(width, { target: { value: "640" } });
+    fireEvent.keyDown(width, { key: "Enter" });
+    expect(store.editor.document.fixedWidth).toBe(640);
+  });
+
+  it("offers to fit the glyphs that are another width, and fits them", () => {
+    const { store } = openPanel();
+    fireEvent.click(screen.getByLabelText<HTMLInputElement>("Fixed width"));
+    const width = screen.getByLabelText<HTMLInputElement>("Width");
+    fireEvent.focus(width);
+    fireEvent.change(width, { target: { value: "777" } });
+    fireEvent.keyDown(width, { key: "Enter" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Fit to 777" }));
+    const advances = Object.values(store.editor.document.glyphs).map((g) => g.advance);
+    expect(advances.every((a) => a === 0 || a === 777 || a === 1554)).toBe(true);
+    expect(screen.queryByRole("button", { name: "Fit to 777" })).toBeNull();
+  });
+});
+
+/** The grid: a preset, or a step and a major spacing typed in. */
+describe("the grid", () => {
+  it("sets an icon grid from a preset, and offers an em it divides into whole units", () => {
+    const { store } = openPanel();
+    fireEvent.change(screen.getByLabelText<HTMLSelectElement>("Grid preset"), {
+      target: { value: "24" },
+    });
+    const step = store.editor.document.grid.step;
+    expect(step).toBeCloseTo(store.editor.document.info.unitsPerEm / 24, 9);
+
+    if (!Number.isInteger(step)) {
+      fireEvent.click(screen.getByRole("button", { name: /^Scale the font to \d+$/ }));
+      expect(Number.isInteger(store.editor.document.grid.step)).toBe(true);
+      expect(store.editor.document.info.unitsPerEm % 24).toBe(0);
+    }
+  });
+
+  it("takes a step and a major spacing typed in, and refuses a step of nothing", () => {
+    const { store } = openPanel();
+    const step = screen.getByLabelText<HTMLInputElement>("Step");
+    fireEvent.focus(step);
+    fireEvent.change(step, { target: { value: "25" } });
+    fireEvent.keyDown(step, { key: "Enter" });
+    const major = screen.getByLabelText<HTMLInputElement>("Major every");
+    fireEvent.focus(major);
+    fireEvent.change(major, { target: { value: "4" } });
+    fireEvent.keyDown(major, { key: "Enter" });
+    expect(store.editor.document.grid).toEqual({ step: 25, major: 4 });
+
+    fireEvent.focus(step);
+    fireEvent.change(step, { target: { value: "0" } });
+    fireEvent.keyDown(step, { key: "Enter" });
+    expect(store.editor.document.grid).toEqual({ step: 25, major: 4 });
+    expect(step.value).toBe("25");
   });
 });
 

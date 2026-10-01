@@ -17,6 +17,10 @@
  * - `|b` — the other side of `b`: a `d`'s left side is a `b`'s right, turned round.
  * - `|` — this glyph's own other side, which is how an `o` is kept symmetrical.
  * - `o+10`, `|b-5` — any of those, and a number of units more or less.
+ * - `=600` — a number of units, naming no glyph: a width that stays 600 whatever
+ *   the glyph's drawing does, or a sidebearing that does the same. Written with
+ *   the `=` in the spacing view, where a number without one is a value to set
+ *   once rather than a key to keep.
  *
  * A leading `=` is allowed and ignored, because that is how the spacing view tells
  * a key from a number, and a key copied out of there should still read. Only whole
@@ -32,6 +36,8 @@ export type MetricKeyReference = {
   /** Take the other side of it: its right side for a left key, and the reverse. */
   readonly opposite: boolean;
   readonly offset: number;
+  /** A number of units the key says outright, with `glyph` empty; `null` for a key naming a glyph. */
+  readonly units: number | null;
 };
 
 /** An optional `=`, an optional bar, a name, and any number of whole `+n` and `-n`. */
@@ -52,7 +58,12 @@ export function parseMetricKey(text: string): MetricKeyReference | null {
     const size = Number(term[2] ?? "0");
     offset += term[1] === "-" ? -size : size;
   }
-  return { glyph, opposite, offset };
+  // Digits alone are a number rather than a glyph: no glyph a font can compile
+  // is named `600`, and the other side of a number is not a thing.
+  if (/^\d+$/.test(glyph)) {
+    return opposite ? null : { glyph: "", opposite: false, offset, units: Number(glyph) };
+  }
+  return { glyph, opposite, offset, units: null };
 }
 
 /**

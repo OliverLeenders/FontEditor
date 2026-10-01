@@ -1,4 +1,5 @@
 import type { Glyph } from "./glyph.js";
+import { type Grid, DEFAULT_GRID } from "./grid.js";
 import type { Guide } from "./guide.js";
 import type { LayerInfo } from "./layers.js";
 import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js";
@@ -64,6 +65,14 @@ export type FontInfo = {
 
   /** How far the letters lean, in degrees, counter-clockwise from upright. */
   readonly italicAngle: number;
+
+  /**
+   * Whether every glyph is the same width: a monospaced font, a terminal's or
+   * an icon font's. What the width is, is the document's `fixedWidth`; this is
+   * the flag the font is compiled with, which is how a terminal decides it may
+   * use the font at all.
+   */
+  readonly postscriptIsFixedPitch: boolean;
 
   readonly copyright: string;
   readonly trademark: string;
@@ -145,6 +154,7 @@ export const DEFAULT_FONT_INFO: FontInfo = {
   versionMajor: 1,
   versionMinor: 0,
   italicAngle: 0,
+  postscriptIsFixedPitch: false,
 
   copyright: "",
   trademark: "",
@@ -256,6 +266,14 @@ export type FontDocument = {
    * drawing in one is on the glyph; see `layers.ts`.
    */
   readonly layers: readonly LayerInfo[];
+  /** What the font is drawn on: see `grid.ts`. */
+  readonly grid: Grid;
+  /**
+   * The width every glyph is, in a font whose `postscriptIsFixedPitch` says so,
+   * or `null` where none has been chosen. Kept while the flag is off, so that
+   * turning it off and on again does not lose the number. See `fixed-width.ts`.
+   */
+  readonly fixedWidth: number | null;
 };
 
 export function fontDocument(
@@ -277,6 +295,8 @@ export function fontDocument(
     guides: [],
     kept: NOTHING_KEPT,
     layers: [],
+    grid: DEFAULT_GRID,
+    fixedWidth: null,
   };
 }
 

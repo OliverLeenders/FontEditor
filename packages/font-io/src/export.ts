@@ -8,8 +8,10 @@ import {
   type StyleMapStyle,
   correctDirections,
   counterIds,
+  fixedWidthOf,
   glyph,
   kernIndex,
+  newGlyphAdvance,
   orderedGlyphs,
   removeOverlap,
   resolveGlyphComponents,
@@ -27,7 +29,7 @@ import { gdefTable } from "./gdef.js";
 import { type SwapVariations, gsubWithSwaps } from "./feature-variations.js";
 import { compileMarks } from "./marks.js";
 import { readTablesOf, withTable } from "./sfnt.js";
-import type { OtGlyph, OtOS2Init, OtPath } from "opentype.js";
+import type { OtGlyph, OtOS2Init, OtPath, OtPostInit } from "opentype.js";
 
 /**
  * Writing a font out.
@@ -157,7 +159,7 @@ export function flattenedGlyphs(document: FontDocument): Glyph[] {
   // every glyph after it sat one place earlier than the character map and the
   // metrics said, and the last character pointed past the end of the font.
   return synthesised
-    ? [glyph(".notdef", { advance: Math.round(document.info.unitsPerEm / 2) }), ...glyphs]
+    ? [glyph(".notdef", { advance: newGlyphAdvance(document) }), ...glyphs]
     : glyphs;
 }
 
@@ -312,6 +314,28 @@ function os2Overrides(info: FontInfo): OtOS2Init {
 }
 
 /**
+ * The tables a fixed-width font says so in, where it is one.
+ *
+ * Three places, read by different software. `post.isFixedPitch` is what a
+ * terminal or a code editor checks before it offers the font at all; the PANOSE
+ * proportion is what Windows' font mapper goes by; and `xAvgCharWidth` is
+ * every glyph's width, which opentype.js would otherwise work out as an average
+ * that counts the marks with no width at all. The PANOSE family is given as
+ * Latin text, the one whose fourth digit is the proportion — on its own the
+ * proportion means nothing, and the rest are left as "any".
+ */
+function fixedPitchTables(
+  os2: OtOS2Init,
+  width: number | null,
+): { os2: OtOS2Init; post?: OtPostInit } {
+  if (width === null) return { os2 };
+  return {
+    os2: { ...os2, xAvgCharWidth: Math.round(width), bFamilyType: 2, bProportion: 9 },
+    post: { isFixedPitch: 1 },
+  };
+}
+
+/**
  * The line metrics `hhea` is told, where the font sets them.
  *
  * opentype.js builds `hhea` from the ascender and descender alone, with no line
@@ -409,7 +433,9 @@ export function exportFont(
     glyphs.push(
       new opentype.Glyph({
         name: ".notdef",
-        advanceWidth: Math.round(document.info.unitsPerEm / 2),
+        // The fixed width in a font that has one: a terminal that finds one
+        // glyph of another width takes the font to be proportional.
+        advanceWidth: newGlyphAdvance(document),
         path: new opentype.Path(),
       }),
     );
@@ -486,7 +512,7 @@ export function exportFont(
     weightClass: info.openTypeOS2WeightClass,
     widthClass: info.openTypeOS2WidthClass,
     fsSelection: selectionOf(info.styleMapStyleName) | decidedSelection(info),
-    tables: { os2: os2Overrides(info) },
+    tables: fixedPitchTables(os2Overrides(info), fixedWidthOf(document)),
 
     glyphs,
   });

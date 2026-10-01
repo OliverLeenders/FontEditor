@@ -1086,6 +1086,10 @@ export class EditorStore {
     this.showInPane(pane, { showPointNumbers: !this.state.views[pane].showPointNumbers });
   }
 
+  toggleGrid(pane: PaneIndex = 0): void {
+    this.showInPane(pane, { showGrid: !this.state.views[pane].showGrid });
+  }
+
   /** Put one pane's canvas settings back, leaving the other pane's alone. */
   resetView(pane: PaneIndex = 0): void {
     this.showInPane(pane, DEFAULT_VIEW);

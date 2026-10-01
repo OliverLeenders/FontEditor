@@ -1,7 +1,13 @@
-import { DEFAULT_FONT_INFO, USE_TYPO_METRICS_BIT } from "@typewright/font-model";
+import {
+  DEFAULT_FONT_INFO,
+  DEFAULT_GRID,
+  USE_TYPO_METRICS_BIT,
+  fontDocument,
+  setFixedPitch,
+} from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
-import { decodeFontInfo } from "../src/schema.js";
+import { decodeFontInfo, encodeFontInfo } from "../src/schema.js";
 
 /**
  * The font's information, read back out of the working store.
@@ -55,5 +61,26 @@ describe("font info from the working store", () => {
 
     expect(info.openTypeOS2WinAscent).toBeNull();
     expect(info.openTypeOS2Selection).toEqual([7]);
+  });
+
+  it("carries the grid, the fixed width and the flag, and reads an older project as having none", () => {
+    const font = setFixedPitch(
+      { ...fontDocument([], DEFAULT_FONT_INFO), grid: { step: 40, major: 4 } },
+      true,
+      600,
+    );
+    const back = decodeFontInfo(JSON.parse(JSON.stringify(encodeFontInfo(font))));
+    expect(back.grid).toEqual({ step: 40, major: 4 });
+    expect(back.fixedWidth).toBe(600);
+    expect(back.info.postscriptIsFixedPitch).toBe(true);
+
+    const older = decodeFontInfo({ schema: 1, familyName: "Older", unitsPerEm: 1000 });
+    expect(older.grid).toEqual(DEFAULT_GRID);
+    expect(older.fixedWidth).toBeNull();
+    expect(older.info.postscriptIsFixedPitch).toBe(false);
+
+    const odd = decodeFontInfo({ schema: 1, grid: { step: 0 }, fixedWidth: -3 });
+    expect(odd.grid).toEqual(DEFAULT_GRID);
+    expect(odd.fixedWidth).toBeNull();
   });
 });

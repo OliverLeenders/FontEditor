@@ -46,7 +46,7 @@ export function sidebearings(g: Glyph, document?: FontDocument): Sidebearings | 
 }
 
 /** The box a glyph's ink fills: its contours, and its components where the font is known. */
-function outlineBounds(g: Glyph, document: FontDocument | undefined): Rect | null {
+export function outlineBounds(g: Glyph, document: FontDocument | undefined): Rect | null {
   if (document === undefined || g.components.length === 0) return glyphBounds(g);
   return glyphBounds(drawableGlyph(document, g));
 }

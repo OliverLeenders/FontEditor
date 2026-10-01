@@ -89,7 +89,7 @@ export {
   turnsMissing,
 } from "./contours.js";
 
-export { infoProblem, setInfo } from "./font.js";
+export { fitToWidth, infoProblem, scaleFontTo, setFixedWidth, setGrid, setInfo } from "./font.js";
 
 export type { NewGlyph } from "./glyphs.js";
 export {

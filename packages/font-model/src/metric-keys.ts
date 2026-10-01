@@ -41,9 +41,9 @@ export type ResolvedMetrics = {
   readonly right: number | null;
 };
 
-/** Whether a key points back at the glyph that holds it. */
+/** Whether a key points back at the glyph that holds it. A number points at nothing. */
 function isOwn(key: MetricKeyReference, holder: GlyphName): boolean {
-  return key.glyph === "" || key.glyph === holder;
+  return key.units === null && (key.glyph === "" || key.glyph === holder);
 }
 
 type ReadKeys = {
@@ -123,7 +123,9 @@ export function resolvedMetrics(
   const taken = (key: MetricKeyReference, side: "left" | "right"): number | null => {
     const wanted = key.opposite ? (side === "left" ? "right" : "left") : side;
     let value: number | null;
-    if (isOwn(key, name)) {
+    if (key.units !== null) {
+      value = key.units;
+    } else if (isOwn(key, name)) {
       // A side from the same side of itself says nothing, and followed once per
       // pass with an offset it would say something different every time.
       if (!key.opposite) return null;
@@ -164,9 +166,15 @@ export function resolvedMetrics(
   if (keys.width !== null) {
     // A width has no other side, and a glyph's width from itself is its width.
     if (keys.width.opposite || isOwn(keys.width, name)) return null;
-    const from = resolvedMetrics(document, keys.width.glyph, depth + 1, trail);
-    if (from === null) return null;
-    const wanted = from.advance + keys.width.offset;
+    let base: number;
+    if (keys.width.units !== null) {
+      base = keys.width.units;
+    } else {
+      const from = resolvedMetrics(document, keys.width.glyph, depth + 1, trail);
+      if (from === null) return null;
+      base = from.advance;
+    }
+    const wanted = base + keys.width.offset;
     // The right side absorbs it, the left being where the outline sits.
     if (right !== null) right += wanted - advance;
     advance = wanted;
