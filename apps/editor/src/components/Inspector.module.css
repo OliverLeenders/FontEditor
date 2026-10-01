@@ -345,6 +345,13 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap: 0.3rem;
 }
+/* Each box offers the glyph names as it is typed in, and Chromium keeps room
+   at its end for an arrow that opens the whole list — a third of a box this
+   narrow, which cut "width" to "widt". The names still come up as they are
+   typed; the arrow, and the room, go. */
+.triple .input::-webkit-calendar-picker-indicator {
+  display: none !important;
+}
 
 /* One row per component: what it is, where it sits, and a way to remove it. */
 .components {
