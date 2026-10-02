@@ -15,7 +15,7 @@ Out come OTF, TTF — hinted, in the desktop application — WOFF, WOFF2, variab
 UFO, and UFO comes back in. A family is several masters, a `.designspace` and one
 `.ufo` each; a UFO folder on disk is opened and saved back to; everything autosaves to the
 browser's own store besides, and copies of the whole font are kept as you work. Guides and a
-picture to trace from sit behind the drawing; before it goes out, twenty checks say what
+picture to trace from sit behind the drawing; before it goes out, twenty-two checks say what
 is wrong with it. Several fonts are kept at once, each in a working copy of its own; the
 window splits into two panes — the drawing may fill both, each canvas showing what it is
 asked to — and a second font opens in a window of its own. The grid lists what the font has
@@ -30,50 +30,51 @@ carries the grid it is drawn on and may be fixed-width; an icon set comes in as 
 strokes still strokes, and goes out as a font that spells each icon's name, with the
 stylesheet and the page a web site needs beside it.
 
-| Phase |                                     | Status                                                                                     |
-| ----- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
-| 0     | Foundations and the geometry kernel | done                                                                                       |
-| 1     | The editing surface                 | done                                                                                       |
-| 2     | Undo, redo, persistence             | done                                                                                       |
-| 3     | From paths to a glyph               | done, and anchors with it                                                                  |
-| 4     | From a glyph to a font              | done                                                                                       |
-| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways                            |
-| 6     | Proofing and shaping                | done, and set by HarfBuzz since phase 17                                                   |
-| 7     | Spacing and kerning                 | done                                                                                       |
-| 8     | OpenType features                   | most of `.fea` compiles to GSUB and GPOS, and anchors to marks                             |
-| 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools        |
-| 10    | Production polish                   | lint, format and about 3,850 tests, run on CI; preferences persist                         |
-| 11    | The drawing hand                    | done                                                                                       |
-| 12    | Not losing what was opened          | done                                                                                       |
-| 13    | The family, named                   | done                                                                                       |
-| 14    | What ships to a browser             | done                                                                                       |
-| 15    | Several fonts, and a name           | done                                                                                       |
-| 16    | The details a font is judged on     | done                                                                                       |
-| 17    | Proving it where it will be used    | done: HarfBuzz sets the proof, FreeType draws the fonts in CI, ttfautohint hints           |
-| 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                            |
-| 19    | Releases                            | done: versions, a release workflow and updates; the installers are unsigned                |
-| 20    | A split window                      | done                                                                                       |
-| 21    | Two fonts side by side              | done: a window per font                                                                    |
-| 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools       |
-| 23    | Right-to-left text                  | done: bidi runs, and direction, script and language chosen in each bar                     |
-| 24    | The web build, hosted               | done: typewright.io, published to Cloudflare Pages from every release                      |
-| 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                        |
-| 26    | The last interface tests            | done: every panel and control is rendered by a test                                        |
-| 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried           |
-| 28    | Binary import keeps its layout      | done: GSUB and GPOS as source, marks as anchors, kerning into the model, fontTools-checked |
-| 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph     |
-| 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters       |
-| 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each  |
-| 32    | More outline operations             | done: subtract, intersect, exclude, offset and simplify, beside the union and the extremes |
-| 33    | One answer to what a glyph is       | done: the union, the ruler, the gap measure and the knife see components                   |
-| 34    | Drawing with a pen                  | done: a broad edge exactly, an oval to within a fiftieth of a unit, on any contour         |
-| 35    | A node that holds its curvature     | done: harmonising that stays, and continuous corners drawn round without extra points      |
-| 36    | Named alternates                    | done: set and variant names from the feature file, and aalt as written or gathered         |
-| —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
-| —     | Finding one's way                   | done, unplanned: a command palette, the undo history, search by name, groups by side       |
-| —     | One look                            | done, unplanned: sunk canvases, one type scale, one button, one set of icon sizes          |
-| —     | Strokes held against the pen        | done, unplanned: folds swept, a turning nib, crossing strokes filled, pictures to check by |
-| 37    | Icon fonts and fixed-width fonts    | done: a grid of the font's own, one width, SVG in, names as ligatures, an icon kit out     |
+| Phase |                                     | Status                                                                                      |
+| ----- | ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| 0     | Foundations and the geometry kernel | done                                                                                        |
+| 1     | The editing surface                 | done                                                                                        |
+| 2     | Undo, redo, persistence             | done                                                                                        |
+| 3     | From paths to a glyph               | done, and anchors with it                                                                   |
+| 4     | From a glyph to a font              | done                                                                                        |
+| 5     | Binary import and export            | done: OTF and UFO both ways, and a UFO folder on disk both ways                             |
+| 6     | Proofing and shaping                | done, and set by HarfBuzz since phase 17                                                    |
+| 7     | Spacing and kerning                 | done                                                                                        |
+| 8     | OpenType features                   | most of `.fea` compiles to GSUB and GPOS, and anchors to marks                              |
+| 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools         |
+| 10    | Production polish                   | lint, format and about 3,900 tests, run on CI; preferences persist                          |
+| 11    | The drawing hand                    | done                                                                                        |
+| 12    | Not losing what was opened          | done                                                                                        |
+| 13    | The family, named                   | done                                                                                        |
+| 14    | What ships to a browser             | done                                                                                        |
+| 15    | Several fonts, and a name           | done                                                                                        |
+| 16    | The details a font is judged on     | done                                                                                        |
+| 17    | Proving it where it will be used    | done: HarfBuzz sets the proof, FreeType draws the fonts in CI, ttfautohint hints            |
+| 18    | Keeping it maintainable             | done; TypeScript is at 6, and 7 waits for the linter to read it                             |
+| 19    | Releases                            | done: versions, a release workflow and updates; the installers are unsigned                 |
+| 20    | A split window                      | done                                                                                        |
+| 21    | Two fonts side by side              | done: a window per font                                                                     |
+| 22    | More of the feature file            | done: most of the language, a Marks file from the anchors, both matched by fontTools        |
+| 23    | Right-to-left text                  | done: bidi runs, and direction, script and language chosen in each bar                      |
+| 24    | The web build, hosted               | done: typewright.io, published to Cloudflare Pages from every release                       |
+| 25    | The feature source, further         | done: completion, find and replace, and a name that opens its glyph                         |
+| 26    | The last interface tests            | done: every panel and control is rendered by a test                                         |
+| 27    | A designspace that survives         | done: maps and avar, sparse masters, rules compiled and edited, the rest carried            |
+| 28    | Binary import keeps its layout      | done: GSUB and GPOS as source, marks as anchors, kerning into the model, fontTools-checked  |
+| 29    | Layers to draw on                   | done: layers in the document, any drawn in, shown behind, copied and swapped per glyph      |
+| 30    | Making masters compatible           | done: start points, contour order, point numbers, and the family between its masters        |
+| 31    | A proof for judging features        | done: a feature switched on in the bar, and a waterfall of blocks with a feature set each   |
+| 32    | More outline operations             | done: subtract, intersect, exclude, offset and simplify, beside the union and the extremes  |
+| 33    | One answer to what a glyph is       | done: the union, the ruler, the gap measure and the knife see components                    |
+| 34    | Drawing with a pen                  | done: a broad edge exactly, an oval to within a fiftieth of a unit, on any contour          |
+| 35    | A node that holds its curvature     | done: harmonising that stays, and continuous corners drawn round without extra points       |
+| 36    | Named alternates                    | done: set and variant names from the feature file, and aalt as written or gathered          |
+| —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines           |
+| —     | Finding one's way                   | done, unplanned: a command palette, the undo history, search by name, groups by side        |
+| —     | One look                            | done, unplanned: sunk canvases, one type scale, one button, one set of icon sizes           |
+| —     | Strokes held against the pen        | done, unplanned: folds swept, a turning nib, crossing strokes filled, pictures to check by  |
+| 37    | Icon fonts and fixed-width fonts    | done: a grid of the font's own, one width, SVG in, names as ligatures, an icon kit out      |
+| 38    | An icon at the size it is used at   | done: the glyph in pixels, checks for the grid, keylines, lining up, a set brought in again |
 
 ### What the table missed
 
@@ -1394,20 +1395,30 @@ use as it stood. 0.1.58 and 0.1.59.
   as an SVG of its own, as compiled.
 - **Bigger cells.** The glyph grid draws its cells up to three times their size.
 
+#### Phase 38 — An icon at the size it is used at — done
+
+What phase 37 left: an icon could be brought in and sent out, and nothing said how it would
+look at twenty-four pixels, or helped draw one to the sizes icons are drawn to. 0.1.60.
+
+- **The glyph in pixels.** A Pixels section in the inspector: the glyph at 16, 24 and 32
+  pixels to the em, exactly as big as it will be, and the one pressed again close up, each
+  pixel a square. Where an edge falls between two lines of the grid it is grey, and this is
+  where that is seen.
+- **Checks for the grid.** In a font drawn on a grid coarser than whole units, preflight
+  notes the outline points off it and the strokes that are not a whole number of steps wide.
+- **Keylines.** `Shift-G` draws the live area and the four shapes icons of different
+  outlines are drawn to, in the proportions the common sets agree on.
+- **Lining up and spacing.** Six ways to line the selection up and two to space it evenly,
+  in the Transform section and in Ctrl-K. Whole contours move as shapes and anything less as
+  points; one contour alone lines up with the glyph's own box, which centres an icon.
+- **A set brought in again.** A file named for an icon the font has redraws it and keeps its
+  code point, name, anchors and mark; a file named for any other glyph is still left out,
+  so `a.svg` never draws over the letter.
+
 #### Open
 
-What phase 37 left, and what is next in the same direction:
+What is next in the same direction:
 
-- **An icon at the size it is meant for.** A preview at 16, 24 and 32 pixels beside the
-  canvas, which is where a point between two lines of the grid shows; and preflight checks
-  for points off the font's grid and strokes that are not a multiple of it. The first is the
-  small-size screen proof under another name.
-- **An icon set brought in again.** A file whose name the font already has is left out; a
-  set that has been redrawn wants to replace what is there, glyph by glyph, keeping code
-  points.
-- **Keylines.** The square, circle and two rectangles an icon set is drawn inside, as an
-  overlay on the canvas.
-- **Aligning and distributing** contours and points, which icon work leans on.
 - **Strokes in a variable font**, whose masters are still written as their skeletons.
 - **Fitting to the fixed width in every layer**, where it now fits the main drawing.
 

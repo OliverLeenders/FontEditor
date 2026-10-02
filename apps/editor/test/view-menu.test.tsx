@@ -79,6 +79,8 @@ describe("what the menu changes", () => {
     ["Show anchors", "showAnchors"],
     ["Curvature comb", "showCurvature"],
     ["Point numbers", "showPointNumbers"],
+    ["Show grid", "showGrid"],
+    ["Show keylines", "showKeylines"],
   ] as const)("turns %s on and off", (label, setting) => {
     const { store } = open();
     const before = store.getState().views[0][setting];

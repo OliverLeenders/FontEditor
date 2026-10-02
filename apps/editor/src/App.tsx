@@ -245,9 +245,11 @@ export function App(): React.JSX.Element {
         store.toggleSnapPoints(drawingRef.current);
         return;
       }
-      // "G" shows the font's grid, which drags snap to whether or not it is shown.
+      // "G" shows the font's grid, which drags snap to whether or not it is shown;
+      // with shift, the keylines an icon is drawn inside.
       if (!typing && !event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "g") {
-        store.toggleGrid(drawingRef.current);
+        if (event.shiftKey) store.toggleKeylines(drawingRef.current);
+        else store.toggleGrid(drawingRef.current);
         return;
       }
       // "B" draws in the background, and again draws in the letter. Adding the

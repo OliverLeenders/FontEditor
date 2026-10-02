@@ -116,6 +116,21 @@ describe("glyphs and shapes that arrive drawn", () => {
     expect(addDrawnGlyphs(s, [box("n", 0, 10, 0)]).state).toBe(s);
   });
 
+  it("redraws the glyphs it is told to, in the same step, and only ones the font has", () => {
+    const s = stateOf(fontDocument([box("n", 40, 300, 60), box("home", 100, 800, 100)]));
+    const again = addDrawnGlyphs(
+      s,
+      [box("star", 0, 900, 100)],
+      [box("home", 50, 500, 50), box("gone", 0, 10, 0)],
+    );
+    expect(again.state.document.glyphs["home"]!.advance).toBe(600);
+    expect(again.state.document.glyphOrder).toEqual(["n", "home", "star"]);
+    expect(again.state.document.glyphs["gone"]).toBeUndefined();
+    // Something new to look at before something changed.
+    expect(again.state.currentGlyph).toBe("star");
+    expect(addDrawnGlyphs(s, [], [box("home", 50, 500, 50)]).state.currentGlyph).toBe("home");
+  });
+
   it("puts contours into the glyph selected, and gives an empty glyph their width", () => {
     const shape = () => [rectContour(ids, { minX: 0, minY: 0, maxX: 500, maxY: 500 })];
 

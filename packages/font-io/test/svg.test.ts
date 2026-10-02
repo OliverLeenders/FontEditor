@@ -313,11 +313,52 @@ describe("a set of SVG files as glyphs", () => {
     // The code point after none: the ones left out did not use any up.
     expect(made.glyphs[0]!.unicodes).toEqual([0xe000]);
     expect(made.skipped).toEqual([
-      { file: "home.svg", why: "the font already has home" },
+      { file: "home.svg", why: "the font already has home, which is not an icon" },
       { file: "notes.svg", why: "it is not an SVG" },
       { file: "empty.svg", why: "it has no shapes a glyph can hold" },
       { file: "---.svg", why: "its name has nothing a glyph can be called" },
-      { file: "star!.svg", why: "the font already has star" },
+      { file: "star!.svg", why: "another file in this set is already star" },
+    ]);
+    expect(made.replaced).toEqual([]);
+  });
+
+  it("redraws an icon the font already has, and keeps what it is known by", () => {
+    const old = glyph("home", {
+      advance: 800,
+      unicodes: [0xe040],
+      contours: contours(svg('<rect x="2" y="2" width="4" height="4"/>')),
+      anchors: [{ id: "a1", name: "top", pt: { x: 400, y: 700 } }],
+      markColor: "1,0,0,1",
+    });
+    const document = fontDocument([old, glyph("a", { advance: 500, unicodes: [0x61] })]);
+    const made = glyphsFromSvgs(
+      [
+        { name: "home.svg", text: square },
+        { name: "a.svg", text: square },
+        { name: "new.svg", text: square },
+        // The same icon twice in one set: the first file is the one taken.
+        { name: "home!.svg", text: stroked },
+      ],
+      document,
+      counterIds("again"),
+    );
+
+    expect(made.glyphs.map((g) => g.name)).toEqual(["new"]);
+    expect(made.replaced).toHaveLength(1);
+    const home = made.replaced[0]!;
+    // The drawing and the width are the file's.
+    expect(home.advance).toBe(1000);
+    expect(home.contours).toHaveLength(1);
+    expect(contourBounds(home.contours[0]!)?.minX).toBeCloseTo(167, 0);
+    // And everything it is known by is as it was.
+    expect(home.name).toBe("home");
+    expect(home.unicodes).toEqual([0xe040]);
+    expect(home.anchors).toEqual(old.anchors);
+    expect(home.markColor).toBe("1,0,0,1");
+    // The letter is never drawn over, whatever the file is called.
+    expect(made.skipped).toEqual([
+      { file: "a.svg", why: "the font already has a, which is not an icon" },
+      { file: "home!.svg", why: "another file in this set is already home" },
     ]);
   });
 });

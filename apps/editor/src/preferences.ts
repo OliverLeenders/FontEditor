@@ -144,6 +144,12 @@ export type ViewSettings = {
    */
   readonly showGrid: boolean;
   /**
+   * Draw an icon's keylines: the live area and the four shapes icons of
+   * different outlines are drawn to. Off by default, and only ever wanted in
+   * an icon font.
+   */
+  readonly showKeylines: boolean;
+  /**
    * How big the points, handles and Tunni controls are drawn.
    *
    * A preference about eyes and pointers rather than about the font: a dense
@@ -162,6 +168,7 @@ export const DEFAULT_VIEW: ViewSettings = {
   showCurvature: false,
   showPointNumbers: false,
   showGrid: false,
+  showKeylines: false,
   controlSize: "normal",
 };
 
@@ -481,6 +488,7 @@ function view(raw: Record<string, unknown>, fallback: ViewSettings): ViewSetting
     showCurvature: boolean(raw["showCurvature"], fallback.showCurvature),
     showPointNumbers: boolean(raw["showPointNumbers"], fallback.showPointNumbers),
     showGrid: boolean(raw["showGrid"], fallback.showGrid),
+    showKeylines: boolean(raw["showKeylines"], fallback.showKeylines),
     controlSize: isControlSize(raw["controlSize"]) ? raw["controlSize"] : fallback.controlSize,
   };
 }

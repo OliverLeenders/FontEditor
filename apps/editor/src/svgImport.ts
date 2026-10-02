@@ -40,11 +40,16 @@ const count = (n: number, one: string, many: string): string =>
 
 /** A set of SVG files brought in, said in a line, with what was left out beneath it. */
 export function importNotice(made: SvgGlyphs): Notice {
-  const parts = [
-    made.glyphs.length === 0
-      ? "No glyphs imported"
-      : `Imported ${count(made.glyphs.length, "glyph", "glyphs")}`,
-  ];
+  const parts: string[] = [];
+  if (made.glyphs.length > 0) {
+    parts.push(`Imported ${count(made.glyphs.length, "glyph", "glyphs")}`);
+  }
+  if (made.replaced.length > 0) {
+    parts.push(
+      `${made.glyphs.length > 0 ? "redrew" : "Redrew"} ${count(made.replaced.length, "icon", "icons")}`,
+    );
+  }
+  if (parts.length === 0) parts.push("No glyphs imported");
   if (made.skipped.length > 0)
     parts.push(`${count(made.skipped.length, "file", "files")} left out`);
   // Warnings repeat across an icon set — every stroked icon says the same

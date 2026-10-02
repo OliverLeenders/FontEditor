@@ -42,6 +42,7 @@ export function ViewMenu(): React.JSX.Element {
   const curvature = useStoreValue((s) => viewOf(s, pane).showCurvature);
   const numbers = useStoreValue((s) => viewOf(s, pane).showPointNumbers);
   const showGrid = useStoreValue((s) => viewOf(s, pane).showGrid);
+  const showKeylines = useStoreValue((s) => viewOf(s, pane).showKeylines);
   const controls = useStoreValue((s) => viewOf(s, pane).controlSize);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -145,6 +146,12 @@ export function ViewMenu(): React.JSX.Element {
             hint="The font's grid, which drags snap to either way  (G)"
             on={showGrid}
             onChange={() => store.toggleGrid(pane)}
+          />
+          <Switch
+            label="Show keylines"
+            hint="The shapes an icon is drawn inside  (Shift-G)"
+            on={showKeylines}
+            onChange={() => store.toggleKeylines(pane)}
           />
           <Switch
             label="Curvature comb"

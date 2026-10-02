@@ -25,6 +25,8 @@ export type RenderPalette = {
    */
   readonly gridLine: string;
   readonly gridMajor: string;
+  /** The shapes an icon is drawn inside: warm, so they are never taken for a guide or the grid. */
+  readonly keyline: string;
   /** The lines the designer put there, as against the font's own metrics. */
   /** An instance between the masters: a reading, not a drawing. */
   readonly instance: string;
@@ -127,6 +129,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   guideEmphasis: "#C2CDD8",
   gridLine: "#F1F4F8",
   gridMajor: "#E2E8EF",
+  keyline: "#E3C9A0",
   guideLabel: "#7C8896",
   instance: "#B9A2D8",
   behind: "#8FA3B8",
@@ -171,6 +174,7 @@ export const DARK_PALETTE: RenderPalette = {
   guideEmphasis: "#33404E",
   gridLine: "#161E28",
   gridMajor: "#212C38",
+  keyline: "#5C4A2C",
   guideLabel: "#8B99A8",
   instance: "#6E5A8C",
   behind: "#5C6F83",

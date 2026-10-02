@@ -12,6 +12,7 @@ import { PenSection } from "./inspector/PenSection.js";
 import { GlyphSection } from "./inspector/GlyphSection.js";
 import { GuidesSection } from "./inspector/GuidesSection.js";
 import { LayersSection } from "./inspector/LayersSection.js";
+import { PixelsSection } from "./inspector/PixelsSection.js";
 import { PointSection } from "./inspector/PointSection.js";
 import { Section } from "./inspector/Section.js";
 import { TracingSection } from "./inspector/TracingSection.js";
@@ -259,6 +260,7 @@ export function Inspector(): React.JSX.Element | null {
         {ordered(focus).map((key) => (
           <Fragment key={key}>
             {key === "glyph" ? <GlyphSection /> : null}
+            {key === "pixels" ? <PixelsSection /> : null}
             {key === "layers" ? <LayersSection /> : null}
             {key === "components" ? <ComponentsSection /> : null}
             {key === "anchors" ? <AnchorsSection /> : null}
@@ -325,11 +327,13 @@ type SectionKey =
   | "point"
   | "curve"
   | "pen"
+  | "pixels"
   | "transform";
 
 /** The glyph's own sections first, as they have always been, then the selection's. */
 const USUAL: readonly SectionKey[] = [
   "glyph",
+  "pixels",
   "layers",
   "components",
   "anchors",

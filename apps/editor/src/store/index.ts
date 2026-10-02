@@ -523,12 +523,13 @@ export class EditorStore {
 
   /**
    * Bring SVG files in as glyphs: one each, named for its file, at the next
-   * private-use code points. One undo step, and a notice of what came of it —
-   * how many, and what was left out and why.
+   * private-use code points, and an icon the font already has redrawn from the
+   * file named for it. One undo step, and a notice of what came of it — how
+   * many, and what was left out and why.
    */
   importSvgs(files: readonly SvgFile[]): Notice {
     const made = glyphsFromSvgs(files, this.editor.document, this.svgIds);
-    this.applyTool(addDrawnGlyphs(this.editor, made.glyphs));
+    this.applyTool(addDrawnGlyphs(this.editor, made.glyphs, made.replaced));
     const notice = importNotice(made);
     this.patch({ notice });
     return notice;
@@ -1149,6 +1150,10 @@ export class EditorStore {
 
   toggleGrid(pane: PaneIndex = 0): void {
     this.showInPane(pane, { showGrid: !this.state.views[pane].showGrid });
+  }
+
+  toggleKeylines(pane: PaneIndex = 0): void {
+    this.showInPane(pane, { showKeylines: !this.state.views[pane].showKeylines });
   }
 
   /** Put one pane's canvas settings back, leaving the other pane's alone. */

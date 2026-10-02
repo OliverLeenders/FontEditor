@@ -252,6 +252,18 @@ export function sceneFor(
     // The names come with the lines; the renderer writes them at the edge.
     // The font's grid where this pane shows it, and never while space is held.
     grid: shows.showGrid && !state.previewing ? editor.document.grid : null,
+    // An icon's keylines, in the box a line gives the glyph: as tall as the
+    // line, and in the middle of the advance.
+    keylines:
+      shows.showKeylines && !state.previewing
+        ? {
+            centre: {
+              x: glyph.advance / 2,
+              y: (editor.document.info.ascender + editor.document.info.descender) / 2,
+            },
+            unit: (editor.document.info.ascender - editor.document.info.descender) / 24,
+          }
+        : null,
     metricLines: metricLines(editor.document.info).map((line) => ({
       y: line.y,
       // Spread rather than assigned: an absent `emphasis` and one set to

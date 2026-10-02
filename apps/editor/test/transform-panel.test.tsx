@@ -203,3 +203,35 @@ describe("where it turns", () => {
     );
   });
 });
+
+describe("lining up and spacing", () => {
+  it("lines whole contours up on the button pressed, as one undo step", () => {
+    const store = selectingAll();
+    render(<TransformPanel />, store);
+    const before = store.editor.document.glyphs[store.editor.currentGlyph]!;
+
+    fireEvent.click(screen.getByRole("button", { name: "Align left edges" }));
+
+    const after = store.editor.document.glyphs[store.editor.currentGlyph]!;
+    const lefts = after.contours.map((c) => Math.min(...c.nodes.map((n) => n.pt.x)));
+    // A single contour is lined up with the glyph's own box, several with each
+    // other: either way they share a left edge afterwards.
+    expect(new Set(lefts).size).toBe(1);
+    expect(after.advance).toBe(before.advance);
+
+    act(() => {
+      store.undo();
+    });
+    expect(store.editor.document.glyphs[store.editor.currentGlyph]).toBe(before);
+  });
+
+  it("offers nothing to line up or space with nothing selected", () => {
+    render(<TransformPanel />, freshStore());
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Align centres" }).disabled).toBe(
+      true,
+    );
+    expect(
+      screen.getByRole<HTMLButtonElement>("button", { name: "Distribute across" }).disabled,
+    ).toBe(true);
+  });
+});

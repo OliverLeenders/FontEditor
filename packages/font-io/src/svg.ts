@@ -3,6 +3,8 @@ import {
   type FontDocument,
   type Glyph,
   type IdFactory,
+  PRIVATE_USE_FIRST,
+  PRIVATE_USE_LAST,
   contourWinding,
   correctDirections,
   fixedWidthOf,
@@ -814,7 +816,12 @@ export type SvgFile = { readonly name: string; readonly text: string };
 export type SvgGlyphs = {
   /** The glyphs made, in the order of the files, each with a private-use code point. */
   readonly glyphs: readonly Glyph[];
-  /** Files left out, and why: not an SVG, nothing to draw, a name already in the font. */
+  /**
+   * Icons the font already had, redrawn: each as it is to be now, with the
+   * drawing and the width from its file and everything else as it was.
+   */
+  readonly replaced: readonly Glyph[];
+  /** Files left out, and why: not an SVG, nothing to draw, the name of a glyph that is no icon. */
   readonly skipped: readonly { readonly file: string; readonly why: string }[];
   /** What was changed or left out inside the files that did come in, by glyph. */
   readonly warnings: readonly { readonly glyph: string; readonly message: string }[];
@@ -825,9 +832,15 @@ export type SvgGlyphs = {
  *
  * Each file is one glyph, named for the file and given the next private-use
  * code point nothing in the font has, since an icon is a character Unicode has
- * no code point for. A name the font already has is left out rather than
- * replaced or renamed: bringing a set in must never draw over a glyph, and a
- * second `home` under another name would be an icon nobody can find.
+ * no code point for.
+ *
+ * A set is brought in more than once: it is redrawn, and the font follows. So
+ * a file named for an icon the font has — a glyph with a private-use code
+ * point — redraws it: the drawing and the width are the file's, and the code
+ * point, the name, the anchors, the guides and the mark stay, since those are
+ * what a web page and a designer know the icon by. A file named for any other
+ * glyph is left out. `a.svg` must never draw over the letter `a`, and a second
+ * `home` under another name would be an icon nobody can find.
  */
 export function glyphsFromSvgs(
   files: readonly SvgFile[],
@@ -840,6 +853,8 @@ export function glyphsFromSvgs(
   const codes = freePrivateUse(used, files.length);
 
   const glyphs: Glyph[] = [];
+  const replaced: Glyph[] = [];
+  const redrawn = new Set<string>();
   const skipped: { file: string; why: string }[] = [];
   const warnings: { glyph: string; message: string }[] = [];
 
@@ -849,8 +864,16 @@ export function glyphsFromSvgs(
       skipped.push({ file: file.name, why: "its name has nothing a glyph can be called" });
       continue;
     }
-    if (taken.has(name)) {
-      skipped.push({ file: file.name, why: `the font already has ${name}` });
+    const existing = document.glyphs[name];
+    if (redrawn.has(name) || (existing === undefined && taken.has(name))) {
+      skipped.push({ file: file.name, why: `another file in this set is already ${name}` });
+      continue;
+    }
+    if (existing !== undefined && !isIcon(existing)) {
+      skipped.push({
+        file: file.name,
+        why: `the font already has ${name}, which is not an icon`,
+      });
       continue;
     }
     const drawing = parseSvg(file.text);
@@ -864,6 +887,12 @@ export function glyphsFromSvgs(
       skipped.push({ file: file.name, why: "it has no shapes a glyph can hold" });
       continue;
     }
+    for (const message of drawing.warnings) warnings.push({ glyph: name, message });
+    if (existing !== undefined) {
+      redrawn.add(name);
+      replaced.push({ ...existing, advance: placement.advance, contours, components: [] });
+      continue;
+    }
     const code = codes[glyphs.length];
     taken.add(name);
     glyphs.push(
@@ -873,7 +902,11 @@ export function glyphsFromSvgs(
         unicodes: code === undefined ? [] : [code],
       }),
     );
-    for (const message of drawing.warnings) warnings.push({ glyph: name, message });
   }
-  return { glyphs, skipped, warnings };
+  return { glyphs, replaced, skipped, warnings };
+}
+
+/** Whether a glyph is an icon: one with a private-use code point. */
+function isIcon(g: Glyph): boolean {
+  return g.unicodes.some((code) => code >= PRIVATE_USE_FIRST && code <= PRIVATE_USE_LAST);
 }

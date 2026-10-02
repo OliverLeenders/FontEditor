@@ -37,14 +37,17 @@ export type {
   Scene,
   SceneInit,
 } from "./scene.js";
+export type { Keylines } from "./scene.js";
 export { DEFAULT_METRICS, DEFAULT_OPTIONS, scene } from "./scene.js";
 
 export type { GlyphCellState } from "./draw.js";
 export {
+  drawGlyphAtSize,
   drawGlyphCell,
   drawGlyphThumbnail,
   drawScene,
   formatCodePoint,
+  pixelBox,
   sampleText,
 } from "./draw.js";
 

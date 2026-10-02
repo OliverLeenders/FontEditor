@@ -182,3 +182,37 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 0.25rem;
 }
+
+/* Lining up and spacing: eight small buttons in one row, as the four above them
+   are, so the two rows read as one block of things done to the selection. */
+.aligns {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 0.2rem;
+}
+.aligns button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  min-height: 1.75rem;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--ground);
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.aligns button svg {
+  width: var(--icon-inline);
+  height: var(--icon-inline);
+}
+.aligns button:hover:not(:disabled) {
+  color: var(--ink);
+}
+.aligns button:disabled {
+  opacity: var(--disabled);
+  cursor: default;
+}
+.aligns button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

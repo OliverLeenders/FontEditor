@@ -60,6 +60,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
   // Over the picture, which is traced on the grid, and under the metric lines,
   // which say more.
   drawGrid(ctx, s);
+  drawKeylines(ctx, s);
   drawMetricLines(ctx, s);
   drawDesignGuides(ctx, s);
   // Neighbours and margins sit under the glyph being edited: they are context,
@@ -171,6 +172,62 @@ export function drawGrid(ctx: Canvas2D, s: Scene): void {
     }
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+/**
+ * The shapes an icon is drawn inside, on a box of twenty-four: the box itself,
+ * the live area an icon keeps within, and the four shapes that make icons of
+ * different outlines look the same size — a square of eighteen, a circle of
+ * twenty, and an upright and a level rectangle of sixteen by twenty.
+ *
+ * A square icon drawn as big as a round one looks bigger, so each outline has
+ * its own size, and these are the sizes the common icon sets agree on. Drawn
+ * faint and warm, under the metric lines: something to draw against, like the
+ * grid, and not something to select.
+ */
+export function drawKeylines(ctx: Canvas2D, s: Scene): void {
+  const keys = s.keylines;
+  if (keys === null) return;
+  const { centre, unit } = keys;
+
+  const box = (width: number, height: number): void => {
+    const a = toScreen(s.view, {
+      x: centre.x - (width * unit) / 2,
+      y: centre.y + (height * unit) / 2,
+    });
+    const b = toScreen(s.view, {
+      x: centre.x + (width * unit) / 2,
+      y: centre.y - (height * unit) / 2,
+    });
+    const x = Math.round(a.x) + 0.5;
+    const y = Math.round(a.y) + 0.5;
+    ctx.rect(x, y, Math.round(b.x) - Math.round(a.x), Math.round(b.y) - Math.round(a.y));
+  };
+
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = s.palette.keyline;
+
+  // The box and the live area, dashed: the edges of the room rather than shapes
+  // to draw to.
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  box(24, 24);
+  box(20, 20);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  box(18, 18);
+  box(16, 20);
+  box(20, 16);
+  ctx.stroke();
+
+  const middle = toScreen(s.view, centre);
+  ctx.beginPath();
+  ctx.arc(middle.x, middle.y, 10 * unit * s.view.scale, 0, Math.PI * 2);
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -1142,6 +1199,46 @@ export function drawGlyphThumbnail(
   ctx.beginPath();
   for (const c of drawable) traceContour(ctx, view, c);
   ctx.fillStyle = palette.outline;
+  ctx.fill();
+}
+
+/** The box a glyph fills at a size: its advance wide and a line tall, in whole pixels. */
+export function pixelBox(
+  glyph: Glyph,
+  pixelsPerEm: number,
+  metrics: { unitsPerEm: number; ascender: number; descender: number },
+): { width: number; height: number } {
+  const scale = pixelsPerEm / metrics.unitsPerEm;
+  return {
+    width: Math.max(1, Math.ceil(glyph.advance * scale)),
+    height: Math.max(1, Math.ceil((metrics.ascender - metrics.descender) * scale)),
+  };
+}
+
+/**
+ * Draw a glyph at a size in pixels to the em, from the top left of its box.
+ *
+ * Unlike {@link drawGlyphThumbnail}, which fits a glyph to a cell, this draws
+ * it exactly as big as it is asked to be and exactly where a line of text would
+ * put it: the origin at the left edge, the ascender at the top. Where its edges
+ * fall against the pixels is then where they will fall in use, which is the
+ * whole of what a preview at a size is for.
+ */
+export function drawGlyphAtSize(
+  ctx: Canvas2D,
+  glyph: Glyph,
+  pixelsPerEm: number,
+  metrics: { unitsPerEm: number; ascender: number; descender: number },
+  colour: string,
+): void {
+  const scale = pixelsPerEm / metrics.unitsPerEm;
+  const view: ViewTransform = { scale, tx: 0, ty: metrics.ascender * scale };
+  const drawable = filledContours(glyph).filter((c) => c.nodes.length >= 2);
+  if (drawable.length === 0) return;
+
+  ctx.beginPath();
+  for (const c of drawable) traceContour(ctx, view, c);
+  ctx.fillStyle = colour;
   ctx.fill();
 }
 

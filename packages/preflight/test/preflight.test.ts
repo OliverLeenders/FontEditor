@@ -15,6 +15,7 @@ import {
   setKern,
   setKernGroup,
   setFixedPitch,
+  withNib,
   setKerning,
 } from "@typewright/font-model";
 import { vec } from "@typewright/geometry";
@@ -187,6 +188,71 @@ describe("names, advances and characters", () => {
     expect(off.map((f) => f.glyph)).toEqual(["m"]);
     expect(off[0]?.message).toContain("640");
     expect(tripped(setFixedPitch(document, false)).has("off-width")).toBe(false);
+  });
+});
+
+describe("the font's own grid", () => {
+  const on = (x: number, y: number, size = 400) =>
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(x, y)),
+        node(ids.node(), vec(x + size, y)),
+        node(ids.node(), vec(x + size, y + size)),
+        node(ids.node(), vec(x, y + size)),
+      ],
+      true,
+    );
+  const gridded = (...glyphs: ReturnType<typeof glyph>[]) => ({
+    ...font(...glyphs),
+    grid: { step: 40, major: 0 },
+  });
+
+  it("says nothing in a font drawn on whole units", () => {
+    const document = font(glyph("a", { advance: 500, contours: [on(13, 7, 391)] }));
+    expect(tripped(document).has("off-font-grid")).toBe(false);
+  });
+
+  it("finds the points of an outline off the grid, and points at the first", () => {
+    const good = glyph("good", { advance: 960, contours: [on(40, 80)] });
+    const bad = glyph("bad", { advance: 960, contours: [on(40, 80), on(50, 85)] });
+    const found = preflight(gridded(good, bad)).filter((f) => f.check === "off-font-grid");
+
+    expect(found.map((f) => f.glyph)).toEqual(["bad"]);
+    expect(found[0]?.message).toBe("4 points off the font's grid of 40.");
+    expect(found[0]?.where?.contourId).toBe(bad.contours[1]!.id);
+  });
+
+  it("allows what rounding to whole units leaves, on a grid that is not whole", () => {
+    // 1000 over 24: the lines of the grid at 41.67, 83.33, 458.33 and 500 are
+    // points at 42, 83, 458 and 500.
+    const rounded = contour(
+      ids.contour(),
+      [
+        node(ids.node(), vec(42, 83)),
+        node(ids.node(), vec(458, 83)),
+        node(ids.node(), vec(458, 500)),
+        node(ids.node(), vec(42, 500)),
+      ],
+      true,
+    );
+    const document = {
+      ...font(glyph("a", { advance: 1000, contours: [rounded] })),
+      grid: { step: 1000 / 24, major: 0 },
+    };
+    expect(tripped(document).has("off-font-grid")).toBe(false);
+  });
+
+  it("leaves a stroke's skeleton alone, and finds a pen that is not whole steps wide", () => {
+    const skeleton = (width: number) => withNib(on(60, 60), { angle: 0, width, thickness: width });
+    const fine = gridded(glyph("a", { advance: 960, contours: [skeleton(80)] }));
+    expect(tripped(fine).has("off-font-grid")).toBe(false);
+    expect(tripped(fine).has("pen-off-grid")).toBe(false);
+
+    const found = preflight(gridded(glyph("a", { advance: 960, contours: [skeleton(60)] }))).filter(
+      (f) => f.check === "pen-off-grid",
+    );
+    expect(found[0]?.message).toBe("A stroke 60 wide, which is 1.5 steps of the grid.");
   });
 });
 

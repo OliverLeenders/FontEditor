@@ -400,6 +400,27 @@ describe("SVGs coming in", () => {
     expect(store.getState().notice).toBeNull();
   });
 
+  it("redraws an icon when its file is brought in again, and says so", () => {
+    const store = freshStore();
+    store.importSvgs([{ name: "arrow-left.svg", text: square }]);
+    const first = store.editor.document.glyphs["arrow_left"]!;
+
+    const wider = svg('<rect x="2" y="2" width="20" height="20"/>');
+    const notice = store.importSvgs([
+      { name: "arrow-left.svg", text: wider },
+      { name: "star.svg", text: square },
+    ]);
+    const again = store.editor.document.glyphs["arrow_left"]!;
+
+    expect(notice.summary).toBe("Imported 1 glyph · redrew 1 icon");
+    expect(again.unicodes).toEqual(first.unicodes);
+    expect(glyphBounds(again)?.minX).toBeLessThan(glyphBounds(first)!.minX);
+    // One step for the lot.
+    store.undo();
+    expect(store.editor.document.glyphs["arrow_left"]).toBe(first);
+    expect(store.editor.document.glyphs["star"]).toBeUndefined();
+  });
+
   it("puts an SVG's shapes into the glyph being drawn, selected", () => {
     const store = freshStore();
     const name = store.editor.currentGlyph;

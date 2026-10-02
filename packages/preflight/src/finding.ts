@@ -31,6 +31,8 @@ export type CheckId =
   | "empty-contour"
   | "duplicate-point"
   | "off-grid"
+  | "off-font-grid"
+  | "pen-off-grid"
   | "missing-base"
   | "recursive-component"
   | "duplicate-unicode"
@@ -176,6 +178,18 @@ export const CHECKS: readonly Check[] = [
     severity: "note",
     title: "Coordinates between units",
     why: "The drawing is kept in fractions and the compiler rounds. Where a design is meant to sit on the grid, a fraction is usually the residue of a scale or a rotation.",
+  },
+  {
+    id: "off-font-grid",
+    severity: "note",
+    title: "Points between the lines of the font's grid",
+    why: "The font is drawn on a grid coarser than whole units, as an icon font is, and a point of an outline between two of its lines is an edge between two pixels at the size the grid is for: grey where it was meant to be black. Curves are expected to leave it; a straight edge off it is usually a slip.",
+  },
+  {
+    id: "pen-off-grid",
+    severity: "note",
+    title: "A stroke that is not a whole number of grid steps wide",
+    why: "A stroke two steps wide is two pixels at the size the grid is for; one of two and a third is two pixels and a grey edge. Usually a stroke scaled with the glyph it was drawn in.",
   },
   {
     id: "no-notdef",

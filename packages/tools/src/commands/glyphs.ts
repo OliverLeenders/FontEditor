@@ -57,11 +57,18 @@ export function createGlyphs(
  * Add glyphs that arrive already drawn: an icon set read from SVG files.
  *
  * One undo step for the lot, as {@link createGlyphs} is, and for the same
- * reason. A name the font already has is skipped: bringing glyphs in must
- * never draw over one that is there. The first one added becomes the current
- * glyph, so there is something to look at.
+ * reason. Among `drawn`, a name the font already has is skipped: bringing
+ * glyphs in must never draw over one that is there. `redrawn` is the other
+ * case, said outright by whoever asks — glyphs the font has, each as it is to
+ * be now, for an icon set brought in again — and one of those whose name the
+ * font has not got is skipped instead. The first one added, or else the first
+ * redrawn, becomes the current glyph, so there is something to look at.
  */
-export function addDrawnGlyphs(state: EditorState, drawn: readonly Glyph[]): ToolResult {
+export function addDrawnGlyphs(
+  state: EditorState,
+  drawn: readonly Glyph[],
+  redrawn: readonly Glyph[] = [],
+): ToolResult {
   let document = state.document;
   const added: GlyphName[] = [];
   for (const g of drawn) {
@@ -69,10 +76,24 @@ export function addDrawnGlyphs(state: EditorState, drawn: readonly Glyph[]): Too
     document = putGlyph(document, g);
     added.push(g.name);
   }
-  const first = added[0];
-  if (first === undefined) return result(state);
+  const replaced: GlyphName[] = [];
+  for (const g of redrawn) {
+    if (state.document.glyphs[g.name] === undefined || added.includes(g.name)) continue;
+    document = putGlyph(document, g);
+    replaced.push(g.name);
+  }
+  const first = added[0] ?? replaced[0];
+  if (first === undefined || document === state.document) return result(state);
 
-  const label = added.length === 1 ? `Import ${first}` : `Import ${String(added.length)} glyphs`;
+  const glyphs = (n: number): string => (n === 1 ? "1 glyph" : `${String(n)} glyphs`);
+  const label =
+    replaced.length === 0
+      ? added.length === 1
+        ? `Import ${first}`
+        : `Import ${glyphs(added.length)}`
+      : added.length === 0
+        ? `Redraw ${replaced.length === 1 ? first : glyphs(replaced.length)}`
+        : `Import ${glyphs(added.length)}, redraw ${String(replaced.length)}`;
   return result({ ...state, document, currentGlyph: first, selection: [] }, [
     begin(label, false),
     commit,

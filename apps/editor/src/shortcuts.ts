@@ -77,6 +77,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       { keys: "H", what: "Handles near the work, or all of them always" },
       { keys: "S", what: "Snapping on or off" },
       { keys: "G", what: "Show or hide the font's grid" },
+      { keys: "Shift-G", what: "Show or hide an icon's keylines" },
       { keys: "B", what: "Draw in the background, or back in the letter" },
       { keys: "Ctrl-A", what: "Select every point" },
       { keys: "Ctrl-C · Ctrl-X · Ctrl-V", what: "Copy, cut and paste contours" },

@@ -4,6 +4,15 @@ import type { BoxFrame, Comb, Selection, SegmentRef, ViewTransform } from "@type
 
 import type { RenderPalette } from "./palette.js";
 
+/**
+ * Where an icon's keylines stand: the middle of the box they are drawn in, and
+ * how many design units one of that box's twenty-four is.
+ */
+export type Keylines = {
+  readonly centre: Vec2;
+  readonly unit: number;
+};
+
 /** A horizontal metric line: baseline, x-height, cap-height and so on. */
 /**
  * A guide as the canvas needs it: the line, and where it came from.
@@ -180,6 +189,8 @@ export type Scene = {
   readonly metricLines: readonly MetricLine[];
   /** The font's grid, where it is shown, or `null`. */
   readonly grid: Grid | null;
+  /** The keylines of an icon, where they are shown, or `null`: see `drawKeylines`. */
+  readonly keylines: Keylines | null;
   /**
    * The lines the designer put there: the font's and this glyph's together.
    *
@@ -387,6 +398,7 @@ export type SceneInit = {
   readonly knifeStroke?: readonly [Vec2, Vec2] | null;
   readonly measurement?: Scene["measurement"];
   readonly grid?: Grid | null;
+  readonly keylines?: Keylines | null;
 };
 
 export function scene(init: SceneInit): Scene {
@@ -399,6 +411,7 @@ export function scene(init: SceneInit): Scene {
     options: { ...DEFAULT_OPTIONS, ...init.options },
     metricLines: init.metricLines ?? [],
     grid: init.grid ?? null,
+    keylines: init.keylines ?? null,
     image: init.image ?? null,
     instance: init.instance ?? [],
     behind: init.behind ?? [],

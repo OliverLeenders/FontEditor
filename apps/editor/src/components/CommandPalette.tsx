@@ -8,7 +8,14 @@ import {
 } from "@typewright/catalog";
 import { canOpenFolders } from "@typewright/disk";
 import { newGlyphAdvance } from "@typewright/font-model";
-import { type ToolId, createGlyphs } from "@typewright/tools";
+import {
+  type ToolId,
+  alignSelection,
+  canAlign,
+  canDistribute,
+  createGlyphs,
+  distributeSelection,
+} from "@typewright/tools";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { EditorStore } from "../store/index.js";
@@ -19,6 +26,7 @@ import { itemsFor } from "./ContextMenu.js";
 import { SearchIcon } from "./icons.js";
 import type { ViewId } from "./TabBar.js";
 import { TOOL_BUTTONS } from "./Toolbar.js";
+import { ALIGNMENTS, DISTRIBUTIONS } from "./TransformPanel.js";
 
 /**
  * Every command, found by typing its name.
@@ -101,6 +109,26 @@ export function commandsFor(
         ...(item.keys === undefined ? {} : { keys: item.keys }),
         run: item.run,
       });
+    }
+    // Lining up and spacing, which have buttons in the inspector and no keys:
+    // offered only while there is something for them to do.
+    if (canAlign(store.editor)) {
+      for (const { how, label } of ALIGNMENTS) {
+        out.push({
+          group: "Glyph",
+          label,
+          run: () => store.applyTool(alignSelection(store.editor, how)),
+        });
+      }
+    }
+    if (canDistribute(store.editor)) {
+      for (const { along, label } of DISTRIBUTIONS) {
+        out.push({
+          group: "Glyph",
+          label,
+          run: () => store.applyTool(distributeSelection(store.editor, along)),
+        });
+      }
     }
     out.push(
       { group: "Go to", label: "Next glyph", keys: "PageDown", run: () => store.stepGlyph(1) },

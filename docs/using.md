@@ -278,9 +278,14 @@ carry — and given the next free code point of the Private Use Area, from `U+E0
 icon is a character Unicode has no code point for. The drawing's view box is scaled to run
 from the descender to the ascender, the box a line of text gives a glyph, so a 24 by 24 icon
 in a font with a 24 pixel grid lands on the grid; its advance is the view box's width, or
-the fixed width with the icon centred in it. A file whose name the font already has is left
-out rather than drawn over a glyph, and the status bar says how many came in and, in its
-tooltip, what was left out and why. In the Glyph workspace, pasting SVG text or dropping
+the fixed width with the icon centred in it. The status bar says how many came in and, in
+its tooltip, what was left out and why.
+
+A set is brought in more than once, as it is redrawn. A file named for an **icon** the font
+already has — a glyph with a private-use code point — redraws it: the drawing and the width
+are the file's, and the code point, the name, the anchors and the mark stay as they were, so
+nothing that uses the font has to change. A file named for any other glyph is left out:
+`a.svg` never draws over the letter `a`. The whole import is one undo step. In the Glyph workspace, pasting SVG text or dropping
 one SVG file on the canvas adds its shapes to the glyph you are in, selected.
 
 A **filled** shape comes in as an outline. A **stroked** one comes in as a stroke: the
@@ -309,6 +314,32 @@ strokes as their ink, components resolved, overlaps joined.
 **Bigger cells.** The slider at the end of the glyph grid's bar draws the cells up to three
 times their size, which is what an icon wants and a text font's two thousand glyphs do not.
 It is kept in this browser, not in the font.
+
+**The glyph at the size it is used at.** The inspector's **Pixels** section shows the glyph
+at 16, 24 and 32 pixels to the em, exactly as big as it will be, and the one you press again
+close up, each of its pixels a square. That is where an edge between two lines of the grid
+shows: grey where it was meant to be black. It is drawn smoothed and unhinted, as a browser
+draws an icon font. The section is folded until you open it.
+
+In a font with a grid coarser than whole units, the preflight check also notes the outline
+**points off the grid** and the **strokes that are not a whole number of steps wide**, and
+selects the first of each. Curves are expected to leave the grid; a straight edge off it is
+usually a slip.
+
+**Keylines.** `Shift-G`, or **Show keylines** in the View menu, draws the shapes an icon
+set is drawn inside, in the box a line gives the glyph: the live area an icon keeps within,
+dashed, and a square, a circle, and an upright and a level rectangle — the sizes at which
+icons of different outlines look the same size, in the proportions the common sets use
+(a live area of 20 in a box of 24, a square of 18, a circle of 20, rectangles of 16 by 20).
+
+**Lining up and spacing.** The Transform section of the inspector ends in a row of eight
+buttons: six to line the selection up on its left, centre or right, its top, middle or
+bottom, and two to space it evenly across or down. Whole contours selected move as shapes,
+kept as they are; anything less is points, each put on the one line. They line up to the box
+round what is selected — and one contour alone lines up with the glyph's own box, its
+advance wide and from descender to ascender, which is how an icon is centred. Spacing wants
+three or more, keeps the first and the last, and makes the gaps between the same. Each is
+in Ctrl-K too, by name, while there is something for it to do.
 
 **Kerning groups.** Letters whose sides have the same shape share a group, and one kerning
 value then covers all of them: `D`, `O` and `Q` end in the same round, so they share a group

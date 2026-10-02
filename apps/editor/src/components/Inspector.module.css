@@ -701,3 +701,58 @@
 .layerRemove .layerAddButton {
   margin: 0.25rem 0.25rem 0 0;
 }
+
+/* The glyph at the sizes it is used at: three in a row, each exactly as big as
+   it will be, with its size under it. The one pressed is shown again below. */
+.pixelSizes {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.3rem;
+}
+.pixelSize {
+  display: grid;
+  justify-items: center;
+  gap: 0.2rem;
+  padding: 0.3rem 0.45rem 0.2rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.pixelSize:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.pixelSize[aria-pressed="true"] {
+  border-color: var(--rule-strong);
+  background: var(--canvas);
+  color: var(--ink);
+}
+.pixelSize:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.pixelCanvas {
+  display: block;
+}
+
+/* Close up: each of the glyph's pixels a square of the screen's, unsmoothed,
+   on the canvas's own ground so its greys are read against what they will be
+   seen against. */
+.pixelClose {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.4rem;
+  padding: 0.5rem;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+  background: var(--canvas);
+}
+.pixelCanvasClose {
+  display: block;
+  image-rendering: pixelated;
+}

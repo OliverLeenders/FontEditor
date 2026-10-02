@@ -349,3 +349,19 @@ describe("turning a component over", () => {
     expect(only(store).transform.yOffset).toBe(600);
   });
 });
+
+describe("the glyph at the sizes it is used at", () => {
+  it("is folded until asked for, and then offers three sizes with one close up", () => {
+    render(<Inspector />);
+    const heading = screen.getByRole("button", { name: /^Pixels/ });
+    expect(screen.queryByRole("group", { name: "Size shown close up" })).toBeNull();
+
+    fireEvent.click(heading);
+    const sizes = screen.getByRole("group", { name: "Size shown close up" });
+    expect(sizes.textContent).toBe("162432");
+    expect(screen.getByRole("img", { name: /at 24 pixels, magnified/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "16 pixels" }));
+    expect(screen.getByRole("img", { name: /at 16 pixels, magnified/ })).toBeTruthy();
+  });
+});

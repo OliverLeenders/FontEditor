@@ -1,4 +1,12 @@
-import type { ComponentSource, Contour, FontDocument, Glyph, Node } from "@typewright/font-model";
+import type {
+  ComponentSource,
+  Contour,
+  ContourId,
+  FontDocument,
+  Glyph,
+  Node,
+  NodeId,
+} from "@typewright/font-model";
 import { isMarkAnchor, wouldRecurse } from "@typewright/font-model";
 
 import { type Finding, finding } from "./finding.js";
@@ -21,6 +29,7 @@ export function glyphFindings(document: FontDocument, g: Glyph): Finding[] {
     ...contourFindings(g),
     ...componentFindings(document, g),
     ...anchorFindings(g),
+    ...fontGridFindings(document, g),
   ];
 }
 
@@ -153,6 +162,67 @@ function offGrid(g: Glyph, c: Contour): Finding[] {
 
   const count = off.length === 1 ? "A point" : `${String(off.length)} points`;
   return [finding("off-grid", g.name, `${count} between units.`, where(c, off[0] ?? null))];
+}
+
+/** How far from a line of the grid still counts as on it, in units: what rounding to whole units leaves. */
+const ON_GRID = 0.51;
+
+/** How far a value is from the nearest multiple of a step. */
+const offBy = (value: number, step: number): number =>
+  Math.abs(value - Math.round(value / step) * step);
+
+/**
+ * What is off the font's own grid, in a font that has one coarser than whole
+ * units: the on-curve points of its outlines, and the width of its strokes.
+ *
+ * Only on-curve points, since a handle is wherever the curve needs it; and
+ * only outlines, since a stroke's skeleton runs down the middle of its ink and
+ * is on the grid or half a step off it according to its width. One finding for
+ * a glyph's points and one for its pens, each naming the first.
+ */
+function fontGridFindings(document: FontDocument, g: Glyph): Finding[] {
+  const { step } = document.grid;
+  if (!(step > 1)) return [];
+  const out: Finding[] = [];
+
+  let off = 0;
+  let first: { contourId: ContourId; nodeId: NodeId } | null = null;
+  for (const c of g.contours) {
+    if (c.nib !== undefined) continue;
+    for (const node of c.nodes) {
+      if (offBy(node.pt.x, step) <= ON_GRID && offBy(node.pt.y, step) <= ON_GRID) continue;
+      off += 1;
+      first ??= { contourId: c.id, nodeId: node.id };
+    }
+  }
+  if (off > 0) {
+    const count = off === 1 ? "A point" : `${String(off)} points`;
+    out.push(
+      finding(
+        "off-font-grid",
+        g.name,
+        `${count} off the font's grid of ${String(Math.round(step * 100) / 100)}.`,
+        first,
+      ),
+    );
+  }
+
+  const pens = g.contours.filter(
+    (c) => c.nib !== undefined && c.nib.width > 0 && offBy(c.nib.width, step) > ON_GRID,
+  );
+  const pen = pens[0];
+  if (pen?.nib !== undefined) {
+    const count = pens.length === 1 ? "A stroke" : `${String(pens.length)} strokes`;
+    out.push(
+      finding(
+        "pen-off-grid",
+        g.name,
+        `${count} ${String(pen.nib.width)} wide, which is ${String(Math.round((pen.nib.width / step) * 100) / 100)} steps of the grid.`,
+        { contourId: pen.id, nodeId: null },
+      ),
+    );
+  }
+  return out;
 }
 
 function componentFindings(document: FontDocument, g: Glyph): Finding[] {

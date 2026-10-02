@@ -14,7 +14,7 @@ import {
 import { type ViewTransform, combFor, toScreen } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
-import { drawScene } from "../src/draw.js";
+import { drawGlyphAtSize, drawScene, pixelBox } from "../src/draw.js";
 import { LIGHT_PALETTE } from "../src/palette.js";
 import { DEFAULT_METRICS } from "../src/scene.js";
 import { scene } from "../src/scene.js";
@@ -348,6 +348,79 @@ describe("showControls", () => {
     expect(ctx.filledIn(LIGHT_PALETTE.nodeSelected)).toHaveLength(0);
     expect(ctx.strokedIn(LIGHT_PALETTE.tunniLine)).toHaveLength(0);
     expect(ctx.filledIn(LIGHT_PALETTE.tunniPoint)).toHaveLength(0);
+  });
+});
+
+describe("keylines", () => {
+  // At half scale from (200, 400): a box of 24 forty-unit steps round (480, 240)
+  // runs from 200 to 680 across the screen, and from 520 up to 40.
+  const keylines = { centre: vec(480, 240), unit: 40 };
+
+  it("draws the box, the live area and the four shapes, in their own colour", () => {
+    const ctx = render({ ...base(ring()), keylines });
+    const rects = ctx.all("rect").filter((o) => o.strokeStyle === LIGHT_PALETTE.keyline);
+    expect(rects.map((o) => [o.args[2], o.args[3]])).toEqual([
+      [480, 480],
+      [400, 400],
+      [360, 360],
+      [320, 400],
+      [400, 320],
+    ]);
+    // The box itself, from its top left corner, on the half pixel.
+    expect(rects[0]!.args.slice(0, 2)).toEqual([200.5, 40.5]);
+    // And the circle of twenty, about the middle.
+    const circle = ctx.all("arc").find((o) => o.strokeStyle === LIGHT_PALETTE.keyline)!;
+    expect(circle.args.slice(0, 3)).toEqual([440, 280, 200]);
+  });
+
+  it("draws nothing where they are not shown", () => {
+    const ctx = render(base(ring()));
+    expect(ctx.strokedIn(LIGHT_PALETTE.keyline)).toHaveLength(0);
+  });
+});
+
+describe("a glyph at a size", () => {
+  const metrics = { unitsPerEm: 960, ascender: 720, descender: -240 };
+  // A square from the baseline, 480 units a side, in a glyph 960 wide.
+  const square = () =>
+    addContour(
+      glyph("icon", { advance: 960 }),
+      contour(
+        counterIds("px").contour(),
+        [
+          node(counterIds("a").node(), vec(240, 0)),
+          node(counterIds("b").node(), vec(720, 0)),
+          node(counterIds("c").node(), vec(720, 480)),
+          node(counterIds("d").node(), vec(240, 480)),
+        ],
+        true,
+      ),
+    );
+
+  it("is as wide as its advance and a line tall, in whole pixels", () => {
+    expect(pixelBox(square(), 24, metrics)).toEqual({ width: 24, height: 24 });
+    expect(pixelBox(square(), 16, metrics)).toEqual({ width: 16, height: 16 });
+    expect(pixelBox(glyph("i", { advance: 500 }), 16, metrics)).toEqual({ width: 9, height: 16 });
+    // Never nothing: a mark with no width still has a canvas to be drawn on.
+    expect(pixelBox(glyph("mark", { advance: 0 }), 16, metrics).width).toBe(1);
+  });
+
+  it("draws from the top left of that box, the ascender at the top", () => {
+    const ctx = new RecordingContext();
+    drawGlyphAtSize(ctx, square(), 24, metrics, "#123456");
+    // Forty units to the pixel: the square runs from 6 to 18 across, and from
+    // the baseline, 18 down, up to 6.
+    const first = ctx.all("moveTo")[0]!;
+    expect(first.args).toEqual([6, 18]);
+    const corners = ctx.all("lineTo").map((o) => o.args);
+    expect(corners).toContainEqual([18, 6]);
+    expect(ctx.filledIn("#123456")).toHaveLength(1);
+  });
+
+  it("draws nothing for a glyph with nothing in it", () => {
+    const ctx = new RecordingContext();
+    drawGlyphAtSize(ctx, glyph("space", { advance: 500 }), 24, metrics, "#123456");
+    expect(ctx.all("fill")).toHaveLength(0);
   });
 });
 

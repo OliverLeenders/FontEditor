@@ -89,6 +89,9 @@ export {
   turnsMissing,
 } from "./contours.js";
 
+export type { Alignment, Distribution } from "./align.js";
+export { alignSelection, canAlign, canDistribute, distributeSelection } from "./align.js";
+
 export {
   fitToWidth,
   infoProblem,

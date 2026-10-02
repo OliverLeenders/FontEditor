@@ -1,11 +1,28 @@
 import { rotation, scaling, skewing, translation } from "@typewright/geometry";
-import { type TransformOrigin, transformSelection } from "@typewright/tools";
+import {
+  type Alignment,
+  type Distribution,
+  type TransformOrigin,
+  alignSelection,
+  canAlign,
+  canDistribute,
+  distributeSelection,
+  transformSelection,
+} from "@typewright/tools";
 import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./TransformPanel.module.css";
 import {
+  AlignBottomIcon,
+  AlignCentreIcon,
+  AlignLeftIcon,
+  AlignMiddleIcon,
+  AlignRightIcon,
+  AlignTopIcon,
   BaselineIcon,
+  DistributeAcrossIcon,
+  DistributeDownIcon,
   FlipHorizontalIcon,
   FlipVerticalIcon,
   OriginIcon,
@@ -52,6 +69,9 @@ export function TransformPanel(): React.JSX.Element {
   );
   const [origin, setOrigin] = useState<TransformOrigin>({ kind: "box", x: "centre", y: "middle" });
   const idle = points === 0;
+  // Whether there is anything to line up, and enough of it to space evenly.
+  const alignable = useStoreValue((s) => canAlign(s.session.editor));
+  const spaceable = useStoreValue((s) => canDistribute(s.session.editor));
 
   const apply = (
     transform: Parameters<typeof transformSelection>[1],
@@ -223,9 +243,62 @@ export function TransformPanel(): React.JSX.Element {
           <RotateRightIcon />
         </button>
       </div>
+
+      {/* Lining up and spacing. Whole contours selected move as shapes, and one
+          alone is lined up with the glyph's own box; anything less is points,
+          put on one line. The tooltips say which the buttons will do. */}
+      <div className={styles.aligns} role="group" aria-label="Align and distribute">
+        {ALIGNMENTS.map(({ how, label, icon: Icon }) => (
+          <button
+            key={how}
+            type="button"
+            disabled={!alignable}
+            aria-label={label}
+            title={label}
+            onClick={() => store.applyTool(alignSelection(store.editor, how))}
+          >
+            <Icon />
+          </button>
+        ))}
+        {DISTRIBUTIONS.map(({ along, label, icon: Icon }) => (
+          <button
+            key={along}
+            type="button"
+            disabled={!spaceable}
+            aria-label={label}
+            title={`${label}: even gaps between three or more`}
+            onClick={() => store.applyTool(distributeSelection(store.editor, along))}
+          >
+            <Icon />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
+
+/** The six ways to line up, in the order they are read: across, then down. */
+export const ALIGNMENTS: readonly {
+  readonly how: Alignment;
+  readonly label: string;
+  readonly icon: () => React.JSX.Element;
+}[] = [
+  { how: "left", label: "Align left edges", icon: AlignLeftIcon },
+  { how: "centre", label: "Align centres", icon: AlignCentreIcon },
+  { how: "right", label: "Align right edges", icon: AlignRightIcon },
+  { how: "top", label: "Align top edges", icon: AlignTopIcon },
+  { how: "middle", label: "Align middles", icon: AlignMiddleIcon },
+  { how: "bottom", label: "Align bottom edges", icon: AlignBottomIcon },
+];
+
+export const DISTRIBUTIONS: readonly {
+  readonly along: Distribution;
+  readonly label: string;
+  readonly icon: () => React.JSX.Element;
+}[] = [
+  { along: "across", label: "Distribute across", icon: DistributeAcrossIcon },
+  { along: "down", label: "Distribute down", icon: DistributeDownIcon },
+];
 
 /**
  * A number that does something once and goes back to meaning nothing.

@@ -21,7 +21,7 @@ export { NO_MODIFIERS, keyInput, modifiers, pointerInput } from "./input.js";
 export type { Effect, ToolResult } from "./effects.js";
 export { abort, begin, commit, result } from "./effects.js";
 
-export type { GuideScope, NewGlyph, Turn } from "./commands/index.js";
+export type { Alignment, Distribution, GuideScope, NewGlyph, Turn } from "./commands/index.js";
 
 export type {
   EditorState,
@@ -130,6 +130,10 @@ export {
   setInfo,
   setGrid,
   setNameLigatures,
+  alignSelection,
+  canAlign,
+  canDistribute,
+  distributeSelection,
   setFixedWidth,
   fitToWidth,
   scaleFontTo,
