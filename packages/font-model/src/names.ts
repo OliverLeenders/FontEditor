@@ -153,6 +153,45 @@ const ASCII_NAMES: Readonly<Record<number, string>> = {
  * also what the importer invents for an unnamed glyph, so a glyph created here
  * and one read from a file end up called the same thing.
  */
+/**
+ * A glyph name made from any text — a file's name, an icon's title.
+ *
+ * A compiled font carries letters, digits, the full stop and the underscore,
+ * up to 63 of them, not starting with a digit or a stop. Everything else
+ * becomes an underscore, runs of them one, so `arrow-left` and `Arrow Left`
+ * are `arrow_left` and `Arrow_Left`: the form icon fonts name their glyphs in,
+ * and the one a ligature spelling the name is typed in. `null` where nothing a
+ * name can be made of is left.
+ */
+export function glyphNameFromText(text: string): string | null {
+  const cleaned = text
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9._]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^[._]+|[._]+$/g, "");
+  if (cleaned === "") return null;
+  const named = /^[0-9]/.test(cleaned) ? `_${cleaned}` : cleaned;
+  return named.slice(0, 63);
+}
+
+/** The first and last code points of the Private Use Area: for what Unicode has no character for. */
+export const PRIVATE_USE_FIRST = 0xe000;
+export const PRIVATE_USE_LAST = 0xf8ff;
+
+/**
+ * Private-use code points that are free, the lowest first: as many as asked
+ * for, or as many as are left. What an icon is given, since an icon is a
+ * character Unicode has no code point for.
+ */
+export function freePrivateUse(taken: Iterable<number>, count: number): number[] {
+  const used = new Set(taken);
+  const out: number[] = [];
+  for (let code = PRIVATE_USE_FIRST; code <= PRIVATE_USE_LAST && out.length < count; code++) {
+    if (!used.has(code)) out.push(code);
+  }
+  return out;
+}
+
 export function glyphNameForCodePoint(codePoint: number): string {
   const known = ASCII_NAMES[codePoint];
   if (known !== undefined) return known;

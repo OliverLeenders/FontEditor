@@ -5,12 +5,13 @@ import {
   counterIds,
   fontDocument,
   glyph,
+  insideGlyph,
   node,
   withNib,
 } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
-import { exportFont } from "../src/export.js";
+import { exportFont, flattenedGlyphs } from "../src/export.js";
 import { importFont } from "../src/import.js";
 import { glif } from "../src/ufo.js";
 
@@ -75,5 +76,59 @@ describe("a stroke written to a .ufo", () => {
     // closed, so there is none.
     expect(text).toContain("<contour>");
     expect(text).not.toContain('type="move"');
+  });
+});
+
+describe("two strokes that cross", () => {
+  const pen = { angle: 0, width: 80, thickness: 80 };
+
+  /** A house: its wall a closed stroke, and a door drawn from the floor and back to it. */
+  const house = () =>
+    glyph("home", {
+      advance: 1000,
+      contours: [
+        withNib(
+          contour(
+            ids.contour(),
+            [
+              node(ids.node(), vec(100, 0)),
+              node(ids.node(), vec(900, 0)),
+              node(ids.node(), vec(900, 800)),
+              node(ids.node(), vec(100, 800)),
+            ],
+            true,
+          ),
+          pen,
+        ),
+        withNib(
+          contour(ids.contour(), [
+            node(ids.node(), vec(350, 0)),
+            node(ids.node(), vec(350, 400)),
+            node(ids.node(), vec(650, 400)),
+            node(ids.node(), vec(650, 0)),
+          ]),
+          pen,
+        ),
+      ],
+    });
+
+  it("are both ink where they cross, and neither is taken for the other's counter", () => {
+    // The door's ink begins inside the wall's ink and stands inside its counter.
+    // Turned by nesting, as a drawn outline is, it was taken for a counter: cut
+    // out of the floor it crosses, and filled where it stood clear of it.
+    const [compiled] = flattenedGlyphs(fontDocument([house()])).filter((g) => g.name === "home");
+    const ink = (x: number, y: number): boolean => insideGlyph(compiled!, vec(x, y));
+
+    // Where the door's ends lie on the floor.
+    expect(ink(350, 0)).toBe(true);
+    expect(ink(650, 0)).toBe(true);
+    // The floor beside them, the door's own strokes, the wall.
+    expect(ink(500, 0)).toBe(true);
+    expect(ink(350, 200)).toBe(true);
+    expect(ink(500, 400)).toBe(true);
+    expect(ink(100, 400)).toBe(true);
+    // And the two rooms: inside the door, and the house round it.
+    expect(ink(500, 200)).toBe(false);
+    expect(ink(200, 600)).toBe(false);
   });
 });

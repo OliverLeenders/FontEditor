@@ -11,8 +11,13 @@
  * round trip. That deserves to be designed rather than bolted on here.
  */
 
+export { nameLigatureCount, withNameLigatures } from "./name-ligatures.js";
+
 export type { PathCommand } from "./commands.js";
 export { contoursFromCommands } from "./commands.js";
+
+export type { SvgBox, SvgDrawing, SvgFile, SvgGlyphs, SvgPlacement, SvgShape } from "./svg.js";
+export { contoursFromSvg, glyphsFromSvgs, parseSvg, svgPlacement } from "./svg.js";
 
 export type { SourceFont, SourceGlyph } from "./source.js";
 export { FontParseError, parseFont } from "./source.js";
@@ -29,7 +34,7 @@ export { tableChecksum, withTable } from "./sfnt.js";
 
 export type { ExportResult } from "./export.js";
 export { FontExportError, exportFont } from "./export.js";
-export { exportFileName, ufoFolderName } from "./file-name.js";
+export { exportFileName, fontFileStem, ufoFolderName } from "./file-name.js";
 
 export { exportVariableTrueType } from "./variable-truetype.js";
 

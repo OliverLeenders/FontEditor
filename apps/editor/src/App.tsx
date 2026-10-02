@@ -9,6 +9,7 @@ import {
 import { useEffect, useRef, useState, useCallback } from "react";
 
 import { applyTheme } from "./scheme.js";
+import { looksLikeSvg } from "./svgImport.js";
 
 import { ContextMenu, type MenuRequest } from "./components/ContextMenu.js";
 import { Divider } from "./components/Divider.js";
@@ -329,6 +330,12 @@ export function App(): React.JSX.Element {
       if (typingIn(event.target) || viewRef.current !== "glyph") return;
       const text = event.clipboardData?.getData("text/plain") ?? "";
       if (text === "") return;
+      // A drawing copied out of another program arrives as SVG text, and its
+      // shapes go into the glyph as a paste of this editor's own contours does.
+      if (looksLikeSvg(text) && store.placeSvg(text)) {
+        event.preventDefault();
+        return;
+      }
       // Not prevented unless it is ours, so pasting something else into the
       // canvas does nothing rather than swallowing the event.
       const result = pasteContours(store.editor, text, pasteIds);

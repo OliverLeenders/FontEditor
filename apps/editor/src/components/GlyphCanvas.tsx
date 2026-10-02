@@ -46,6 +46,7 @@ import {
 import type { EditorStore } from "../store/index.js";
 import { watchScheme } from "../scheme.js";
 import { useEditorStore } from "../useStore.js";
+import { isSvgFile } from "../svgImport.js";
 import type { PaneIndex } from "../layout.js";
 import { usePane } from "../pane.js";
 import type { MenuRequest } from "./ContextMenu.js";
@@ -331,6 +332,17 @@ export function GlyphCanvas({
       className={styles.canvas}
       tabIndex={0}
       aria-label="Glyph editing canvas"
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        // One SVG file dropped on the drawing goes into it, as a paste does.
+        const dropped = [...event.dataTransfer.files];
+        const file = dropped[0];
+        if (dropped.length !== 1 || file === undefined || !isSvgFile(file)) return;
+        event.preventDefault();
+        void file.text().then((text) => store.placeSvg(text));
+      }}
       onPointerDown={(event) => {
         // Belt as well as braces. The stylesheet stops a selection being
         // *painted*, and this stops one being *started* — which also keeps the

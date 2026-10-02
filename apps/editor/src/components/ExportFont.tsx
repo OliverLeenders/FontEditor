@@ -1,6 +1,19 @@
-import { exportFamily, exportFileName, exportUfo, toWoff, toWoff2 } from "@typewright/font-io";
-import { type Location, defaultLocation } from "@typewright/font-model";
-import { useState } from "react";
+import {
+  exportFamily,
+  exportFileName,
+  exportUfo,
+  fontFileStem,
+  toWoff,
+  toWoff2,
+  zip,
+} from "@typewright/font-io";
+import {
+  type Location,
+  PRIVATE_USE_FIRST,
+  PRIVATE_USE_LAST,
+  defaultLocation,
+} from "@typewright/font-model";
+import { useMemo, useState } from "react";
 
 import { desktop } from "../desktop.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
@@ -39,6 +52,17 @@ export function ExportFont(): React.JSX.Element {
   const masters = useStoreValue((s) => s.project.masters.length);
   const axes = useStoreValue((s) => s.project.axes.length);
   const instanceCount = useStoreValue((s) => s.project.instances.length);
+  // How many glyphs are icons, which is what a kit is made of: the ones with a
+  // private-use code point. Counted from the document, which this menu is only
+  // mounted beside the glyph grid to see.
+  const document = useStoreValue((s) => s.session.editor.document);
+  const iconCount = useMemo(
+    () =>
+      Object.values(document.glyphs).filter((g) =>
+        g.unicodes.some((code) => code >= PRIVATE_USE_FIRST && code <= PRIVATE_USE_LAST),
+      ).length,
+    [document],
+  );
   const [status, setStatus] = useState<Status>({ kind: "idle" });
 
   /**
@@ -286,6 +310,35 @@ export function ExportFont(): React.JSX.Element {
       return { file: fileName, warnings: [] };
     });
 
+  /**
+   * What a web page is given to use the font as icons: the font, a stylesheet
+   * with a class for each icon, a page showing them all, and the names and code
+   * points as data — in one archive, each written from the font as it stands.
+   */
+  const iconKit = (): void =>
+    void attemptAsync(async () => {
+      const { exportTrueType, iconKitFiles } = await binary();
+      const document = store.editor.document;
+      const made = exportTrueType(document);
+      const out = await toWoff2(new Uint8Array(made.bytes));
+      const files = iconKitFiles(document, out.bytes);
+      const file = `${fontFileStem(document)}-kit.zip`;
+      download(zip(files).slice().buffer, file, "application/zip");
+      return { file: `${file} · ${String(files.length)} files`, warnings: made.warnings };
+    });
+
+  /** Every glyph that draws something as a picture of its own, as compiled. */
+  const svgs = (): void =>
+    void attemptAsync(async () => {
+      const { glyphSvgFiles } = await binary();
+      const document = store.editor.document;
+      const files = glyphSvgFiles(document);
+      if (files.length === 0) throw new Error("No glyph in this font draws anything.");
+      const file = `${fontFileStem(document)}-svg.zip`;
+      download(zip(files).slice().buffer, file, "application/zip");
+      return { file: `${file} · ${String(files.length)} files`, warnings: [] };
+    });
+
   /*
    * Five files, one menu.
    *
@@ -346,6 +399,27 @@ export function ExportFont(): React.JSX.Element {
       icon: DownloadIcon,
       disabled: glyphCount === 0,
       run: ufo,
+    },
+    // The font as icons, and as the pictures an icon set is drawn as.
+    { kind: "separator" },
+    {
+      kind: "item",
+      label: "Icon kit",
+      note:
+        iconCount === 0
+          ? "needs private-use code points"
+          : `WOFF2, CSS and a page of ${String(iconCount)}`,
+      icon: DownloadIcon,
+      disabled: glyphCount === 0 || iconCount === 0,
+      run: iconKit,
+    },
+    {
+      kind: "item",
+      label: "SVGs",
+      note: "a picture per glyph, zipped",
+      icon: DownloadIcon,
+      disabled: glyphCount === 0,
+      run: svgs,
     },
   ];
 

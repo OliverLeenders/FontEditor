@@ -21,6 +21,7 @@ import { cff2Table, sameShape } from "./cff2.js";
 import { type ExportResult, exportFont } from "./export.js";
 import { swapVariationsFor, type SwapVariations } from "./feature-variations.js";
 import { type NamedInstance, avarTable, fvarTable, statTable } from "./fvar.js";
+import { withNameLigatures } from "./name-ligatures.js";
 import { withNames } from "./names.js";
 import { postWithNames } from "./post.js";
 import { readTablesOf, withTable } from "./sfnt.js";
@@ -118,9 +119,19 @@ export function prepareVariable(
           .filter((m) => m.sparse !== true)
           .map((m) => ({ name: m.name, location: m.location }));
 
+  // An icon family's names as ligatures, by what the default master says: the
+  // letters they need are added to every whole master alike, or the masters
+  // would no longer hold the same glyphs.
+  const spelling = ordered[0].document.nameLigatures;
+  const spelled = ordered.map((m) =>
+    m.sparse === true
+      ? m
+      : { ...m, document: withNameLigatures({ ...m.document, nameLigatures: spelling }) },
+  );
+
   return {
     axes: along,
-    masters: ordered,
+    masters: spelled,
     instances,
     swaps: swapVariationsFor(along, axes, options.rules ?? [], options.rulesProcessing ?? "first"),
     warnings,

@@ -372,3 +372,46 @@ describe("keeping copies of the font", () => {
     expect(await store.restoreSnapshot(1)).toBeNull();
   });
 });
+
+describe("SVGs coming in", () => {
+  const svg = (body: string) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${body}</svg>`;
+  const square = svg('<rect x="4" y="4" width="16" height="16"/>');
+
+  it("adds a glyph for each file in one undo step, and says what came of it", () => {
+    const store = freshStore();
+    const before = store.editor.document.glyphOrder.length;
+
+    const notice = store.importSvgs([
+      { name: "arrow-left.svg", text: square },
+      { name: "broken.svg", text: "nothing" },
+    ]);
+
+    expect(store.editor.document.glyphOrder.length).toBe(before + 1);
+    expect(store.editor.document.glyphs["arrow_left"]?.unicodes).toEqual([0xe000]);
+    expect(store.editor.currentGlyph).toBe("arrow_left");
+    expect(notice.summary).toBe("Imported 1 glyph · 1 file left out");
+    expect(store.getState().notice?.details).toEqual(["broken.svg: it is not an SVG"]);
+
+    store.undo();
+    expect(store.editor.document.glyphOrder.length).toBe(before);
+
+    store.dismissNotice();
+    expect(store.getState().notice).toBeNull();
+  });
+
+  it("puts an SVG's shapes into the glyph being drawn, selected", () => {
+    const store = freshStore();
+    const name = store.editor.currentGlyph;
+    const before = store.editor.document.glyphs[name]!;
+
+    expect(store.placeSvg("not a drawing")).toBe(false);
+    expect(store.placeSvg(square)).toBe(true);
+
+    const after = store.editor.document.glyphs[name]!;
+    expect(after.contours.length).toBe(before.contours.length + 1);
+    expect(store.editor.selection.length).toBe(4);
+    // A glyph with something in it keeps its own width.
+    if (before.contours.length > 0) expect(after.advance).toBe(before.advance);
+  });
+});

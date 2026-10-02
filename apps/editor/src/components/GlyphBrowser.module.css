@@ -158,6 +158,13 @@
   outline-offset: -1px;
 }
 
+/* How big the cells are: a short slider, since it is set once for a font and
+   left, and the bar has the search to give its width to. */
+.cellSize {
+  flex: none;
+  width: 5rem;
+}
+
 .count {
   flex: none;
   font-size: var(--text-s);
@@ -187,6 +194,13 @@
   z-index: 1;
   pointer-events: none;
   box-shadow: var(--shadow-inset);
+}
+/* Files held over the grid, which takes SVGs as glyphs: the accent round its
+   edge, on the same overlay, so the grid says it is listening. */
+.gridArea[data-dropping]::after {
+  box-shadow:
+    var(--shadow-inset),
+    inset 0 0 0 2px var(--accent);
 }
 
 .scroller {

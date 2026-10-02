@@ -12,7 +12,15 @@ import {
 import type { ViewTransform } from "@typewright/view";
 import { describe, expect, it } from "vitest";
 
-import { fitToWidth, scaleFontTo, setFixedWidth, setGrid } from "../src/commands/font.js";
+import { placeContours } from "../src/clipboard.js";
+import {
+  fitToWidth,
+  scaleFontTo,
+  setFixedWidth,
+  setGrid,
+  setNameLigatures,
+} from "../src/commands/font.js";
+import { addDrawnGlyphs } from "../src/commands/glyphs.js";
 import { nudgeSidebearing, setSidebearing } from "../src/commands/spacing.js";
 import { pointerInput } from "../src/input.js";
 import { pointerDown, pointerMove } from "../src/select.js";
@@ -90,6 +98,45 @@ describe("a fixed width", () => {
     const set = setSidebearing(s, "n", "left", 100).state.document.glyphs["n"]!;
     expect(set.advance).toBe(550);
     expect(sidebearings(set)).toEqual({ left: 100, right: 150 });
+  });
+});
+
+describe("glyphs and shapes that arrive drawn", () => {
+  it("adds the glyphs the font has not got, and opens the first", () => {
+    const s = stateOf(fontDocument([box("n", 40, 300, 60)]));
+    const added = addDrawnGlyphs(s, [
+      box("n", 0, 10, 0),
+      box("home", 100, 800, 100),
+      box("star", 0, 900, 100),
+    ]);
+    // The `n` that is there is not drawn over.
+    expect(added.state.document.glyphs["n"]!.advance).toBe(400);
+    expect(added.state.document.glyphOrder).toEqual(["n", "home", "star"]);
+    expect(added.state.currentGlyph).toBe("home");
+    expect(addDrawnGlyphs(s, [box("n", 0, 10, 0)]).state).toBe(s);
+  });
+
+  it("puts contours into the glyph selected, and gives an empty glyph their width", () => {
+    const shape = () => [rectContour(ids, { minX: 0, minY: 0, maxX: 500, maxY: 500 })];
+
+    const empty = stateOf(fontDocument([glyph("n", { advance: 300 })]));
+    const filled = placeContours(empty, shape(), "Place SVG", 960).state;
+    expect(filled.document.glyphs["n"]!.advance).toBe(960);
+    expect(filled.document.glyphs["n"]!.contours).toHaveLength(1);
+    expect(filled.selection).toHaveLength(4);
+
+    // A glyph with something in it keeps the width it was spaced at.
+    const drawn = stateOf(fontDocument([box("n", 40, 300, 60)]));
+    const more = placeContours(drawn, shape(), "Place SVG", 960).state;
+    expect(more.document.glyphs["n"]!.advance).toBe(400);
+    expect(more.document.glyphs["n"]!.contours).toHaveLength(2);
+  });
+
+  it("switches icons' names as ligatures on and off", () => {
+    const s = stateOf(fontDocument([box("n", 40, 300, 60)]));
+    const on = setNameLigatures(s, true).state;
+    expect(on.document.nameLigatures).toBe(true);
+    expect(setNameLigatures(on, true).state).toBe(on);
   });
 });
 

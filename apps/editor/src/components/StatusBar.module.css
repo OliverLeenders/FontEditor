@@ -40,6 +40,32 @@
   height: 0.85rem;
 }
 
+/* Something that just happened, kept until it is read: the same line as the
+   facts beside it, in ink a step stronger, and a button because clicking it
+   is how it is put away. */
+.notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  padding: 0.1rem 0.25rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--ink-2);
+  font: inherit;
+  cursor: pointer;
+}
+.notice svg {
+  flex: none;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.notice:hover {
+  border-color: var(--rule-strong);
+  color: var(--ink);
+}
+
 .hints {
   margin-left: auto;
   min-width: 0;

@@ -40,6 +40,7 @@ import {
   type GridLayout,
   cellBox,
   cellIndexAt,
+  DEFAULT_GRID,
   gridLayout,
   scrollToCell,
   visibleCells,
@@ -49,6 +50,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { isDarkNow, watchScheme } from "../scheme.js";
 import { wholeOf } from "../store/masters.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
+import { MAX_CELL_SCALE, MIN_CELL_SCALE } from "../limits.js";
+import { areSvgFiles, readSvgFiles } from "../svgImport.js";
+
+/** The two lines of label under a cell's drawing, in pixels: the renderer's own number. */
+const CELL_LABELS = 30;
 import { BarMenu } from "./BarMenu.js";
 import { type Item, Menu } from "./ContextMenu.js";
 import {
@@ -110,7 +116,10 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   const grid = useMemo(() => withWhole(document, whole), [document, whole]);
   const absent = (name: string): boolean => whole !== null && document.glyphs[name] === undefined;
   /** A glyph this master does not draw, which somebody has asked to open. */
+  const cellScale = useStoreValue((s) => s.cellScale);
   const [offer, setOffer] = useState<string | null>(null);
+  /** SVG files held over the grid, which will be added as glyphs if let go. */
+  const [dropping, setDropping] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -183,7 +192,16 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
   // One layout, computed in render, used by the spacer, the keyboard and the
   // canvas alike. Deriving it separately in the frame callback is what let the
   // two disagree.
-  const layout: GridLayout = useMemo(() => gridLayout(shown.length, width), [shown.length, width]);
+  // The cells at the size asked for. Only the drawing grows: the two lines of
+  // label under it are text, and stay the size text is.
+  const layout: GridLayout = useMemo(
+    () =>
+      gridLayout(shown.length, width, {
+        cellWidth: Math.round(DEFAULT_GRID.cellWidth * cellScale),
+        cellHeight: Math.round((DEFAULT_GRID.cellHeight - CELL_LABELS) * cellScale) + CELL_LABELS,
+      }),
+    [shown.length, width, cellScale],
+  );
   const columns = layout.columns;
 
   /*
@@ -741,6 +759,17 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
                 run: () => store.setCatalogQuery({ order: order.id }),
               }))}
             />
+            <input
+              type="range"
+              className={styles.cellSize}
+              min={MIN_CELL_SCALE}
+              max={MAX_CELL_SCALE}
+              step={0.25}
+              value={cellScale}
+              aria-label="Cell size"
+              title="How big the glyphs are drawn in the grid"
+              onChange={(event) => store.setCellScale(Number(event.target.value))}
+            />
             <span className={styles.count}>
               {shown.length - toMake === entries.length
                 ? `${String(entries.length)} glyphs`
@@ -751,7 +780,27 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
           </div>
         </div>
 
-        <div className={styles.gridArea}>
+        <div
+          className={styles.gridArea}
+          data-dropping={dropping ? "" : undefined}
+          onDragOver={(event) => {
+            // Only files: a drag that began inside the page is somebody
+            // selecting, and must not light the grid up.
+            if (!event.dataTransfer.types.includes("Files")) return;
+            event.preventDefault();
+            setDropping(true);
+          }}
+          onDragLeave={() => setDropping(false)}
+          onDrop={(event) => {
+            setDropping(false);
+            const dropped = [...event.dataTransfer.files];
+            if (!areSvgFiles(dropped)) return;
+            // Prevented only for what is taken: anything else falls through to
+            // the browser, as it did before the grid listened at all.
+            event.preventDefault();
+            void readSvgFiles(dropped).then((files) => store.importSvgs(files));
+          }}
+        >
           <div
             ref={scrollRef}
             className={styles.scroller}

@@ -217,6 +217,17 @@ describe("preferences and the store", () => {
     expect(second.getState().proofSize).toBe(64);
   });
 
+  it("remembers how big the glyph grid's cells are, within what it allows", () => {
+    const first = new EditorStore();
+    first.setCellScale(2.5);
+    expect(new EditorStore().getState().cellScale).toBe(2.5);
+
+    first.setCellScale(9);
+    expect(first.getState().cellScale).toBeLessThanOrEqual(3);
+    first.setCellScale(Number.NaN);
+    expect(Number.isFinite(first.getState().cellScale)).toBe(true);
+  });
+
   it("does not remember the text being worked on", () => {
     // Content, not a setting: a proof that reopens holding yesterday's paragraph
     // has stopped being the one you just typed.

@@ -3,6 +3,7 @@ import { canOpenFolders } from "@typewright/disk";
 import { useRef, useState } from "react";
 
 import { desktop } from "../desktop.js";
+import { areSvgFiles, readSvgFiles } from "../svgImport.js";
 import { unsaved } from "../store/index.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { openWindow } from "../windows.js";
@@ -17,6 +18,7 @@ import {
   FolderClockIcon,
   FolderOpenIcon,
   FolderOutputIcon,
+  ImageIcon,
   SaveIcon,
   TriangleAlertIcon,
   UploadIcon,
@@ -43,6 +45,7 @@ export function FileMenu(): React.JSX.Element {
   const reading = useStoreValue((s) => s.ownership === "reading");
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const svgInputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
@@ -77,6 +80,18 @@ export function FileMenu(): React.JSX.Element {
       return `${done.family} · ${String(done.glyphs)} glyphs${warnings}`;
     });
 
+  /**
+   * SVG files as glyphs, added to the font that is open rather than replacing
+   * it. What came of it is said in the status bar, where it is said for a drop
+   * on the grid too, so this line is cleared rather than saying it twice.
+   */
+  const readSvgs = (files: readonly File[]): Promise<void> =>
+    attempt(async () => {
+      store.importSvgs(await readSvgFiles(files));
+      setSaid(null);
+      return null;
+    });
+
   // The same instruction as Ctrl-S, through the same store method: the shortcut
   // itself lives on the window in `App`, because this component is mounted only
   // in the font view and the key has to work in every workspace.
@@ -104,6 +119,14 @@ export function FileMenu(): React.JSX.Element {
       icon: UploadIcon,
       disabled: working,
       run: () => inputRef.current?.click(),
+    },
+    {
+      kind: "item",
+      label: "Import SVGs…",
+      icon: ImageIcon,
+      hint: "Add a glyph for each SVG file, named for the file: an icon set",
+      disabled: working,
+      run: () => svgInputRef.current?.click(),
     },
   ];
 
@@ -208,8 +231,10 @@ export function FileMenu(): React.JSX.Element {
       onDrop={(event) => {
         event.preventDefault();
         setDragging(false);
-        const file = event.dataTransfer.files[0];
-        if (file !== undefined) void read(file);
+        const dropped = [...event.dataTransfer.files];
+        // Pictures are added to this font; anything else is a font to open.
+        if (areSvgFiles(dropped)) void readSvgs(dropped);
+        else if (dropped[0] !== undefined) void read(dropped[0]);
       }}
     >
       <input
@@ -221,6 +246,19 @@ export function FileMenu(): React.JSX.Element {
           const file = event.target.files?.[0];
           if (file !== undefined) void read(file);
           // Cleared so choosing the same file twice fires a second change.
+          event.target.value = "";
+        }}
+      />
+
+      <input
+        ref={svgInputRef}
+        type="file"
+        accept=".svg,image/svg+xml"
+        multiple
+        className={styles.input}
+        onChange={(event) => {
+          const picked = [...(event.target.files ?? [])];
+          if (picked.length > 0) void readSvgs(picked);
           event.target.value = "";
         }}
       />

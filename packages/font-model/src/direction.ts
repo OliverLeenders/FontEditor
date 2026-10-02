@@ -3,7 +3,7 @@ import { type Vec2, flatten } from "@typewright/geometry";
 import { type Contour, reverseContour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { corneredContour } from "./corner.js";
 import type { Glyph } from "./glyph.js";
-import { inkRegions } from "./stroke.js";
+import { inkRegions, isInk } from "./stroke.js";
 
 /**
  * Which way round a contour runs, and putting a set of them right.
@@ -383,12 +383,17 @@ export function filledContours(g: Glyph): readonly Contour[] {
   // to work out on every move of a drag. They are not direction-corrected with the
   // outlines, which would take a region overlapping its neighbour for a counter.
   // An outline is filled as it is drawn, its continuous corners rounded.
-  const outlines = g.contours.filter((c) => c.nib === undefined).map(corneredContour);
-  const strokes = g.contours.filter((c) => c.nib !== undefined);
+  //
+  // Ink that arrives already worked out is left alone for the same reason: a
+  // glyph prepared for drawing has its strokes replaced by their ink, and that
+  // ink has no pen to say what it is — only its mark.
+  const drawn = g.contours.filter((c) => c.nib === undefined && !isInk(c));
+  const outlines = drawn.map(corneredContour);
+  const ink = g.contours.flatMap((c) =>
+    c.nib !== undefined ? inkRegions(c) : isInk(c) ? [c] : [],
+  );
   const corrected =
-    strokes.length === 0
-      ? correctDirections(outlines)
-      : [...correctDirections(outlines), ...strokes.flatMap((c) => inkRegions(c))];
+    ink.length === 0 ? correctDirections(outlines) : [...correctDirections(outlines), ...ink];
   filled.set(g, corrected);
   return corrected;
 }

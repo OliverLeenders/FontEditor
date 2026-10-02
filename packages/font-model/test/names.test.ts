@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { glyphFileName, glyphNameForCodePoint } from "../src/names.js";
+import {
+  freePrivateUse,
+  glyphFileName,
+  glyphNameForCodePoint,
+  glyphNameFromText,
+} from "../src/names.js";
 
 /**
  * Turning a glyph name into a filename, and a code point into a glyph name.
@@ -90,5 +95,36 @@ describe("naming a code point", () => {
 
   it("uses the six-digit form above the basic plane", () => {
     expect(glyphNameForCodePoint(0x1f600)).toBe("u01F600");
+  });
+});
+
+describe("a glyph name from any text", () => {
+  it("keeps what a font can carry and joins the rest with underscores", () => {
+    expect(glyphNameFromText("arrow-left")).toBe("arrow_left");
+    expect(glyphNameFromText("Arrow  Left (filled)")).toBe("Arrow_Left_filled");
+    expect(glyphNameFromText("home.fill")).toBe("home.fill");
+  });
+
+  it("does not start with a digit or a full stop, or end on a join", () => {
+    expect(glyphNameFromText("24-hours")).toBe("_24_hours");
+    expect(glyphNameFromText(".hidden-")).toBe("hidden");
+  });
+
+  it("is nothing where nothing is left, and no longer than a font allows", () => {
+    expect(glyphNameFromText("—")).toBeNull();
+    expect(glyphNameFromText("")).toBeNull();
+    expect(glyphNameFromText("a".repeat(80))).toHaveLength(63);
+  });
+});
+
+describe("free private-use code points", () => {
+  it("are the lowest nothing has, as many as asked for", () => {
+    expect(freePrivateUse([], 3)).toEqual([0xe000, 0xe001, 0xe002]);
+    expect(freePrivateUse([0x41, 0xe000, 0xe002], 3)).toEqual([0xe001, 0xe003, 0xe004]);
+  });
+
+  it("run out rather than leave the area", () => {
+    const taken = Array.from({ length: 0xf8ff - 0xe000 }, (_, i) => 0xe000 + i);
+    expect(freePrivateUse(taken, 5)).toEqual([0xf8ff]);
   });
 });

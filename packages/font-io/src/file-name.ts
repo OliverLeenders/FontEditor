@@ -15,7 +15,8 @@ export function ufoFolderName(document: FontDocument): string {
   return `${fontFileStem(document)}.ufo`;
 }
 
-function fontFileStem(document: FontDocument): string {
+/** The family and the style joined, which every file written for a font is named from. */
+export function fontFileStem(document: FontDocument): string {
   const clean = (s: string): string => s.replace(/[^A-Za-z0-9]/g, "");
   const family = clean(document.info.familyName) || "Untitled";
   const style = clean(document.info.styleName) || "Regular";

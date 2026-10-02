@@ -235,6 +235,20 @@ describe("a fixed width", () => {
   });
 });
 
+/** Icons' names as ligatures: a switch, and a line saying what it will do. */
+describe("names as ligatures", () => {
+  it("is off until ticked, and says when no glyph is an icon yet", () => {
+    const { store } = openPanel();
+    const box = screen.getByLabelText<HTMLInputElement>("Names as ligatures");
+    expect(box.checked).toBe(false);
+
+    fireEvent.click(box);
+    expect(store.editor.document.nameLigatures).toBe(true);
+    // The starter font has letters and no icons.
+    expect(screen.getByText(/No glyph has a private-use code point yet/)).toBeTruthy();
+  });
+});
+
 /** The grid: a preset, or a step and a major spacing typed in. */
 describe("the grid", () => {
   it("sets an icon grid from a preset, and offers an em it divides into whole units", () => {

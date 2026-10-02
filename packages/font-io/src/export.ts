@@ -16,11 +16,12 @@ import {
   removeOverlap,
   resolveGlyphComponents,
   segments,
-  withInk,
+  inkOf,
   withResolvedMetrics,
 } from "@typewright/font-model";
 
 import { kerningLookups, kerningSubtables } from "./gpos.js";
+import { withNameLigatures } from "./name-ligatures.js";
 import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
 import { type FeatureName, compileFeatures } from "./features.js";
@@ -95,19 +96,36 @@ function tracePath(path: OtPath, c: Contour): void {
  */
 function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Contour[] {
   // A stroke's skeleton is the path a pen was drawn along; what goes in the font is
-  // the ink it leaves. Worked out before anything else, so the directions and the
-  // union below see only outlines.
-  const own = withInk(g, ids).contours;
-  if (g.components.length === 0) return own;
+  // the ink it leaves. Worked out before anything else, so the union below sees
+  // only outlines.
+  //
+  // The two kinds are kept apart until they are oriented. A drawn outline runs
+  // whichever way its points were placed, and is turned by its nesting: a
+  // contour inside another is a counter. A stroke's ink is already turned the
+  // way ink is, and must not be judged by nesting — the ink of one stroke often
+  // begins inside the counter of another, a door inside a house, and taking it
+  // for a counter cut it out of the wall it crosses and filled it where it
+  // stood clear. The editor fills them the same way; see `filledContours`.
+  const split = (glyph: Glyph, kind: "outline" | "ink"): readonly Contour[] =>
+    glyph.contours
+      .filter((c) => (c.nib === undefined) === (kind === "outline"))
+      .flatMap((c) => inkOf(c, ids));
 
-  const source: ComponentSource = {
-    glyphOf: (name) => {
-      const found = document.glyphs[name];
-      return found === undefined ? null : withInk(found, ids);
-    },
+  const gathered = (kind: "outline" | "ink"): readonly Contour[] => {
+    const own = split(g, kind);
+    if (g.components.length === 0) return own;
+    // Each glyph a component names gives the same kind of contour, all the way
+    // down, so a stroke inside a component is still ink when it arrives here.
+    const source: ComponentSource = {
+      glyphOf: (name) => {
+        const found = document.glyphs[name];
+        return found === undefined ? null : { ...found, contours: split(found, kind) };
+      },
+    };
+    return [...own, ...resolveGlyphComponents(source, g.name, g.components, ids)];
   };
 
-  return [...own, ...resolveGlyphComponents(source, g.name, g.components, ids)];
+  return [...directed(gathered("outline")), ...gathered("ink")];
 }
 
 /**
@@ -125,7 +143,7 @@ function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Con
  * exactly as it was drawn — the same arrangement every font tool has, where a
  * designer keeps the pieces apart and the compiler joins them.
  *
- * Taken *after* the directions are put right, because what the union is depends
+ * Taken *after* the directions are put right (in `flatten`), because what the union is depends
  * on them: two shapes running opposite ways enclose the difference between them
  * rather than the whole of both, and the answer would be a shape nobody drew.
  * What comes out is already oriented — the boundary is walked with the ink on
@@ -142,7 +160,10 @@ function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Con
  * Exported because the TrueType flavour needs exactly the same outlines and
  * would otherwise have its own copy of that order to get wrong.
  */
-export function flattenedGlyphs(document: FontDocument): Glyph[] {
+export function flattenedGlyphs(source: FontDocument): Glyph[] {
+  // The same glyphs `exportFont` writes, in the same order: the letters an
+  // icon font's ligatures need are added here as they are there.
+  const document = withNameLigatures(source);
   const ids = counterIds("t");
   const warnings: string[] = [];
 
@@ -151,7 +172,7 @@ export function flattenedGlyphs(document: FontDocument): Glyph[] {
     const g = document.glyphs[name];
     if (g === undefined) return glyph(name);
 
-    const contours = unioned(g, directed(flatten(g, document, ids)), ids, warnings);
+    const contours = unioned(g, flatten(g, document, ids), ids, warnings);
     return { ...g, components: [], contours: [...contours] };
   });
 
@@ -422,7 +443,9 @@ export function exportFont(
   // A font file has no way to say "this glyph is spaced like that one": it
   // records an advance and an outline position, and that is all a rasteriser
   // ever sees. So the keys are followed here and what comes out is ordinary.
-  const spaced = withResolvedMetrics(source);
+  // Before it, an icon font's names as ligatures, where it asks for them: the
+  // rules, and a blank glyph for each letter they spell with.
+  const spaced = withResolvedMetrics(withNameLigatures(source));
   const document = spaced.document;
 
   const warnings: string[] = spaced.problems.map((p) => `${p.glyph} ${p.says}`);
@@ -445,11 +468,7 @@ export function exportFont(
     const g = document.glyphs[name];
     if (g === undefined) continue;
 
-    const path = pathFor(
-      g,
-      unioned(g, directed(flatten(g, document, ids)), ids, warnings),
-      warnings,
-    );
+    const path = pathFor(g, unioned(g, flatten(g, document, ids), ids, warnings), warnings);
     const init: {
       name: string;
       advanceWidth: number;

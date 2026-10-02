@@ -3,7 +3,7 @@ import { currentGlyph, shownMeasurement } from "@typewright/tools";
 import { selectionBounds } from "@typewright/view";
 
 import { measurableNeighbours } from "../scene.js";
-import { useStoreValue } from "../useStore.js";
+import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./StatusBar.module.css";
 import type { AutosaveStatus } from "@typewright/storage";
 
@@ -13,9 +13,11 @@ import {
   CircleCheckIcon,
   CloudOffIcon,
   HistoryIcon,
+  InfoIcon,
   KeyboardIcon,
   LoaderCircleIcon,
   TriangleAlertIcon,
+  XIcon,
 } from "./icons.js";
 
 /**
@@ -65,6 +67,8 @@ export function StatusBar({
   // than one that never started.
   const problem = useStoreValue((s) => s.folder.problem);
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
+  const store = useEditorStore();
+  const notice = useStoreValue((s) => s.notice);
 
   // Three scalar selectors rather than one returning the measurement: it is a
   // fresh object every time, and comparing it by identity would re-render this
@@ -153,6 +157,22 @@ export function StatusBar({
           <TriangleAlertIcon />
           <span className={styles.problem}>{problem}</span>
         </span>
+      )}
+      {/* What just happened, with what was left out of it in the tooltip: a
+          set of SVG files brought in from the grid or the canvas, where there
+          is no menu beside the work to say so. A button, because it stays until
+          it is read. */}
+      {notice === null ? null : (
+        <button
+          type="button"
+          className={styles.notice}
+          title={[...notice.details, "Click to dismiss"].join("\n")}
+          onClick={() => store.dismissNotice()}
+        >
+          <InfoIcon />
+          <span className={styles.problem}>{notice.summary}</span>
+          <XIcon />
+        </button>
       )}
       {/* The line that already carried a keyboard and a few of the keys is
           where somebody would look for the rest of them, so it is the way in

@@ -173,6 +173,7 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
           OLD_METRIC_KEYS,
           GRID_KEY,
           FIXED_WIDTH_KEY,
+          NAME_LIGATURES_KEY,
         ]);
   const drawnOn = drawingSettings(libSource);
 
@@ -606,7 +607,14 @@ const GRID_KEY = "org.typewright.grid";
 /** The width of a fixed-width font, in units; see `fixed-width.ts` in the model. */
 const FIXED_WIDTH_KEY = "org.typewright.fixedWidth";
 
-type DrawingSettings = { readonly grid: Grid; readonly fixedWidth: number | null };
+/** Whether icons' names are compiled as ligatures; see `name-ligatures.ts`. */
+const NAME_LIGATURES_KEY = "org.typewright.nameLigatures";
+
+type DrawingSettings = {
+  readonly grid: Grid;
+  readonly fixedWidth: number | null;
+  readonly nameLigatures: boolean;
+};
 
 /**
  * The grid and the fixed width, from the lib. A grid that cannot be one — a
@@ -614,7 +622,7 @@ type DrawingSettings = { readonly grid: Grid; readonly fixedWidth: number | null
  * is a setting for drawing, and a font is still a font without it.
  */
 function drawingSettings(lib: string | null): DrawingSettings {
-  if (lib === null) return { grid: DEFAULT_GRID, fixedWidth: null };
+  if (lib === null) return { grid: DEFAULT_GRID, fixedWidth: null, nameLigatures: false };
   const dict = parsePlistDict(lib);
   const said = dict[GRID_KEY];
   const step = isDict(said) ? plistNumber(said, "step") : null;
@@ -623,11 +631,17 @@ function drawingSettings(lib: string | null): DrawingSettings {
   return {
     grid: (step === null ? null : grid(step, major)) ?? DEFAULT_GRID,
     fixedWidth: width !== null && width > 0 ? Math.round(width) : null,
+    nameLigatures: dict[NAME_LIGATURES_KEY] === true,
   };
 }
 
 function withDrawingSettings(document: FontDocument, settings: DrawingSettings): FontDocument {
-  return { ...document, grid: settings.grid, fixedWidth: settings.fixedWidth };
+  return {
+    ...document,
+    grid: settings.grid,
+    fixedWidth: settings.fixedWidth,
+    nameLigatures: settings.nameLigatures,
+  };
 }
 
 /**

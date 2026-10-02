@@ -54,6 +54,32 @@ export function createGlyphs(
 }
 
 /**
+ * Add glyphs that arrive already drawn: an icon set read from SVG files.
+ *
+ * One undo step for the lot, as {@link createGlyphs} is, and for the same
+ * reason. A name the font already has is skipped: bringing glyphs in must
+ * never draw over one that is there. The first one added becomes the current
+ * glyph, so there is something to look at.
+ */
+export function addDrawnGlyphs(state: EditorState, drawn: readonly Glyph[]): ToolResult {
+  let document = state.document;
+  const added: GlyphName[] = [];
+  for (const g of drawn) {
+    if (g.name === "" || document.glyphs[g.name] !== undefined) continue;
+    document = putGlyph(document, g);
+    added.push(g.name);
+  }
+  const first = added[0];
+  if (first === undefined) return result(state);
+
+  const label = added.length === 1 ? `Import ${first}` : `Import ${String(added.length)} glyphs`;
+  return result({ ...state, document, currentGlyph: first, selection: [] }, [
+    begin(label, false),
+    commit,
+  ]);
+}
+
+/**
  * Put a drawing into the font as a glyph of its own, and open it.
  *
  * For a master that draws only some glyphs: a glyph it does not draw yet is

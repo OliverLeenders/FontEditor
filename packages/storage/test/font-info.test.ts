@@ -73,6 +73,12 @@ describe("font info from the working store", () => {
     expect(back.grid).toEqual({ step: 40, major: 4 });
     expect(back.fixedWidth).toBe(600);
     expect(back.info.postscriptIsFixedPitch).toBe(true);
+    // And whether icons' names are compiled as ligatures, off unless it is said.
+    expect(back.nameLigatures).toBe(false);
+    expect(
+      decodeFontInfo(JSON.parse(JSON.stringify(encodeFontInfo({ ...font, nameLigatures: true }))))
+        .nameLigatures,
+    ).toBe(true);
 
     const older = decodeFontInfo({ schema: 1, familyName: "Older", unitsPerEm: 1000 });
     expect(older.grid).toEqual(DEFAULT_GRID);

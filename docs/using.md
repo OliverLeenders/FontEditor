@@ -271,6 +271,45 @@ drawing across its cell rather than changing the advance. The preflight check li
 glyph of another width, and the exported font says it is fixed-width where terminals and
 operating systems look: `post`, the PANOSE proportion and the average width.
 
+**Icons from SVG files.** **Import SVGs…** in the File menu takes any number of SVG files
+and makes a glyph of each, in one undo step; dropping the files on the glyph grid does the
+same. A glyph is named for its file — `arrow-left.svg` is `arrow_left`, the form a font can
+carry — and given the next free code point of the Private Use Area, from `U+E000`, since an
+icon is a character Unicode has no code point for. The drawing's view box is scaled to run
+from the descender to the ascender, the box a line of text gives a glyph, so a 24 by 24 icon
+in a font with a 24 pixel grid lands on the grid; its advance is the view box's width, or
+the fixed width with the icon centred in it. A file whose name the font already has is left
+out rather than drawn over a glyph, and the status bar says how many came in and, in its
+tooltip, what was left out and why. In the Glyph workspace, pasting SVG text or dropping
+one SVG file on the canvas adds its shapes to the glyph you are in, selected.
+
+A **filled** shape comes in as an outline. A **stroked** one comes in as a stroke: the
+path it was drawn along, with a round pen of the stroke's width, so an icon set drawn in
+strokes stays editable as strokes and its weight can be changed afterwards. Round ends and
+round joins are exact; square ends and mitred corners come in rounded, and the tooltip
+names the glyphs. Paths, rectangles, circles, ellipses, lines, polylines and polygons are
+read, through groups, transforms, classes and inline styles. Text, pictures, clips and
+masks, and shapes used by reference are not, and are named too.
+
+**Icons by name.** Tick **Names as ligatures** under Icons in Font info and the exported
+font spells each icon's name: typing `home` draws the glyph called `home`, and the word
+is still there to read where the font fails to load. An icon is a glyph with a private-use
+code point. The rules, and the blank letters they need, are made when the font is exported
+and are not written into the feature file, so they never go stale when an icon is renamed;
+the panel says how many there are. The longest name wins, so `arrow` and `arrow_left`
+can both be icons.
+
+**An icon kit.** **Icon kit** in the Export menu writes one archive with what a web page
+needs: the font as WOFF2, a stylesheet with a class for every icon, a page showing every
+icon with its name and code point (click one to copy its classes), and the names and code
+points as JSON. The classes are named from the family, `my-icons my-icons-home`. **SVGs**
+writes every glyph that draws something as a picture of its own, as the font compiles it —
+strokes as their ink, components resolved, overlaps joined.
+
+**Bigger cells.** The slider at the end of the glyph grid's bar draws the cells up to three
+times their size, which is what an icon wants and a text font's two thousand glyphs do not.
+It is kept in this browser, not in the font.
+
 **Kerning groups.** Letters whose sides have the same shape share a group, and one kerning
 value then covers all of them: `D`, `O` and `Q` end in the same round, so they share a group
 for their **right side**, used when the letter stands before a gap; `C`, `G`, `O` and `Q`

@@ -13,7 +13,14 @@
  * exist.
  */
 
-export { glyphFileName, glyphNameForCodePoint } from "./names.js";
+export {
+  PRIVATE_USE_FIRST,
+  PRIVATE_USE_LAST,
+  freePrivateUse,
+  glyphFileName,
+  glyphNameForCodePoint,
+  glyphNameFromText,
+} from "./names.js";
 
 export type { Anchor } from "./anchor.js";
 export { anchor, isMarkAnchor, movedAnchor, pairedName, renamedAnchor } from "./anchor.js";
@@ -285,6 +292,8 @@ export { offsetContour } from "./offset.js";
 export {
   DEFAULT_NIB,
   inkOf,
+  isInk,
+  markInk,
   inkRegions,
   isDerived,
   isOval,

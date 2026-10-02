@@ -1,5 +1,6 @@
 import { resolveGlyphComponents } from "./component.js";
-import { inkRegions, isDerived, withInk } from "./stroke.js";
+import { inkOf, inkRegions, isDerived, markInk } from "./stroke.js";
+import type { Contour } from "./contour.js";
 import type { FontDocument } from "./document.js";
 import type { Glyph } from "./glyph.js";
 import { counterIds } from "./ids.js";
@@ -61,25 +62,34 @@ function resolvedWith(
 
   // Ids for contours nothing selects: they exist to be drawn.
   const ids = counterIds(`drawn-${glyph.name}-`);
-  const ink = (g: Glyph): Glyph =>
-    joined
-      ? withInk(g, ids)
-      : g.contours.some(isDerived)
-        ? { ...g, contours: g.contours.flatMap((c) => inkRegions(c)) }
-        : g;
+  /** What one contour draws: a stroke's ink, joined or in its regions, or the outline itself. */
+  const drawnBy = (c: Contour): readonly Contour[] => (joined ? inkOf(c, ids) : inkRegions(c));
+  /** A glyph's own drawing of one kind: what its strokes leave, or its outlines. */
+  const kind = (g: Glyph, strokes: boolean): Contour[] =>
+    g.contours.filter((c) => (c.nib !== undefined) === strokes).flatMap(drawnBy);
   // A glyph placed as a component draws what it draws, strokes included: the
-  // component is asked for its ink, not for its skeletons.
-  const source = {
-    glyphOf: (name: string) => {
-      const found = document.glyphs[name];
-      return found === undefined ? null : ink(found);
-    },
-  };
+  // component is asked for its ink, not for its skeletons. Asked for the two
+  // kinds apart, all the way down, because a contour moved through a component
+  // is a new contour and no longer says which it was — and ink has to go on
+  // saying it is ink, or whatever fills this glyph takes it for a counter.
+  const through = (strokes: boolean): Contour[] =>
+    resolveGlyphComponents(
+      {
+        glyphOf: (name: string) => {
+          const found = document.glyphs[name];
+          return found === undefined ? null : { ...found, contours: kind(found, strokes) };
+        },
+      },
+      glyph.name,
+      glyph.components,
+      ids,
+    );
   const resolved: Glyph = {
     ...glyph,
+    // In the order drawn, the glyph's own first.
     contours: [
-      ...ink(glyph).contours,
-      ...resolveGlyphComponents(source, glyph.name, glyph.components, ids),
+      ...glyph.contours.flatMap(drawnBy),
+      ...(glyph.components.length === 0 ? [] : [...through(false), ...markInk(through(true))]),
     ],
     components: [],
   };

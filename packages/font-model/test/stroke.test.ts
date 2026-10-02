@@ -12,7 +12,7 @@ import {
   segmentCubic,
 } from "../src/contour.js";
 import { contourWinding } from "../src/direction.js";
-import { drawableGlyph } from "../src/drawable.js";
+import { drawableGlyph, measurableGlyph } from "../src/drawable.js";
 import { filledContours, insideGlyph } from "../src/direction.js";
 import { fontDocument } from "../src/document.js";
 import { component } from "../src/component.js";
@@ -548,6 +548,52 @@ describe("what a glyph fills", () => {
     expect(filled[0]!.closed).toBe(true);
     expect(filled[0]!.nib).toBeUndefined();
     expect(contourBounds(filled[0]!)).toEqual({ minX: -40, minY: 0, maxX: 40, maxY: 300 });
+  });
+
+  it("fills one stroke's ink where it lies in another's, drawn or placed as a component", () => {
+    // A floor, and a post standing on it, both drawn with a round pen. The post's
+    // round end lies wholly inside the floor's ink. A glyph prepared for drawing
+    // has its strokes replaced by their ink, and that ink was then turned by its
+    // nesting as a drawn outline is — which took the round end for a counter and
+    // cut a bite out of the floor, in the glyph grid, the spacing line and the
+    // proof.
+    const round = { angle: 0, width: 80, thickness: 80 };
+    const drawn = glyph("post", {
+      advance: 600,
+      contours: [
+        withNib(
+          path([
+            [0, 0],
+            [600, 0],
+          ]),
+          round,
+        ),
+        withNib(
+          path([
+            [300, 0],
+            [300, 400],
+          ]),
+          round,
+        ),
+      ],
+    });
+    const placed = glyph("placed", {
+      advance: 600,
+      components: [component(ids.component(), "post")],
+    });
+    const document = fontDocument([drawn, placed]);
+
+    for (const g of [drawn, placed]) {
+      for (const shown of [drawableGlyph(document, g), measurableGlyph(document, g)]) {
+        // Under the post, in the lower half of the floor: inside the round end.
+        expect(insideGlyph(shown, { x: 300, y: -25 })).toBe(true);
+        expect(insideGlyph(shown, { x: 280, y: -20 })).toBe(true);
+        // The floor beside it, the post, and nothing above the floor beside the post.
+        expect(insideGlyph(shown, { x: 100, y: -25 })).toBe(true);
+        expect(insideGlyph(shown, { x: 300, y: 200 })).toBe(true);
+        expect(insideGlyph(shown, { x: 100, y: 200 })).toBe(false);
+      }
+    }
   });
 });
 

@@ -216,6 +216,8 @@ export type StoredFontInfo = {
   readonly grid?: { readonly step: number; readonly major: number };
   /** The width of a fixed-width font. Omitted when none has been chosen. */
   readonly fixedWidth?: number;
+  /** Whether icons' names are compiled as ligatures. Omitted when they are not. */
+  readonly nameLigatures?: boolean;
 };
 
 type PlainRecord = Readonly<Record<string, PlainValue>>;
@@ -327,6 +329,7 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
     ...(document.layers.length === 0 ? {} : { layers: document.layers }),
     ...(isDefaultGrid(document.grid) ? {} : { grid: document.grid }),
     ...(document.fixedWidth === null ? {} : { fixedWidth: document.fixedWidth }),
+    ...(document.nameLigatures ? { nameLigatures: true } : {}),
   };
   return document.features === "" ? base : { ...base, features: document.features };
 }
@@ -392,6 +395,7 @@ export function decodeFontInfo(raw: unknown): {
   layers: readonly LayerInfo[];
   grid: Grid;
   fixedWidth: number | null;
+  nameLigatures: boolean;
 } {
   if (!isRecord(raw)) {
     return {
@@ -403,6 +407,7 @@ export function decodeFontInfo(raw: unknown): {
       layers: [],
       grid: DEFAULT_GRID,
       fixedWidth: null,
+      nameLigatures: false,
     };
   }
 
@@ -420,6 +425,7 @@ export function decodeFontInfo(raw: unknown): {
       typeof raw["fixedWidth"] === "number" && raw["fixedWidth"] > 0
         ? Math.round(raw["fixedWidth"])
         : null,
+    nameLigatures: raw["nameLigatures"] === true,
   };
 }
 

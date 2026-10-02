@@ -487,6 +487,7 @@ const METRIC_KEYS = "org.typewright.metricKeys";
 /** The grid the font is drawn on, and the width of a fixed-width font: the model's own. */
 const GRID_KEY = "org.typewright.grid";
 const FIXED_WIDTH_KEY = "org.typewright.fixedWidth";
+const NAME_LIGATURES_KEY = "org.typewright.nameLigatures";
 
 export function ufoFiles(
   document: FontDocument,
@@ -629,6 +630,7 @@ export function ufoFiles(
     lib.push([GRID_KEY, dict(said)]);
   }
   if (document.fixedWidth !== null) lib.push([FIXED_WIDTH_KEY, int(document.fixedWidth)]);
+  if (document.nameLigatures) lib.push([NAME_LIGATURES_KEY, "<true/>"]);
 
   // Everything else somebody put in the lib, back where they put it. A lib is
   // where every tool keeps what the format has no field for, so it is the one
@@ -638,7 +640,8 @@ export function ufoFiles(
       key === "public.glyphOrder" ||
       key === METRIC_KEYS ||
       key === GRID_KEY ||
-      key === FIXED_WIDTH_KEY
+      key === FIXED_WIDTH_KEY ||
+      key === NAME_LIGATURES_KEY
     ) {
       continue;
     }

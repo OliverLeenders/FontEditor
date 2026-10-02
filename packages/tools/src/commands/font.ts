@@ -172,6 +172,17 @@ export function fitToWidth(state: EditorState): ToolResult {
 }
 
 /**
+ * Whether the compiled font spells each icon's name as a ligature. Only the
+ * switch: the rules are made when the font is compiled, from the names as they
+ * then are.
+ */
+export function setNameLigatures(state: EditorState, on: boolean): ToolResult {
+  if (state.document.nameLigatures === on) return result(state);
+  const document = { ...state.document, nameLigatures: on };
+  return done(state, { ...state, document }, on ? "Names as ligatures" : "No name ligatures");
+}
+
+/**
  * Whether two sets of facts say the same thing.
  *
  * Over every key rather than the seven it used to be. The list grew to two

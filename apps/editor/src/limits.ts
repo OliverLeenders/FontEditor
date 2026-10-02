@@ -47,6 +47,13 @@ export const MAX_OUTLINE_WIDTH = 6;
  * the slider cannot would leave the handle pinned at one end while the text kept
  * growing.
  */
+/**
+ * How big the glyph grid's cells are drawn, as a multiple of their ordinary
+ * size. Up to three times, where an icon is big enough to judge and a window
+ * still holds a few rows of them.
+ */
+export const MIN_CELL_SCALE = 1;
+export const MAX_CELL_SCALE = 3;
 export const MIN_SPACING_SIZE = 24;
 export const MAX_SPACING_SIZE = 320;
 export const MIN_PROOF_SIZE = 8;

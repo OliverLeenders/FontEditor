@@ -274,6 +274,13 @@ export type FontDocument = {
    * turning it off and on again does not lose the number. See `fixed-width.ts`.
    */
   readonly fixedWidth: number | null;
+  /**
+   * Whether the compiled font spells each icon's name as a ligature, so typing
+   * `home` draws the glyph called `home`. The rules and the blank letters they
+   * need are made when the font is compiled and are not in the source; see
+   * `name-ligatures.ts` in font-io.
+   */
+  readonly nameLigatures: boolean;
 };
 
 export function fontDocument(
@@ -297,6 +304,7 @@ export function fontDocument(
     layers: [],
     grid: DEFAULT_GRID,
     fixedWidth: null,
+    nameLigatures: false,
   };
 }
 

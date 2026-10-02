@@ -2,9 +2,14 @@ import type { CatalogQuery } from "@typewright/catalog";
 import {
   type ExtraLayer,
   type FamilyMaster,
+  type SvgFile,
+  contoursFromSvg,
+  glyphsFromSvgs,
   layersIntoDocument,
+  parseSvg,
   placeMarks,
   readMarks,
+  svgPlacement,
 } from "@typewright/font-io";
 import {
   canRedoSession,
@@ -32,12 +37,14 @@ import {
   type ToolResult,
   begin,
   commit,
+  addDrawnGlyphs,
   addLayerNamed,
   clearLayerAt,
   copyToLayerAt,
   currentGlyph,
   drawGlyphHere,
   drawInLayer,
+  placeContours,
   removeLayerNamed,
   swapWithLayerAt,
   result,
@@ -60,7 +67,9 @@ import { frameGlyph } from "../framing.js";
 import { type Decoded, ImageCache } from "../images.js";
 import {
   type ControlSize,
+  MAX_CELL_SCALE,
   MAX_FEATURE_SIZE,
+  MIN_CELL_SCALE,
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
   MAX_PROOF_SIZE,
@@ -84,6 +93,7 @@ import {
 } from "../preferences.js";
 import { Persistence, type PersistenceReport } from "../persistence.js";
 import { type ProofBlock, heldSize } from "../proof-blocks.js";
+import { type Notice, importNotice } from "../svgImport.js";
 import {
   type FolderReport,
   type SaveReport,
@@ -342,6 +352,7 @@ export class EditorStore {
 
   /** Ids for the anchors a Marks file adds. */
   private readonly markIds = randomIds();
+  private readonly svgIds = randomIds();
 
   /**
    * Put what a Marks file says into the anchors of the master being edited.
@@ -508,6 +519,51 @@ export class EditorStore {
   /** Replace the document with a font read from a file. */
   async importFont(bytes: ArrayBuffer, fileName = ""): Promise<ImportReport> {
     return await importFont(this.host, bytes, fileName);
+  }
+
+  /**
+   * Bring SVG files in as glyphs: one each, named for its file, at the next
+   * private-use code points. One undo step, and a notice of what came of it —
+   * how many, and what was left out and why.
+   */
+  importSvgs(files: readonly SvgFile[]): Notice {
+    const made = glyphsFromSvgs(files, this.editor.document, this.svgIds);
+    this.applyTool(addDrawnGlyphs(this.editor, made.glyphs));
+    const notice = importNotice(made);
+    this.patch({ notice });
+    return notice;
+  }
+
+  /**
+   * Put an SVG's shapes into the glyph being drawn, selected, as a paste is.
+   *
+   * `false` where the text is not an SVG at all, so whoever asked can try it
+   * as something else. An empty glyph takes the drawing's width as well; a
+   * glyph with something in it keeps its own.
+   */
+  placeSvg(text: string): boolean {
+    const drawing = parseSvg(text);
+    if (drawing === null) return false;
+    const placement = svgPlacement(drawing, this.editor.document);
+    const contours = contoursFromSvg(drawing, placement, this.svgIds);
+    if (contours.length === 0) {
+      this.patch({
+        notice: { summary: "The SVG has no shapes a glyph can hold", details: drawing.warnings },
+      });
+      return true;
+    }
+    this.applyTool(placeContours(this.editor, contours, "Place SVG", placement.advance));
+    this.patch({
+      notice:
+        drawing.warnings.length === 0
+          ? null
+          : { summary: "The SVG came in changed", details: drawing.warnings },
+    });
+    return true;
+  }
+
+  dismissNotice(): void {
+    if (this.state.notice !== null) this.patch({ notice: null });
   }
 
   // ---- masters ------------------------------------------------------------
@@ -1043,6 +1099,11 @@ export class EditorStore {
   setProofLeading(proofLeading: number): void {
     const held = within(proofLeading, MIN_PROOF_LEADING, MAX_PROOF_LEADING);
     if (held !== null) this.remember({ proofLeading: held });
+  }
+
+  setCellScale(cellScale: number): void {
+    const held = within(cellScale, MIN_CELL_SCALE, MAX_CELL_SCALE);
+    if (held !== null) this.remember({ cellScale: held });
   }
 
   setSpacingSize(spacingSize: number): void {

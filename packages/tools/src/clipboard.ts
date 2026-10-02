@@ -260,8 +260,35 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
 export function pasteContours(state: EditorState, text: string, ids: IdFactory): ToolResult {
   const contours = parseClipboard(text, ids);
   if (contours === null) return result(state);
+  return placeContours(state, contours, contours.length === 1 ? "Paste contour" : "Paste contours");
+}
+
+/**
+ * Put contours that came from somewhere else into the current glyph, selected.
+ *
+ * What a paste does, and what a drawing dropped or pasted in from another
+ * program does: an SVG read into contours lands the same way. `advance` is for
+ * a drawing that knows how wide its glyph should be, and is taken only by a
+ * glyph with nothing in it yet — a drawing added to a letter must not respace
+ * the letter.
+ */
+export function placeContours(
+  state: EditorState,
+  contours: readonly Contour[],
+  label: string,
+  advance: number | null = null,
+): ToolResult {
+  if (contours.length === 0) return result(state);
 
   let editor = state;
+  if (advance !== null) {
+    const document = editCurrentGlyph(editor, (g) =>
+      g.contours.length === 0 && g.components.length === 0 && g.advance !== advance
+        ? { ...g, advance }
+        : null,
+    );
+    if (document !== null) editor = { ...editor, document };
+  }
   for (const c of contours) {
     const document = editCurrentGlyph(editor, (g) => addContour(g, c));
     if (document !== null) editor = { ...editor, document };
@@ -274,8 +301,5 @@ export function pasteContours(state: EditorState, text: string, ids: IdFactory):
     c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
   );
 
-  return result({ ...editor, selection }, [
-    begin(contours.length === 1 ? "Paste contour" : "Paste contours", false),
-    commit,
-  ]);
+  return result({ ...editor, selection }, [begin(label, false), commit]);
 }

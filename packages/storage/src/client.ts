@@ -95,7 +95,8 @@ export class StorageClient {
     // for `replaceAll`, the project does it for a load from disk, and this does
     // it for a load across the wire — and each is a place where a field added to
     // the model can be quietly left behind.
-    const { info, features, guides, kept, layers, grid, fixedWidth } = decodeFontInfo(payload.info);
+    const { info, features, guides, kept, layers, grid, fixedWidth, nameLigatures } =
+      decodeFontInfo(payload.info);
     // Guides and what the file carried unread were once left out here, which
     // is the silent loss this comment warns of: they came back on a reload only
     // as far as the worker, and the next save wrote the font without them.
@@ -105,7 +106,7 @@ export class StorageClient {
           setFeatures(
             setKerning(
               setGlyphOrder(
-                { ...fontDocument(glyphs, info), grid, fixedWidth },
+                { ...fontDocument(glyphs, info), grid, fixedWidth, nameLigatures },
                 glyphs.map((g) => g.name),
               ),
               decodeKerning(payload.kerning),

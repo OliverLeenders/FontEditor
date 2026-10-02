@@ -15,6 +15,7 @@ import {
   isWholeStep,
   offWidthGlyphs,
 } from "@typewright/font-model";
+import { nameLigatureCount } from "@typewright/font-io";
 import {
   fitToWidth,
   infoProblem,
@@ -22,6 +23,7 @@ import {
   setFixedWidth,
   setGrid,
   setInfo,
+  setNameLigatures,
 } from "@typewright/tools";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
@@ -396,6 +398,7 @@ export function FontInfoPanel(): React.JSX.Element {
           </section>
           {/* Beside the em, which its step is counted in and which it may ask to change. */}
           {section.title === "Metrics" ? <GridSection document={document} store={store} /> : null}
+          {section.title === "Metrics" ? <IconsSection document={document} store={store} /> : null}
         </Fragment>
       ))}
       <p className={styles.note}>
@@ -890,6 +893,50 @@ function GridSection({
           ) : null}
         </p>
       )}
+    </section>
+  );
+}
+
+/**
+ * What an icon font wants compiled into it that a text font does not.
+ *
+ * One switch for now: each icon's name as a ligature, so the name typed draws
+ * the icon. The rules are made on the way out and never written into the
+ * feature file, so the line under the switch says how many there would be —
+ * which is also how to see that a font has no icons yet, an icon being a glyph
+ * with a private-use code point.
+ */
+function IconsSection({
+  document,
+  store,
+}: {
+  readonly document: FontDocument;
+  readonly store: ReturnType<typeof useEditorStore>;
+}): React.JSX.Element {
+  const icons = useMemo(() => nameLigatureCount(document), [document]);
+  return (
+    <section className={styles.section}>
+      <h3 className={styles.heading}>Icons</h3>
+      <label className={styles.field}>
+        <span className={styles.label}>Names as ligatures</span>
+        <input
+          type="checkbox"
+          className={styles.check}
+          checked={document.nameLigatures}
+          title="In the exported font, typing an icon's name draws it: home for the glyph called home"
+          aria-label="Names as ligatures"
+          onChange={(event) =>
+            store.applyTool(setNameLigatures(store.editor, event.target.checked))
+          }
+        />
+      </label>
+      {document.nameLigatures ? (
+        <p className={styles.caveat}>
+          {icons === 0
+            ? "No glyph has a private-use code point yet, which is what makes one an icon."
+            : `${icons === 1 ? "One icon is" : `${String(icons)} icons are`} typed by name in the exported font. Nothing is added to the feature file.`}
+        </p>
+      ) : null}
     </section>
   );
 }

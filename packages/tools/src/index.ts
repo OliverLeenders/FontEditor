@@ -67,6 +67,7 @@ export {
   swapWithLayerAt,
   breakOutKern,
   deleteKernGroup,
+  addDrawnGlyphs,
   createGlyphs,
   drawGlyphHere,
   deleteGlyph,
@@ -128,6 +129,7 @@ export {
   removeComponent,
   setInfo,
   setGrid,
+  setNameLigatures,
   setFixedWidth,
   fitToWidth,
   scaleFontTo,
@@ -224,6 +226,7 @@ export {
   deleteSelectedContours,
   parseClipboard,
   pasteContours,
+  placeContours,
   selectedContours,
 } from "./clipboard.js";
 

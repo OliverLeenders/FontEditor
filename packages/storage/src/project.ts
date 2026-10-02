@@ -126,7 +126,8 @@ export async function saveDocument(
     previous === null ||
     previous.info !== document.info ||
     previous.grid !== document.grid ||
-    previous.fixedWidth !== document.fixedWidth;
+    previous.fixedWidth !== document.fixedWidth ||
+    previous.nameLigatures !== document.nameLigatures;
   if (changed.length > 0 || orderChanged || infoChanged) {
     await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   }
@@ -294,9 +295,8 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
   // is appended, so a glyph file that appeared without the index being rewritten
   // still shows up rather than vanishing.
   const rawInfo = await store.read(FONT_INFO_PATH);
-  const { info, glyphOrder, features, guides, kept, layers, grid, fixedWidth } = decodeFontInfo(
-    parseOrNull(rawInfo),
-  );
+  const { info, glyphOrder, features, guides, kept, layers, grid, fixedWidth, nameLigatures } =
+    decodeFontInfo(parseOrNull(rawInfo));
   const kerning = decodeKerning(parseOrNull(await store.read(KERNING_PATH)));
 
   const ordered: Glyph[] = [];
@@ -318,7 +318,7 @@ export async function loadDocument(store: FileStore): Promise<LoadResult> {
         setFeatures(
           setKerning(
             setGlyphOrder(
-              { ...fontDocument(ordered, info), grid, fixedWidth },
+              { ...fontDocument(ordered, info), grid, fixedWidth, nameLigatures },
               ordered.map((g) => g.name),
             ),
             kerning,

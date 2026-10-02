@@ -15,6 +15,7 @@ import type { InspectorPlacement, PaneViews, Preferences, ThemeChoice } from "..
 import type { ProofBlock } from "../proof-blocks.js";
 import type { Ownership, StorageState } from "../persistence.js";
 import { starterFont } from "../sample.js";
+import type { Notice } from "../svgImport.js";
 import { PROOF_TEXT } from "../specimens.js";
 
 /**
@@ -37,6 +38,12 @@ export type StoreState = {
   readonly storage: StorageState;
   readonly storageDetail: string;
   readonly recovered: boolean;
+  /**
+   * What just happened that the status bar should say, until it is dismissed:
+   * a set of SVG files brought in, and what was left out of it. `null` for
+   * nothing to say, which is nearly always.
+   */
+  readonly notice: Notice | null;
   /**
    * The copies of the whole font kept beside it, newest first.
    *
@@ -157,6 +164,8 @@ export type StoreState = {
   readonly featureSize: number;
   /** Line spacing as a multiple of the em, which is how type is set. */
   readonly proofLeading: number;
+  /** How big the glyph grid's cells are, as a multiple of their ordinary size. */
+  readonly cellScale: number;
   readonly viewport: { readonly width: number; readonly height: number };
 };
 
@@ -292,6 +301,7 @@ export function initialState(preferences: Preferences): StoreState {
     storage: "connecting",
     storageDetail: "",
     recovered: false,
+    notice: null,
     snapshots: [],
     project: project(starter),
     preview: null,
@@ -319,6 +329,7 @@ export function initialState(preferences: Preferences): StoreState {
     proofZoom: 1,
     featureSize: preferences.featureSize,
     proofLeading: preferences.proofLeading,
+    cellScale: preferences.cellScale,
     previewing: false,
     inspector: preferences.inspector,
     split: preferences.split,

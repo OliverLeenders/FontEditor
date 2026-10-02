@@ -72,6 +72,7 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
     // letter, not a counter.
     answer = (unionByPolygons(regions, ids) ?? answer).filter((r) => thickness(r) >= SLIVER);
   }
+  markInk(answer);
   joinedInk.set(c, answer);
   return answer;
 }
@@ -122,6 +123,36 @@ const partsOf = new WeakMap<
   { readonly pieces: readonly Contour[]; readonly folds: readonly (readonly Contour[])[] }
 >();
 
+/**
+ * The contours that are a stroke's ink rather than something drawn.
+ *
+ * A drawn outline runs whichever way its points were placed, so whatever fills
+ * a glyph first turns each contour by its nesting: one inside another is a
+ * counter. Ink is already turned the way ink is, and must not be judged like
+ * that — the ink of one stroke often lies inside another's, a round end resting
+ * on the stroke it meets, a door inside a house, and taken for a counter it is
+ * cut out of what it crosses. A stroke says so by its pen, but its ink is
+ * handed on without one — into a glyph prepared for drawing, through a
+ * component — so the ink is marked here, where it is made, and the mark is
+ * what {@link isInk} reads.
+ *
+ * By identity, since the model is persistent: a contour is ink or it is not
+ * for as long as it exists. A copy made by moving it through a component is a
+ * new contour, and whoever makes one says so with {@link markInk}.
+ */
+const inkMarks = new WeakSet<Contour>();
+
+/** Say these contours are a stroke's ink. Returns them, for use in a chain. */
+export function markInk<T extends readonly Contour[]>(contours: T): T {
+  for (const c of contours) inkMarks.add(c);
+  return contours;
+}
+
+/** Whether a contour is a stroke's ink: already turned as ink is, and to be filled as it is. */
+export function isInk(c: Contour): boolean {
+  return inkMarks.has(c);
+}
+
 /** Ids for the regions of a stroke's ink: nothing selects them, they are drawn. */
 const regionIds = counterIds("ink-");
 
@@ -141,6 +172,7 @@ export function inkRegions(c: Contour): readonly Contour[] {
   if (known !== undefined) return known;
   const parts = strokeParts(c);
   const regions = [...parts.pieces, ...parts.folds.flat()];
+  markInk(regions);
   regionsOf.set(c, regions);
   return regions;
 }

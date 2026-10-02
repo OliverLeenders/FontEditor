@@ -174,6 +174,7 @@ export function documentOf(snapshot: StoredSnapshot): {
     ...fontDocument(glyphs, read.info),
     grid: read.grid,
     fixedWidth: read.fixedWidth,
+    nameLigatures: read.nameLigatures,
   };
   if (read.glyphOrder.length > 0) document = setGlyphOrder(document, read.glyphOrder);
   document = setKerning(document, decodeKerning(snapshot.kerning));

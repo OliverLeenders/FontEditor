@@ -6,7 +6,9 @@ import {
   CONTROL_SIZES,
   DEFAULT_FEATURE_SIZE,
   DEFAULT_OUTLINE_WIDTH,
+  MAX_CELL_SCALE,
   MAX_FEATURE_SIZE,
+  MIN_CELL_SCALE,
   MIN_FEATURE_SIZE,
   MAX_OUTLINE_WIDTH,
   MAX_PROOF_LEADING,
@@ -206,6 +208,13 @@ export type Preferences = {
    */
   readonly proofBlocks: readonly ProofBlock[];
   readonly proofLeading: number;
+  /**
+   * How big the glyph grid's cells are, as a multiple of their ordinary size.
+   * About the reader's eyes and what is being looked at — a text font's two
+   * thousand glyphs at a glance, or an icon set's forty one at a time — and so
+   * kept here rather than in the font.
+   */
+  readonly cellScale: number;
   /** The size the feature source is set at, in pixels. */
   readonly featureSize: number;
   /**
@@ -261,6 +270,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   spacingSize: 128,
   proofSize: 32,
   proofLeading: 1.4,
+  cellScale: 1,
   featureSize: DEFAULT_FEATURE_SIZE,
   spacingTextSettings: READ_FROM_TEXT,
   proofTextSettings: READ_FROM_TEXT,
@@ -318,6 +328,10 @@ export function loadPreferences(): Preferences {
     proofSize: number(raw["proofSize"], DEFAULT_PREFERENCES.proofSize, {
       min: MIN_PROOF_SIZE,
       max: MAX_PROOF_SIZE,
+    }),
+    cellScale: number(raw["cellScale"], DEFAULT_PREFERENCES.cellScale, {
+      min: MIN_CELL_SCALE,
+      max: MAX_CELL_SCALE,
     }),
     proofLeading: number(raw["proofLeading"], DEFAULT_PREFERENCES.proofLeading, {
       min: MIN_PROOF_LEADING,
