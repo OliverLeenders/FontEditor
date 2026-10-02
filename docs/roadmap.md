@@ -15,7 +15,7 @@ Out come OTF, TTF — hinted, in the desktop application — WOFF, WOFF2, variab
 UFO, and UFO comes back in. A family is several masters, a `.designspace` and one
 `.ufo` each; a UFO folder on disk is opened and saved back to; everything autosaves to the
 browser's own store besides, and copies of the whole font are kept as you work. Guides and a
-picture to trace from sit behind the drawing; before it goes out, nineteen checks say what
+picture to trace from sit behind the drawing; before it goes out, twenty checks say what
 is wrong with it. Several fonts are kept at once, each in a working copy of its own; the
 window splits into two panes — the drawing may fill both, each canvas showing what it is
 asked to — and a second font opens in a window of its own. The grid lists what the font has
@@ -25,7 +25,10 @@ where it is drawn. A Macintosh bitmap font in a StuffIt archive opens as outline
 desktop application installs from a release, updates itself, and says which version it is,
 and the browser build is served at [typewright.io](https://typewright.io) from every release.
 Every command and every glyph is a Ctrl-K away, by name, character, code point or what the
-standard calls it, and the undo history can be walked to any step in one press.
+standard calls it, and the undo history can be walked to any step in one press. A font
+carries the grid it is drawn on and may be fixed-width; an icon set comes in as SVG files,
+strokes still strokes, and goes out as a font that spells each icon's name, with the
+stylesheet and the page a web site needs beside it.
 
 | Phase |                                     | Status                                                                                     |
 | ----- | ----------------------------------- | ------------------------------------------------------------------------------------------ |
@@ -39,7 +42,7 @@ standard calls it, and the undo history can be walked to any step in one press.
 | 7     | Spacing and kerning                 | done                                                                                       |
 | 8     | OpenType features                   | most of `.fea` compiles to GSUB and GPOS, and anchors to marks                             |
 | 9     | Variable fonts                      | done: CFF2 with blended charstrings, fvar, STAT and HVAR, checked against fontTools        |
-| 10    | Production polish                   | lint, format and about 3,750 tests, run on CI; preferences persist                         |
+| 10    | Production polish                   | lint, format and about 3,850 tests, run on CI; preferences persist                         |
 | 11    | The drawing hand                    | done                                                                                       |
 | 12    | Not losing what was opened          | done                                                                                       |
 | 13    | The family, named                   | done                                                                                       |
@@ -69,6 +72,8 @@ standard calls it, and the undo history can be walked to any step in one press.
 | —     | Old Macintosh fonts                 | done, unplanned: StuffIt archives, resource forks, bitmap suitcases into outlines          |
 | —     | Finding one's way                   | done, unplanned: a command palette, the undo history, search by name, groups by side       |
 | —     | One look                            | done, unplanned: sunk canvases, one type scale, one button, one set of icon sizes          |
+| —     | Strokes held against the pen        | done, unplanned: folds swept, a turning nib, crossing strokes filled, pictures to check by |
+| 37    | Icon fonts and fixed-width fonts    | done: a grid of the font's own, one width, SVG in, names as ligatures, an icon kit out     |
 
 ### What the table missed
 
@@ -1324,6 +1329,87 @@ it about finding one's way round rather than about the font.
   been written out, one faded state, one scrim, one focus ring. Two colours the grid's list
   of sets used had never been defined, so it had shown no hover and no chosen set, and a
   select's chevron was a `data:` image the content security policy refused.
+
+#### After 0.1.54 — Strokes held against the pen — done
+
+Not a phase: what 0.1.55 to 0.1.57 carried, and one thing 0.1.59 found. Phase 34 worked a
+stroke's ink out side by side; these are the places that went wrong, each found on a real
+drawing.
+
+- **A slow, sure pen to check against.** The pen stood at two hundred and forty places along
+  a path and its ink read off a grid, which no real stroke could afford and every real stroke
+  can be held against. Sixteen strokes are, in the tests, and the two that were drawn in the
+  editor and came out wrong are among them.
+- **Folds swept rather than skipped.** On the inside of a bend tighter than the pen, the side
+  of the ink runs backwards. Its samples there were left out and the gap crossed straight,
+  which ran through ink where the side came back past itself: a notch in a hook, a gap past
+  a sharp corner. A fold is now the pen swept from one position to the next.
+- **A broad nib that turns.** A nib that only moves swaps its sides at its centre; one that
+  also turns pivots somewhere else along itself, and the ink it laid pivoting was left out.
+- **Strokes that convert into one outline.** Where the union of curves refuses, the union of
+  polygons is tried; a ring with one corner, and a round ring, come back as contours; sliver
+  holes where two parts all but met are left out.
+- **Strokes that cross.** A stroke's ink is turned the way ink is when it is made, and was
+  then turned again by its nesting wherever a glyph was filled, as a drawn outline has to be.
+  One stroke's ink lying in another's — a round end resting on the stroke it meets, a door in
+  a house — was taken for a counter: cut out of what it crossed in the exported font, and
+  bitten out of it in the glyph grid, the spacing line and the proof. Ink is marked where it
+  is made and left as it is by everything that fills.
+- **Pictures to check by.** `pnpm screenshots` serves the editor on a port of its own, opens
+  it in a headless Chromium with an empty profile, and writes each workspace in both themes
+  to a folder git ignores. A stylesheet change passes every test whether or not it looks
+  right; this is how one is looked at without anybody's open font.
+
+#### Phase 37 — Icon fonts and fixed-width fonts — done
+
+An icon font is a font, and the editor could draw one, but nothing in it knew what an icon
+was: a point snapped to whole units whatever the icon was drawn on, every glyph was its own
+width, an icon set had to be redrawn by hand, and what came out was a file no web page could
+use as it stood. 0.1.58 and 0.1.59.
+
+- **A grid of the font's own.** A step in units and, every few steps, a stronger line, kept
+  in the font's lib and so the same wherever it is opened. Drags snap to it where they
+  snapped to whole units; `G` draws it, the fine lines fading as zooming out packs them
+  together. Presets for an icon drawn at 16 to 48 pixels work the step out from the em, and
+  where it does not come out whole the panel offers the em that divides it.
+- **An em that can scale.** Typing a new em asks what is meant: the numbers kept, or the
+  whole font scaled with it — outlines, pens, components, anchors, guides, advances, kerning,
+  metrics, the grid — in one undo step. The feature file is not scaled, and it says so.
+- **One width.** A font says it is fixed-width and at what width. The glyphs of another
+  width are counted and fitted when asked, centred, marks and double-width glyphs left
+  alone; new glyphs take the width; a sidebearing slides the drawing in its cell; a width
+  key may be a number. Preflight lists a glyph of another width, and the compiled font says
+  it is fixed where terminals and operating systems look.
+- **SVG in.** Any number of files from the File menu or dropped on the grid, a glyph each,
+  named for the file, at the next private-use code points, scaled to the line box. A filled
+  shape is an outline; a stroked one is a stroke with a round pen of its width, so a set
+  drawn in strokes can still have its weight changed. Pasted or dropped on the canvas, an
+  SVG's shapes go into the glyph being drawn. What is left out is said, by file and by
+  glyph.
+- **Names as ligatures.** A switch, and the exported font spells each icon's name, the
+  longest first. The rules and the blank letters they need are made on the way out and are
+  never in the source, so they cannot go stale. Set by HarfBuzz in the tests.
+- **An icon kit out.** The font as WOFF2, a stylesheet with a class for each icon, a page
+  showing them all, and the names and code points as JSON, in one archive; and every glyph
+  as an SVG of its own, as compiled.
+- **Bigger cells.** The glyph grid draws its cells up to three times their size.
+
+#### Open
+
+What phase 37 left, and what is next in the same direction:
+
+- **An icon at the size it is meant for.** A preview at 16, 24 and 32 pixels beside the
+  canvas, which is where a point between two lines of the grid shows; and preflight checks
+  for points off the font's grid and strokes that are not a multiple of it. The first is the
+  small-size screen proof under another name.
+- **An icon set brought in again.** A file whose name the font already has is left out; a
+  set that has been redrawn wants to replace what is there, glyph by glyph, keeping code
+  points.
+- **Keylines.** The square, circle and two rectangles an icon set is drawn inside, as an
+  overlay on the canvas.
+- **Aligning and distributing** contours and points, which icon work leans on.
+- **Strokes in a variable font**, whose masters are still written as their skeletons.
+- **Fitting to the fixed width in every layer**, where it now fits the main drawing.
 
 #### Parked
 
