@@ -54,6 +54,23 @@ export type ProjectRecord = {
    * next save writes only what differs rather than the whole font.
    */
   readonly wrote: readonly (readonly [string, WrittenFile])[];
+  /**
+   * Whether the folder is a family's: a designspace and a UFO for each master,
+   * in a folder of their own, rather than one font's UFO.
+   *
+   * Absent in every record from before a font drawn more than once could be
+   * kept in a folder, where it is the one UFO it always was.
+   */
+  readonly family?: boolean;
+  /**
+   * The masters, other than the one open, whose drawing the folder does not
+   * have: changed and then left, by their ids.
+   *
+   * Kept here because nothing else outlives the tab. The open master is asked
+   * each time the font is opened, by comparing it with what the last save left;
+   * a master that is parked cannot be asked without reading all of it in.
+   */
+  readonly unsavedMasters?: readonly string[];
 };
 
 /** A folder handle may be able to say whether it is the same place as another. */
@@ -231,6 +248,10 @@ function asProject(found: unknown): ProjectRecord | null {
     savedAt: typeof it.savedAt === "number" ? it.savedAt : null,
     savedHash: typeof it.savedHash === "string" ? it.savedHash : null,
     wrote: Array.isArray(it.wrote) ? it.wrote.filter(isWritten) : [],
+    ...(it.family === true ? { family: true } : {}),
+    ...(Array.isArray(it.unsavedMasters)
+      ? { unsavedMasters: it.unsavedMasters.filter((id): id is string => typeof id === "string") }
+      : {}),
   };
 }
 

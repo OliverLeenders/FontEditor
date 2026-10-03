@@ -122,9 +122,20 @@ export type {
   FamilyInstance,
   FamilyMaster,
   FamilyProblem,
+  FamilySource,
   FamilySparse,
 } from "./family.js";
-export { exportFamily, familyFiles, looksLikeFamily, readFamily } from "./family.js";
+export {
+  exportFamily,
+  familyDesignspace,
+  familyFiles,
+  familyStem,
+  familyUfoFiles,
+  familyUfoName,
+  isLayerOf,
+  looksLikeFamily,
+  readFamily,
+} from "./family.js";
 
 export type { InstanceFont, InstanceMaster, InstancesExport, NamedPlace } from "./instances.js";
 export { exportInstances, instanceFonts } from "./instances.js";
