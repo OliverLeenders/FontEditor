@@ -11,7 +11,7 @@ import {
   setLayers,
 } from "@typewright/font-model";
 
-import type { FileStore } from "./file-store.js";
+import { type FileStore, type ReadProgress, readAll } from "./file-store.js";
 import { isGenerational } from "./generations.js";
 import { inParallel } from "./parallel.js";
 
@@ -287,20 +287,16 @@ export type LoadResult =
  * load. Losing one glyph to a corrupt file is bad; losing the project because
  * one glyph is corrupt is worse.
  */
-export async function loadDocument(store: FileStore): Promise<LoadResult> {
+export async function loadDocument(store: FileStore, progress?: ReadProgress): Promise<LoadResult> {
   const problems: string[] = [];
   const glyphs = new Map<string, Glyph>();
 
-  // Read a few at a time, and fold the results in afterwards in the order the
-  // paths came in: which glyph wins a name collision and which problem is
+  // Read several at a time, and fold the results in afterwards in the order
+  // the paths came in: which glyph wins a name collision and which problem is
   // reported first must not depend on which read finished first.
-  const files = await inParallel(await store.list(GLYPHS_PREFIX), async (path) => ({
-    path,
-    raw: await store.read(path),
-  }));
+  const files = await readAll(store, GLYPHS_PREFIX, progress);
 
   for (const { path, raw } of files) {
-    if (raw === null) continue;
     const decoded = decodeFile(raw);
     if (decoded.ok) glyphs.set(decoded.value.name, decoded.value);
     else problems.push(`${path}: ${decoded.reason}`);

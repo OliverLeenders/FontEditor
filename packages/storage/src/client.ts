@@ -12,9 +12,16 @@ import {
 import type { ImageEntry } from "./images.js";
 import type { StoredLayer } from "./layers.js";
 import type { StoredDesignspace } from "./masters.js";
-import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
+import type { ReadProgress } from "./file-store.js";
+import type {
+  LoadedPayload,
+  StorageProgress,
+  StorageRequest,
+  StorageResponse,
+} from "./protocol.js";
 import { type SnapshotEntry, type StoredSnapshot, documentOf, snapshotOf } from "./snapshots.js";
 import {
+  type StoredGlyph,
   decodeFontInfo,
   decodeGlyph,
   decodeKerning,
@@ -51,18 +58,30 @@ export class StorageClient {
   private nextId = 1;
   private readonly waiting = new Map<
     number,
-    { resolve: (value: unknown) => void; reject: (reason: Error) => void }
+    {
+      resolve: (value: unknown) => void;
+      reject: (reason: Error) => void;
+      progress: ReadProgress | undefined;
+    }
   >();
 
   constructor(private readonly worker: Worker) {
-    this.worker.addEventListener("message", (event: MessageEvent<StorageResponse>) => {
-      const response = event.data;
-      const pending = this.waiting.get(response.id);
-      if (pending === undefined) return;
-      this.waiting.delete(response.id);
-      if (response.ok) pending.resolve(response.value);
-      else pending.reject(new Error(response.reason));
-    });
+    this.worker.addEventListener(
+      "message",
+      (event: MessageEvent<StorageResponse | StorageProgress>) => {
+        const response = event.data;
+        const pending = this.waiting.get(response.id);
+        if (pending === undefined) return;
+        // How far it has got, which is not yet the answer.
+        if ("progress" in response) {
+          pending.progress?.(response.progress.done, response.progress.total);
+          return;
+        }
+        this.waiting.delete(response.id);
+        if (response.ok) pending.resolve(response.value);
+        else pending.reject(new Error(response.reason));
+      },
+    );
 
     this.worker.addEventListener("error", (event) => {
       // A worker that has died will never reply, so anything outstanding has to
@@ -77,13 +96,15 @@ export class StorageClient {
     await this.send({ kind: "open", directory });
   }
 
-  async load(): Promise<LoadedProject> {
-    const payload = (await this.send({ kind: "load" })) as LoadedPayload;
-    if (payload.glyphs.length === 0) return { kind: "empty" };
+  /** Read the font. `progress` is told how many glyph files have been read, of how many. */
+  async load(progress?: ReadProgress): Promise<LoadedProject> {
+    const payload = (await this.send({ kind: "load" }, progress)) as LoadedPayload;
+    const sent = JSON.parse(payload.glyphs) as StoredGlyph[];
+    if (sent.length === 0) return { kind: "empty" };
 
     const glyphs = [];
     const problems = [...payload.problems];
-    for (const stored of payload.glyphs) {
+    for (const stored of sent) {
       const decoded = decodeGlyph(stored);
       if (decoded.ok) glyphs.push(decoded.value);
       else problems.push(`${stored.name}: ${decoded.reason}`);
@@ -300,10 +321,10 @@ export class StorageClient {
     this.worker.terminate();
   }
 
-  private send(request: WithoutId<StorageRequest>): Promise<unknown> {
+  private send(request: WithoutId<StorageRequest>, progress?: ReadProgress): Promise<unknown> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject });
+      this.waiting.set(id, { resolve, reject, progress });
       this.worker.postMessage({ ...request, id });
     });
   }

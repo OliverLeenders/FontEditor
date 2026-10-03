@@ -32,10 +32,41 @@ import type { DiskFile, DiskFolder } from "./handles.js";
  */
 export const MAX_DEPTH = 6;
 
-/** Read every file under a folder, as `unzip` would have returned them. */
-export async function readFolder(folder: DiskFolder): Promise<ZipFile[]> {
-  const out: ZipFile[] = [];
-  await walk(folder, "", 0, out);
+/** How many files of a folder are read at once. */
+const READS_AT_ONCE = 32;
+
+/**
+ * Read every file under a folder, as `unzip` would have returned them.
+ *
+ * Listed first and read afterwards, several at a time: a font of four thousand
+ * glyphs is four thousand files, and read one after another each waits on the
+ * one before for nothing. The files come back in the order the folder lists
+ * them, whichever read finished first. `progress` is told how many have been
+ * read so far, of how many.
+ */
+export async function readFolder(
+  folder: DiskFolder,
+  progress?: (done: number, total: number) => void,
+): Promise<ZipFile[]> {
+  const found: { path: string; file: DiskFile }[] = [];
+  await walk(folder, "", 0, found);
+
+  const out = new Array<ZipFile>(found.length);
+  let next = 0;
+  let done = 0;
+  const reader = async (): Promise<void> => {
+    for (;;) {
+      const i = next++;
+      const entry = found[i];
+      if (entry === undefined) return;
+      const file = await entry.file.getFile();
+      out[i] = { path: entry.path, bytes: new Uint8Array(await file.arrayBuffer()) };
+      done += 1;
+      if (done % READS_AT_ONCE === 0) progress?.(done, found.length);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(READS_AT_ONCE, found.length) }, reader));
+  progress?.(found.length, found.length);
   return out;
 }
 
@@ -43,18 +74,14 @@ async function walk(
   folder: DiskFolder,
   prefix: string,
   depth: number,
-  out: ZipFile[],
+  out: { path: string; file: DiskFile }[],
 ): Promise<void> {
   if (depth > MAX_DEPTH) throw new Error(`this folder is more than ${String(MAX_DEPTH)} deep`);
 
   for await (const [name, entry] of folder.entries()) {
     const path = `${prefix}${name}`;
-    if (entry.kind === "directory") {
-      await walk(entry, `${path}/`, depth + 1, out);
-      continue;
-    }
-    const file = await entry.getFile();
-    out.push({ path, bytes: new Uint8Array(await file.arrayBuffer()) });
+    if (entry.kind === "directory") await walk(entry, `${path}/`, depth + 1, out);
+    else out.push({ path, file: entry });
   }
 }
 

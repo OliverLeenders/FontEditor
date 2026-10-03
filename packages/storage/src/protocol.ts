@@ -120,7 +120,16 @@ export type StorageRequest =
   | { readonly id: number; readonly kind: "wipe" };
 
 export type LoadedPayload = {
-  readonly glyphs: readonly StoredGlyph[];
+  /**
+   * The glyphs in their stored form, as one piece of JSON text.
+   *
+   * Text rather than the objects themselves, because of what crossing costs:
+   * four thousand glyphs as objects are copied node by node on the way out and
+   * built again node by node on the way in, the second on the page's own
+   * thread, and a string is copied as a block. Writing the text and parsing it
+   * takes about half the time the copy did.
+   */
+  readonly glyphs: string;
   readonly info: StoredFontInfo | null;
   /**
    * Carried across explicitly, like everything else.
@@ -137,3 +146,16 @@ export type LoadedPayload = {
 export type StorageResponse =
   | { readonly id: number; readonly ok: true; readonly value: unknown }
   | { readonly id: number; readonly ok: false; readonly reason: string };
+
+/**
+ * How far a request has got, said before its reply.
+ *
+ * The one thing that crosses without being a reply: a font of four thousand
+ * glyphs takes seconds to read, and the page has nothing to show for them
+ * unless it is told. Any number may come for a request, or none; the reply
+ * still comes once, after them.
+ */
+export type StorageProgress = {
+  readonly id: number;
+  readonly progress: { readonly done: number; readonly total: number };
+};

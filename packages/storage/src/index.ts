@@ -42,8 +42,8 @@ export {
  */
 export { glyphFileName } from "@typewright/font-model";
 
-export type { FileStore } from "./file-store.js";
-export { MemoryFileStore } from "./file-store.js";
+export type { FileRead, FileStore, ReadProgress } from "./file-store.js";
+export { MemoryFileStore, readAll } from "./file-store.js";
 
 export type { JournalRecord, LoadResult, SaveReport } from "./project.js";
 export {
@@ -70,7 +70,12 @@ export { PROJECT_LOCK, projectLock, ProjectLock, browserLocks } from "./lock.js"
 export type { AutosaveHooks, AutosaveOptions, AutosaveStatus } from "./autosave.js";
 export { Autosave, DEFAULT_DEBOUNCE_MS } from "./autosave.js";
 
-export type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
+export type {
+  LoadedPayload,
+  StorageProgress,
+  StorageRequest,
+  StorageResponse,
+} from "./protocol.js";
 
 export type { LoadedProject } from "./client.js";
 export { StorageClient } from "./client.js";

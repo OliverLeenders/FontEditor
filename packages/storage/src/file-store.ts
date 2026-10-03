@@ -1,3 +1,5 @@
+import { inParallel } from "./parallel.js";
+
 /**
  * The narrow filesystem the rest of this package is written against.
  *
@@ -34,6 +36,49 @@ export interface FileStore {
    * files removed one by one.
    */
   removeFolder?(path: string): Promise<void>;
+  /**
+   * Every file in a folder, read in one go, where the store can do that faster
+   * than `list` and a `read` for each. Optional: {@link readAll} does it the
+   * slow way for a store without it.
+   *
+   * `folder` ends in `/`. `progress` is told how many have been read so far, of
+   * how many, often enough to draw a bar from and not once for every file.
+   */
+  readFolder?(folder: string, progress?: ReadProgress): Promise<FileRead[]>;
+}
+
+/** One file of a folder read whole: where it is, and what it holds. */
+export type FileRead = { readonly path: string; readonly raw: string };
+
+/** How far reading a folder has got. */
+export type ReadProgress = (done: number, total: number) => void;
+
+/** How many files are read between one report of progress and the next. */
+export const PROGRESS_EVERY = 64;
+
+/**
+ * Every file in a folder, the fast way where the store has one.
+ *
+ * In the order the store lists them either way, so which glyph wins a name
+ * collision does not depend on which read finished first.
+ */
+export async function readAll(
+  store: FileStore,
+  folder: string,
+  progress?: ReadProgress,
+): Promise<FileRead[]> {
+  if (store.readFolder !== undefined) return await store.readFolder(folder, progress);
+
+  const paths = await store.list(folder);
+  let done = 0;
+  const out = await inParallel(paths, async (path) => {
+    const raw = await store.read(path);
+    done += 1;
+    if (done % PROGRESS_EVERY === 0) progress?.(done, paths.length);
+    return { path, raw };
+  });
+  progress?.(paths.length, paths.length);
+  return out.filter((file): file is FileRead => file.raw !== null);
 }
 
 /** An in-memory `FileStore`, for tests and for a session that cannot persist. */

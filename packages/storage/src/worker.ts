@@ -18,9 +18,14 @@ import {
   setLayers,
 } from "@typewright/font-model";
 
-import type { FileStore } from "./file-store.js";
+import type { FileStore, ReadProgress } from "./file-store.js";
 import { GenerationalStore } from "./generations.js";
-import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
+import type {
+  LoadedPayload,
+  StorageProgress,
+  StorageRequest,
+  StorageResponse,
+} from "./protocol.js";
 import { listSnapshots, pruneSnapshots, readSnapshot, writeSnapshot } from "./snapshots.js";
 import { listImages, readImage, removeImage, writeImage } from "./images.js";
 import { readLayers, writeLayers } from "./layers.js";
@@ -67,6 +72,8 @@ export type OpenStore = (directory: string) => Promise<FileStore>;
  */
 export function storageHandler(
   open: OpenStore,
+  /** Told how far a long request has got, to pass on before its reply. */
+  notify: (progress: StorageProgress) => void = () => undefined,
 ): (request: StorageRequest) => Promise<StorageResponse> {
   let store: FileStore | null = null;
 
@@ -82,7 +89,9 @@ export function storageHandler(
         store = await GenerationalStore.over(await open(request.directory));
         return null;
       default:
-        return runOn(required(), request);
+        return runOn(required(), request, (done, total) => {
+          notify({ id: request.id, progress: { done, total } });
+        });
     }
   };
 
@@ -116,7 +125,11 @@ export function storageHandler(
   };
 }
 
-async function runOn(store: FileStore, request: StorageRequest): Promise<unknown> {
+async function runOn(
+  store: FileStore,
+  request: StorageRequest,
+  progress: ReadProgress,
+): Promise<unknown> {
   const required = (): FileStore => store;
 
   switch (request.kind) {
@@ -126,10 +139,10 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
       return null;
 
     case "load": {
-      const result = await loadDocument(required());
+      const result = await loadDocument(required(), progress);
       if (result.kind === "empty") {
         const payload: LoadedPayload = {
-          glyphs: [],
+          glyphs: "[]",
           info: null,
           kerning: null,
           recovered: false,
@@ -138,7 +151,7 @@ async function runOn(store: FileStore, request: StorageRequest): Promise<unknown
         return payload;
       }
       const payload: LoadedPayload = {
-        glyphs: orderedGlyphs(result.document).map(encodeGlyph),
+        glyphs: JSON.stringify(orderedGlyphs(result.document).map(encodeGlyph)),
         info: encodeFontInfo(result.document),
         kerning: encodeKerning(result.document.kerning),
         recovered: result.recovered,

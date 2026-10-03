@@ -91,6 +91,23 @@ describe("reading a folder", () => {
     );
   });
 
+  it("reads a large folder in the order it lists, saying how far it has got", async () => {
+    const folder = new FakeFolder("Many.ufo");
+    const names = Array.from({ length: 150 }, (_, i) => `glyphs/g${String(i)}.glif`);
+    for (const [i, name] of names.entries()) folder.put(name, String(i));
+
+    const said: [number, number][] = [];
+    const files = await readFolder(folder, (done, total) => said.push([done, total]));
+
+    // Several are read at once; which finishes first changes nothing.
+    expect(files.map((f) => f.path)).toEqual(names);
+    expect(files.map((f) => new TextDecoder().decode(f.bytes))).toEqual(
+      names.map((_, i) => String(i)),
+    );
+    expect(said.at(-1)).toEqual([150, 150]);
+    expect(said.length).toBeGreaterThan(1);
+  });
+
   it("refuses a folder that goes on for ever", async () => {
     const folder = new FakeFolder("deep");
     folder.put(

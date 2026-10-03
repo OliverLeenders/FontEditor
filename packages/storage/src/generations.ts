@@ -1,4 +1,4 @@
-import type { FileStore } from "./file-store.js";
+import { type FileRead, type FileStore, type ReadProgress, readAll } from "./file-store.js";
 import { inParallel } from "./parallel.js";
 
 /**
@@ -95,13 +95,14 @@ export class GenerationalStore implements FileStore {
     return (await this.inner.list(`${folder}${prefix}`)).map((path) => path.slice(folder.length));
   }
 
-  /**
-   * Write a whole font as the next generation, and make it the current one.
-   *
-   * `write` is handed a store that writes into the next generation, and does
-   * everything the replacement is made of through it. Nothing the rest of
-   * storage reads changes until it has finished and the pointer is down.
-   */
+  /** Every file in a folder, named as `list` names them, read the fast way where there is one. */
+  async readFolder(folder: string, progress?: ReadProgress): Promise<FileRead[]> {
+    const own = this.current !== "" && GenerationalStore.owns(folder);
+    const prefix = own ? `${this.current}/` : "";
+    const read = await readAll(this.inner, `${prefix}${folder}`, progress);
+    return own ? read.map((file) => ({ ...file, path: file.path.slice(prefix.length) })) : read;
+  }
+
   /**
    * Forget the generations, for a working copy that has just been emptied: what
    * is written next goes at the top, as it would in a new one, rather than into
@@ -112,6 +113,13 @@ export class GenerationalStore implements FileStore {
     this.number = 0;
   }
 
+  /**
+   * Write a whole font as the next generation, and make it the current one.
+   *
+   * `write` is handed a store that writes into the next generation, and does
+   * everything the replacement is made of through it. Nothing the rest of
+   * storage reads changes until it has finished and the pointer is down.
+   */
   async replace(write: (next: FileStore) => Promise<void>): Promise<void> {
     const number = this.number + 1;
     const folder = folderOf(number);

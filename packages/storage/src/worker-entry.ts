@@ -14,7 +14,12 @@ import { storageHandler } from "./worker.js";
  * to test.
  */
 const scope = self as unknown as DedicatedWorkerGlobalScope;
-const handle = storageHandler((directory) => OpfsFileStore.open(directory));
+const handle = storageHandler(
+  (directory) => OpfsFileStore.open(directory),
+  (progress) => {
+    scope.postMessage(progress);
+  },
+);
 
 scope.addEventListener("message", (event: MessageEvent<StorageRequest>) => {
   void handle(event.data).then((response) => {
