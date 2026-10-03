@@ -345,11 +345,13 @@
   grid-template-columns: 1fr 1fr 1fr;
   gap: 0.3rem;
 }
-/* Each box offers the glyph names as it is typed in, and Chromium keeps room
-   at its end for an arrow that opens the whole list — a third of a box this
-   narrow, which cut "width" to "widt". The names still come up as they are
-   typed; the arrow, and the room, go. */
-.triple .input::-webkit-calendar-picker-indicator {
+/* A box that offers the glyph names as they are typed — where spacing comes
+   from, a component's glyph — gets Chromium's arrow for opening the whole list,
+   and the room for it: a third of the spacing boxes, which cut "width" to
+   "widt", and a heavy black triangle in the component box, drawn in nothing
+   else's style. The names still come up as they are typed; the arrow, and the
+   room, go. */
+.input[list]::-webkit-calendar-picker-indicator {
   display: none !important;
 }
 
@@ -515,10 +517,12 @@
 }
 
 /* One row per anchor: what it is called, where it is, and a way to remove it.
-   The name gets the room, since the numbers are three digits and it is not. */
+   The name gets the room, since the numbers are three digits and it is not.
+   The button's column is the button's own size: a column narrower than what is
+   in it lets the button spill over its neighbour. */
 .anchorRow {
   display: grid;
-  grid-template-columns: 1fr 3.2rem 3.2rem 1.1rem;
+  grid-template-columns: 1fr 3.2rem 3.2rem var(--tool);
   align-items: center;
   gap: 0.25rem;
 }
@@ -529,7 +533,8 @@
 /* A component row is an anchor row with two more buttons on the end: the name,
    where it sits, the two flips, and the bin. */
 .componentEntry {
-  grid-template-columns: 1fr 3.2rem 3.2rem 1.15rem 1.15rem 1.15rem;
+  grid-template-columns: 1fr 3rem 3rem repeat(3, var(--tool));
+  gap: 0.2rem;
 }
 
 /* The tracing row: which picture, where its corner is, how big, and the one

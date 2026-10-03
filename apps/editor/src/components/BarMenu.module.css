@@ -66,10 +66,10 @@
 
 /*
  * The drawing toolbar's look: the borderless button its tools are, at their
- * height, open drawn as the View menu's is, and a small chevron at the foot of
- * the icon, beside it. In the corner of the square it lay on the icon's own
- * stroke, since the icon fills the square; a few pixels of width of its own
- * is what lets it be read.
+ * height, open drawn as the View menu's is, and a small chevron beside the
+ * icon, level with its middle as every other menu's chevron is. In the corner
+ * of the square it lay on the icon's own stroke, since the icon fills the
+ * square; a few pixels of width of its own is what lets it be read.
  */
 .tool {
   height: var(--tool);
@@ -101,8 +101,7 @@
   cursor: default;
 }
 .toolCaret {
-  align-self: flex-end;
-  margin-bottom: 4px;
+  align-self: center;
   line-height: 0;
 }
 .toolCaret svg {
