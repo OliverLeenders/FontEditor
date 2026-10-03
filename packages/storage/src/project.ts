@@ -51,6 +51,28 @@ export const JOURNAL_PATH = "journal.ndjson";
  * reordered.
  */
 export const KERNING_PATH = "kerning.json";
+/**
+ * Which master the glyphs here are, by its id.
+ *
+ * A font drawn more than once keeps one master in these files and the rest
+ * parked, and the designspace beside them says which is open. The two are
+ * written apart — every glyph, and then the designspace — so stopping between
+ * them left the designspace naming one master over another's drawing, which the
+ * next switch then parked under the wrong name. This is written with the glyphs
+ * it describes, as one of the font's own files, so that it is never out of step
+ * with them; a reader believes it over the designspace.
+ *
+ * Absent for a font with nothing to tell apart, and in every working copy from
+ * before it existed.
+ */
+export const MASTER_PATH = "master.txt";
+
+/** The master a working copy says its glyphs are, or `null` where it does not say. */
+export async function readHeldMaster(store: FileStore): Promise<string | null> {
+  const raw = await store.read(MASTER_PATH);
+  const id = raw === null ? "" : raw.trim();
+  return id === "" ? null : id;
+}
 
 export function glyphPath(name: string): string {
   return GLYPHS_PREFIX + glyphFileName(name);
@@ -158,6 +180,8 @@ export async function saveDocument(
 export async function replaceDocument(
   store: FileStore,
   document: FontDocument,
+  /** The master this document is, where the font has several: see {@link MASTER_PATH}. */
+  master: string | null = null,
 ): Promise<{ readonly written: number; readonly removed: number }> {
   // Kept in generations, the new font is written beside the old one and takes
   // its place in one step: see `generations.ts`. Nothing of the old font is
@@ -166,7 +190,7 @@ export async function replaceDocument(
     const before = (await store.list(GLYPHS_PREFIX)).length;
     let written = 0;
     await store.replace(async (next) => {
-      written = (await writeWhole(next, document)).length;
+      written = (await writeWhole(next, document, master)).length;
     });
     return { written, removed: Math.max(0, before - written) };
   }
@@ -188,12 +212,18 @@ export async function replaceDocument(
 
   await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
+  if (master === null) await store.remove(MASTER_PATH);
+  else await store.write(MASTER_PATH, master);
   await clearJournal(store);
   return { written: keep.size, removed };
 }
 
 /** Every file of a font into a store that has none of them yet: its glyphs, its info, its kerning. */
-async function writeWhole(store: FileStore, document: FontDocument): Promise<string[]> {
+async function writeWhole(
+  store: FileStore,
+  document: FontDocument,
+  master: string | null,
+): Promise<string[]> {
   const wanted = document.glyphOrder
     .map((name) => document.glyphs[name])
     .filter((g): g is Glyph => g !== undefined);
@@ -204,6 +234,7 @@ async function writeWhole(store: FileStore, document: FontDocument): Promise<str
   });
   await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
+  if (master !== null) await store.write(MASTER_PATH, master);
   return paths;
 }
 

@@ -136,3 +136,52 @@ describe("snapshots", () => {
     expect(document.glyphOrder).toContain("o");
   });
 });
+
+describe("copies of a font drawn more than once", () => {
+  it("say which master they are of, in the list, without being opened", async () => {
+    const store = new MemoryFileStore();
+    await writeSnapshot(store, snapshotOf(font(), at(0)));
+    await writeSnapshot(store, snapshotOf(font(), at(1), "bold"));
+    // An id with hyphens of its own, as the ones made here have.
+    await writeSnapshot(store, snapshotOf(font(), at(2), "master-1790998110232-0"));
+
+    const entries = await listSnapshots(store);
+    expect(entries.map((e) => e.master)).toEqual(["master-1790998110232-0", "bold", null]);
+    expect(entries.every((e) => e.glyphs === 2)).toBe(true);
+  });
+
+  it("are read back whichever master they are of", async () => {
+    const store = new MemoryFileStore();
+    await writeSnapshot(store, snapshotOf(font(), at(1), "master-1790998110232-0"));
+
+    const back = await readSnapshot(store, at(1));
+    expect(back?.master).toBe("master-1790998110232-0");
+    expect(documentOf(back!).document.info.familyName).toBe("Kept");
+  });
+
+  it("reads a copy from before they said, as one that does not say", async () => {
+    const store = new MemoryFileStore();
+    await store.write(
+      `snapshots/${String(at(0))}-2.json`,
+      JSON.stringify(snapshotOf(font(), at(0))),
+    );
+
+    expect(await listSnapshots(store)).toEqual([{ at: at(0), glyphs: 2, master: null }]);
+    expect(await readSnapshot(store, at(0))).not.toBeNull();
+  });
+
+  it("are dropped a master at a time, so one master's do not push out another's", async () => {
+    const store = new MemoryFileStore();
+    await writeSnapshot(store, snapshotOf(font(), at(0), "regular"));
+    for (let i = 1; i <= KEEP + 2; i++)
+      await writeSnapshot(store, snapshotOf(font(), at(i), "bold"));
+
+    const dropped = await pruneSnapshots(store, "bold");
+    expect(dropped.map((e) => e.at)).toEqual([at(2), at(1)]);
+
+    const left = await listSnapshots(store);
+    // The regular's one copy, older than every one of the bold's, is still there.
+    expect(left.filter((e) => e.master === "regular")).toHaveLength(1);
+    expect(left.filter((e) => e.master === "bold")).toHaveLength(KEEP);
+  });
+});

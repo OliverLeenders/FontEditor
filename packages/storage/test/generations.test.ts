@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import { type FileStore, MemoryFileStore } from "../src/file-store.js";
 import { GenerationalStore } from "../src/generations.js";
-import { glyphPath, loadDocument, replaceDocument, saveGlyphs, wipe } from "../src/project.js";
+import {
+  glyphPath,
+  loadDocument,
+  readHeldMaster,
+  replaceDocument,
+  saveGlyphs,
+  wipe,
+} from "../src/project.js";
 
 /**
  * Replacing a whole font in one step.
@@ -138,5 +145,70 @@ describe("a working copy emptied", () => {
     await saveGlyphs(store, [glyph("b", { advance: 500 })]);
     const again = await GenerationalStore.over(inner);
     expect(await namesIn(again)).toEqual(["b"]);
+  });
+});
+
+describe("which master a working copy holds", () => {
+  it("is written with the glyphs it describes, in their generation", async () => {
+    const inner = new MemoryFileStore();
+    const store = await GenerationalStore.over(inner);
+
+    await replaceDocument(store, named("Family", "a"), "bold");
+
+    expect(await readHeldMaster(store)).toBe("bold");
+    expect(inner.has("generation-1/master.txt")).toBe(true);
+  });
+
+  it("is not said for a font with nothing to tell apart, and is not left over from one that had", async () => {
+    const store = await GenerationalStore.over(new MemoryFileStore());
+    await replaceDocument(store, named("Family", "a"), "bold");
+
+    await replaceDocument(store, named("Other", "b"));
+    expect(await readHeldMaster(store)).toBeNull();
+  });
+
+  it("is still the old master's when the replacement stops part of the way", async () => {
+    const inner = new MemoryFileStore();
+    await replaceDocument(
+      await GenerationalStore.over(inner),
+      named("Family", "a", "b"),
+      "regular",
+    );
+
+    let allowed = 2;
+    const stopping: FileStore = {
+      ...inner,
+      read: (path) => inner.read(path),
+      readBytes: (path) => inner.readBytes(path),
+      list: (prefix) => inner.list(prefix),
+      append: (path, contents) => inner.append(path, contents),
+      writeBytes: (path, contents) => inner.writeBytes(path, contents),
+      remove: (path) => inner.remove(path),
+      write: async (path, contents) => {
+        if (allowed-- <= 0) throw new Error("the tab was closed");
+        await inner.write(path, contents);
+      },
+    };
+    await expect(
+      replaceDocument(
+        await GenerationalStore.over(stopping),
+        named("Family", "c", "d", "e"),
+        "bold",
+      ),
+    ).rejects.toThrow("the tab was closed");
+
+    // The glyphs and the name for them, both the regular's still.
+    const again = await GenerationalStore.over(inner);
+    expect(await namesIn(again)).toEqual(["a", "b"]);
+    expect(await readHeldMaster(again)).toBe("regular");
+  });
+
+  it("is said in a working copy from before generations too", async () => {
+    const store = new MemoryFileStore();
+    await replaceDocument(store, named("Family", "a"), "bold");
+    expect(await readHeldMaster(store)).toBe("bold");
+
+    await replaceDocument(store, named("Family", "a"));
+    expect(await readHeldMaster(store)).toBeNull();
   });
 });

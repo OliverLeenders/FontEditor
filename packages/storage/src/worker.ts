@@ -37,6 +37,7 @@ import {
   clearJournal,
   glyphPath,
   loadDocument,
+  readHeldMaster,
   replaceDocument,
   wipe,
 } from "./project.js";
@@ -147,6 +148,7 @@ async function runOn(
           kerning: null,
           recovered: false,
           problems: [],
+          master: null,
         };
         return payload;
       }
@@ -156,6 +158,7 @@ async function runOn(
         kerning: encodeKerning(result.document.kerning),
         recovered: result.recovered,
         problems: result.problems,
+        master: await readHeldMaster(required()),
       };
       return payload;
     }
@@ -228,7 +231,7 @@ async function runOn(
         ),
         layers,
       );
-      const report = await replaceDocument(required(), document);
+      const report = await replaceDocument(required(), document, request.master);
       return report;
     }
 
@@ -251,7 +254,7 @@ async function runOn(
       await writeSnapshot(required(), request.snapshot);
       // Pruned here rather than on a timer: the moment a new copy exists is the
       // moment the oldest one stops being worth keeping.
-      await pruneSnapshots(required());
+      await pruneSnapshots(required(), request.snapshot.master ?? null);
       return await listSnapshots(required());
     }
 

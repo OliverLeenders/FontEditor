@@ -45,6 +45,8 @@ export type LoadedProject =
       readonly document: FontDocument;
       readonly recovered: boolean;
       readonly problems: readonly string[];
+      /** The master the working copy says its glyphs are, or `null` where it does not say. */
+      readonly master: string | null;
     };
 
 /**
@@ -141,7 +143,13 @@ export class StorageClient {
       layers,
     );
 
-    return { kind: "loaded", document, recovered: payload.recovered, problems };
+    return {
+      kind: "loaded",
+      document,
+      recovered: payload.recovered,
+      problems,
+      master: payload.master,
+    };
   }
 
   async saveGlyphs(glyphs: readonly Glyph[]): Promise<readonly string[]> {
@@ -169,7 +177,11 @@ export class StorageClient {
    * Returns what the worker actually did, so an import can report how many
    * glyphs landed and how many belonged to the font being replaced.
    */
-  async replaceAll(document: FontDocument): Promise<{ written: number; removed: number }> {
+  async replaceAll(
+    document: FontDocument,
+    /** The master this document is, where the font has several. */
+    master: string | null = null,
+  ): Promise<{ written: number; removed: number }> {
     const glyphs = document.glyphOrder
       .map((name) => document.glyphs[name])
       .filter((g): g is Glyph => g !== undefined);
@@ -178,6 +190,7 @@ export class StorageClient {
       glyphs: glyphs.map(encodeGlyph),
       info: encodeFontInfo(document),
       kerning: encodeKerning(document.kerning),
+      master,
     });
     return result as { written: number; removed: number };
   }
@@ -190,8 +203,16 @@ export class StorageClient {
    * thinking about — a large font is a megabyte or two of JSON — which is why
    * the caller decides when, not this.
    */
-  async snapshot(document: FontDocument, at: number): Promise<readonly SnapshotEntry[]> {
-    const entries = await this.send({ kind: "snapshot", snapshot: snapshotOf(document, at) });
+  async snapshot(
+    document: FontDocument,
+    at: number,
+    /** The master it is a copy of, where the font has several. */
+    master: string | null = null,
+  ): Promise<readonly SnapshotEntry[]> {
+    const entries = await this.send({
+      kind: "snapshot",
+      snapshot: snapshotOf(document, at, master),
+    });
     return entries as readonly SnapshotEntry[];
   }
 

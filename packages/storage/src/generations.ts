@@ -191,7 +191,7 @@ export class GenerationalStore implements FileStore {
 const GLYPHS = "glyphs/";
 
 /** The font's own files that are not glyphs. */
-const OWN_FILES = new Set(["fontinfo.json", "kerning.json", "journal.ndjson"]);
+const OWN_FILES = new Set(["fontinfo.json", "kerning.json", "journal.ndjson", "master.txt"]);
 
 const folderOf = (n: number): string => `generation-${String(n)}`;
 const pointerName = (n: number): string => `generation.${String(n)}`;

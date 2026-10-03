@@ -49,6 +49,8 @@ export type StorageRequest =
       readonly kerning: StoredKerning;
       readonly glyphs: readonly StoredGlyph[];
       readonly info: StoredFontInfo;
+      /** The master these glyphs are, written with them. `null` for a font with one. */
+      readonly master: string | null;
     }
   | {
       readonly id: number;
@@ -141,6 +143,8 @@ export type LoadedPayload = {
   readonly kerning: StoredKerning | null;
   readonly recovered: boolean;
   readonly problems: readonly string[];
+  /** The master the working copy says its glyphs are, or `null` where it does not say. */
+  readonly master: string | null;
 };
 
 export type StorageResponse =

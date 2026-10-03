@@ -51,35 +51,64 @@ export type StoredSnapshot = {
   readonly kerning: StoredKerning;
   readonly glyphs: readonly StoredGlyph[];
   readonly features?: string;
+  /**
+   * The master it is a copy of, by its id, in a font drawn more than once.
+   *
+   * A copy is of the document that was open, which is one master. Without this
+   * a copy kept while the regular was drawn could be put back while the bold
+   * was, and the bold became the regular. Absent in a copy of a font with one
+   * master, and in every copy from before this was kept.
+   */
+  readonly master?: string;
 };
 
 /**
  * What a list of snapshots says without opening any of them.
  *
- * The time and the size are in the filename, so listing is one directory read
- * however large the font is — which matters because the list is what someone
- * stares at while deciding whether they have lost anything.
+ * The time, the size and the master are in the filename, so listing is one
+ * directory read however large the font is — which matters because the list is
+ * what someone stares at while deciding whether they have lost anything.
  */
 export type SnapshotEntry = {
   readonly at: number;
   readonly glyphs: number;
+  /** The master it is a copy of, or `null` where it does not say. */
+  readonly master: string | null;
 };
 
+/** The master's id goes last, written so that whatever is in it is one safe piece of a name. */
 const pathOf = (entry: SnapshotEntry): string =>
-  `${SNAPSHOTS_PREFIX}${String(entry.at)}-${String(entry.glyphs)}.json`;
+  `${SNAPSHOTS_PREFIX}${String(entry.at)}-${String(entry.glyphs)}${
+    entry.master === null ? "" : `-${encodeURIComponent(entry.master)}`
+  }.json`;
 
 function entryOf(path: string): SnapshotEntry | null {
   const name = path.slice(SNAPSHOTS_PREFIX.length).replace(/\.json$/, "");
-  const [at, glyphs] = name.split("-");
+  const [at, glyphs, ...rest] = name.split("-");
   if (at === undefined || glyphs === undefined) return null;
 
   const when = Number(at);
   const many = Number(glyphs);
-  return Number.isFinite(when) && Number.isFinite(many) ? { at: when, glyphs: many } : null;
+  if (!Number.isFinite(when) || !Number.isFinite(many)) return null;
+
+  let master: string | null = null;
+  if (rest.length > 0) {
+    try {
+      // An id may hold a hyphen of its own, so it is everything after the size.
+      master = decodeURIComponent(rest.join("-"));
+    } catch {
+      master = rest.join("-");
+    }
+  }
+  return { at: when, glyphs: many, master };
 }
 
 /** Encode a document as a snapshot payload, ready to cross to the worker. */
-export function snapshotOf(document: FontDocument, at: number): StoredSnapshot {
+export function snapshotOf(
+  document: FontDocument,
+  at: number,
+  master: string | null = null,
+): StoredSnapshot {
   const glyphs = orderedGlyphs(document).map(encodeGlyph);
   return {
     schema: SCHEMA_VERSION,
@@ -88,6 +117,7 @@ export function snapshotOf(document: FontDocument, at: number): StoredSnapshot {
     kerning: encodeKerning(document.kerning),
     glyphs,
     ...(document.features === "" ? {} : { features: document.features }),
+    ...(master === null ? {} : { master }),
   };
 }
 
@@ -95,7 +125,11 @@ export async function writeSnapshot(
   store: FileStore,
   snapshot: StoredSnapshot,
 ): Promise<SnapshotEntry> {
-  const entry = { at: snapshot.at, glyphs: snapshot.glyphs.length };
+  const entry = {
+    at: snapshot.at,
+    glyphs: snapshot.glyphs.length,
+    master: snapshot.master ?? null,
+  };
   await store.write(pathOf(entry), JSON.stringify(snapshot));
   return entry;
 }
@@ -112,12 +146,20 @@ export async function listSnapshots(store: FileStore): Promise<SnapshotEntry[]> 
 }
 
 /**
- * Drop the oldest until `keep` remain.
+ * Drop the oldest copies of one master until `keep` remain.
+ *
+ * Of one master, so that an afternoon spent in the bold does not push the last
+ * copy of the regular off the end: each master has its own twenty. `null` is
+ * the copies that do not say, which is all of them in a font drawn once.
  *
  * Returns what it removed, so a caller can say so rather than guess.
  */
-export async function pruneSnapshots(store: FileStore, keep = KEEP): Promise<SnapshotEntry[]> {
-  const entries = await listSnapshots(store);
+export async function pruneSnapshots(
+  store: FileStore,
+  master: string | null = null,
+  keep = KEEP,
+): Promise<SnapshotEntry[]> {
+  const entries = (await listSnapshots(store)).filter((entry) => entry.master === master);
   const dropped = entries.slice(Math.max(keep, 0));
   for (const entry of dropped) await store.remove(pathOf(entry));
   return dropped;
