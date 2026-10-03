@@ -1,0 +1,135 @@
+import { describe, expect, it } from "vitest";
+
+import { FakeWorker } from "../../../packages/storage/test/fake-worker.js";
+import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js";
+
+installBrowserGlobals();
+
+const { EditorStore } = await import("../src/store/index.js");
+const { MemoryFileStore } = await import("@typewright/storage");
+
+type Store = InstanceType<typeof EditorStore>;
+
+/**
+ * Going from one master to another, with a store behind it.
+ *
+ * Which master is open and which drawing is on screen have to change together.
+ * They came apart after a reload: the project holds only the open master's
+ * document then, would not go to one it was not holding, and so showed the
+ * other master's drawing under the name of the one left — and the next switch
+ * parked that drawing there, over the master's own. These ask for the pair to
+ * stay a pair, and for each master to keep its own drawing through it.
+ */
+
+/**
+ * A store opened on a working copy, as the editor is after a load.
+ *
+ * Each working copy is its own font, with its own lock. An editor opened on one
+ * that an earlier editor still holds — which is what a reload looks like here,
+ * where nothing ends the first — takes it over, as "Edit here instead" does.
+ */
+async function opened(files: InstanceType<typeof MemoryFileStore>): Promise<Store> {
+  clearStoredSettings();
+  let font = fonts.get(files);
+  if (font === undefined) {
+    font = `font-${String(fonts.size)}`;
+    fonts.set(files, font);
+  }
+  const store = new EditorStore();
+  await store.connectStorage(new FakeWorker(files) as unknown as Worker, font);
+  if (store.getState().ownership === "reading") await store.takeOver();
+  return store;
+}
+
+const fonts = new Map<object, string>();
+
+/**
+ * Which master's drawing is open, by a mark written in it: an edit, committed
+ * and saved as any edit in the editor is.
+ */
+const drawing = (store: Store): string => store.editor.document.features;
+
+const WEIGHT = { tag: "wght", name: "Weight", min: 100, default: 400, max: 900 };
+
+/** Two masters, each marked as itself, left open on the second: the font in the working copy. */
+async function twoMasters(files: InstanceType<typeof MemoryFileStore>): Promise<{
+  store: Store;
+  regular: string;
+}> {
+  const store = await opened(files);
+  const regular = store.getState().project.current;
+  store.setFeatures("# the regular");
+
+  await store.setAxes([WEIGHT]);
+  await store.addMaster("bold", "Bold", { wght: 900 });
+  await store.switchMaster("bold");
+  store.setFeatures("# the bold");
+  await store.flushNow();
+  return { store, regular };
+}
+
+describe("going to another master", () => {
+  it("shows its drawing and says it is the one open, in the session that made it", async () => {
+    const { store, regular } = await twoMasters(new MemoryFileStore());
+
+    await store.switchMaster(regular);
+    expect(store.getState().project.current).toBe(regular);
+    expect(drawing(store)).toBe("# the regular");
+
+    await store.switchMaster("bold");
+    expect(store.getState().project.current).toBe("bold");
+    expect(drawing(store)).toBe("# the bold");
+  });
+
+  it("does the same after a reload, when only the open master is in memory", async () => {
+    const files = new MemoryFileStore();
+    const { regular } = await twoMasters(files);
+
+    // The reload: a new editor over the same working copy.
+    const store = await opened(files);
+    expect(store.getState().project.current).toBe("bold");
+    expect(drawing(store)).toBe("# the bold");
+
+    await store.switchMaster(regular);
+    // The name and the drawing, together.
+    expect(store.getState().project.current).toBe(regular);
+    expect(drawing(store)).toBe("# the regular");
+  });
+
+  it("leaves each master its own drawing, however often they are gone between", async () => {
+    const files = new MemoryFileStore();
+    const { regular } = await twoMasters(files);
+    const store = await opened(files);
+
+    await store.switchMaster(regular);
+    await store.switchMaster("bold");
+    await store.switchMaster(regular);
+    await store.switchMaster("bold");
+    expect(drawing(store)).toBe("# the bold");
+
+    await store.switchMaster(regular);
+    expect(drawing(store)).toBe("# the regular");
+
+    // And what was written down agrees, for the reload after this one.
+    const again = await opened(files);
+    expect(again.getState().project.current).toBe(regular);
+    expect(drawing(again)).toBe("# the regular");
+    await again.switchMaster("bold");
+    expect(drawing(again)).toBe("# the bold");
+  });
+
+  it("does not put back the project as it was when masters were read in for a preview", async () => {
+    const files = new MemoryFileStore();
+    const { regular } = await twoMasters(files);
+    const store = await opened(files);
+
+    // Asked for together: the preview reads the parked master in while the
+    // switch is on its way.
+    const preview = store.setPreview({ wght: 650 });
+    const going = store.switchMaster(regular);
+    await Promise.all([preview, going]);
+
+    expect(store.getState().project.current).toBe(regular);
+    expect(drawing(store)).toBe("# the regular");
+  });
+});

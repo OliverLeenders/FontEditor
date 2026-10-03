@@ -258,7 +258,7 @@ export class EditorStore {
         this.patch(changes);
       },
       disk: this.disk,
-      keepSnapshot: () => this.snapshot(),
+      keepSnapshot: (document) => this.snapshot(document),
       forgetImage: (name) => {
         this.pictures.forget(name);
       },

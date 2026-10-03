@@ -26,8 +26,8 @@ import {
 import { editorState } from "@typewright/tools";
 
 import type { Persistence } from "../persistence.js";
-import { adoptFamily, startFresh } from "./masters.js";
-import { shown, tell } from "./opening.js";
+import { adoptFamily, beginFresh } from "./masters.js";
+import { painted, shown, tell } from "./opening.js";
 import { UNTITLED } from "./projects.js";
 import type { StoreHost } from "./state.js";
 
@@ -43,8 +43,8 @@ import type { StoreHost } from "./state.js";
 /** What opening a font needs of the store beyond reading and patching state. */
 export type FontHost = StoreHost & {
   readonly disk: Persistence;
-  /** Keep a copy of the font as it is now, before replacing it. */
-  keepSnapshot: () => Promise<void>;
+  /** Keep a copy of a font being replaced: the one given, or the one open. */
+  keepSnapshot: (document?: FontDocument) => Promise<void>;
   /** Let go of a decoded picture, because the bytes behind it have changed. */
   forgetImage: (name: string) => void;
   /** The folder on disk this font came from, if it came from one. */
@@ -323,29 +323,40 @@ export async function adoptDocument(
   document: FontDocument,
   keep = true,
 ): Promise<void> {
-  // A copy of what is open before it stops being open. Replacing a font is the
-  // most destructive thing this editor does — it replaces every glyph on disk —
-  // and it is exactly the moment someone discovers they meant the other file.
-  if (keep) await host.keepSnapshot();
+  const replaced = host.state().session.editor.document;
 
   // One master again, and the old font's masters gone with it: they are
   // drawings of a typeface that is no longer open.
-  await startFresh(host, document);
+  const writeFresh = beginFresh(host, document);
 
   showDocument(host, document, false);
-  // On screen now. What follows writes it down, which the status bar says and
-  // which nobody needs to wait behind a pane for.
-  shown(host);
   host.setCatalogQuery(DEFAULT_QUERY);
   // Whatever folder on disk was open held the *previous* font. Forgetting it
   // here means Save can never quietly write this font over that one; opening a
   // folder sets the link again straight afterwards.
   host.setFolder(null);
+  // On screen now, and given a frame to be drawn in. Everything after this
+  // writes it down — a copy of the font it replaces, its one master parked
+  // whole, every glyph of it — which for a large font is seconds, said by the
+  // status bar, that nobody needs to wait behind a pane for. It used to come
+  // first, and the first time a font was opened it was most of the wait.
+  shown(host);
+  await painted();
+
+  // A copy of what was open, now that it has stopped being open. Replacing a
+  // font is the most destructive thing this editor does — it replaces every
+  // glyph on disk — and it is exactly the moment someone discovers they meant
+  // the other file. Nothing of it has been written over yet: that is last.
+  if (keep) await host.keepSnapshot(replaced);
+  await writeFresh();
+
   // Layers are in the document now. The file they were once kept in beside
   // it is cleared, so a project from before cannot bring the last font's
   // sketch back into this one.
   await host.disk.putLayers([]);
-  await host.disk.replaceAll(document);
+  // The font as it is by now: the one opened, with whatever was changed in it
+  // in the moments since it was shown.
+  await host.disk.replaceAll(host.state().session.editor.document);
 }
 
 /** Put a document on screen, starting its history over. */

@@ -69,14 +69,21 @@ export type MasterReport = {
  * The order is the whole of it: park what is open before reading what is not,
  * so a crash between the two loses nothing. `null` where there is nothing to
  * go to, which a panel treats as "you are already there".
+ *
+ * Which master is open and which document is on screen change together, or
+ * neither does. They once could come apart: the project would not go to a
+ * master whose document it was not holding, and after a reload it holds only
+ * the open one's — so the other master's drawing came on screen under the name
+ * of the one left, and the next switch parked it there, over that master's own.
  */
 export async function switchMaster(host: FontHost, id: MasterId): Promise<MasterReport | null> {
-  const project = host.state().project;
-  if (id === project.current) return null;
+  const asked = host.state().project;
+  if (id === asked.current) return null;
 
-  const master = project.masters.find((m) => m.id === id);
+  const master = asked.masters.find((m) => m.id === id);
   if (master === undefined) return null;
 
+  const left = host.state().session.editor.document;
   await parkCurrent(host);
 
   const found = await host.disk.getMaster(id);
@@ -84,11 +91,24 @@ export async function switchMaster(host: FontHost, id: MasterId): Promise<Master
     throw new Error(`${master.name} could not be read back`);
   }
 
-  const next = switchProjectTo(project, id);
+  // The project as it is now, not as it was before the waiting: reading a
+  // master of a large font is seconds, and anything may have been renamed,
+  // moved or read in meanwhile.
+  const project = host.state().project;
+  if (!project.masters.some((m) => m.id === id)) return null;
+  const next = switchProjectTo(
+    {
+      ...project,
+      // Both held from here on: the one arrived at, which is what lets the
+      // project go to it, and the one left, as it was parked a moment ago.
+      sources: { ...project.sources, [project.current]: left, [id]: found.document },
+    },
+    id,
+  );
   host.patch({ project: next });
   showDocument(host, found.document, false);
   await host.disk.replaceAll(found.document);
-  await rememberDesignspace(host, next);
+  await rememberDesignspace(host);
   // A master that draws only some glyphs is shown against the one it is a
   // layer of, so that one is read in as well.
   await loadWhole(host);
@@ -170,14 +190,25 @@ export async function setAxes(host: FontHost, axes: readonly Axis[]): Promise<vo
  * Opening a font replaces everything, and the masters of the font that was open
  * are drawings of a typeface that is no longer here. Leaving them parked would
  * mean a project whose designspace describes one font and whose files hold two.
+ *
+ * In two halves: the project is one master around the document at once, and
+ * what comes back writes that down when it is called. Two because writing it down is slow where the font is large — its one
+ * master is parked whole, every glyph of it — and a font being opened should be
+ * on screen before that rather than after it. The first half is all the screen
+ * needs.
  */
-export async function startFresh(host: FontHost, document: FontDocument): Promise<void> {
-  for (const m of host.state().project.masters) await host.disk.dropMaster(m.id);
-
+export function beginFresh(host: FontHost, document: FontDocument): () => Promise<void> {
+  const gone = host.state().project.masters.map((m) => m.id);
   const next = makeProject(document, { id: `master-${String(Date.now())}` });
   host.patch({ project: next });
-  await host.disk.putMaster(next.current, document);
-  await rememberDesignspace(host, next);
+
+  return async () => {
+    for (const id of gone) await host.disk.dropMaster(id);
+    await host.disk.putMaster(next.current, document);
+    // The project as it is by now: a master may have been added since the font
+    // was shown, and what was made above no longer says so.
+    await rememberDesignspace(host);
+  };
 }
 
 /**
@@ -417,20 +448,31 @@ export async function glyphFromFamily(host: FontHost, name: string): Promise<Gly
  * wants to see between them.
  */
 export async function loadSources(host: FontHost): Promise<void> {
-  const project = host.state().project;
-  const sources: Record<string, FontDocument> = {
-    ...project.sources,
-    // The open one is whatever is on the screen, not whatever was parked.
-    [project.current]: host.state().session.editor.document,
-  };
+  const asked = host.state().project;
+  const read: Record<string, FontDocument> = {};
 
-  for (const m of project.masters) {
-    if (m.id === project.current || sources[m.id] !== undefined) continue;
+  for (const m of asked.masters) {
+    if (m.id === asked.current || asked.sources[m.id] !== undefined) continue;
     const found = await host.disk.getMaster(m.id);
-    if (found !== null) sources[m.id] = found.document;
+    if (found !== null) read[m.id] = found.document;
   }
 
-  host.patch({ project: { ...project, sources } });
+  // Into the project as it is now. Reading a large font's masters is seconds,
+  // and putting back the project as it was before them would undo whatever
+  // happened meanwhile — a master gone to, most of all, which would leave one
+  // master's name over another's drawing.
+  const project = host.state().project;
+  host.patch({
+    project: {
+      ...project,
+      sources: {
+        ...read,
+        ...project.sources,
+        // The open one is whatever is on the screen, not whatever was parked.
+        [project.current]: host.state().session.editor.document,
+      },
+    },
+  });
 }
 
 /**

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, screen } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { installBrowserGlobals } from "./browser-globals.js";
 import { threeGlyphFont } from "./fonts.js";
@@ -76,6 +76,32 @@ describe("opening a font file", () => {
     expect(said).toContain("Three.ttf: drawing");
     expect(store.getState().opening).toBeNull();
     expect(store.editor.document.info.familyName).toBe("Imported");
+  });
+
+  it("shows the font before any copy of it is written down", async () => {
+    const { Persistence } = await import("../src/persistence.js");
+    const store = freshStore();
+    // What was on screen when each write was asked for.
+    const seen: string[] = [];
+    const at = (what: string) => (): Promise<never[]> => {
+      const { opening, session } = store.getState();
+      const pane = opening === null ? "no pane" : "pane";
+      seen.push(`${what}: ${session.editor.document.info.familyName}, ${pane}`);
+      return Promise.resolve([]);
+    };
+    const spies = [
+      vi.spyOn(Persistence.prototype, "snapshot").mockImplementation(at("snapshot")),
+      vi.spyOn(Persistence.prototype, "putMaster").mockImplementation(at("master") as never),
+      vi.spyOn(Persistence.prototype, "replaceAll").mockImplementation(at("font") as never),
+    ];
+    onTestFinished(() => {
+      for (const spy of spies) spy.mockRestore();
+    });
+
+    await store.importFont(threeGlyphFont(), "Three.ttf");
+
+    // Parking a large font's master is seconds: none of them behind the pane.
+    expect(seen).toEqual(["master: Imported, no pane", "font: Imported, no pane"]);
   });
 
   it("stops saying so for a file that could not be opened", async () => {
