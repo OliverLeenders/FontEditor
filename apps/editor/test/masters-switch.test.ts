@@ -110,7 +110,10 @@ describe("going to another master", () => {
     await store.switchMaster(regular);
     expect(drawing(store)).toBe("# the regular");
 
-    // And what was written down agrees, for the reload after this one.
+    // And what was written down agrees, for the reload after this one. The
+    // master gone to is written into the working copy after the switch has
+    // answered, and a window waits for that before it closes.
+    await store.flushNow();
     const again = await opened(files);
     expect(again.getState().project.current).toBe(regular);
     expect(drawing(again)).toBe("# the regular");
@@ -131,5 +134,98 @@ describe("going to another master", () => {
 
     expect(store.getState().project.current).toBe(regular);
     expect(drawing(store)).toBe("# the regular");
+  });
+});
+
+describe("a switch on a font that takes a while to write", () => {
+  it("has answered once the drawing is shown, with the writing still to come", async () => {
+    const files = new MemoryFileStore();
+    const { store, regular } = await twoMasters(files);
+
+    await store.switchMaster(regular);
+    // On screen, and the one open — and the working copy not yet made its own.
+    expect(drawing(store)).toBe("# the regular");
+    expect(store.getState().saveStatus).toBe("saving");
+
+    await store.flushNow();
+    expect(store.getState().saveStatus).toBe("idle");
+    const again = await opened(files);
+    expect(again.getState().project.current).toBe(regular);
+    expect(drawing(again)).toBe("# the regular");
+  });
+
+  it("keeps what is typed while the master is being written", async () => {
+    const files = new MemoryFileStore();
+    const { store, regular } = await twoMasters(files);
+
+    await store.switchMaster(regular);
+    // Not a glyph, so in no journal: only the save that follows can keep it.
+    store.setFeatures("# typed while it was written");
+    await store.flushNow();
+
+    const again = await opened(files);
+    expect(drawing(again)).toBe("# typed while it was written");
+  });
+
+  it("waits for the one before, when masters are gone between quickly", async () => {
+    const files = new MemoryFileStore();
+    const { store, regular } = await twoMasters(files);
+
+    // Neither waited for before the next is asked.
+    const one = store.switchMaster(regular);
+    const two = one.then(() => store.switchMaster("bold"));
+    await two;
+    await store.flushNow();
+
+    expect(store.getState().project.current).toBe("bold");
+    const again = await opened(files);
+    expect(again.getState().project.current).toBe("bold");
+    expect(drawing(again)).toBe("# the bold");
+    await again.switchMaster(regular);
+    expect(drawing(again)).toBe("# the regular");
+  });
+});
+
+describe("adding a master", () => {
+  it("copies the drawing as it stands, for an export that never visits it", async () => {
+    const store = await opened(new MemoryFileStore());
+    store.setFeatures("# edited before adding");
+    await store.setAxes([WEIGHT]);
+    await store.addMaster("bold", "Bold", { wght: 900 });
+
+    const all = await store.allMasters();
+    expect(all.find((m) => m.id === "bold")?.document.features).toBe("# edited before adding");
+  });
+});
+
+describe("removing the master being drawn", () => {
+  it("changes the name and the drawing together", async () => {
+    const { store, regular } = await twoMasters(new MemoryFileStore());
+    // Every state the store passes through: which master, over which drawing.
+    const seen = new Set<string>();
+    store.subscribe(() => {
+      const current = store.getState().project.current === regular ? "regular" : "bold";
+      seen.add(`${current} over ${drawing(store)}`);
+    });
+
+    await store.removeMaster("bold");
+
+    expect(store.getState().project.masters.map((m) => m.id)).toEqual([regular]);
+    expect(drawing(store)).toBe("# the regular");
+    // Never the one's name over the other's drawing, at any step on the way.
+    expect([...seen]).not.toContain("regular over # the bold");
+    expect([...seen]).not.toContain("bold over # the regular");
+    expect([...seen]).toContain("regular over # the regular");
+  });
+
+  it("removes nothing when the other master cannot be read", async () => {
+    const files = new MemoryFileStore();
+    const { store, regular } = await twoMasters(files);
+    await files.remove(`masters/${regular}.json`);
+
+    await expect(store.removeMaster("bold")).rejects.toThrow(/could not be read back/);
+    expect(store.getState().project.masters).toHaveLength(2);
+    expect(store.getState().project.current).toBe("bold");
+    expect(drawing(store)).toBe("# the bold");
   });
 });

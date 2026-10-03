@@ -153,6 +153,7 @@ import {
   setAxes,
   setRulesProcessing,
   switchMaster,
+  written,
   updateAxis,
 } from "./masters.js";
 import { defaults, remember, within } from "./settings.js";
@@ -1367,6 +1368,9 @@ export class EditorStore {
    * to be there when they finish.
    */
   async flushNow(): Promise<void> {
+    // A master gone to a moment ago may still be on its way into the working
+    // copy, and the window must not close on half of it.
+    await written(this.host);
     await this.disk.flushNow();
     await parkCurrent(this.host);
   }

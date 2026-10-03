@@ -29,7 +29,7 @@ import type { Persistence } from "../persistence.js";
 import { adoptFamily, beginFresh } from "./masters.js";
 import { painted, shown, tell } from "./opening.js";
 import { UNTITLED } from "./projects.js";
-import type { StoreHost } from "./state.js";
+import type { StoreHost, StoreState } from "./state.js";
 
 /**
  * Putting a whole font in front of the reader: a new one, or one from a file.
@@ -359,9 +359,21 @@ export async function adoptDocument(
   await host.disk.replaceAll(host.state().session.editor.document);
 }
 
-/** Put a document on screen, starting its history over. */
-export function showDocument(host: FontHost, document: FontDocument, recovered: boolean): void {
+/**
+ * Put a document on screen, starting its history over.
+ *
+ * `also` is whatever else has to change in the same step: the project, when
+ * the document is another master's, so that nothing reading the store ever
+ * finds one master named over another's drawing.
+ */
+export function showDocument(
+  host: FontHost,
+  document: FontDocument,
+  recovered: boolean,
+  also: Partial<StoreState> = {},
+): void {
   host.patch({
+    ...also,
     session: newSession(editorState({ document, view: host.state().session.editor.view })),
     recovered,
   });

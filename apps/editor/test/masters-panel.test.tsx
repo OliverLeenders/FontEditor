@@ -279,3 +279,67 @@ describe("naming the styles between the masters", () => {
     expect(store.getState().project.instances).toEqual([]);
   });
 });
+
+describe("naming a master", () => {
+  const field = (name: string): HTMLInputElement =>
+    screen.getByLabelText<HTMLInputElement>(`Name of the master ${name}`);
+
+  it("takes a name of two words, typed a letter at a time", () => {
+    const store = withThreeRendered();
+    const box = field("Black");
+
+    // The space is the letter that used to vanish as it was typed.
+    for (const typed of ["Extra", "Extra ", "Extra B", "Extra Bold"]) {
+      fireEvent.change(box, { target: { value: typed } });
+      expect(box.value).toBe(typed);
+    }
+    fireEvent.blur(box);
+
+    expect(store.getState().project.masters.map((m) => m.name)).toContain("Extra Bold");
+    expect(box.value).toBe("Extra Bold");
+  });
+
+  it("can be emptied on the way to another name", () => {
+    const store = withThreeRendered();
+    const box = field("Black");
+
+    fireEvent.change(box, { target: { value: "" } });
+    expect(box.value).toBe("");
+    fireEvent.change(box, { target: { value: "Heavy" } });
+    fireEvent.blur(box);
+
+    expect(store.getState().project.masters.map((m) => m.name)).toContain("Heavy");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("goes back to the name it has, and says why, when left with one it cannot have", async () => {
+    const store = withThreeRendered();
+    const box = field("Black");
+
+    await act(async () => {
+      fireEvent.change(box, { target: { value: "Thin" } });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      fireEvent.blur(box);
+      await Promise.resolve();
+    });
+
+    expect(box.value).toBe("Black");
+    expect(store.getState().project.masters.map((m) => m.name)).toContain("Black");
+    expect(screen.getByRole("alert").textContent).toMatch(/already a master with that name/);
+  });
+});
+
+describe("in a tab that is only reading", () => {
+  it("does not offer to draw another master, which it could not write", () => {
+    const store = withThree();
+    act(() => store.patch({ ownership: "reading" }));
+    render(<Masters />, store);
+    fireEvent.click(screen.getByRole("button", { name: /^Masters/ }));
+
+    const draw = screen.getAllByRole<HTMLButtonElement>("button", { name: "Draw" });
+    expect(draw.every((button) => button.disabled)).toBe(true);
+    expect(draw[0]!.title).toMatch(/Another tab is saving/);
+  });
+});

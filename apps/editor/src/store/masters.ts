@@ -75,8 +75,17 @@ export type MasterReport = {
  * master whose document it was not holding, and after a reload it holds only
  * the open one's — so the other master's drawing came on screen under the name
  * of the one left, and the next switch parked it there, over that master's own.
+ *
+ * It is finished once the drawing is on screen. Making the working copy that
+ * master's is every glyph written again — seconds, for a large font — and that
+ * goes on afterwards, said by the status bar as any save is. The next switch
+ * waits for it, since what it parks and what it writes have to follow in order;
+ * drawing does not.
  */
 export async function switchMaster(host: FontHost, id: MasterId): Promise<MasterReport | null> {
+  // The master before this one may still be on its way into the working copy.
+  await written(host);
+
   const asked = host.state().project;
   if (id === asked.current) return null;
 
@@ -105,15 +114,49 @@ export async function switchMaster(host: FontHost, id: MasterId): Promise<Master
     },
     id,
   );
-  host.patch({ project: next });
-  showDocument(host, found.document, false);
-  await host.disk.replaceAll(found.document);
-  await rememberDesignspace(host);
+  showDocument(host, found.document, false, { project: next });
   // A master that draws only some glyphs is shown against the one it is a
   // layer of, so that one is read in as well.
   await loadWhole(host);
 
+  writing.set(host, makeCurrent(host, id, found.document));
+
   return { name: master.name, glyphs: found.document.glyphOrder.length, problems: found.problems };
+}
+
+/**
+ * Make the working copy a master's: its glyphs written, and then the project
+ * saying it is the one open.
+ *
+ * In that order, and the second saying *this* master whatever is open by then:
+ * what the project names as open has to be what the working copy holds, since
+ * that is the pair a reload reads back. Never rejects — it runs after the
+ * switch that began it has answered, so what goes wrong is said where a failed
+ * save is said.
+ */
+async function makeCurrent(host: FontHost, id: MasterId, document: FontDocument): Promise<void> {
+  try {
+    await host.disk.replaceAll(document);
+    // The project as it is by now, with this master the one open — unless the
+    // font has been replaced meanwhile and this master is not in it at all.
+    const project = host.state().project;
+    if (project.masters.some((m) => m.id === id)) {
+      await writeDesignspace(host, { ...project, current: id });
+    }
+  } catch (error) {
+    host.patch({
+      saveStatus: "failed",
+      storageDetail: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/** The master being written into the working copy, for each store that is writing one. */
+const writing = new WeakMap<FontHost, Promise<void>>();
+
+/** Wait for a master on its way into the working copy to be there. */
+export async function written(host: FontHost): Promise<void> {
+  await writing.get(host);
 }
 
 /**
@@ -131,14 +174,33 @@ export async function addMaster(
   location: Location,
 ): Promise<void> {
   const project = host.state().project;
-  const out = addToProject(project, id, name, location, project.current);
+
+  // What it is a copy of: the document as it stands rather than whatever the
+  // project happens to be holding. The open master's document lives in the
+  // session, and the project's copy of it is only as fresh as the last time
+  // anything asked — a master made from that came out as the font was when it
+  // was loaded, for an export or a preview that did not visit it first. A
+  // master drawn as a layer is a handful of glyphs, and a new master is a
+  // whole font, so that is copied from the master the layer belongs to.
+  const of = project.masters.find((m) => m.id === project.current)?.sparse?.of ?? project.current;
+  const from =
+    of === project.current
+      ? host.state().session.editor.document
+      : (project.sources[of] ?? (await host.disk.getMaster(of))?.document);
+  if (from === undefined) throw new Error(masterProblemSays("missing"));
+
+  const now = host.state().project;
+  const out = addToProject(
+    { ...now, sources: { ...now.sources, [of]: from } },
+    id,
+    name,
+    location,
+    now.current,
+  );
   if (!isProject(out)) throw new Error(masterProblemSays(out));
 
-  // Parked at once, and from the document as it stands rather than from
-  // whatever the project happens to be holding: the open master's document
-  // lives in the session, and the project's copy of it is only as fresh as the
-  // last time anything asked.
-  await host.disk.putMaster(id, host.state().session.editor.document);
+  // Parked at once, and the same document the project now holds for it.
+  await host.disk.putMaster(id, from);
   host.patch({ project: out });
   await rememberDesignspace(host, out);
 }
@@ -148,18 +210,38 @@ export async function removeMaster(host: FontHost, id: MasterId): Promise<void> 
   const out = removeFromProject(project, id);
   if (!isProject(out)) throw new Error(masterProblemSays(out));
 
-  // If the one being drawn has gone, what is on screen belongs to nothing: the
-  // project has already chosen where to stand, so go there.
-  const wasCurrent = project.current === id;
-  host.patch({ project: out });
-  await host.disk.dropMaster(id);
-  await rememberDesignspace(host, out);
+  if (project.current !== id) {
+    host.patch({ project: out });
+    await host.disk.dropMaster(id);
+    await rememberDesignspace(host, out);
+    return;
+  }
 
-  if (!wasCurrent) return;
+  // The one being drawn is going, so what is on screen has to become the master
+  // the project will stand in — and the two at once. It is read before anything
+  // changes: told first, the project named that master over this one's drawing
+  // for as long as the reading took, and a window closed then parked this
+  // drawing as that master's. One that cannot be read leaves everything as it
+  // was.
+  await written(host);
   const found = await host.disk.getMaster(out.current);
-  if (found === null) return;
-  showDocument(host, found.document, false);
+  if (found === null) {
+    const other = out.masters.find((m) => m.id === out.current)?.name ?? "The other master";
+    throw new Error(`${other} could not be read back, so nothing was removed`);
+  }
+
+  const now = removeFromProject(host.state().project, id);
+  if (!isProject(now)) throw new Error(masterProblemSays(now));
+  const next = { ...now, sources: { ...now.sources, [now.current]: found.document } };
+  showDocument(host, found.document, false, { project: next });
+
+  // Written down as a switch is: the working copy made that master's, then the
+  // project saying so, and the file of the one removed last — so stopping part
+  // of the way leaves a font that still has it rather than one that names a
+  // master whose drawing is not there.
   await host.disk.replaceAll(found.document);
+  await rememberDesignspace(host);
+  await host.disk.dropMaster(id);
 }
 
 export async function renameMaster(host: FontHost, id: MasterId, name: string): Promise<void> {
@@ -485,14 +567,28 @@ export async function loadSources(host: FontHost): Promise<void> {
  */
 export async function parkCurrent(host: FontHost): Promise<void> {
   const state = host.state();
+  // Nothing to keep up to date for a font drawn once: its only master is the
+  // working copy, and its parked file is read by nothing until there is a
+  // second — which is made from the document, not from the file.
+  if (state.project.masters.length < 2) return;
   await host.disk.putMaster(state.project.current, state.session.editor.document);
 }
 
-/** Keep the axes and the masters beside the fonts, so a reload comes back here. */
-export async function rememberDesignspace(
-  host: FontHost,
-  project = host.state().project,
-): Promise<void> {
+/**
+ * Keep the axes and the masters beside the fonts, so a reload comes back here.
+ *
+ * After a master on its way into the working copy has arrived. What is written
+ * here says which master is open, and written sooner it would say so of a
+ * working copy that still held the one before — a rename made in the seconds a
+ * large font takes to switch, and a reload in the same seconds, would open one
+ * master's drawing under another's name.
+ */
+export async function rememberDesignspace(host: FontHost, project?: FontProject): Promise<void> {
+  await written(host);
+  await writeDesignspace(host, project ?? host.state().project);
+}
+
+async function writeDesignspace(host: FontHost, project: FontProject): Promise<void> {
   await host.disk.putDesignspace({
     axes: project.axes,
     masters: project.masters,

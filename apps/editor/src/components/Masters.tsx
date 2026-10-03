@@ -8,7 +8,7 @@ import {
   orderedMasters,
 } from "@typewright/font-model";
 import { selectContour } from "@typewright/tools";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
@@ -141,13 +141,13 @@ export function Masters({
           const here = m.id === project.current;
           return (
             <li key={m.id} className={styles.row} data-here={here ? "true" : undefined}>
-              <input
+              <NameField
                 className={styles.name}
                 value={m.name}
-                aria-label={`Name of the master ${m.name}`}
-                spellCheck={false}
+                label={`Name of the master ${m.name}`}
                 disabled={reading}
-                onChange={(event) => void store.renameMaster(m.id, event.target.value)}
+                onRename={(name) => store.renameMaster(m.id, name)}
+                onProblem={setFailed}
               />
               <span className={styles.at}>
                 {project.axes.length === 0 ? "" : describeLocation(project.axes, m.location)}
@@ -155,8 +155,16 @@ export function Masters({
               <button
                 type="button"
                 className={styles.go}
-                disabled={busy || here}
-                title={here ? "This is the one you are drawing" : `Draw ${m.name}`}
+                // A tab that is only reading cannot park the master it leaves
+                // or make the working copy the other's, so it stays where it is.
+                disabled={busy || here || reading}
+                title={
+                  here
+                    ? "This is the one you are drawing"
+                    : reading
+                      ? "Another tab is saving this project"
+                      : `Draw ${m.name}`
+                }
                 onClick={() => void goTo(m.id)}
               >
                 {here ? "drawing" : "Draw"}
@@ -315,23 +323,23 @@ function Instances({
         {instances.map((it) => (
           <li key={it.id} className={styles.instance}>
             <div className={styles.instanceHead}>
-              <input
+              <NameField
                 className={styles.name}
                 value={it.name}
-                aria-label={`Name of the instance ${it.name}`}
-                spellCheck={false}
+                label={`Name of the instance ${it.name}`}
                 disabled={reading}
-                onChange={(event) => void store.renameInstance(it.id, event.target.value)}
+                onRename={(name) => store.renameInstance(it.id, name)}
+                onProblem={onFailed}
               />
-              <input
+              <NameField
                 className={styles.instanceFamily}
                 value={it.familyName}
                 placeholder={family}
                 title="The family this style belongs to, where it is not this one"
-                aria-label={`Family of the instance ${it.name}`}
-                spellCheck={false}
+                label={`Family of the instance ${it.name}`}
                 disabled={reading}
-                onChange={(event) => void store.setInstanceFamily(it.id, event.target.value)}
+                onRename={(name) => store.setInstanceFamily(it.id, name)}
+                onProblem={onFailed}
               />
               <button
                 type="button"
@@ -371,6 +379,72 @@ function Instances({
         ))}
       </ul>
     </div>
+  );
+}
+
+/**
+ * A name, changed as it is typed.
+ *
+ * What is typed is kept here while the field has the keyboard, and the name is
+ * changed to it letter by letter wherever it can be. The two differ, and have
+ * to: a name is kept without the space at its end, and shown back like that a
+ * space typed would vanish as it was typed — "Extra Bold" could only ever be
+ * written "ExtraBold" — and a name emptied on the way to another would spring
+ * back before the other was begun. So the field shows what was typed, the font
+ * takes what it can, and a name it could not take — none at all, or one
+ * something else has — is said once the field is left, when what is shown goes
+ * back to what the name is.
+ */
+function NameField({
+  value,
+  label,
+  className,
+  disabled,
+  placeholder,
+  title,
+  onRename,
+  onProblem,
+}: {
+  value: string;
+  label: string;
+  className: string | undefined;
+  disabled: boolean;
+  placeholder?: string;
+  title?: string;
+  /** Change the name; rejects with the reason where it cannot be that. */
+  onRename: (name: string) => Promise<void>;
+  onProblem: (message: string | null) => void;
+}): React.JSX.Element {
+  const [typed, setTyped] = useState<string | null>(null);
+  // Why the last thing typed was not taken, to be said when the field is left.
+  const refused = useRef<string | null>(null);
+
+  return (
+    <input
+      className={className}
+      value={typed ?? value}
+      placeholder={placeholder}
+      title={title}
+      aria-label={label}
+      spellCheck={false}
+      disabled={disabled}
+      onChange={(event) => {
+        const next = event.target.value;
+        setTyped(next);
+        refused.current = null;
+        onRename(next).catch((error: unknown) => {
+          refused.current = error instanceof Error ? error.message : String(error);
+        });
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
+      onBlur={() => {
+        setTyped(null);
+        if (refused.current !== null) onProblem(refused.current);
+        refused.current = null;
+      }}
+    />
   );
 }
 
