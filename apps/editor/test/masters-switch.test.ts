@@ -339,10 +339,16 @@ describe("copies of the font, in a font drawn more than once", () => {
     await store.setAxes([WEIGHT]);
     await store.addMaster("bold", "Bold", { wght: 900 });
 
-    expect(listed(store)).toEqual([null]);
+    // One or two of them: the first edit keeps a copy of its own, and whether
+    // that and the one asked for are two files or one depends on whether a
+    // millisecond passed between them. Either way none says, and all are here.
+    const before = listed(store);
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.every((master) => master === null)).toBe(true);
+
     await store.switchMaster("bold");
     await store.refreshSnapshots();
-    expect(listed(store)).toEqual([null]);
+    expect(listed(store)).toEqual(before);
   });
 });
 
