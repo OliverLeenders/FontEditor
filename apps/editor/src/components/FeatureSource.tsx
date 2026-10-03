@@ -1,5 +1,6 @@
 import { wheelIntent } from "@typewright/view";
 import {
+  memo,
   useEffect,
   useId,
   useImperativeHandle,
@@ -10,7 +11,7 @@ import {
 } from "react";
 
 import { type Completion, completionsAt, glyphAt } from "../completion.js";
-import { type Token, highlightFea } from "../highlight.js";
+import { type Token, highlightLines } from "../highlight.js";
 import { type Edit, closeBrace, indent, newline, outdent } from "../indentation.js";
 import { type Match, type SearchOptions, findAll, matchFrom, replaced } from "../search.js";
 import styles from "./FeatureSource.module.css";
@@ -131,8 +132,27 @@ export function FeatureSource({
   const [findFocus, setFindFocus] = useState(0);
   const [link, setLink] = useState<Span | null>(null);
 
-  const lines = useMemo(() => linesOf(highlightFea(value)), [value]);
+  // The lines as they were last coloured, so that only a changed one is again.
+  const coloured = useRef(new Map<string, readonly Token[]>());
+  const lines = useMemo(() => highlightLines(value, coloured.current), [value]);
   const starts = useMemo(() => lineStarts(value), [value]);
+  const widest = useMemo(() => widestLine(value), [value]);
+
+  // A whole number of pixels to the line, so that a line's place is its number
+  // times this exactly: the lines out of sight are stood in for by one block of
+  // their height, and a fraction lost on each would add up over a long file.
+  const lineHeight = Math.round(size * LINE);
+  // The lines drawn in colour: those in sight and some either side. A feature
+  // file can be thousands of lines — an icon font's ligatures, one to a line —
+  // and coloured in full it is tens of thousands of pieces to make and lay out
+  // before the workspace can be shown, for a screenful that is read.
+  const [range, setRange] = useState({ first: 0, last: UNMEASURED });
+  const first = Math.min(range.first, lines.length);
+  const last = Math.min(range.last, lines.length);
+  const above = { height: `${String(first * lineHeight)}px` };
+  const below = { height: `${String((lines.length - last) * lineHeight)}px` };
+  const lineCount = useRef(lines.length);
+  lineCount.current = lines.length;
   const matches = useMemo(
     () => (find === null ? [] : findAll(value, find.query, find)),
     [value, find],
@@ -197,10 +217,43 @@ export function FeatureSource({
     if (gutter.current !== null) gutter.current.scrollTop = box.scrollTop;
   };
 
+  /**
+   * Draw the lines now in sight, if the ones drawn no longer cover them.
+   *
+   * Some slack either side, so that scrolling a line at a time redraws once in
+   * a while rather than on every line. Nothing is known of the box's height
+   * before it is laid out, or where there is no layout at all, and the lines
+   * drawn then are simply the first few hundred.
+   */
+  const rewindow = (): void => {
+    const box = area.current;
+    if (box === null || box.clientHeight <= 0 || lineHeight <= 0) return;
+    const top = Math.floor(box.scrollTop / lineHeight);
+    const bottom = top + Math.ceil(box.clientHeight / lineHeight) + 1;
+    setRange((was) => {
+      const covered =
+        (was.first === 0 || top >= was.first + SLACK) &&
+        (was.last >= lineCount.current || bottom <= was.last - SLACK);
+      return covered ? was : { first: Math.max(0, top - AROUND), last: bottom + AROUND };
+    });
+  };
+
   // A new size moves every line, so the copies underneath catch up at once, and
-  // so does a copy of the matches that has just appeared.
+  // so does a copy of the matches that has just appeared — and either after the
+  // lines drawn have changed.
   const marking = matches.length > 0;
-  useLayoutEffect(follow, [size, marking]);
+  useLayoutEffect(follow, [size, marking, range]);
+
+  // The lines in sight change with the size of the text and of the box.
+  useLayoutEffect(() => {
+    rewindow();
+    const box = area.current;
+    if (box === null || typeof ResizeObserver !== "function") return;
+    const watching = new ResizeObserver(rewindow);
+    watching.observe(box);
+    return () => watching.disconnect();
+    // `rewindow` reads the box and a ref, and nothing else that changes.
+  }, [lineHeight]);
 
   useImperativeHandle(
     ref,
@@ -221,6 +274,7 @@ export function FeatureSource({
         // Two lines of what comes before, so the line is read in its context.
         if (Number.isFinite(height)) box.scrollTop = Math.max(0, (line - 3) * height);
         follow();
+        rewindow();
       },
     }),
     [value],
@@ -380,7 +434,13 @@ export function FeatureSource({
     <div
       ref={editor}
       className={styles.editor}
-      style={{ fontSize: `${String(size)}px` }}
+      style={
+        {
+          fontSize: `${String(size)}px`,
+          lineHeight: `${String(lineHeight)}px`,
+          "--line": `${String(lineHeight)}px`,
+        } as React.CSSProperties
+      }
       onKeyDown={(event) => {
         const modified = (event.ctrlKey || event.metaKey) && !event.altKey;
         const key = event.key.toLowerCase();
@@ -405,15 +465,21 @@ export function FeatureSource({
       )}
       <div className={styles.panes}>
         <div ref={gutter} className={styles.gutter} aria-hidden="true">
-          {lines.map((_, index) => (
-            <div
-              key={index}
-              className={styles.number}
-              data-problem={problemLines.has(index + 1) ? "" : undefined}
-            >
-              {index + 1}
-            </div>
-          ))}
+          {/* As wide as the last number, which may not be among those drawn. */}
+          <div style={{ ...above, minWidth: `${String(String(lines.length).length)}ch` }} />
+          {lines.slice(first, last).map((_, n) => {
+            const index = first + n;
+            return (
+              <div
+                key={index}
+                className={styles.number}
+                data-problem={problemLines.has(index + 1) ? "" : undefined}
+              >
+                {index + 1}
+              </div>
+            );
+          })}
+          <div style={below} />
         </div>
         <div className={styles.text}>
           <span ref={measure} className={styles.measure} aria-hidden="true">
@@ -421,37 +487,36 @@ export function FeatureSource({
           </span>
           {marking ? (
             <div ref={found} className={styles.found} aria-hidden="true">
-              {foundRows(value, starts, matches, shown)}
+              <div style={{ ...above, minWidth: `${String(widest + 1)}ch` }} />
+              {foundRows(value, starts, matches, shown, first, last)}
+              <div style={below} />
             </div>
           ) : null}
           <div ref={shadow} className={styles.shadow} aria-hidden="true">
-            {lines.map((tokens, index) => {
-              let at = starts[index] ?? 0;
+            {/* As wide as the longest line, which may not be among those drawn:
+                the text box scrolls sideways as far as that one goes, and this
+                has to be able to follow it there. */}
+            <div style={{ ...above, minWidth: `${String(widest + 1)}ch` }} />
+            {lines.slice(first, last).map((tokens, n) => {
+              const index = first + n;
+              const start = starts[index] ?? 0;
+              const next = starts[index + 1] ?? value.length + 1;
               return (
-                <div
+                <Row
                   key={index}
-                  className={styles.row}
-                  data-problem={problemLines.has(index + 1) ? "" : undefined}
-                >
-                  {tokens.length === 0
-                    ? // An empty line still needs its height.
-                      " "
-                    : tokens.map((token, n) => {
-                        const start = at;
-                        at += token.text.length;
-                        return (
-                          <span
-                            key={n}
-                            data-kind={token.kind}
-                            data-link={link !== null && link.start === start ? "" : undefined}
-                          >
-                            {dotted(token.text)}
-                          </span>
-                        );
-                      })}
-                </div>
+                  tokens={tokens}
+                  problem={problemLines.has(index + 1)}
+                  // Where in the line the name under the pointer starts, for
+                  // the one line it is in.
+                  link={
+                    link !== null && link.start >= start && link.start < next
+                      ? link.start - start
+                      : -1
+                  }
+                />
               );
             })}
+            <div style={below} />
           </div>
           <textarea
             ref={area}
@@ -477,6 +542,7 @@ export function FeatureSource({
             }}
             onScroll={(event) => {
               follow();
+              rewindow();
               if (popup !== null) {
                 setScroll({
                   top: event.currentTarget.scrollTop,
@@ -593,7 +659,7 @@ export function FeatureSource({
               className={styles.completions}
               style={{
                 left: `calc(1rem + ${String(popup.column)}ch - ${String(scroll.left)}px)`,
-                top: `calc(0.8rem + ${String(popup.line + 1)} * 1.6em - ${String(scroll.top)}px)`,
+                top: `calc(0.8rem + ${String((popup.line + 1) * lineHeight - scroll.top)}px)`,
               }}
             >
               {popup.items.map((item, index) => (
@@ -779,6 +845,32 @@ function FindBar({
   );
 }
 
+/** A line's height, in the text's own size. */
+const LINE = 1.6;
+
+/** How many lines are drawn before anything is known of how many are in sight. */
+const UNMEASURED = 300;
+
+/** How many lines are drawn either side of those in sight. */
+const AROUND = 60;
+
+/** How near the edge of the lines drawn the ones in sight may come before more are. */
+const SLACK = 20;
+
+/** The longest line, in columns, counting a tab to its next stop of four. */
+function widestLine(text: string): number {
+  let widest = 0;
+  let column = 0;
+  for (let at = 0; at < text.length; at += 1) {
+    const code = text.charCodeAt(at);
+    if (code === 10) {
+      if (column > widest) widest = column;
+      column = 0;
+    } else column = code === 9 ? column + 4 - (column % 4) : column + 1;
+  }
+  return Math.max(widest, column);
+}
+
 /** Where every line starts. */
 function lineStarts(text: string): number[] {
   const starts = [0];
@@ -816,15 +908,25 @@ function revealIn(box: HTMLTextAreaElement, text: string, span: Span, charWidth:
   }
 }
 
-/** The text again, invisible, with each match marked and the one shown marked apart. */
+/**
+ * The text again, invisible, with each match marked and the one shown marked
+ * apart: the lines from `first` up to `last`, which are the ones drawn.
+ */
 function foundRows(
   text: string,
   starts: readonly number[],
   matches: readonly Match[],
   current: number,
+  first: number,
+  last: number,
 ): React.ReactNode[] {
+  // The first match that reaches the first line drawn.
+  const from = starts[first] ?? text.length;
   let next = 0;
-  return starts.map((start, line) => {
+  while (next < matches.length && matches[next]!.end <= from) next += 1;
+
+  return starts.slice(first, last).map((start, n) => {
+    const line = first + n;
     const following = starts[line + 1];
     const end = following === undefined ? text.length : following - 1;
     const parts: React.ReactNode[] = [];
@@ -852,6 +954,55 @@ function foundRows(
   });
 }
 
+/**
+ * One line, in colour.
+ *
+ * A component of its own so that it is drawn again only when it changes. A
+ * letter typed makes every line anew — the whole file is cut into pieces again —
+ * but leaves all but one of them as they were, and comparing a line's pieces
+ * costs far less than making its spans.
+ */
+const Row = memo(
+  function Row({
+    tokens,
+    problem,
+    link,
+  }: {
+    tokens: readonly Token[];
+    problem: boolean;
+    /** The column a glyph name shown as a link starts at, or -1. */
+    link: number;
+  }): React.JSX.Element {
+    let at = 0;
+    return (
+      <div className={styles.row} data-problem={problem ? "" : undefined}>
+        {tokens.length === 0
+          ? // An empty line still needs its height.
+            " "
+          : tokens.map((token, n) => {
+              const start = at;
+              at += token.text.length;
+              return (
+                <span key={n} data-kind={token.kind} data-link={link === start ? "" : undefined}>
+                  {dotted(token.text)}
+                </span>
+              );
+            })}
+      </div>
+    );
+  },
+  // A line that has not changed is the same pieces it was, not only equal ones.
+  (was, now) =>
+    was.problem === now.problem &&
+    was.link === now.link &&
+    (was.tokens === now.tokens ||
+      (was.tokens.length === now.tokens.length &&
+        was.tokens.every((token, n) => {
+          const other = now.tokens[n]!;
+          return token.kind === other.kind && token.text === other.text;
+        }))),
+);
+
 /** A dot for every space, and the rest as written. */
 function dotted(text: string): React.ReactNode {
   if (!text.includes(" ")) return text;
@@ -864,14 +1015,4 @@ function dotted(text: string): React.ReactNode {
       part
     ),
   );
-}
-
-/** The pieces, a line at a time, with the newlines between them dropped. */
-function linesOf(tokens: readonly Token[]): Token[][] {
-  const lines: Token[][] = [[]];
-  for (const token of tokens) {
-    if (token.kind === "newline") lines.push([]);
-    else lines[lines.length - 1]!.push(token);
-  }
-  return lines;
 }

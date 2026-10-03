@@ -171,7 +171,7 @@
   position: absolute;
   z-index: 5;
   min-width: 14rem;
-  max-height: calc(8 * 1.6em + 0.4rem);
+  max-height: calc(8 * var(--line, 1.6em) + 0.4rem);
   margin: 0;
   padding: 0.2rem 0;
   overflow-y: auto;

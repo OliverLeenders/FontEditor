@@ -100,6 +100,32 @@ const NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
 
 const blank = (ch: string): boolean => ch !== "\n" && /\s/.test(ch);
 
+/**
+ * The source a line at a time, each line's pieces on their own.
+ *
+ * A line is coloured by what is on it and nothing else: a comment and a quoted
+ * name end with their line, and so does the wait for a tag. So a line that has
+ * not changed is coloured as it was, and `known` — the lines of the last time,
+ * by their text — hands those back without cutting them up again. A letter
+ * typed in a file of four thousand lines is then one line's work rather than
+ * four thousand's, and an unchanged line is the same array it was, which is
+ * what lets whatever draws it see at a glance that it need not draw it again.
+ *
+ * `known` is filled with this source's lines and emptied of any others, so it
+ * holds one file's worth however long it is kept.
+ */
+export function highlightLines(source: string, known: Map<string, readonly Token[]>): Token[][] {
+  const seen = new Map<string, readonly Token[]>();
+  const lines = source.split("\n").map((line) => {
+    const tokens = seen.get(line) ?? known.get(line) ?? highlightFea(line);
+    seen.set(line, tokens);
+    return tokens as Token[];
+  });
+  known.clear();
+  for (const [line, tokens] of seen) known.set(line, tokens);
+  return lines;
+}
+
 export function highlightFea(source: string): Token[] {
   const tokens: Token[] = [];
   // Tags still expected: after `feature`, `lookup` and the like, and after the

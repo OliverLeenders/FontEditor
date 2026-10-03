@@ -124,3 +124,14 @@ describe("the glyph name at a place", () => {
     expect(glyphAt("pos base \\mark <anchor 0 0> mark @MC_top;", 11)?.name).toBe("mark");
   });
 });
+
+describe("a glyph name far down a file", () => {
+  it("is found from its own line, at its place in the whole file", () => {
+    const source = "feature liga {\n    sub f i by f_i; # f_x\n} liga;";
+    const at = source.indexOf("f_i");
+    expect(glyphAt(source, at + 1)).toEqual({ start: at, end: at + 3, name: "f_i" });
+    // A word that names a tag on its own line is not a glyph, and one in a comment is not.
+    expect(glyphAt(source, source.lastIndexOf("liga") + 1)).toBeNull();
+    expect(glyphAt(source, source.indexOf("f_x") + 1)).toBeNull();
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { highlightFea } from "../src/highlight.js";
+import { type Token, highlightFea, highlightLines } from "../src/highlight.js";
 
 /**
  * Colouring feature source.
@@ -105,5 +105,54 @@ describe("colouring feature source", () => {
       "glyph:b",
       "punctuation:;",
     ]);
+  });
+});
+
+describe("colouring a line at a time", () => {
+  const source = [
+    "feature liga {",
+    "    sub f i by f_i; # the usual",
+    "",
+    '    name "No. #2";',
+    "} liga;",
+    "    sub f i by f_i; # the usual",
+  ].join("\n");
+
+  /** The whole file cut up at once, then put into lines: what a line at a time must match. */
+  const whole = (text: string) => {
+    const lines: ReturnType<typeof highlightFea>[] = [[]];
+    for (const token of highlightFea(text)) {
+      if (token.kind === "newline") lines.push([]);
+      else lines.at(-1)!.push(token);
+    }
+    return lines;
+  };
+
+  it("gives what cutting the whole file up gives", () => {
+    expect(highlightLines(source, new Map())).toEqual(whole(source));
+    expect(highlightLines("", new Map())).toEqual(whole(""));
+    expect(highlightLines("a\n", new Map())).toEqual(whole("a\n"));
+    // A tag is waited for to the end of its line and no further.
+    expect(highlightLines("feature\nliga {", new Map())).toEqual(whole("feature\nliga {"));
+  });
+
+  it("hands back the lines that have not changed, the very same", () => {
+    const known = new Map<string, readonly Token[]>();
+    const before = highlightLines(source, known);
+    const after = highlightLines(source.replace("the usual", "the usual one"), known);
+
+    expect(after[0]).toBe(before[0]);
+    expect(after[3]).toBe(before[3]);
+    expect(after[1]).not.toBe(before[1]);
+    expect(after[1]!.at(-1)).toEqual({ kind: "comment", text: "# the usual one" });
+    // Two lines alike are one line's work.
+    expect(before[5]).toBe(before[1]);
+  });
+
+  it("remembers one file's lines and no more", () => {
+    const known = new Map<string, readonly Token[]>();
+    highlightLines("one\ntwo\nthree", known);
+    highlightLines("one\nfour", known);
+    expect([...known.keys()].sort()).toEqual(["four", "one"]);
   });
 });

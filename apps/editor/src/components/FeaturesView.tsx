@@ -1,6 +1,6 @@
 import { type MarksSource, compileFeatures, readMarks, writeMarks } from "@typewright/font-io";
 import { type Glyph, type GlyphName, currentMaster } from "@typewright/font-model";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { FeatureSource, type FeatureSourceHandle } from "./FeatureSource.js";
@@ -39,6 +39,33 @@ type Draft = { readonly text: string; readonly written: string };
  * anchors are what it made them — leaving the file, or changing an anchor
  * anywhere else, writes it again from the anchors.
  */
+/** How long a file is, in characters, before it is compiled on a pause rather than on every key. */
+const LONG_FILE = 20_000;
+
+/** How long the typing has to stop for a long file to be compiled, in milliseconds. */
+const PAUSE = 200;
+
+/**
+ * A value once it has stopped changing for `pause` milliseconds.
+ *
+ * With no pause it is the value itself, at once and with nothing in between —
+ * so a short file is compiled exactly as it was before there was a pause at all.
+ */
+function useSettled<T>(value: T, pause: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    // Kept up to date while there is no pause, so that a file grown long enough
+    // to have one starts from what it holds now rather than what it once held.
+    if (pause <= 0) {
+      setSettled(value);
+      return;
+    }
+    const timer = setTimeout(() => setSettled(value), pause);
+    return () => clearTimeout(timer);
+  }, [value, pause]);
+  return pause <= 0 ? value : settled;
+}
+
 export function FeaturesView({
   onOpenGlyph,
 }: {
@@ -56,13 +83,17 @@ export function FeaturesView({
   const [draft, setDraft] = useState<Draft | null>(null);
 
   // Compiled as you type, which is the whole value of the panel: a rule about a
-  // glyph you have not drawn yet should say so now rather than at export.
+  // glyph you have not drawn yet should say so now rather than at export. A
+  // long file is compiled when the typing pauses instead — an icon font's
+  // ligatures are thousands of rules, and compiling them between one letter
+  // and the next is what made the letters late.
+  const settled = useSettled(source, source.length > LONG_FILE ? PAUSE : 0);
   const compiled = useMemo(() => {
     // Ids are positions in the glyph order, which is what the export uses too —
     // so a rule that compiles here compiles there.
     const ids = new Map(glyphOrder.map((name, index) => [name, index]));
-    return compileFeatures(source, (name) => ids.get(name));
-  }, [source, glyphOrder]);
+    return compileFeatures(settled, (name) => ids.get(name));
+  }, [settled, glyphOrder]);
 
   // Only while the Marks file is open: writing it walks every glyph.
   const written = useMemo(

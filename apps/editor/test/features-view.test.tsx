@@ -351,3 +351,79 @@ describe("finding and replacing", () => {
     expect(features(store)).toBe("sub n by e;\nsub o by c;");
   });
 });
+
+describe("a long file", () => {
+  const long = Array.from({ length: 1000 }, (_, i) => `# line ${String(i + 1)}`).join("\n");
+  const drawn = (): string[] =>
+    [...document.querySelectorAll('[data-kind="comment"]')].map((span) =>
+      span.textContent.replaceAll("·", " "),
+    );
+
+  it("is coloured only where it is in sight, and some either side", () => {
+    const { store, box } = open(long, 0);
+
+    // Nothing is known yet of how much is in sight: the first few hundred.
+    expect(drawn()).toContain("# line 1");
+    expect(drawn()).not.toContain("# line 900");
+    expect(drawn().length).toBeLessThan(400);
+
+    // Twenty lines of box, scrolled to the five hundredth line.
+    const line = Math.round(store.getState().featureSize * 1.6);
+    Object.defineProperty(box, "clientHeight", { value: 20 * line, configurable: true });
+    box.scrollTop = 499 * line;
+    fireEvent.scroll(box);
+
+    expect(drawn()).toContain("# line 500");
+    expect(drawn()).toContain("# line 520");
+    expect(drawn()).not.toContain("# line 1");
+    expect(drawn()).not.toContain("# line 900");
+    expect(drawn().length).toBeLessThan(200);
+    // The whole file is still the text box's, to select, search and edit.
+    expect(box.value).toBe(long);
+  });
+
+  it("numbers the lines drawn by their place in the file", () => {
+    const { store, box } = open(long, 0);
+    const line = Math.round(store.getState().featureSize * 1.6);
+    Object.defineProperty(box, "clientHeight", { value: 20 * line, configurable: true });
+    box.scrollTop = 499 * line;
+    fireEvent.scroll(box);
+
+    expect(screen.getByText("500")).toBeTruthy();
+    expect(screen.queryByText("1")).toBeNull();
+  });
+});
+
+describe("a long file being typed", () => {
+  // Past the length at which a file is compiled on a pause: one rule, under a
+  // comment long enough to make the file a long one.
+  const long = `# ${"x".repeat(21_000)}\nfeature liga {\n    sub o by e;\n} liga;`;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is compiled once the typing stops, not on every letter", () => {
+    vi.useFakeTimers();
+    const { store } = open(long, 0);
+    // Compiled as it was opened: there was no typing to wait for.
+    expect(screen.getByText(/1 rule/)).toBeTruthy();
+    expect(screen.queryByText(/there is no glyph called nosuch/)).toBeNull();
+
+    act(() => store.setFeatures(long.replace("sub o by e;", "sub nosuch by e;")));
+    // Typed, and on screen, and not yet compiled.
+    expect(features(store)).toContain("nosuch");
+    expect(screen.queryByText(/there is no glyph called nosuch/)).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    expect(screen.getByText(/there is no glyph called nosuch/)).toBeTruthy();
+  });
+
+  it("leaves a short file compiled as it is typed", () => {
+    const { store } = open("feature liga {\n    sub o by e;\n} liga;", 0);
+    act(() => store.setFeatures("feature liga {\n    sub nosuch by e;\n} liga;"));
+    expect(screen.getByText(/there is no glyph called nosuch/)).toBeTruthy();
+  });
+});

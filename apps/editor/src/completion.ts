@@ -164,8 +164,12 @@ export function glyphAt(
   source: string,
   offset: number,
 ): { start: number; end: number; name: string } | null {
-  let at = 0;
-  for (const token of highlightFea(source)) {
+  // Its own line is all that says what a word on it is, so only that is read:
+  // this is asked as the pointer moves, over a file that may be very long.
+  const lineStart = source.lastIndexOf("\n", offset - 1) + 1;
+  const lineEnd = source.indexOf("\n", offset);
+  let at = lineStart;
+  for (const token of highlightFea(source.slice(lineStart, lineEnd === -1 ? undefined : lineEnd))) {
     const end = at + token.text.length;
     if (token.kind === "glyph" && offset >= at && offset <= end) {
       const name = token.text.startsWith("\\") ? token.text.slice(1) : token.text;
