@@ -12,6 +12,7 @@ import {
 } from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
+import { isGenerational } from "./generations.js";
 import { inParallel } from "./parallel.js";
 
 import {
@@ -158,6 +159,18 @@ export async function replaceDocument(
   store: FileStore,
   document: FontDocument,
 ): Promise<{ readonly written: number; readonly removed: number }> {
+  // Kept in generations, the new font is written beside the old one and takes
+  // its place in one step: see `generations.ts`. Nothing of the old font is
+  // left to remove, and the journal belonged to it.
+  if (isGenerational(store)) {
+    const before = (await store.list(GLYPHS_PREFIX)).length;
+    let written = 0;
+    await store.replace(async (next) => {
+      written = (await writeWhole(next, document)).length;
+    });
+    return { written, removed: Math.max(0, before - written) };
+  }
+
   const wanted = document.glyphOrder
     .map((name) => document.glyphs[name])
     .filter((g): g is Glyph => g !== undefined);
@@ -177,6 +190,21 @@ export async function replaceDocument(
   await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
   await clearJournal(store);
   return { written: keep.size, removed };
+}
+
+/** Every file of a font into a store that has none of them yet: its glyphs, its info, its kerning. */
+async function writeWhole(store: FileStore, document: FontDocument): Promise<string[]> {
+  const wanted = document.glyphOrder
+    .map((name) => document.glyphs[name])
+    .filter((g): g is Glyph => g !== undefined);
+  const paths = await inParallel(wanted, async (g) => {
+    const path = glyphPath(g.name);
+    await store.write(path, JSON.stringify(encodeGlyph(g)));
+    return path;
+  });
+  await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
+  await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
+  return paths;
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +382,7 @@ function decodeFile(raw: string): ReturnType<typeof decodeGlyph> {
 /** Remove everything. Used by "start over", and by tests. */
 export async function wipe(store: FileStore): Promise<void> {
   await inParallel(await store.list(""), (path) => store.remove(path));
+  if (isGenerational(store)) store.emptied();
 }
 
 export { DEFAULT_FONT_INFO, SCHEMA_VERSION };

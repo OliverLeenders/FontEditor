@@ -28,6 +28,12 @@ export interface FileStore {
   remove(path: string): Promise<void>;
   /** Paths beginning with `prefix`, in no guaranteed order. */
   list(prefix: string): Promise<string[]>;
+  /**
+   * Remove a folder and everything in it, where the store can do that in one
+   * step rather than a file at a time. Optional: a store without it has its
+   * files removed one by one.
+   */
+  removeFolder?(path: string): Promise<void>;
 }
 
 /** An in-memory `FileStore`, for tests and for a session that cannot persist. */

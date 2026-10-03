@@ -113,6 +113,17 @@ export class OpfsFileStore implements FileStore {
     }
   }
 
+  async removeFolder(path: string): Promise<void> {
+    const { directory, file } = this.split(path);
+    const parent = await this.directoryHandle(directory, false);
+    if (parent === null) return;
+    try {
+      await parent.removeEntry(file, { recursive: true });
+    } catch {
+      // Already gone, which is the outcome the caller wanted.
+    }
+  }
+
   async list(prefix: string): Promise<string[]> {
     const found: string[] = [];
     await this.walk(this.root, "", found);

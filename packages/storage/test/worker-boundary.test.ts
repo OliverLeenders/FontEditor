@@ -127,8 +127,9 @@ describe("deleting a glyph", () => {
     await client.removeGlyphs(removedGlyphs(before, after));
     await client.saveFontInfo(after);
 
-    expect(worker.store.has(glyphPath("vee"))).toBe(true);
-    expect(worker.store.has(glyphPath("v"))).toBe(false);
+    // In the generation the font was written into when it was replaced whole.
+    expect(worker.store.has(`generation-1/${glyphPath("vee")}`)).toBe(true);
+    expect(worker.store.has(`generation-1/${glyphPath("v")}`)).toBe(false);
   });
 
   it("does not mind being asked to remove nothing", async () => {

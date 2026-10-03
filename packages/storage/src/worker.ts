@@ -19,6 +19,7 @@ import {
 } from "@typewright/font-model";
 
 import type { FileStore } from "./file-store.js";
+import { GenerationalStore } from "./generations.js";
 import type { LoadedPayload, StorageRequest, StorageResponse } from "./protocol.js";
 import { listSnapshots, pruneSnapshots, readSnapshot, writeSnapshot } from "./snapshots.js";
 import { listImages, readImage, removeImage, writeImage } from "./images.js";
@@ -77,14 +78,15 @@ export function storageHandler(
   const run = async (request: StorageRequest): Promise<unknown> => {
     switch (request.kind) {
       case "open":
-        store = await open(request.directory);
+        // In generations, so that replacing the whole font is one step.
+        store = await GenerationalStore.over(await open(request.directory));
         return null;
       default:
         return runOn(required(), request);
     }
   };
 
-  return async (request: StorageRequest): Promise<StorageResponse> => {
+  const answer = async (request: StorageRequest): Promise<StorageResponse> => {
     try {
       return { id: request.id, ok: true, value: await run(request) };
     } catch (error) {
@@ -97,6 +99,20 @@ export function storageHandler(
         reason: error instanceof Error ? error.message : String(error),
       };
     }
+  };
+
+  // One request at a time, in the order they came. Each file is read and
+  // written through an access handle of its own, and a file can have only one
+  // open at once: run side by side, a load reading the project and a font being
+  // written over it opened the same file twice, the second was refused, and
+  // storage gave up — a font opened a moment after a reload, before the load had
+  // finished, was never saved. The handles make each file's work serial anyway,
+  // so waiting costs nothing that was being gained.
+  let queue: Promise<unknown> = Promise.resolve();
+  return (request: StorageRequest): Promise<StorageResponse> => {
+    const next = queue.then(() => answer(request));
+    queue = next;
+    return next;
   };
 }
 
