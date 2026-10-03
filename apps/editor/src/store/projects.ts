@@ -121,12 +121,16 @@ export async function noteProjects(host: FontHost, current: string | null): Prom
   // Linked, not read: reading would replace the font recovered from the working
   // copy with whatever is on disk, which is a decision rather than something to
   // do to somebody at startup.
-  await noteFolder(host, {
-    folder: project.folder,
-    name: project.folder.name,
-    at: project.savedAt ?? 0,
-    wrote: project.wrote,
-  });
+  await noteFolder(
+    host,
+    {
+      folder: project.folder,
+      name: project.folder.name,
+      at: project.savedAt ?? 0,
+      wrote: project.wrote,
+    },
+    { family: project.family === true, unsavedMasters: project.unsavedMasters ?? [] },
+  );
   await confirmSaved(host, project.savedHash);
 }
 

@@ -1,11 +1,14 @@
 import {
   type Incompatibility,
   type MasterId,
+  type StructureDifferences,
+  type StructurePart,
   WEIGHT,
   defaultLocation,
   describeLocation,
   orderedInstances,
   orderedMasters,
+  sameStructure,
 } from "@typewright/font-model";
 import { selectContour } from "@typewright/tools";
 import { useRef, useState } from "react";
@@ -43,7 +46,12 @@ export function Masters({
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [checked, setChecked] = useState<{ name: string; found: Incompatibility[] } | null>(null);
+  const [checked, setChecked] = useState<{
+    id: MasterId;
+    name: string;
+    found: Incompatibility[];
+    structure: StructureDifferences;
+  } | null>(null);
 
   const attempt = async (run: () => Promise<string | null>): Promise<void> => {
     setBusy(true);
@@ -108,7 +116,28 @@ export function Masters({
       const done = await store.compareWith(id);
       if (done === null) return "Nothing to compare against.";
 
-      setChecked({ name: done.master.name, found: [...done.found] });
+      setChecked({
+        id,
+        name: done.master.name,
+        found: [...done.found],
+        structure: done.structure,
+      });
+      return null;
+    });
+
+  /** Copy one part of what two masters differ in across, and look again. */
+  const copy = (id: MasterId, part: StructurePart): Promise<void> =>
+    attempt(async () => {
+      await store.copyStructure(id, part);
+      const done = await store.compareWith(id);
+      if (done !== null) {
+        setChecked({
+          id,
+          name: done.master.name,
+          found: [...done.found],
+          structure: done.structure,
+        });
+      }
       return null;
     });
 
@@ -218,7 +247,15 @@ export function Masters({
       ) : null}
 
       {checked === null ? null : (
-        <Report name={checked.name} found={checked.found} store={store} onOpen={onOpen} />
+        <>
+          <Shared
+            name={checked.name}
+            differences={checked.structure}
+            disabled={busy || reading}
+            onCopy={(part) => void copy(checked.id, part)}
+          />
+          <Report name={checked.name} found={checked.found} store={store} onOpen={onOpen} />
+        </>
       )}
 
       {failed !== null ? (
@@ -501,6 +538,127 @@ function Preview(): React.JSX.Element {
               <span className={styles.axisValue}>{Math.round(shown[a.tag] ?? a.default)}</span>
             </label>
           ))}
+    </div>
+  );
+}
+
+/**
+ * What two masters differ in that every master should share.
+ *
+ * A glyph added, renamed or removed, a code point, the order, the features, the
+ * kerning groups and the family's own information are carried from the master
+ * being drawn to the others as it is left. This is for what they differ in all
+ * the same: masters read from files drawn somewhere else, or that came apart
+ * before changes were carried. Nothing says which master is right, so nothing
+ * is put right by itself — each part is copied one way by whoever knows.
+ *
+ * Nothing at all where they agree, which is what they should do and usually do.
+ */
+function Shared({
+  name,
+  differences,
+  disabled,
+  onCopy,
+}: {
+  name: string;
+  differences: StructureDifferences;
+  disabled: boolean;
+  onCopy: (part: StructurePart) => void;
+}): React.JSX.Element | null {
+  if (sameStructure(differences)) return null;
+
+  /** A few names and how many more, for a line that has to stay a line. */
+  const some = (glyphs: readonly string[]): string =>
+    glyphs.length <= 6
+      ? glyphs.join(", ")
+      : `${glyphs.slice(0, 6).join(", ")} and ${String(glyphs.length - 6)} more`;
+  const count = (n: number): string => (n === 1 ? "1 glyph is" : `${String(n)} glyphs are`);
+
+  const lines: { part: StructurePart; says: string; does: string; title: string }[] = [];
+  if (differences.onlyHere.length > 0) {
+    lines.push({
+      part: "onlyHere",
+      says: `${count(differences.onlyHere.length)} only in this master: ${some(differences.onlyHere)}`,
+      does: `Add to ${name}`,
+      title: `Add them to ${name}, as copies of this master's drawing`,
+    });
+  }
+  if (differences.onlyThere.length > 0) {
+    lines.push({
+      part: "onlyThere",
+      says: `${count(differences.onlyThere.length)} only in ${name}: ${some(differences.onlyThere)}`,
+      does: "Add here",
+      title: `Add them to this master, as copies of ${name}'s drawing`,
+    });
+  }
+  if (differences.unicodes.length > 0) {
+    lines.push({
+      part: "unicodes",
+      says: `${differences.unicodes.length === 1 ? "1 glyph has" : `${String(differences.unicodes.length)} glyphs have`} other code points in ${name}: ${some(differences.unicodes)}`,
+      does: "Use this master's",
+      title: `Give them this master's code points in ${name}`,
+    });
+  }
+  if (differences.order) {
+    lines.push({
+      part: "order",
+      says: `The glyphs are in another order in ${name}`,
+      does: "Use this master's",
+      title: `Put ${name}'s glyphs in this master's order`,
+    });
+  }
+  if (differences.features) {
+    lines.push({
+      part: "features",
+      says: `The features are not the same in ${name}`,
+      does: "Use this master's",
+      title: `Replace ${name}'s features with this master's`,
+    });
+  }
+  if (differences.groups) {
+    lines.push({
+      part: "groups",
+      says: `The kerning groups are not the same in ${name}`,
+      does: "Use this master's",
+      title: `Give ${name} this master's groups. Its own kerning values are kept, save those against a group it no longer has`,
+    });
+  }
+  if (differences.info.length > 0) {
+    lines.push({
+      part: "info",
+      says: `The family's information differs in ${name}: ${some(differences.info)}`,
+      does: "Use this master's",
+      title: `Copy these from this master to ${name}`,
+    });
+  }
+  if (differences.unitsPerEm) {
+    lines.push({
+      part: "unitsPerEm",
+      says: `${name} is drawn on another em`,
+      does: `Scale ${name}`,
+      title: `Scale ${name} to this master's units per em`,
+    });
+  }
+
+  return (
+    <div className={styles.report}>
+      <p className={styles.reportHead}>This master and {name} differ in what every master shares</p>
+      <ul className={styles.list}>
+        {lines.map((line) => (
+          <li key={line.part} className={styles.shared}>
+            <span className={styles.says}>{line.says}</span>
+            <button
+              type="button"
+              className={styles.add}
+              disabled={disabled}
+              title={line.title}
+              onClick={() => onCopy(line.part)}
+            >
+              {line.does}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

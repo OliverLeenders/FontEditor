@@ -99,7 +99,7 @@ describe("the font's folder on disk", () => {
 
     const report = await store.saveFolder();
 
-    expect(report.written).toBeGreaterThan(0);
+    expect(report?.written).toBeGreaterThan(0);
     expect(unsavedNow(store.getState())).toBe(false);
     expect(store.getState().folder.savedAt).not.toBeNull();
     // What was written is what is open, not what was opened.
@@ -296,10 +296,10 @@ describe("saving again", () => {
 
     edit(store);
     const first = await store.saveFolder();
-    expect(first.written).toBeGreaterThan(1);
+    expect(first?.written).toBeGreaterThan(1);
 
     const again = await store.saveFolder();
-    expect(again.written).toBe(0);
+    expect(again?.written).toBe(0);
   });
 
   it("writes the glyph that moved, and not the rest of the font", async () => {
@@ -311,8 +311,8 @@ describe("saving again", () => {
     const again = await store.saveFolder();
 
     // The glyph's own file, and the two indexes that name what is in the font.
-    expect(again.written).toBeLessThan(4);
-    expect(again.written).toBeGreaterThan(0);
+    expect(again?.written).toBeLessThan(4);
+    expect(again?.written).toBeGreaterThan(0);
   });
 
   it("keeps a record of what it left, for the session after this one", async () => {

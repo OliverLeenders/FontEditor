@@ -169,6 +169,15 @@
   padding: 0.15rem 0;
 }
 
+/* A part two masters differ in, and the button that copies it across. */
+.shared {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+}
+
 .foundGlyph {
   padding: 0;
   border: 0;

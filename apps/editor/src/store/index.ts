@@ -58,7 +58,10 @@ import {
   type RuleId,
   type RulesProcessing,
   type SparseSource,
+  type StructurePart,
+  applyStructure,
   orderedMasters,
+  structureCopy,
 } from "@typewright/font-model";
 import type { ViewTransform } from "@typewright/view";
 import { type DiskFolder, FIRST_PROJECT, projectById } from "@typewright/disk";
@@ -114,6 +117,7 @@ import {
   toggleInspectorSection,
 } from "./inspector.js";
 import { count, shown, tell } from "./opening.js";
+import { copyStructureTo, noteArrived, shareStructure } from "./structure.js";
 import { type SplitChanges, placeSplit } from "./split.js";
 import {
   type Arrival,
@@ -136,6 +140,7 @@ import {
   addMaster,
   addRule,
   compareWith,
+  documentOfMaster,
   glyphFromFamily,
   loadWhole,
   moveInstance,
@@ -683,6 +688,9 @@ export class EditorStore {
       kept?: KeptXml;
     }[]
   > {
+    // An export is the family as it should be: what this master has changed
+    // that they share is made in the others first.
+    await shareStructure(this.host);
     await loadSources(this.host);
     const project = this.state.project;
 
@@ -714,6 +722,30 @@ export class EditorStore {
   /** What cannot be interpolated between this master and another. */
   async compareWith(id: string): Promise<Awaited<ReturnType<typeof compareWith>>> {
     return await compareWith(this.host, id);
+  }
+
+  /**
+   * Make two masters agree in one part of what they differ in.
+   *
+   * The other master is made to agree with the open one, save for the glyphs
+   * only the other has: those are added to the open master, as an edit of it —
+   * a step of its history, to be undone like any other — and reach the rest of
+   * the family as any glyph added here does.
+   */
+  async copyStructure(id: string, part: StructurePart): Promise<void> {
+    if (part !== "onlyThere") {
+      await copyStructureTo(this.host, id, part);
+      return;
+    }
+
+    const there = await documentOfMaster(this.host, id);
+    if (there === null) return;
+    const here = this.editor.document;
+    const next = applyStructure(here, { ...structureCopy(there, here, "onlyHere"), order: null });
+    if (next === here) return;
+    this.applyTool(
+      result({ ...this.editor, document: next }, [begin("Add glyphs from another master"), commit]),
+    );
   }
 
   /** Read in the master the open one is a layer of, where it is one. */
@@ -757,7 +789,7 @@ export class EditorStore {
   }
 
   /** Write the font back to its folder. */
-  async saveFolder(): Promise<SaveReport> {
+  async saveFolder(): Promise<SaveReport | null> {
     return await saveFolder(this.host);
   }
 
@@ -1315,6 +1347,9 @@ export class EditorStore {
     // recovered from the journal is ahead of them, and the starter font shown
     // when the store is empty has never been written at all.
     const onDisk = loaded.kind === "loaded" && !loaded.recovered && !migrated;
+    // The font as it stands is the master arrived at: what changes in it from
+    // here is what is carried to its other masters when it is left.
+    noteArrived(this.host, this.editor.document);
     await this.disk.settle(this.editor.document, !onDisk);
   }
 
@@ -1371,6 +1406,9 @@ export class EditorStore {
     // A master gone to a moment ago may still be on its way into the working
     // copy, and the window must not close on half of it.
     await written(this.host);
+    // What this master has changed that the others share, made in them before
+    // the window goes: nothing else would carry it once it has.
+    await shareStructure(this.host);
     await this.disk.flushNow();
     await parkCurrent(this.host);
   }

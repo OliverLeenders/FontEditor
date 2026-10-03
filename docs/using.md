@@ -229,13 +229,25 @@ opens the glyph and selects the contour a line is about.
 **Going between masters.** **Draw** in the Masters panel puts another master in front of you.
 It is done once that master's drawing is on screen; making it the working copy is every glyph
 written again, which for a large font is some seconds and goes on afterwards, shown as
-_saving_ in the status bar. Each master is a font of its own in three places worth knowing.
+_saving_ in the status bar. Each master is a font of its own in two places worth knowing.
 The copies under **History** are the open master's: a copy kept in the Regular is offered in
 the Regular and not in the Bold, each master has its own twenty, and a copy from before the
-font had a second master is offered to either. The font's folder on disk is one master's — the
-one that was open when it was last saved — so **Re-read** replaces the drawing in front of you
-and leaves the other masters as they are. And the undo history is the open master's, starting
-again each time you arrive.
+font had a second master is offered to either. And the undo history is the open master's,
+starting again each time you arrive.
+
+**What the masters share.** A master's drawing is its own: its outlines, its widths, where its
+anchors sit, how much it kerns a pair by, its style name and weight. Everything else is the
+family's, and is changed through whichever master is open: a glyph added, removed or renamed,
+its code points, the order of the glyphs, the features, the kerning groups, and the family's
+information — its name, its em, its vertical metrics, the grid. A change to any of these is
+made in the other masters when you leave the one you made it in: on going to another master,
+saving to the folder, exporting, or closing the window. It is the change as it stands then, so
+one that was undone is not made at all. A glyph added arrives in the others as a copy of the
+drawing it was made with, compatible from the start; a glyph renamed keeps each master's own
+drawing under the new name. Masters that differ already — a family drawn elsewhere, or from
+before this — are not made to agree, since nothing says which is right: **Check** in the
+Masters panel lists what two masters differ in, a part at a time, with a button to copy that
+part across.
 
 **Between the masters.** The Spacing line and the Proof have a **Between** switch and a
 slider for each axis: the text is then set with the family worked out at that place rather
@@ -751,7 +763,22 @@ beside it as `MyFont-Regular-2.ufo`. From then on Ctrl-S writes to that UFO with
 picker opens where you last kept a font, not inside the last font's own folder, and it will
 not save one font into another font's UFO. An empty folder whose name ends in `.ufo` is taken
 as the font's own, if you would rather make the folder yourself. **Open UFO folder** is the
-other way round: there you pick the `.ufo` itself. The list under **Switch font** names the UFO each font is
+other way round: there you pick the `.ufo` itself.
+
+**A family on disk.** A font drawn more than once is kept as a family: a folder of its own,
+named for the family, holding a `.designspace` and a UFO for each master —
+`MyFont/MyFont.designspace`, `MyFont/MyFont-Regular.ufo`, `MyFont/MyFont-Bold.ufo` — which is
+what fontmake is given and what other editors read. Ctrl-S writes every master that has
+changed since the last save and leaves the others alone, and the File menu shows the font as
+unsaved while any master, or the designspace, is behind. **Open UFO folder** on a family's
+folder reads every master, and **Re-read** does the same, replacing them all with what the
+folder has. A font saved as a single UFO that has since been given a second master is asked
+for a folder the next time it is saved — a browser gives no way from a folder to the one it is
+in — and is kept as a family there from then on; the UFO it was saved in is left where it was.
+A master renamed or removed has its UFO taken out of the family's folder at the next save;
+anything in the folder the editor did not write is left alone.
+
+The list under **Switch font** names the UFO each font is
 kept in, or says it has not been saved to disk yet. Its **Open UFO folder** button opens a
 font kept anywhere on disk straight from the list, and **Import font file** opens a TTF, OTF,
 WOFF or zipped UFO there as a new font, the same as in the File menu.

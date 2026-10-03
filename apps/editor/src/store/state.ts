@@ -292,6 +292,25 @@ export type FolderState = {
    * font on screen has been compared with that fingerprint.
    */
   readonly behind: boolean;
+  /**
+   * Whether the folder is a family's — a designspace and a UFO for each master,
+   * in a folder of their own — rather than one font's UFO.
+   */
+  readonly family: boolean;
+  /**
+   * The masters, other than the one open, whose drawing the folder does not
+   * have: changed and then left, or added since the last save.
+   *
+   * `saved` and `behind` are about the open master. A master that is parked
+   * cannot be asked without reading all of it in, so its answer is kept as it
+   * is left and taken up again when it is gone back to.
+   */
+  readonly others: readonly string[];
+  /**
+   * Whether the family is no longer as the designspace in the folder says: a
+   * master renamed, moved, added or removed, an axis changed, a style named.
+   */
+  readonly designspaceBehind: boolean;
   readonly problem: string | null;
 };
 
@@ -305,6 +324,9 @@ export const NO_FOLDER: FolderState = {
   written: new Map(),
   checked: true,
   behind: false,
+  family: false,
+  others: [],
+  designspaceBehind: false,
   problem: null,
 };
 

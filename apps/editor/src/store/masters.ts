@@ -14,6 +14,7 @@ import {
   type RuleId,
   type RulesProcessing,
   type SparseSource,
+  type StructureDifferences,
   addInstance as addToInstances,
   addRule as addToRules,
   removeRule as removeFromRules,
@@ -35,12 +36,16 @@ import {
   setInstanceFamily as setFamilyInInstances,
   project as makeProject,
   setAxes as setProjectAxes,
+  structuralDifferences,
   switchTo as switchProjectTo,
   weightsAmong,
 } from "@typewright/font-model";
 
+import { noteDesignspace, noteMasterAdded, noteMasterOpened } from "./family-folder.js";
 import type { FontHost } from "./fonts.js";
 import { showDocument } from "./fonts.js";
+import { painted, shown } from "./opening.js";
+import { shareStructure } from "./structure.js";
 
 /**
  * Several drawings of one typeface, and moving between them.
@@ -92,6 +97,11 @@ export async function switchMaster(host: FontHost, id: MasterId): Promise<Master
   const master = asked.masters.find((m) => m.id === id);
   if (master === undefined) return null;
 
+  // What this master has had done to it that every master shares — a glyph
+  // added or renamed, the features — made in the others, before the one gone
+  // to is read.
+  await shareStructure(host);
+
   const left = host.state().session.editor.document;
   await parkCurrent(host);
 
@@ -115,6 +125,7 @@ export async function switchMaster(host: FontHost, id: MasterId): Promise<Master
     id,
   );
   showDocument(host, found.document, false, { project: next });
+  noteMasterOpened(host, project.current, id, found.document, left);
   // A master that draws only some glyphs is shown against the one it is a
   // layer of, so that one is read in as well.
   await loadWhole(host);
@@ -202,6 +213,7 @@ export async function addMaster(
   // Parked at once, and the same document the project now holds for it.
   await host.disk.putMaster(id, from);
   host.patch({ project: out });
+  noteMasterAdded(host, id);
   await rememberDesignspace(host, out);
 }
 
@@ -233,7 +245,9 @@ export async function removeMaster(host: FontHost, id: MasterId): Promise<void> 
   const now = removeFromProject(host.state().project, id);
   if (!isProject(now)) throw new Error(masterProblemSays(now));
   const next = { ...now, sources: { ...now.sources, [now.current]: found.document } };
+  const was = host.state().session.editor.document;
   showDocument(host, found.document, false, { project: next });
+  noteMasterOpened(host, null, next.current, found.document, was);
 
   // Written down as a switch is: the working copy made that master's, then the
   // project saying so, and the file of the one removed last — so stopping part
@@ -296,10 +310,15 @@ export function beginFresh(host: FontHost, document: FontDocument): () => Promis
 /**
  * Take on a whole family: the axes, and a master per source.
  *
- * The first master goes on screen and into the ordinary layout; the rest are
- * parked, which is where masters that are not being drawn live. Ids are made
- * here rather than read from the file — a designspace names its sources by
- * filename, and a filename is a thing people change.
+ * One master goes on screen and into the ordinary layout — the first, or the
+ * one asked for — and the rest are parked, which is where masters that are not
+ * being drawn live. Ids are made here rather than read from the file — a
+ * designspace names its sources by filename, and a filename is a thing people
+ * change.
+ *
+ * The master and the project go on screen in one step, and before anything is
+ * written: a family is as many fonts as it has masters, and writing them is
+ * seconds nobody needs to spend behind a pane.
  */
 export async function adoptFamily(
   host: FontHost,
@@ -324,8 +343,10 @@ export async function adoptFamily(
     readonly rulesProcessing?: RulesProcessing;
     readonly kept?: KeptXml | null;
   },
+  /** Which master to open, by its place in the family. */
+  open = 0,
 ): Promise<void> {
-  for (const m of host.state().project.masters) await host.disk.dropMaster(m.id);
+  const gone = host.state().project.masters.map((m) => m.id);
 
   const stamp = Date.now();
   const ids = family.masters.map((_, i) => `master-${String(stamp)}-${String(i)}`);
@@ -341,8 +362,9 @@ export async function adoptFamily(
     ...(m.kept === undefined ? {} : { kept: m.kept }),
   }));
 
-  const first = masters[0];
-  const opened = family.masters[0];
+  const at = masters[open] === undefined ? 0 : open;
+  const first = masters[at];
+  const opened = family.masters[at];
   if (first === undefined || opened === undefined) return;
 
   const next: FontProject = {
@@ -361,8 +383,11 @@ export async function adoptFamily(
     rulesProcessing: family.rulesProcessing ?? "first",
     kept: family.kept ?? null,
   };
-  host.patch({ project: next });
+  showDocument(host, opened.document, false, { project: next });
+  shown(host);
+  await painted();
 
+  for (const id of gone) await host.disk.dropMaster(id);
   for (const [i, m] of masters.entries()) {
     const source = family.masters[i];
     if (source !== undefined) await host.disk.putMaster(m.id, source.document);
@@ -372,7 +397,14 @@ export async function adoptFamily(
   // kept in beside the font is cleared.
   await host.disk.putLayers([]);
 
+  // The working copy made the open master's, and then the project saying so:
+  // the order a switch writes them in, for the reason it does.
+  await written(host);
+  await host.disk.replaceAll(opened.document, next.current);
   await rememberDesignspace(host, next);
+  // A master that draws only some glyphs is shown against the one it is a
+  // layer of.
+  await loadWhole(host);
 }
 
 /**
@@ -596,6 +628,9 @@ export async function parkCurrent(host: FontHost): Promise<void> {
  * master's drawing under another's name.
  */
 export async function rememberDesignspace(host: FontHost, project?: FontProject): Promise<void> {
+  // Whether the family is still as its folder on disk has it, said at once:
+  // every change to the project comes through here.
+  noteDesignspace(host);
   await written(host);
   await writeDesignspace(host, project ?? host.state().project);
 }
@@ -683,17 +718,28 @@ export async function setInstanceFamily(
 export async function compareWith(
   host: FontHost,
   id: MasterId,
-): Promise<{ master: Master; found: ReturnType<typeof incompatibilities> } | null> {
+): Promise<{
+  master: Master;
+  found: ReturnType<typeof incompatibilities>;
+  /** What the two differ in that every master should share. */
+  structure: StructureDifferences;
+} | null> {
   const project = host.state().project;
   const master = project.masters.find((m) => m.id === id);
   if (master === undefined || id === project.current) return null;
 
+  // What has changed here since this master was arrived at is carried first:
+  // it is on its way to the other master, and is not a difference between them.
+  await shareStructure(host);
+
   const found = await host.disk.getMaster(id);
   if (found === null) return null;
 
+  const here = host.state().session.editor.document;
   return {
     master,
-    found: incompatibilities(host.state().session.editor.document, found.document),
+    found: incompatibilities(here, found.document),
+    structure: structuralDifferences(here, found.document),
   };
 }
 

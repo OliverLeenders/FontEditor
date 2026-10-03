@@ -20,8 +20,20 @@ import {
 import { crc32, entryBytes, readUfo, ufoFiles, ufoFolderName } from "@typewright/font-io";
 import { type FontDocument, randomIds } from "@typewright/font-model";
 
+import { DEFAULT_QUERY } from "@typewright/catalog";
+
+import {
+  designspaceIn,
+  designspaceSaved,
+  familyStemOf,
+  openMasterSaved,
+  readFamilyFolder,
+  writeFamily,
+} from "./family-folder.js";
 import { type FontHost, adoptAsOpenMaster, adoptDocument, adoptImages } from "./fonts.js";
+import { adoptFamily } from "./masters.js";
 import { count, tell } from "./opening.js";
+import { shareStructure } from "./structure.js";
 import { type FolderState, NO_FOLDER } from "./state.js";
 
 /**
@@ -94,6 +106,12 @@ export async function reopenFolder(host: FontHost): Promise<FolderReport | null>
 }
 
 async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderReport> {
+  // A family's folder: a designspace, and the UFOs it names beside it.
+  if ((await whatItHolds(folder)) === "family") {
+    const designspace = await designspaceIn(folder);
+    if (designspace !== null) return await adoptFamilyFolder(host, folder, designspace);
+  }
+
   await tell(host, folder.name, "files");
   const files = await readFolder(folder, (done, total) => {
     count(host, done, total);
@@ -122,6 +140,8 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
   // folder is one master's.
   const again = project.id === before;
   const masters = host.state().project.masters;
+  // Only while the font is still kept as one UFO. Kept as a family, its folder
+  // is the family's and is read whole: see `adoptFamilyFolder`.
   const into = again && masters.length > 1;
   if (into) await adoptAsOpenMaster(host, read.document);
   else await adoptDocument(host, read.document, again);
@@ -141,6 +161,81 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
     master: into
       ? (masters.find((m) => m.id === host.state().project.current)?.name ?? null)
       : null,
+  };
+}
+
+/**
+ * Open a family from its folder: every master the designspace names.
+ *
+ * Read again into the font it belongs to, it replaces every master — the
+ * folder is the whole family, and reading it is asking for the family as it is
+ * on disk — after a copy of the drawing in front of you has been kept. The
+ * master that was open is the one opened again, where the folder still has one
+ * of that name.
+ */
+async function adoptFamilyFolder(
+  host: FontHost,
+  folder: DiskFolder,
+  designspace: string,
+): Promise<FolderReport> {
+  await tell(host, folder.name, "files");
+  const family = await readFamilyFolder(folder, designspace, (done, total) => {
+    count(host, done, total);
+  });
+  const first = family.masters[0];
+  if (first === undefined) throw new Error(`${folder.name}: the family has no masters`);
+
+  await tell(host, folder.name, "drawing");
+  const was = host.state();
+  const replaced = was.session.editor.document;
+  const wasOpen = was.project.masters.find((m) => m.id === was.project.current)?.name;
+  const project = await moveToProjectFor(host, folder, first.document);
+  const again = project.id === was.projects.current;
+
+  // Kept before anything is replaced, and only where something is: a font moved
+  // out of is still in its own working copy.
+  if (again) await host.keepSnapshot(replaced);
+
+  const at = again ? family.masters.findIndex((m) => m.name === wasOpen) : 0;
+  const open = Math.max(0, at);
+  const opened = family.masters[open] ?? first;
+
+  host.setCatalogQuery(DEFAULT_QUERY);
+  await adoptFamily(host, family, open);
+  // Every master's pictures, all into the one store: an image belongs to the
+  // font rather than to a master.
+  for (const m of family.masters) await adoptImages(host, m.images);
+
+  host.setFolder(folder, folder.name);
+  await rememberFolder(folder);
+  await saveProject({
+    ...project,
+    name: nameOf(opened.document, folder),
+    folder,
+    family: true,
+    unsavedMasters: [],
+  });
+  host.patch({
+    folder: {
+      ...host.state().folder,
+      saved: opened.document,
+      savedAt: null,
+      family: true,
+      others: [],
+      behind: false,
+      designspaceBehind: false,
+    },
+  });
+
+  return {
+    name: folder.name,
+    family: `${opened.document.info.familyName} ${opened.name}`.trim(),
+    glyphs: opened.document.glyphOrder.length,
+    warnings: [
+      `${String(family.masters.length)} masters: ${family.masters.map((m) => m.name).join(", ")}`,
+      ...family.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
+    ],
+    master: null,
   };
 }
 
@@ -174,10 +269,34 @@ function nameOf(document: FontDocument, folder: DiskFolder): string {
   return named === "" ? folder.name : named;
 }
 
-/** Write the font back to the folder it came from. */
-export async function saveFolder(host: FontHost): Promise<SaveReport> {
+/**
+ * Whether the font is kept as a family: a designspace and a UFO for each
+ * master. One drawn more than once is, and so is one that has been — its
+ * folder is a family's, and stays one.
+ */
+export function keptAsFamily(state: {
+  readonly folder: FolderState;
+  readonly project: { readonly masters: readonly unknown[] };
+}): boolean {
+  return state.folder.family || state.project.masters.length > 1;
+}
+
+/**
+ * Write the font back to the folder it came from.
+ *
+ * A font that has gained a second master since it was saved as one UFO has
+ * nowhere to write it: a family is kept in a folder of its own, and the UFO it
+ * came from is one master's. The browser gives no way from a folder to the one
+ * it is in, so the place is asked for once — which is why this can answer
+ * `null`, for the picker closed.
+ */
+export async function saveFolder(host: FontHost): Promise<SaveReport | null> {
   const folder = host.folder();
   if (folder === null) throw new Error("no folder is open; use Save as");
+  if (keptAsFamily(host.state()) && !host.state().folder.family) return await saveFolderAs(host);
+  // Every master as it should be before any is written: what this one has
+  // changed that they share, made in the others.
+  await shareStructure(host);
   return await writeTo(host, folder);
 }
 
@@ -202,8 +321,22 @@ export async function saveFolderAs(host: FontHost): Promise<SaveReport | null> {
   if (place === null) return null;
   if (!(await askAccess(place, "readwrite"))) throw new Error(`${place.name} cannot be written to`);
 
-  const folder = await folderFor(host, place);
-  const report = await writeTo(host, folder);
+  const family = keptAsFamily(host.state());
+  // Where the font was kept as one UFO until now, to say so afterwards.
+  const single = host.state().folder.family ? null : host.state().folder.name;
+  const folder = family ? await familyFolderFor(host, place) : await folderFor(host, place);
+  await shareStructure(host);
+  const written = await writeTo(host, folder);
+  const report =
+    family && single !== null
+      ? {
+          ...written,
+          notes: [
+            ...written.notes,
+            `kept as a family in ${folder.name} from now on; ${single} is still where it was, and is no longer written to`,
+          ],
+        }
+      : written;
   // The same font, kept somewhere else from now on. `writeTo` has already
   // pointed the handle and the font's project at the new folder, together with
   // the record of what it wrote there. Remembering the folder again here, with
@@ -224,11 +357,8 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
   });
   try {
     const document = host.state().session.editor.document;
-    // The pictures and the other layers go with it. A folder holding a font
-    // that names images it does not contain opens blank in every other tool,
-    // and one whose `layercontents.plist` lists only the layer we edit has
-    // thrown away the designer's sketch as far as anything reading it can tell.
-    const written = await writeFolder(folder, ufoFiles(document, await host.disk.allImages()), {
+    const family = keptAsFamily(host.state());
+    const options = {
       // Only the files that differ from what the last save left. A UFO is one
       // file per glyph, so moving one point changes one of several hundred,
       // and rewriting the rest is the whole of the wait.
@@ -238,12 +368,26 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
       // touched it. Within a session nothing has, and asking would be a read
       // per file for an answer that is always the same.
       verify: !before.checked,
-      onProgress: (done, total) => {
+      onProgress: (done: number, total: number) => {
         host.patch({
           folder: { ...host.state().folder, progress: { done, total } },
         });
       },
-    });
+    };
+    // The pictures and the other layers go with it. A folder holding a font
+    // that names images it does not contain opens blank in every other tool,
+    // and one whose `layercontents.plist` lists only the layer we edit has
+    // thrown away the designer's sketch as far as anything reading it can tell.
+    const written = family
+      ? await writeFamily(host, folder, options)
+      : await (async () => {
+          const one = await writeFolder(
+            folder,
+            ufoFiles(document, await host.disk.allImages()),
+            options,
+          );
+          return { ...one, removed: one.removed.length };
+        })();
 
     host.patch({
       folder: {
@@ -256,6 +400,10 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
         written: written.wrote,
         checked: true,
         behind: false,
+        family,
+        // Every master the folder lacked has just been written to it.
+        others: [],
+        designspaceBehind: false,
         problem: null,
       },
     });
@@ -279,13 +427,15 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
         savedAt: host.state().folder.savedAt,
         savedHash: hashOfWritten(wrote),
         wrote,
+        family,
+        unsavedMasters: [],
       });
     }
 
     return {
       name: folder.name,
       written: written.written,
-      removed: written.removed.length,
+      removed: written.removed,
       notes: written.notes,
     };
   } catch (error) {
@@ -336,8 +486,23 @@ export async function forgetOpenFolder(host: FontHost): Promise<void> {
  * here. Where permission *has* survived — an installed app may keep it — the
  * check happens here instead and the first save is silent.
  */
-export async function noteFolder(host: FontHost, remembered: RememberedFolder): Promise<void> {
+export async function noteFolder(
+  host: FontHost,
+  remembered: RememberedFolder,
+  /** What the font's record says of a folder that is a family's. */
+  kept: { readonly family: boolean; readonly unsavedMasters: readonly string[] } = {
+    family: false,
+    unsavedMasters: [],
+  },
+): Promise<void> {
   if (host.state().folder.name !== null) return;
+
+  // The masters the folder was left without, of those the font still has. The
+  // open one is asked afresh, by comparing it with what the last save left.
+  const project = host.state().project;
+  const others = kept.unsavedMasters.filter(
+    (id) => id !== project.current && project.masters.some((m) => m.id === id),
+  );
 
   host.setFolder(remembered.folder, remembered.name);
   host.patch({
@@ -346,6 +511,11 @@ export async function noteFolder(host: FontHost, remembered: RememberedFolder): 
       name: remembered.name,
       remembered: null,
       savedAt: remembered.at,
+      family: kept.family,
+      others,
+      // Left with changes and come back to: it is behind, whatever the
+      // comparison that follows can or cannot say.
+      behind: kept.family && kept.unsavedMasters.includes(project.current),
       written: new Map(remembered.wrote),
       // Nothing has looked at the folder since the last session, so what the
       // record says about it is a belief rather than a fact.
@@ -432,6 +602,46 @@ async function folderFor(host: FontHost, place: DiskFolder): Promise<DiskFolder>
   throw new Error(`${place.name} already holds a hundred fonts called ${stem}`);
 }
 
+/**
+ * The folder a family goes into, given the one picked: a folder of its own
+ * inside it, named for the family and made if need be.
+ *
+ * A folder of its own, because a family is several things — a designspace and
+ * a UFO for each master — and they are read back by reading the folder: it has
+ * to hold the family and nothing else. The same care as for one UFO otherwise:
+ * a folder that is some other font's is refused, and one of the family's name
+ * already there is never written over — the family gets the next free name
+ * beside it.
+ */
+async function familyFolderFor(host: FontHost, place: DiskFolder): Promise<DiskFolder> {
+  const current = host.folder();
+  const mine = async (folder: DiskFolder): Promise<boolean> =>
+    current !== null && host.state().folder.family && (await sameEntry(current, folder));
+
+  const holds = await whatItHolds(place);
+  if (holds === "family") {
+    if (await mine(place)) return place;
+    throw new Error(
+      `${place.name} is another family's folder. Pick the folder you want this one kept in, and it will be saved there in a folder of its own.`,
+    );
+  }
+  if (holds === "ufo") {
+    throw new Error(
+      `${place.name} is a font's UFO. Pick the folder you want this family kept in, and it will be saved there in a folder of its own.`,
+    );
+  }
+
+  const stem = familyStemOf(host.state().session.editor.document);
+  for (let n = 1; n < 100; n++) {
+    const name = n === 1 ? stem : `${stem}-${String(n)}`;
+    const existing = await childFolder(place, name);
+    if (existing === null) return await place.getDirectoryHandle(name, { create: true });
+    const inside = await whatItHolds(existing);
+    if (inside === "empty" || (inside === "family" && (await mine(existing)))) return existing;
+  }
+  throw new Error(`${place.name} already holds a hundred folders called ${stem}`);
+}
+
 /** A folder of that name inside another, or `null` where there is none. */
 async function childFolder(parent: DiskFolder, name: string): Promise<DiskFolder | null> {
   for await (const [entry, handle] of parent.entries()) {
@@ -452,18 +662,26 @@ async function sameEntry(a: DiskFolder, b: DiskFolder): Promise<boolean> {
   }
 }
 
-async function whatItHolds(folder: DiskFolder): Promise<"empty" | "ufo" | "other"> {
+async function whatItHolds(folder: DiskFolder): Promise<"empty" | "ufo" | "family" | "other"> {
   let empty = true;
-  for await (const [name] of folder.entries()) {
+  let family = false;
+  for await (const [name, entry] of folder.entries()) {
     if (name === "metainfo.plist") return "ufo";
+    if (entry.kind === "file" && name.endsWith(".designspace")) family = true;
     empty = false;
   }
-  return empty ? "empty" : "other";
+  return family ? "family" : empty ? "empty" : "other";
 }
 
 /** Whether the font has moved since it was last written to its folder. */
 export function unsaved(folder: FolderState, now: FontDocument): boolean {
-  return folder.behind || (folder.saved !== null && folder.saved !== now);
+  // The open master; the masters that are not open; and the family itself.
+  return (
+    folder.behind ||
+    (folder.saved !== null && folder.saved !== now) ||
+    folder.others.length > 0 ||
+    folder.designspaceBehind
+  );
 }
 
 /**
@@ -483,6 +701,24 @@ export async function confirmSaved(host: FontHost, savedHash: string | null): Pr
 
   const before = host.state().folder;
   const document = host.state().session.editor.document;
+
+  // A family: the open master against its own UFO, and the designspace against
+  // the one beside it. The other masters' answers came with the font's record.
+  if (before.family) {
+    const images = await host.disk.allImages();
+    const project = host.state().project;
+    const same = openMasterSaved(project, document, images, before.written);
+    const plan = designspaceSaved(project, document, before.written);
+
+    const after = host.state().folder;
+    if (after.busy || after.saved !== before.saved) return;
+    const behind = after.behind || same === false;
+    host.patch({
+      folder: { ...after, saved: behind ? null : document, behind, designspaceBehind: !plan },
+    });
+    return;
+  }
+
   const entries = ufoFiles(document, await host.disk.allImages());
   const now = hashOfWritten(
     entries.map((entry): [string, WrittenFile] => [

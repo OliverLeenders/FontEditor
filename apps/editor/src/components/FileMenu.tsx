@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 
 import { desktop } from "../desktop.js";
 import { areSvgFiles, readSvgFiles } from "../svgImport.js";
+import { familyStemOf } from "../store/family-folder.js";
+import { keptAsFamily } from "../store/folder.js";
 import { unsaved } from "../store/index.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { openWindow } from "../windows.js";
@@ -43,6 +45,9 @@ export function FileMenu(): React.JSX.Element {
   const folder = useStoreValue((s) => s.folder);
   const dirty = useStoreValue((s) => unsaved(s.folder, s.session.editor.document));
   const reading = useStoreValue((s) => s.ownership === "reading");
+  // A font drawn more than once is kept as a family: a designspace and a UFO
+  // for each master, in a folder of their own.
+  const family = useStoreValue((s) => keptAsFamily(s));
 
   const inputRef = useRef<HTMLInputElement>(null);
   const svgInputRef = useRef<HTMLInputElement>(null);
@@ -97,9 +102,7 @@ export function FileMenu(): React.JSX.Element {
   const save = (): Promise<void> =>
     attempt(async () => {
       const done = await store.saveToFolder();
-      if (done === null) return null;
-      const removed = done.removed === 0 ? "" : `, ${String(done.removed)} removed`;
-      return `Saved ${String(done.written)} files to ${done.name}${removed}`;
+      return done === null ? null : savedSays(done);
     });
 
   const working = busy || folder.busy || reading;
@@ -144,6 +147,7 @@ export function FileMenu(): React.JSX.Element {
       kind: "item",
       label: "Open UFO folder…",
       icon: FolderOpenIcon,
+      hint: "A font's .ufo, or a family's folder with its designspace: worked on where it is, and saved back to",
       disabled: working,
       run: () =>
         void attempt(async () => {
@@ -162,7 +166,9 @@ export function FileMenu(): React.JSX.Element {
         kind: "item",
         label: `Re-read ${folder.name}`,
         icon: FolderClockIcon,
-        hint: `Read ${folder.name} from disk again, discarding changes not saved to it`,
+        hint: folder.family
+          ? `Read ${folder.name} from disk again, every master of it, discarding changes not saved to it`
+          : `Read ${folder.name} from disk again, discarding changes not saved to it`,
         disabled: working,
         run: () =>
           void attempt(async () => {
@@ -193,30 +199,43 @@ export function FileMenu(): React.JSX.Element {
   if (folders) {
     // Saving names the file it makes: a font is kept on disk as a UFO of its own,
     // in whatever folder is picked to hold it.
-    const ufo = ufoFolderName(store.editor.document);
+    //
+    // A family is kept as a folder of its own instead — its designspace and a
+    // UFO for each master — and a font saved as one UFO that has since gained
+    // a master has to be given one: the UFO it came from is one master's, and
+    // a browser gives no way from a folder to the one it is in.
+    const stem = familyStemOf(store.editor.document);
+    const kept = family
+      ? `a folder of its own, ${stem}/, with a designspace and a UFO for each master`
+      : ufoFolderName(store.editor.document);
+    // The folder a save goes to without asking, where there is one that can
+    // take the font as it is now.
+    const into = folder.name !== null && (!family || folder.family) ? folder.name : null;
+    const placed = into !== null;
     items.push({ kind: "separator" });
     items.push({
       kind: "item",
-      label: folder.name === null ? "Save to folder…" : "Save",
+      label: placed ? "Save" : "Save to folder…",
       icon: SaveIcon,
       keys: "Ctrl-S",
-      hint:
-        folder.name === null
-          ? `Choose a folder to keep this font in, as ${ufo}`
-          : `Write the changes to ${folder.name}`,
-      disabled: working || (folder.name !== null && !dirty),
+      hint: placed
+        ? `Write the changes to ${into}`
+        : folder.name === null
+          ? `Choose a folder to keep this font in, as ${kept}`
+          : `This font has more than one master now, and ${folder.name} is one master's. Choose a folder to keep the family in, as ${kept}`,
+      disabled: working || (placed && !dirty),
       run: () => void save(),
     });
     items.push({
       kind: "item",
       label: "Save to another folder…",
       icon: FolderOutputIcon,
-      hint: `Keep this font in another folder, as ${ufo}, and work there from now on`,
+      hint: `Keep this font in another folder, as ${kept}, and work there from now on`,
       disabled: working,
       run: () =>
         void attempt(async () => {
           const done = await store.saveFolderAs();
-          return done === null ? null : `Saved ${String(done.written)} files to ${done.name}`;
+          return done === null ? null : savedSays(done);
         }),
     });
   }
@@ -328,6 +347,22 @@ export function FileMenu(): React.JSX.Element {
  * by the reader rather than being a state anyone gets stuck in.
  */
 export const FONT_FILES = ".ttf,.otf,.woff,.ufoz,.zip,.sit,font/ttf,font/otf,font/woff";
+
+/**
+ * What a save did, said in one line — and what it has to say besides: that a
+ * font is kept as a family from now on, that a master's UFO was taken out. A
+ * save says these once, and nowhere else.
+ */
+function savedSays(done: {
+  name: string;
+  written: number;
+  removed: number;
+  notes: readonly string[];
+}): string {
+  const removed = done.removed === 0 ? "" : `, ${String(done.removed)} removed`;
+  const notes = done.notes.length === 0 ? "" : ` · ${done.notes.join(" · ")}`;
+  return `Saved ${String(done.written)} files to ${done.name}${removed}${notes}`;
+}
 
 /** What opening a folder found, said in one line. */
 function reportOf(done: {

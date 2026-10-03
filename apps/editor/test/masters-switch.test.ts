@@ -9,6 +9,7 @@ installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
 const { MemoryFileStore } = await import("@typewright/storage");
+const { setInfo } = await import("@typewright/tools");
 const { ufoFiles } = await import("@typewright/font-io");
 const { writeFolder } = await import("@typewright/disk");
 
@@ -51,9 +52,17 @@ const fonts = new Map<object, string>();
 
 /**
  * Which master's drawing is open, by a mark written in it: an edit, committed
- * and saved as any edit in the editor is.
+ * and saved as any edit in the editor is. Written in what a master keeps to
+ * itself — the name of its own style — since what the masters share is carried
+ * from one to the next and would say the same in all of them.
  */
-const drawing = (store: Store): string => store.editor.document.features;
+const drawing = (store: Store): string =>
+  store.editor.document.info.openTypeNamePreferredSubfamilyName;
+
+/** Write that mark in the open master. */
+const draw = (store: Store, text: string): void => {
+  store.applyTool(setInfo(store.editor, { openTypeNamePreferredSubfamilyName: text }));
+};
 
 const WEIGHT = { tag: "wght", name: "Weight", min: 100, default: 400, max: 900 };
 
@@ -64,12 +73,12 @@ async function twoMasters(files: InstanceType<typeof MemoryFileStore>): Promise<
 }> {
   const store = await opened(files);
   const regular = store.getState().project.current;
-  store.setFeatures("# the regular");
+  draw(store, "# the regular");
 
   await store.setAxes([WEIGHT]);
   await store.addMaster("bold", "Bold", { wght: 900 });
   await store.switchMaster("bold");
-  store.setFeatures("# the bold");
+  draw(store, "# the bold");
   await store.flushNow();
   return { store, regular };
 }
@@ -166,7 +175,7 @@ describe("a switch on a font that takes a while to write", () => {
 
     await store.switchMaster(regular);
     // Not a glyph, so in no journal: only the save that follows can keep it.
-    store.setFeatures("# typed while it was written");
+    draw(store, "# typed while it was written");
     await store.flushNow();
 
     const again = await opened(files);
@@ -195,12 +204,14 @@ describe("a switch on a font that takes a while to write", () => {
 describe("adding a master", () => {
   it("copies the drawing as it stands, for an export that never visits it", async () => {
     const store = await opened(new MemoryFileStore());
-    store.setFeatures("# edited before adding");
+    draw(store, "# edited before adding");
     await store.setAxes([WEIGHT]);
     await store.addMaster("bold", "Bold", { wght: 900 });
 
     const all = await store.allMasters();
-    expect(all.find((m) => m.id === "bold")?.document.features).toBe("# edited before adding");
+    expect(all.find((m) => m.id === "bold")?.document.info.openTypeNamePreferredSubfamilyName).toBe(
+      "# edited before adding",
+    );
   });
 });
 
@@ -318,7 +329,7 @@ describe("copies of the font, in a font drawn more than once", () => {
     const { store, regular } = await twoMasters(files);
     await store.snapshot();
     const at = store.getState().snapshots[0]!.at;
-    store.setFeatures("# the bold, spoiled");
+    draw(store, "# the bold, spoiled");
 
     await store.restoreSnapshot(at);
     expect(drawing(store)).toBe("# the bold");
@@ -334,7 +345,7 @@ describe("copies of the font, in a font drawn more than once", () => {
 
   it("offers a copy from before there was a second master to either", async () => {
     const store = await opened(new MemoryFileStore());
-    store.setFeatures("# drawn once");
+    draw(store, "# drawn once");
     await store.snapshot();
     await store.setAxes([WEIGHT]);
     await store.addMaster("bold", "Bold", { wght: 900 });
@@ -360,7 +371,7 @@ describe("a folder read again, in a font drawn more than once", () => {
     const store = await opened(files);
 
     // The font as its folder has it, opened from there.
-    store.setFeatures("# in the folder");
+    draw(store, "# in the folder");
     const folder = new FakeFolder("Test.ufo");
     await writeFolder(folder, ufoFiles(store.editor.document));
     (globalThis as { showDirectoryPicker?: unknown }).showDirectoryPicker = () =>
@@ -371,9 +382,9 @@ describe("a folder read again, in a font drawn more than once", () => {
     await store.setAxes([WEIGHT]);
     await store.addMaster("bold", "Bold", { wght: 900 });
     await store.switchMaster("bold");
-    store.setFeatures("# the bold");
+    draw(store, "# the bold");
     await store.switchMaster(regular);
-    store.setFeatures("# the regular, changed since");
+    draw(store, "# the regular, changed since");
 
     const report = await store.reopenFolder();
 

@@ -28,6 +28,7 @@ import { editorState } from "@typewright/tools";
 import type { Persistence } from "../persistence.js";
 import { adoptFamily, beginFresh, written } from "./masters.js";
 import { painted, shown, tell } from "./opening.js";
+import { noteArrived } from "./structure.js";
 import { UNTITLED } from "./projects.js";
 import type { StoreHost, StoreState } from "./state.js";
 
@@ -221,12 +222,8 @@ async function adoptFamilyFrom(host: FontHost, family: FamilyImport): Promise<Im
   if (first === undefined) throw new Error("the family has no masters");
 
   await moveToNewFont(host, first.document);
-  showDocument(host, first.document, false);
-  shown(host);
   host.setCatalogQuery(DEFAULT_QUERY);
   host.setFolder(null);
-  await host.disk.replaceAll(first.document);
-
   await adoptFamily(host, family);
   // Every master's pictures, all into the one store: an image belongs to the
   // font rather than to a master, and two masters tracing the same sheet name
@@ -408,5 +405,8 @@ export function showDocument(
     session: newSession(editorState({ document, view: host.state().session.editor.view })),
     recovered,
   });
+  // A document put on screen is a master arrived at: what changes in it from
+  // here is what is carried to the others when it is left.
+  noteArrived(host, document);
   host.showGlyph(document.glyphOrder[0] ?? "");
 }
