@@ -132,6 +132,8 @@ describe("the font's folder in the bar", () => {
       fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
+    // Opened, and said so: the font is read with the page left free to draw.
+    await screen.findByText(/glyphs from Test\.ufo/);
     edit(store);
     openMenu();
 
@@ -150,6 +152,8 @@ describe("the font's folder in the bar", () => {
       fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
+    // Opened, and said so: the font is read with the page left free to draw.
+    await screen.findByText(/glyphs from Test\.ufo/);
     edit(store);
 
     openMenu();

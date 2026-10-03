@@ -135,7 +135,12 @@ export class Persistence {
    * The lock is taken *before* the read, so a tab that cannot write never
    * journals or saves on the way to finding that out.
    */
-  async open(worker: Worker, project: string = FIRST_PROJECT): Promise<LoadedProject | null> {
+  async open(
+    worker: Worker,
+    project: string = FIRST_PROJECT,
+    /** Told how many glyph files have been read, of how many. */
+    progress?: (done: number, total: number) => void,
+  ): Promise<LoadedProject | null> {
     try {
       const client = new StorageClient(worker);
       this.client = client;
@@ -147,7 +152,7 @@ export class Persistence {
       this.owner = await this.lock.tryAcquire();
       this.report({ ownership: this.owner ? "owner" : "reading" });
 
-      const loaded = await client.load();
+      const loaded = await client.load(progress);
       if (loaded.kind === "loaded") {
         for (const problem of loaded.problems) console.warn("[storage]", problem);
       }

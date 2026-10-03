@@ -61,7 +61,7 @@ import {
   orderedMasters,
 } from "@typewright/font-model";
 import type { ViewTransform } from "@typewright/view";
-import { type DiskFolder, FIRST_PROJECT } from "@typewright/disk";
+import { type DiskFolder, FIRST_PROJECT, projectById } from "@typewright/disk";
 
 import { frameGlyph } from "../framing.js";
 import { type Decoded, ImageCache } from "../images.js";
@@ -113,6 +113,7 @@ import {
   toggleInspector,
   toggleInspectorSection,
 } from "./inspector.js";
+import { count, shown, tell } from "./opening.js";
 import { type SplitChanges, placeSplit } from "./split.js";
 import {
   type Arrival,
@@ -521,7 +522,12 @@ export class EditorStore {
 
   /** Replace the document with a font read from a file. */
   async importFont(bytes: ArrayBuffer, fileName = ""): Promise<ImportReport> {
-    return await importFont(this.host, bytes, fileName);
+    try {
+      return await importFont(this.host, bytes, fileName);
+    } finally {
+      // Taken away when the font is shown; this is for one that never was.
+      shown(this.host);
+    }
   }
 
   /**
@@ -733,12 +739,20 @@ export class EditorStore {
 
   /** Open a UFO folder the user picks, replacing what is open. */
   async openFolder(): Promise<FolderReport | null> {
-    return await openFolder(this.host);
+    try {
+      return await openFolder(this.host);
+    } finally {
+      shown(this.host);
+    }
   }
 
   /** Read the open font's folder again, replacing what is in the editor. */
   async reopenFolder(): Promise<FolderReport | null> {
-    return await reopenFolder(this.host);
+    try {
+      return await reopenFolder(this.host);
+    } finally {
+      shown(this.host);
+    }
   }
 
   /** Write the font back to its folder. */
@@ -1250,11 +1264,28 @@ export class EditorStore {
    * without OPFS should still give a usable editor that simply cannot remember
    * anything, which is why nothing here is allowed to throw.
    */
-  async connectStorage(worker: Worker, project: string = FIRST_PROJECT): Promise<void> {
-    const loaded = await this.disk.open(worker, project);
+  async connectStorage(
+    worker: Worker,
+    project: string = FIRST_PROJECT,
+    /** Whether to say how far the reading has got, for a font opened at startup. */
+    announce = false,
+  ): Promise<void> {
+    const loaded = await this.disk.open(
+      worker,
+      project,
+      announce
+        ? (done, total) => {
+            count(this.host, done, total);
+          }
+        : undefined,
+    );
     if (loaded === null) return;
 
     if (loaded.kind === "loaded") {
+      // Putting it in the page draws every glyph of it, on this thread: said
+      // first, and given a frame to be drawn in.
+      const opening = this.state.opening;
+      if (opening !== null) await tell(this.host, opening.name, "drawing");
       // The session is still the one the constructor made, so this swaps the
       // document into it rather than starting a new history over nothing.
       this.patch({
@@ -1284,6 +1315,25 @@ export class EditorStore {
     // when the store is empty has never been written at all.
     const onDisk = loaded.kind === "loaded" && !loaded.recovered && !migrated;
     await this.disk.settle(this.editor.document, !onDisk);
+  }
+
+  /**
+   * Open a font at startup, saying what is being read and how far it has got.
+   *
+   * A large font is seconds of reading with nothing else true to show, and the
+   * pane that covers the editor until then would otherwise be blank for all of
+   * them. Called by what the font is listed as, since nothing has been read
+   * that could say what it calls itself.
+   */
+  async arriveAt(worker: Worker, project: string): Promise<void> {
+    const name = (await projectById(project).catch(() => null))?.name ?? "";
+    this.patch({ opening: { name, step: "glyphs", done: 0, total: 0 } });
+    try {
+      await this.connectStorage(worker, project, true);
+      await this.noteProjects(project);
+    } finally {
+      shown(this.host);
+    }
   }
 
   /**

@@ -19,6 +19,7 @@ import { GlyphStrip } from "./components/GlyphStrip.js";
 import { Inspector } from "./components/Inspector.js";
 import { FeaturesView } from "./components/FeaturesView.js";
 import { ProofView } from "./components/ProofView.js";
+import { Opening } from "./components/Opening.js";
 import { Projects } from "./components/Projects.js";
 import { CloseWarning } from "./components/CloseWarning.js";
 import { UpdateNotice } from "./components/UpdateNotice.js";
@@ -384,11 +385,10 @@ export function App(): React.JSX.Element {
         return;
       }
 
-      await store.connectStorage(worker, arrival.id);
       // Not guarded again. Noting which font is open is a write to the store
       // and to the list of projects, and both are true whether or not this
       // component is still on screen.
-      await store.noteProjects(arrival.id);
+      await store.arriveAt(worker, arrival.id);
     })();
 
     return () => {
@@ -586,6 +586,8 @@ export function App(): React.JSX.Element {
         // Blank until there is something true to show: the list, or the font.
         <div className={styles.arriving} aria-busy="true" />
       ) : null}
+      {/* Over either of them, and over the editor: a font being read. */}
+      <Opening />
       <main
         className={styles.panes}
         data-orientation={panes.second === null ? undefined : split.orientation}

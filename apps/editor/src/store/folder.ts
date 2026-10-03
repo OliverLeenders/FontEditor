@@ -21,6 +21,7 @@ import { crc32, entryBytes, readUfo, ufoFiles, ufoFolderName } from "@typewright
 import { type FontDocument, randomIds } from "@typewright/font-model";
 
 import { type FontHost, adoptDocument, adoptImages } from "./fonts.js";
+import { count, tell } from "./opening.js";
 import { type FolderState, NO_FOLDER } from "./state.js";
 
 /**
@@ -88,7 +89,14 @@ export async function reopenFolder(host: FontHost): Promise<FolderReport | null>
 }
 
 async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderReport> {
-  const read = readUfo(await readFolder(folder), randomIds());
+  await tell(host, folder.name, "files");
+  const files = await readFolder(folder, (done, total) => {
+    count(host, done, total);
+  });
+  // Parsing is this thread's work, with nothing drawn while it lasts, so it is
+  // said first.
+  await tell(host, folder.name, "parsing");
+  const read = readUfo(files, randomIds());
   // A folder that is not a UFO is reported rather than half-adopted, exactly as
   // a damaged archive is: there is no partial font to fall back on.
   if ("reason" in read) throw new Error(`${folder.name}: ${read.reason}`);
@@ -96,6 +104,7 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
   // A font of its own, in a working copy of its own. This is the moment the
   // editor stopped being a single-font program: opening a second font used to
   // write over the first one's working copy, and now it moves to another.
+  await tell(host, folder.name, "drawing");
   const before = host.state().projects.current;
   const project = await moveToProjectFor(host, folder, read.document);
 

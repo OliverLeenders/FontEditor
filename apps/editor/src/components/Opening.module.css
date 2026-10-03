@@ -1,0 +1,78 @@
+/*
+ * A font on its way in.
+ *
+ * The same ground and the same sheet as the list of fonts, one step above it:
+ * a font opened from the list is read with the list still behind, where what
+ * went wrong is said if it cannot be.
+ */
+.pane {
+  position: absolute;
+  inset: 0;
+  z-index: 41;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  background: var(--ground);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: min(30rem, 100%);
+}
+
+.title {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar {
+  position: relative;
+  height: 0.25rem;
+  overflow: hidden;
+  border-radius: 0.125rem;
+  background: var(--rule);
+}
+
+.fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+/* A step that cannot be counted: a piece of the bar, going across. */
+.bar:not([data-counted]) .fill {
+  position: absolute;
+  width: 30%;
+  animation: across 1.2s ease-in-out infinite;
+}
+
+@keyframes across {
+  from {
+    left: -30%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* Still, for a reader who has asked for less movement: a third of the bar, filled. */
+@media (prefers-reduced-motion: reduce) {
+  .bar:not([data-counted]) .fill {
+    left: 35%;
+    animation: none;
+  }
+}
+
+.step {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: var(--text-s);
+  font-variant-numeric: tabular-nums;
+}

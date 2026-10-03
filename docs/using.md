@@ -713,6 +713,13 @@ the tab and coming back keeps your work. Note that this store belongs to the bro
 not to you — the files cannot be opened in a file manager. To keep a font where other
 tools can read it, save it from the File menu, or with Ctrl-S.
 
+**Opening a large font** takes a few seconds — an icon font of four thousand glyphs is four
+thousand files to read and as many glyphs to draw — and for those seconds the window says so:
+the font's name, a bar, and how far it has got, such as _Reading glyphs · 1,280 of 4,042_. It
+is shown when the program starts on a font, when a UFO folder is opened and when a font file
+is imported, and goes as soon as the font is on screen; a font that was opened or imported is
+then written to the browser's store in the background, which the status bar shows as _saving_.
+
 **The File menu** is in four groups, each named for what happens to files. **New font**
 starts another font and **Switch font** opens one of the others: both keep the font that
 was open, in this browser, on the list of fonts — nothing is thrown away by starting a new

@@ -38,6 +38,8 @@ export type StoreState = {
   readonly storage: StorageState;
   readonly storageDetail: string;
   readonly recovered: boolean;
+  /** A font on its way in, and how far it has got; `null` once it is on screen. */
+  readonly opening: Opening | null;
   /**
    * What just happened that the status bar should say, until it is dismissed:
    * a set of SVG files brought in, and what was left out of it. `null` for
@@ -201,6 +203,26 @@ export type ProjectsState = {
   readonly arriving: boolean;
 };
 
+/**
+ * A font being opened: what it is, what is being done to it, and how far that
+ * has got.
+ *
+ * A font of four thousand glyphs takes seconds to read, parse and draw, and
+ * for those seconds the page has nothing else true to show. `total` is zero
+ * for a step that cannot be counted — parsing a file, drawing the font — and
+ * the bar then only says that something is happening.
+ */
+export type Opening = {
+  /** The font or the file, as the reader knows it. */
+  readonly name: string;
+  readonly step: OpeningStep;
+  readonly done: number;
+  readonly total: number;
+};
+
+/** The steps of opening a font, in the order they happen. */
+export type OpeningStep = "files" | "glyphs" | "parsing" | "drawing";
+
 export const NO_PROJECTS: ProjectsState = {
   all: [],
   current: null,
@@ -301,6 +323,7 @@ export function initialState(preferences: Preferences): StoreState {
     storage: "connecting",
     storageDetail: "",
     recovered: false,
+    opening: null,
     notice: null,
     snapshots: [],
     project: project(starter),

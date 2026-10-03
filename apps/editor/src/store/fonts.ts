@@ -27,6 +27,7 @@ import { editorState } from "@typewright/tools";
 
 import type { Persistence } from "../persistence.js";
 import { adoptFamily, startFresh } from "./masters.js";
+import { shown, tell } from "./opening.js";
 import { UNTITLED } from "./projects.js";
 import type { StoreHost } from "./state.js";
 
@@ -104,16 +105,25 @@ export async function importFont(
   bytes: ArrayBuffer,
   fileName = "",
 ): Promise<ImportReport> {
+  // Said before the file is parsed, which is a second or more of this thread's
+  // time for a large font, with nothing drawn while it lasts.
+  const name = fileName === "" ? "the font" : fileName;
+  await tell(host, name, "parsing");
+
   // A family is a zip too, and looks like one until it is opened: the
   // difference is a `.designspace` inside, so the archive is read once and
   // asked rather than guessed at from the name.
   if (looksLikeArchive(fileName)) {
     const family = await readFamilyFrom(bytes);
-    if (family !== null) return await adoptFamilyFrom(host, family);
+    if (family !== null) {
+      await tell(host, name, "drawing");
+      return await adoptFamilyFrom(host, family);
+    }
   }
 
   const read = await readSomething(bytes, fileName);
 
+  await tell(host, name, "drawing");
   await moveToNewFont(host, read.document);
   // No copy of what was open is kept: it is still open, as a font of its own.
   await adoptDocument(host, read.document, false);
@@ -212,6 +222,7 @@ async function adoptFamilyFrom(host: FontHost, family: FamilyImport): Promise<Im
 
   await moveToNewFont(host, first.document);
   showDocument(host, first.document, false);
+  shown(host);
   host.setCatalogQuery(DEFAULT_QUERY);
   host.setFolder(null);
   await host.disk.replaceAll(first.document);
@@ -322,6 +333,9 @@ export async function adoptDocument(
   await startFresh(host, document);
 
   showDocument(host, document, false);
+  // On screen now. What follows writes it down, which the status bar says and
+  // which nobody needs to wait behind a pane for.
+  shown(host);
   host.setCatalogQuery(DEFAULT_QUERY);
   // Whatever folder on disk was open held the *previous* font. Forgetting it
   // here means Save can never quietly write this font over that one; opening a
