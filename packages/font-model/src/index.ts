@@ -404,6 +404,14 @@ export {
 
 export type { Incompatibility } from "./compatible.js";
 export { glyphCompatible, glyphIncompatibilities, incompatibilities } from "./compatible.js";
+export type { StructuralChange, StructureDifferences, StructurePart } from "./structure.js";
+export {
+  applyStructure,
+  sameStructure,
+  structuralChange,
+  structuralDifferences,
+  structureCopy,
+} from "./structure.js";
 
 export type { Region, Support } from "./variation.js";
 export {
