@@ -27,6 +27,7 @@ import {
   pointerInput,
   pointerMove,
   pointerUp,
+  setInfo,
   setSidebearing,
 } from "@typewright/tools";
 import type { ViewTransform } from "@typewright/view";
@@ -221,6 +222,17 @@ describe("transactions", () => {
     expect(nudged.history.entries).toHaveLength(1);
     expect(nudged.history.entries[0]!.label).toBe("Nudge");
     expect(nodeAt(nudged, c, 0).pt).toEqual(vec(101, 480));
+  });
+
+  it("keeps two steps that asked to stand alone apart, though made in the same moment", () => {
+    const { s } = start();
+    // Two edits of one name by one command: the same millisecond, the second
+    // beginning exactly where the first ended.
+    const once = apply(s, setInfo(s.editor, { copyright: "one" }), 5000);
+    const twice = apply(once, setInfo(once.editor, { copyright: "two" }), 5000);
+
+    expect(twice.history.entries).toHaveLength(2);
+    expect(undo(twice).editor.document.info.copyright).toBe("one");
   });
 });
 

@@ -75,7 +75,9 @@ export class Snapshots {
   consider(document: FontDocument): void {
     if (document === this.kept) return;
     if (Date.now() - this.at < SNAPSHOT_EVERY_MS) return;
-    void this.keep(document);
+    // Nobody asked for this one, so nobody is told it could not be kept: the
+    // next is tried when it is due.
+    void this.keep(document).catch(() => undefined);
   }
 
   /**

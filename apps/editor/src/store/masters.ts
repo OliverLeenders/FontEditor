@@ -184,6 +184,14 @@ export async function addMaster(
   name: string,
   location: Location,
 ): Promise<void> {
+  // What this master has changed that the others share, made in them first.
+  // The new master is a copy of this one as it stands, changes and all — and a
+  // change taken back afterwards has to be taken back in the copy too, which
+  // it can only be if it is counted from here: carried later, a change undone
+  // was no change at all, and the copy kept a glyph, or a name, that no other
+  // master had.
+  await shareStructure(host);
+
   const project = host.state().project;
 
   // What it is a copy of: the document as it stands rather than whatever the
@@ -224,8 +232,11 @@ export async function removeMaster(host: FontHost, id: MasterId): Promise<void> 
 
   if (project.current !== id) {
     host.patch({ project: out });
-    await host.disk.dropMaster(id);
+    // The project said to be without it, and then its file taken away. The
+    // other way round and stopped between the two, the project named a master
+    // whose drawing was gone, which could not be gone to or checked against.
     await rememberDesignspace(host, out);
+    await host.disk.dropMaster(id);
     return;
   }
 

@@ -1417,7 +1417,8 @@ export class EditorStore {
     this.disk.flush();
     // The parked copy of the open master, brought up to date. It is what every
     // other master is compared against and what a switch reads back, and it is
-    // stale for exactly as long as this tab has been drawing.
-    void parkCurrent(this.host);
+    // stale for exactly as long as this tab has been drawing. On the way out,
+    // with nobody left to tell if it could not be written.
+    void parkCurrent(this.host).catch(() => undefined);
   }
 }

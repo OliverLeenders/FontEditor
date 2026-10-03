@@ -106,9 +106,12 @@ export function apply(
               selectionAfter: state.selection,
               at: now,
             },
-            // A step that asked not to coalesce gets a zero window, so it
-            // stands alone however fast it followed the last one.
-            pending.coalesce ? options : { ...options, coalesceMs: 0 },
+            // A step that asked not to coalesce gets no window at all, so it
+            // stands alone however fast it followed the last one. Less than
+            // none rather than none: a window of nothing still took in a
+            // step made in the same millisecond as the one before, and two
+            // steps of one name made by one command were then one undo.
+            pending.coalesce ? options : { ...options, coalesceMs: -1 },
           );
         }
         pending = null;
