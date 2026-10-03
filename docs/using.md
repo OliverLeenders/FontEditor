@@ -42,7 +42,7 @@ twice, since what each canvas shows is its own. Both draw the same glyph with th
 camera; the inspector and the glyph strip stay single and follow the pane the keyboard is
 in.
 
-**Windows.** A second font goes in a window of its own. File → New window opens one on the
+**Windows.** A second font goes in a window of its own. File → Open another window opens one on the
 list of fonts — Ctrl-Shift-N in the desktop application — and the button beside each font
 in that list opens the font straight away. Each window is on one font and names it in its
 title. The same font in a second window is read-only there, with a button to edit it there
@@ -271,7 +271,7 @@ drawing across its cell rather than changing the advance. The preflight check li
 glyph of another width, and the exported font says it is fixed-width where terminals and
 operating systems look: `post`, the PANOSE proportion and the average width.
 
-**Icons from SVG files.** **Import SVGs…** in the File menu takes any number of SVG files
+**Icons from SVG files.** **Import SVGs as glyphs…** in the File menu takes any number of SVG files
 and makes a glyph of each, in one undo step; dropping the files on the glyph grid does the
 same. A glyph is named for its file — `arrow-left.svg` is `arrow_left`, the form a font can
 carry — and given the next free code point of the Private Use Area, from `U+E000`, since an
@@ -708,16 +708,25 @@ the tab and coming back keeps your work. Note that this store belongs to the bro
 not to you — the files cannot be opened in a file manager. To keep a font where other
 tools can read it, save it from the File menu, or with Ctrl-S.
 
+**The File menu** is in four groups, each named for what happens to files. **New font**
+starts another font and **Switch font** opens one of the others: both keep the font that
+was open, in this browser, on the list of fonts — nothing is thrown away by starting a new
+one. **Open UFO folder** works on a font where it is kept on disk and saves back to it;
+**Import font file** reads a TTF, OTF, WOFF, zipped UFO or family in as a copy, in place of
+the font that is open; **Import SVGs as glyphs** adds glyphs to it. **Save** (or **Save to
+folder** the first time) and **Save to another folder** write it to disk, and **Open another
+window** is last.
+
 **Where a font is kept.** Each font is kept on disk as a UFO of its own — a folder named after
 the font, such as `MyFont-Regular.ufo`. The first time a font is saved, you are asked for the
 folder to keep it _in_: your fonts folder, or the folder of the project the font belongs to.
 The editor makes `MyFont-Regular.ufo` inside it; anything else in that folder is left alone,
 and a font already there under the same name is never written over — the new one is saved
 beside it as `MyFont-Regular-2.ufo`. From then on Ctrl-S writes to that UFO without asking.
-**Save as** does the same for another place, and the font is worked on there afterwards. The
+**Save to another folder** does the same for another place, and the font is worked on there afterwards. The
 picker opens where you last kept a font, not inside the last font's own folder, and it will
 not save one font into another font's UFO. An empty folder whose name ends in `.ufo` is taken
-as the font's own, if you would rather make the folder yourself. **Open folder** is the other
-way round: there you pick the `.ufo` itself. The **Fonts** list names the UFO each font is
+as the font's own, if you would rather make the folder yourself. **Open UFO folder** is the
+other way round: there you pick the `.ufo` itself. The list under **Switch font** names the UFO each font is
 kept in, or says it has not been saved to disk yet, and its **Open a .ufo** button opens a
 font kept anywhere on disk straight from the list.

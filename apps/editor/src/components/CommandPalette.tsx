@@ -161,14 +161,15 @@ export function commandsFor(
     out.push({ group: "Edit", label: "Undo history…", keys: "Ctrl-Shift-H", run: showHistory });
   }
   out.push(
-    { group: "File", label: "Fonts…", run: () => store.showProjects(true) },
-    { group: "File", label: "New window", run: () => openWindow("fonts") },
+    { group: "File", label: "New font", run: () => void store.startProject() },
+    { group: "File", label: "Switch font…", run: () => store.showProjects(true) },
+    { group: "File", label: "Open another window", run: () => openWindow("fonts") },
   );
   if (canOpenFolders()) {
     out.push(
       { group: "File", label: "Save", keys: "Ctrl-S", run: () => void store.saveToFolder() },
-      { group: "File", label: "Save as…", run: () => void store.saveFolderAs() },
-      { group: "File", label: "Open folder…", run: () => void store.openFolder() },
+      { group: "File", label: "Save to another folder…", run: () => void store.saveFolderAs() },
+      { group: "File", label: "Open UFO folder…", run: () => void store.openFolder() },
     );
   }
   return out;

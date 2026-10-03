@@ -78,7 +78,7 @@ export async function arrive(skipChooser: boolean): Promise<Arrival> {
 }
 
 /** What the working copy is called before anything has said what it holds. */
-const UNTITLED = "Untitled font";
+export const UNTITLED = "Untitled font";
 
 /**
  * Note in the store which font is open, and what else there is.

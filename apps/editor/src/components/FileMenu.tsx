@@ -105,60 +105,45 @@ export function FileMenu(): React.JSX.Element {
 
   const working = busy || folder.busy || reading;
 
+  /*
+   * Four groups, each named for what happens to files. The fonts kept in this
+   * browser: a new one, or another of them. A font from outside: a UFO folder,
+   * which is worked on where it is and saved back to; a font file, which is
+   * read in as a copy; SVG files, which become glyphs. Saving to a folder. And
+   * another window.
+   *
+   * The names used to be "New font…", "Open font…", "Fonts…" and "Open
+   * folder…": four ways to a font, none saying how they differed — which ones
+   * kept the font that was open, and which one wrote back to what it opened.
+   */
   const items: Item[] = [
     {
       kind: "item",
-      label: "New font…",
+      label: "New font",
       icon: FilePlusIcon,
+      // A font of its own, beside this one: this one stays on the list of
+      // fonts, so starting another throws nothing away and asks nothing.
+      hint: "Start another font. This one stays in this browser, under Switch font",
       disabled: working,
-      run: () => setAsking(true),
+      run: () => void store.startProject(),
     },
     {
       kind: "item",
-      label: "Open font…",
-      icon: UploadIcon,
+      label: "Switch font…",
+      icon: FolderClockIcon,
+      hint: "The fonts kept in this browser: open another, or forget one",
       disabled: working,
-      run: () => inputRef.current?.click(),
+      run: () => {
+        store.showProjects(true);
+      },
     },
-    {
-      kind: "item",
-      label: "Import SVGs…",
-      icon: ImageIcon,
-      hint: "Add a glyph for each SVG file, named for the file: an icon set",
-      disabled: working,
-      run: () => svgInputRef.current?.click(),
-    },
+    { kind: "separator" },
   ];
 
-  items.push({ kind: "separator" });
-  items.push({
-    kind: "item",
-    label: "Fonts…",
-    icon: FolderClockIcon,
-    hint: "Switch to another font, or start a new one",
-    disabled: working,
-    run: () => {
-      store.showProjects(true);
-    },
-  });
-  items.push({
-    kind: "item",
-    label: "New window",
-    icon: AppWindowIcon,
-    // A browser keeps Ctrl-Shift-N for a private window and never passes it on,
-    // so only the desktop application has the key to offer.
-    ...(desktop() === null ? {} : { keys: "Ctrl-Shift-N" }),
-    hint: "Another window, on the list of fonts: for a second font beside this one",
-    run: () => {
-      openWindow("fonts");
-    },
-  });
-
   if (folders) {
-    items.push({ kind: "separator" });
     items.push({
       kind: "item",
-      label: "Open folder…",
+      label: "Open UFO folder…",
       icon: FolderOpenIcon,
       disabled: working,
       run: () =>
@@ -187,14 +172,33 @@ export function FileMenu(): React.JSX.Element {
           }),
       });
     }
+  }
 
+  items.push({
+    kind: "item",
+    label: "Import font file…",
+    icon: UploadIcon,
+    hint: "A copy of a TTF, OTF, WOFF, zipped UFO or family, in place of the font that is open",
+    disabled: working,
+    run: () => inputRef.current?.click(),
+  });
+  items.push({
+    kind: "item",
+    label: "Import SVGs as glyphs…",
+    icon: ImageIcon,
+    hint: "A glyph for each SVG file, named for the file: an icon set, added to this font",
+    disabled: working,
+    run: () => svgInputRef.current?.click(),
+  });
+
+  if (folders) {
     // Saving names the file it makes: a font is kept on disk as a UFO of its own,
     // in whatever folder is picked to hold it.
     const ufo = ufoFolderName(store.editor.document);
     items.push({ kind: "separator" });
     items.push({
       kind: "item",
-      label: folder.name === null ? "Save…" : "Save",
+      label: folder.name === null ? "Save to folder…" : "Save",
       icon: SaveIcon,
       keys: "Ctrl-S",
       hint:
@@ -206,7 +210,7 @@ export function FileMenu(): React.JSX.Element {
     });
     items.push({
       kind: "item",
-      label: "Save as…",
+      label: "Save to another folder…",
       icon: FolderOutputIcon,
       hint: `Keep this font in another folder, as ${ufo}, and work there from now on`,
       disabled: working,
@@ -217,6 +221,20 @@ export function FileMenu(): React.JSX.Element {
         }),
     });
   }
+
+  items.push({ kind: "separator" });
+  items.push({
+    kind: "item",
+    label: "Open another window",
+    icon: AppWindowIcon,
+    // A browser keeps Ctrl-Shift-N for a private window and never passes it on,
+    // so only the desktop application has the key to offer.
+    ...(desktop() === null ? {} : { keys: "Ctrl-Shift-N" }),
+    hint: "Another window, on the list of fonts: for a second font beside this one",
+    run: () => {
+      openWindow("fonts");
+    },
+  });
 
   return (
     <div

@@ -79,9 +79,9 @@ describe("the font's folder in the bar", () => {
 
     openMenu();
 
-    expect(screen.getByRole("menuitemcheckbox", { name: "Open folder…" })).toBeTruthy();
+    expect(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" })).toBeTruthy();
     // There is nowhere to save to yet, so the item says what pressing it does.
-    expect(screen.getByRole("menuitemcheckbox", { name: /^Save…/ })).toBeTruthy();
+    expect(screen.getByRole("menuitemcheckbox", { name: /^Save to folder…/ })).toBeTruthy();
   });
 
   it("names the folder once one is open", async () => {
@@ -91,7 +91,7 @@ describe("the font's folder in the bar", () => {
 
     openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
 
@@ -109,7 +109,7 @@ describe("the font's folder in the bar", () => {
 
     openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
 
@@ -129,7 +129,7 @@ describe("the font's folder in the bar", () => {
 
     openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
     edit(store);
@@ -147,7 +147,7 @@ describe("the font's folder in the bar", () => {
 
     openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
     edit(store);
@@ -171,7 +171,7 @@ describe("the font's folder in the bar", () => {
 
     openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
 
@@ -187,14 +187,14 @@ describe("the font's folder in the bar", () => {
 
     openMenu();
     await act(async () => {
-      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open folder…" }));
+      fireEvent.click(screen.getByRole("menuitemcheckbox", { name: "Open UFO folder…" }));
       await Promise.resolve();
     });
 
     expect(store.editor.document).toBe(before);
     // Still nowhere to save to, so the item still asks for a folder.
     openMenu();
-    expect(screen.getByRole("menuitemcheckbox", { name: /^Save…/ })).toBeTruthy();
+    expect(screen.getByRole("menuitemcheckbox", { name: /^Save to folder…/ })).toBeTruthy();
   });
 
   it("offers nothing about folders in a browser that has none", () => {
@@ -204,8 +204,51 @@ describe("the font's folder in the bar", () => {
 
     // Firefox and Safari have the file pickers but not the directory one. What
     // they can do is still offered; what they cannot is not there to press.
-    expect(screen.getByRole("menuitemcheckbox", { name: "Open font…" })).toBeTruthy();
-    expect(screen.queryByRole("menuitemcheckbox", { name: "Open folder…" })).toBeNull();
+    expect(screen.getByRole("menuitemcheckbox", { name: "Import font file…" })).toBeTruthy();
+    expect(screen.queryByRole("menuitemcheckbox", { name: "Open UFO folder…" })).toBeNull();
     expect(screen.queryByRole("menuitemcheckbox", { name: /^Save/ })).toBeNull();
+  });
+});
+
+describe("what the menu offers", () => {
+  it("is in groups named for what happens to files", () => {
+    render(<FileMenu />);
+    openMenu();
+
+    const menu = screen.getByRole("menuitemcheckbox", { name: /^New font/ }).parentElement!;
+    const said = [...menu.children].map((child) =>
+      child.getAttribute("role") === "separator"
+        ? "|"
+        : child.textContent.replace(/Ctrl-S$/, "").trim(),
+    );
+    expect(said).toEqual([
+      "New font",
+      "Switch font…",
+      "|",
+      "Open UFO folder…",
+      "Import font file…",
+      "Import SVGs as glyphs…",
+      "|",
+      "Save to folder…",
+      "Save to another folder…",
+      "|",
+      "Open another window",
+    ]);
+  });
+
+  it("starts another font without throwing this one away, and asks nothing", () => {
+    const store = freshStore();
+    const started: (string | undefined)[] = [];
+    store.startProject = (name?: string) => {
+      started.push(name);
+      return Promise.resolve();
+    };
+    render(<FileMenu />, store);
+    openMenu();
+
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: /^New font/ }));
+
+    expect(started).toEqual([undefined]);
+    expect(screen.queryByText("Discard this font?")).toBeNull();
   });
 });

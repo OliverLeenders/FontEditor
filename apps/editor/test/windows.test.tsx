@@ -121,7 +121,7 @@ describe("opening another window", () => {
     render(<FileMenu />, freshStore());
 
     fireEvent.click(screen.getByRole("button", { name: /^File/ }));
-    fireEvent.click(screen.getByText("New window"));
+    fireEvent.click(screen.getByText("Open another window"));
 
     expect(opened).toEqual(["/?fonts"]);
   });

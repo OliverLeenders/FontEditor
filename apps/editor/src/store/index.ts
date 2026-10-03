@@ -125,6 +125,7 @@ import {
   showChooser,
   startProject,
   switchTo,
+  UNTITLED,
 } from "./projects.js";
 import { type AddedImage, addImage, refreshImages, setImageOn } from "./images.js";
 import {
@@ -845,8 +846,11 @@ export class EditorStore {
     switchTo(id);
   }
 
-  /** Start a font that has no folder yet, and open it. */
-  async startProject(name: string): Promise<void> {
+  /**
+   * Start a font that has no folder yet, and open it. The font that was open
+   * is kept where it was, in this browser, on the list of fonts.
+   */
+  async startProject(name: string = UNTITLED): Promise<void> {
     await startProject(name);
   }
 
