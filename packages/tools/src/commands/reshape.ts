@@ -5,6 +5,7 @@ import {
   type OffsetJoin,
   type Glyph,
   inLayer,
+  isEmptyContour,
   offsetContour,
   putGlyph,
   randomIds,
@@ -42,6 +43,8 @@ export type ReshapeReport =
       readonly points: number;
       /** Points put in at extremes that the outline lacked. */
       readonly extremes: number;
+      /** Contours taken out whole, because they drew nothing. */
+      readonly contours: number;
     };
 
 export type OffsetRequest = {
@@ -111,7 +114,8 @@ export function offsetAt(
  *
  * Four steps, in the order that makes each worth doing. Segments that go
  * nowhere first — a point on top of its neighbour — since nothing measured
- * across one means anything. Then the points the outline does not need; then
+ * across one means anything; a contour that then draws nothing at all, a line
+ * there and back or a point on its own, is taken out whole. Then the points the outline does not need; then
  * a point at every extreme it lacks, which every font format wants and which
  * the first pass may have uncovered by taking out a point that happened to be
  * near one; and the points the outline does not need once more, since a new
@@ -139,18 +143,27 @@ export function simplifyAt(
 
   let taken = 0;
   let extremes = 0;
-  const contours = g.contours.map((c) => {
-    if (only !== null && !only.has(c.id)) return c;
+  let emptyContours = 0;
+  const contours = g.contours.flatMap((c) => {
+    if (only !== null && !only.has(c.id)) return [c];
     const emptied = withoutEmptySegments(c) ?? c;
+    // A contour that draws nothing goes whole, and its points are not counted
+    // as points taken out: what was taken out was the contour.
+    if (isEmptyContour(emptied)) {
+      emptyContours += 1;
+      return [];
+    }
     const simpler = simplifyContour(emptied, tolerance) ?? emptied;
     const turnedOut = turned(simpler, "extreme", ids) ?? simpler;
     const tidier = simplifyContour(turnedOut, tolerance) ?? turnedOut;
-    if (tidier === c) return c;
+    if (tidier === c) return [c];
     extremes += turnedOut.nodes.length - simpler.nodes.length;
     taken += c.nodes.length + (turnedOut.nodes.length - simpler.nodes.length) - tidier.nodes.length;
-    return tidier;
+    return [tidier];
   });
-  if (taken === 0 && extremes === 0) return { outcome: "nothing", result: result(state) };
+  if (taken === 0 && extremes === 0 && emptyContours === 0) {
+    return { outcome: "nothing", result: result(state) };
+  }
 
   const after = {
     ...state,
@@ -161,7 +174,7 @@ export function simplifyAt(
   };
 
   return {
-    outcome: { kind: "simplified", points: taken, extremes },
+    outcome: { kind: "simplified", points: taken, extremes, contours: emptyContours },
     result: done(state, after, only === null ? "Simplify" : "Simplify selection"),
   };
 }

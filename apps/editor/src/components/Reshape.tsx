@@ -139,7 +139,7 @@ export function Reshape(): React.JSX.Element {
         title={
           reading
             ? "Another tab is saving this project"
-            : "Tidy the outline: take out points that go nowhere or are not needed, and add the extremes it lacks"
+            : "Tidy the outline: take out points that go nowhere or are not needed and contours that draw nothing, and add the extremes it lacks"
         }
         aria-label={chosen ? "Simplify selection" : "Simplify"}
         onClick={() => apply("simplify")}
@@ -182,8 +182,13 @@ function said(outcome: ReshapeReport, what: "offset" | "simplify", scoped: boole
       ? "Offset 1 outline."
       : `Offset ${String(outcome.contours)} outlines.`;
   }
-  const points = (n: number): string => (n === 1 ? "1 point" : `${String(n)} points`);
-  if (outcome.extremes === 0) return `Took out ${points(outcome.points)}.`;
-  if (outcome.points <= 0) return `Added ${points(outcome.extremes)} at extremes.`;
-  return `Took out ${points(outcome.points)} and added ${String(outcome.extremes)} at extremes.`;
+  const count = (n: number, one: string): string => (n === 1 ? `1 ${one}` : `${String(n)} ${one}s`);
+  const out = [
+    ...(outcome.points > 0 ? [count(outcome.points, "point")] : []),
+    ...(outcome.contours > 0 ? [count(outcome.contours, "empty contour")] : []),
+  ];
+  const took = out.length === 0 ? null : `Took out ${out.join(" and ")}`;
+  if (outcome.extremes === 0) return `${took ?? "Took out nothing"}.`;
+  if (took === null) return `Added ${count(outcome.extremes, "point")} at extremes.`;
+  return `${took}, and added ${String(outcome.extremes)} at extremes.`;
 }

@@ -131,7 +131,7 @@ describe("simplifying", () => {
 
     const { outcome, result } = simplifyAt(state, "a", 1);
 
-    expect(outcome).toEqual({ kind: "simplified", points: 2, extremes: 0 });
+    expect(outcome).toEqual({ kind: "simplified", points: 2, extremes: 0, contours: 0 });
     expect(result.state.document.glyphs["a"]!.contours[0]!.nodes).toHaveLength(before - 2);
   });
 
@@ -195,6 +195,31 @@ describe("tidying an outline", () => {
     expect(new Set(places).size).toBe(places.length);
     const furthest = Math.max(...tidied.nodes.map((n) => n.pt.x));
     expect(furthest).toBeCloseTo(contourBounds(tidied)!.maxX, 3);
+  });
+
+  it("takes out a contour that draws nothing, and leaves a stroke along a line", () => {
+    const tidyIds = counterIds("empty");
+    const at = (x: number, y: number) => node(tidyIds.node(), { x, y });
+    const square = rectContour(tidyIds, { minX: 0, minY: 0, maxX: 100, maxY: 100 });
+    // A line there and back, with a point doubled on it: what a counter is
+    // once its corners rounded to nothing have been taken out.
+    const sliver = contour(tidyIds.contour(), [at(10, 50), at(90, 50), at(90, 50)], true);
+    const stroke = {
+      ...contour(tidyIds.contour(), [at(10, 20), at(90, 20)], false),
+      nib: { angle: 30, width: 80 },
+    };
+    const state = editorState({
+      document: fontDocument([glyph("o", { advance: 400, contours: [square, sliver, stroke] })]),
+      view: { scale: 1, tx: 0, ty: 0 },
+      currentGlyph: "o",
+    });
+
+    const { outcome, result: done } = simplifyAt(state, "o", 1, null, tidyIds);
+    expect(outcome).toEqual({ kind: "simplified", points: 0, extremes: 0, contours: 1 });
+    expect(done.state.document.glyphs["o"]!.contours.map((c) => c.id)).toEqual([
+      square.id,
+      stroke.id,
+    ]);
   });
 
   it("says nothing was done to an outline that is already tidy", () => {

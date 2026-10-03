@@ -94,6 +94,55 @@ export function withoutEmptySegments(c: Contour): Contour | null {
   return removed ? { ...c, nodes } : null;
 }
 
+/** How far a point may lie off a line and still be on it, in units. */
+const ON_LINE = 1e-6;
+
+/**
+ * Whether a contour draws nothing at all, and so can be taken out.
+ *
+ * A closed outline draws nothing when every one of its points and handles lies
+ * on one straight line: it encloses no area, so it fills none. What is left of
+ * a counter whose sides have all been taken out is one — a line drawn there and
+ * back — and Material Symbols' pause_presentation arrives with one. Any contour
+ * whose points and handles are all at one place draws nothing either, open or
+ * closed.
+ *
+ * A stroke is never empty. A pen drawn along a line, or standing at one place,
+ * leaves ink, and that is what it is there for. Nor is an open outline with
+ * somewhere to go: it fills nothing, but it is a path somebody may be about to
+ * give a pen, close, or join, rather than litter.
+ */
+export function isEmptyContour(c: Contour): boolean {
+  if (c.nib !== undefined) return false;
+
+  const places = c.nodes.flatMap((n) => [
+    n.pt,
+    ...(n.in === null ? [] : [n.in]),
+    ...(n.out === null ? [] : [n.out]),
+  ]);
+  const first = places[0];
+  if (first === undefined) return true;
+
+  // The place furthest from the first, which with it fixes the line: furthest,
+  // so a near neighbour's rounding cannot tip the line's direction.
+  let far = first;
+  let reach = 0;
+  for (const p of places) {
+    const d = Math.hypot(p.x - first.x, p.y - first.y);
+    if (d > reach) {
+      far = p;
+      reach = d;
+    }
+  }
+  if (reach <= SAME_PLACE) return true;
+  if (!c.closed) return false;
+
+  const along = { x: (far.x - first.x) / reach, y: (far.y - first.y) / reach };
+  return places.every(
+    (p) => Math.abs((p.x - first.x) * along.y - (p.y - first.y) * along.x) <= ON_LINE,
+  );
+}
+
 /**
  * The contour with every point taken out that can be, or `null` if none can.
  *

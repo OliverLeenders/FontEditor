@@ -11,7 +11,12 @@ import {
 } from "../src/contour.js";
 import { counterIds } from "../src/ids.js";
 import { node } from "../src/node.js";
-import { keptByPolicy, simplifyContour, withoutEmptySegments } from "../src/simplify.js";
+import {
+  isEmptyContour,
+  keptByPolicy,
+  simplifyContour,
+  withoutEmptySegments,
+} from "../src/simplify.js";
 import { ellipseContour, rectContour } from "../src/shapes.js";
 
 const ids = counterIds("simp");
@@ -220,5 +225,52 @@ describe("segments that go nowhere", () => {
   it("never takes a contour below two points", () => {
     const dot = contour(ids.contour(), [at(5, 5), at(5, 5), at(5, 5)], true);
     expect(withoutEmptySegments(dot)!.nodes).toHaveLength(2);
+  });
+});
+
+describe("a contour that draws nothing", () => {
+  const at = (x: number, y: number, init: Parameters<typeof node>[2] = {}) =>
+    node(ids.node(), { x, y }, init);
+
+  it("is a closed line there and back, as pause_presentation has one", () => {
+    expect(isEmptyContour(contour(ids.contour(), [at(157, 237), at(803, 237)], true))).toBe(true);
+  });
+
+  it("is a closed run of points along one slant, handles and all", () => {
+    const slant = contour(
+      ids.contour(),
+      [at(0, 0, { out: { x: 10, y: 20 } }), at(30, 60, { in: { x: 20, y: 40 } }), at(50, 100)],
+      true,
+    );
+    expect(isEmptyContour(slant)).toBe(true);
+  });
+
+  it("is every point at one place, open or closed", () => {
+    expect(isEmptyContour(contour(ids.contour(), [at(5, 5), at(5, 5)], true))).toBe(true);
+    expect(isEmptyContour(contour(ids.contour(), [at(5, 5), at(5, 5)], false))).toBe(true);
+  });
+
+  it("is not a closed line with a handle off it, which bulges", () => {
+    const bulge = contour(
+      ids.contour(),
+      [at(0, 0, { out: { x: 50, y: 40 } }), at(100, 0, { in: { x: 50, y: 40 } })],
+      true,
+    );
+    expect(isEmptyContour(bulge)).toBe(false);
+  });
+
+  it("is not an open line, which may yet be given a pen or closed", () => {
+    expect(isEmptyContour(contour(ids.contour(), [at(0, 0), at(100, 0)], false))).toBe(false);
+  });
+
+  it("is never a stroke, whose pen leaves ink along a line or at a point", () => {
+    const line = contour(ids.contour(), [at(0, 0), at(100, 0)], true);
+    expect(isEmptyContour({ ...line, nib: { angle: 30, width: 80 } })).toBe(false);
+    const dot = contour(ids.contour(), [at(5, 5), at(5, 5)], false);
+    expect(isEmptyContour({ ...dot, nib: { angle: 30, width: 80 } })).toBe(false);
+  });
+
+  it("is not a rectangle", () => {
+    expect(isEmptyContour(rectContour(ids, { minX: 0, minY: 0, maxX: 10, maxY: 10 }))).toBe(false);
   });
 });
