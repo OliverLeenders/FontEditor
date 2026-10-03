@@ -266,8 +266,9 @@ export class Persistence {
     await client.replaceAll(document);
 
     // Disk now holds exactly this document, so autosave starts from it rather
-    // than believing every glyph is still unwritten.
-    this.autosave.markLoaded(document, false);
+    // than believing every glyph is still unwritten — and keeps whatever was
+    // committed while it was being written, which is newer than it.
+    this.autosave.rebase(document);
     // Disk holds every glyph of this document, so nothing is ahead of it and the
     // font just replaced must not be what the next journal pass diffs against.
     this.lastJournalled = document;

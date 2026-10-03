@@ -190,6 +190,40 @@ export class Autosave {
     this.state = "idle";
   }
 
+  /**
+   * The whole font has just been written as `document`: start from there, and
+   * keep what has been committed since.
+   *
+   * What a replacement calls when it lands, having called {@link abandon} before
+   * it began. Writing a large font whole is seconds, and the font is on screen
+   * for all of them — so it can be edited, and an edit committed in those
+   * seconds is newer than what was written. Calling the font saved as it was
+   * written forgot that edit until the next one, and one that was not to a
+   * glyph — the features, the kerning, the font's info — is in no journal
+   * either, so a reload lost it.
+   */
+  rebase(document: FontDocument): void {
+    this.lastSaved = document;
+    // `abandon` emptied this, so anything here was committed after it.
+    if (this.queued === null || this.queued === document) {
+      if (this.timer !== null) {
+        this.clearTimer(this.timer);
+        this.timer = null;
+      }
+      this.queued = document;
+      if (!this.inFlight) this.state = "idle";
+      return;
+    }
+
+    this.state = this.inFlight ? "saving" : "pending";
+    if (this.timer === null && !this.inFlight) {
+      this.timer = this.setTimer(() => {
+        this.timer = null;
+        void this.flush();
+      }, this.debounceMs);
+    }
+  }
+
   dispose(): void {
     if (this.timer !== null) this.clearTimer(this.timer);
     this.timer = null;

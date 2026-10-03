@@ -902,6 +902,53 @@ describe("abandoning a save when the project is replaced", () => {
     await autosave.flush();
     expect(written).toEqual([[".notdef", "X"]]);
   });
+
+  it("keeps an edit made while the replacement was being written", async () => {
+    const saves: { now: string[]; from: string[] | null }[] = [];
+    const autosave = new Autosave(
+      {
+        journal: async () => {},
+        save: async (d, previous) =>
+          void saves.push({ now: [...d.glyphOrder], from: previous && [...previous.glyphOrder] }),
+      },
+      // A timer that never fires by itself: the save is asked for below.
+      { debounceMs: 1000, setTimer: () => 1, clearTimer: () => {} },
+    );
+
+    autosave.markSaved(doc(["A", "B", "C"]));
+    await autosave.abandon();
+
+    // The replacement is on its way to disk, and on screen: it is edited.
+    const replacement = doc([".notdef"]);
+    autosave.commit(doc([".notdef", "X"]));
+
+    // It lands. The edit is newer than it, and is still to be written.
+    autosave.rebase(replacement);
+    expect(autosave.dirty).toBe(true);
+    expect(autosave.status).toBe("pending");
+
+    await autosave.flush();
+    // Written, and measured against the replacement rather than the old font.
+    expect(saves).toEqual([{ now: [".notdef", "X"], from: [".notdef"] }]);
+    expect(autosave.dirty).toBe(false);
+  });
+
+  it("is saved, with nothing to write, when nothing was edited meanwhile", async () => {
+    const written: string[][] = [];
+    const autosave = new Autosave(
+      { journal: async () => {}, save: async (d) => void written.push([...d.glyphOrder]) },
+      { debounceMs: 1000, setTimer: () => 1, clearTimer: () => {} },
+    );
+
+    autosave.markSaved(doc(["A"]));
+    await autosave.abandon();
+    autosave.rebase(doc([".notdef"]));
+
+    expect(autosave.dirty).toBe(false);
+    expect(autosave.status).toBe("idle");
+    await autosave.flush();
+    expect(written).toEqual([]);
+  });
 });
 
 describe("kerning on disk", () => {
