@@ -309,7 +309,7 @@ export {
   hasContinuousCorners,
   readContinuous,
 } from "./corner.js";
-export { keptByPolicy, simplifyContour } from "./simplify.js";
+export { keptByPolicy, simplifyContour, withoutEmptySegments } from "./simplify.js";
 export type { CombineOutcome, SetOperation } from "./overlap.js";
 export { combineContours, contoursMeet, removeOverlap } from "./overlap.js";
 

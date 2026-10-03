@@ -120,7 +120,7 @@ describe("simplifying from the bar", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Simplify" }));
 
-    expect(note()).toBe("The outline needs every point it has.");
+    expect(note()).toBe("The outline is already tidy.");
   });
 
   it("needs no dialog to do it", () => {
@@ -129,6 +129,6 @@ describe("simplifying from the bar", () => {
     // One press, no panel: the tolerance is stated on the button rather than asked
     // for, because nobody has an opinion about a thousandth of an em.
     const button = screen.getByRole<HTMLButtonElement>("button", { name: "Simplify" });
-    expect(button.title).toMatch(/keeping corners and extremes$/);
+    expect(button.title).toMatch(/add the extremes it lacks$/);
   });
 });

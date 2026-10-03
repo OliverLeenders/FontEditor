@@ -1,10 +1,12 @@
 import {
+  contour,
   contourBounds,
   counterIds,
   ellipseContour,
   fontDocument,
   glyph,
   insertNodeOnSegment,
+  node,
   rectContour,
 } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
@@ -129,7 +131,7 @@ describe("simplifying", () => {
 
     const { outcome, result } = simplifyAt(state, "a", 1);
 
-    expect(outcome).toEqual({ kind: "simplified", points: 2 });
+    expect(outcome).toEqual({ kind: "simplified", points: 2, extremes: 0 });
     expect(result.state.document.glyphs["a"]!.contours[0]!.nodes).toHaveLength(before - 2);
   });
 
@@ -158,5 +160,54 @@ describe("simplifying", () => {
     const { result } = simplifyAt(state, "a", 1);
 
     expect(result.effects[0]).toMatchObject({ kind: "beginTransaction", label: "Simplify" });
+  });
+});
+
+describe("tidying an outline", () => {
+  it("takes out a point on top of another and adds the extreme a curve lacks, as one step", () => {
+    const tidyIds = counterIds("tidy");
+    // A D: an upright stem, and a bowl drawn as one curve whose furthest point
+    // has no point of its own — and the top of the stem doubled.
+    const d = contour(
+      tidyIds.contour(),
+      [
+        node(tidyIds.node(), { x: 0, y: 0 }),
+        node(tidyIds.node(), { x: 0, y: 400 }),
+        node(tidyIds.node(), { x: 0, y: 400 }, { out: { x: 300, y: 400 } }),
+        node(tidyIds.node(), { x: 0, y: 0 }, { in: { x: 300, y: 0 } }),
+      ],
+      true,
+    );
+    const state = editorState({
+      document: fontDocument([glyph("D", { advance: 400, contours: [d] })]),
+      view: { scale: 1, tx: 0, ty: 0 },
+      currentGlyph: "D",
+    });
+
+    const { outcome, result: done } = simplifyAt(state, "D", 1, null, tidyIds);
+    if (outcome === "nothing" || outcome.kind !== "simplified") throw new Error("nothing done");
+    expect(outcome.extremes).toBe(1);
+    expect(done.effects.map((e) => e.kind)).toEqual(["beginTransaction", "commitTransaction"]);
+
+    const tidied = done.state.document.glyphs["D"]!.contours[0]!;
+    const places = tidied.nodes.map((n) => `${String(n.pt.x)},${String(n.pt.y)}`);
+    // No two points in one place, and one at the bowl's furthest reach.
+    expect(new Set(places).size).toBe(places.length);
+    const furthest = Math.max(...tidied.nodes.map((n) => n.pt.x));
+    expect(furthest).toBeCloseTo(contourBounds(tidied)!.maxX, 3);
+  });
+
+  it("says nothing was done to an outline that is already tidy", () => {
+    const state = editorState({
+      document: fontDocument([
+        glyph("o", {
+          advance: 400,
+          contours: [rectContour(counterIds("t"), { minX: 0, minY: 0, maxX: 100, maxY: 100 })],
+        }),
+      ]),
+      view: { scale: 1, tx: 0, ty: 0 },
+      currentGlyph: "o",
+    });
+    expect(simplifyAt(state, "o", 1).outcome).toBe("nothing");
   });
 });

@@ -37,6 +37,63 @@ const EXTREME_DEGREES = 0.5;
 /** How far two tangents may differ and still count as one direction, in degrees. */
 const SMOOTH_DEGREES = 1;
 
+/** How near two places must be to be one, in units: a hair, since these are written down exactly. */
+const SAME_PLACE = 1e-9;
+
+const samePlace = (a: Vec2, b: Vec2): boolean =>
+  Math.abs(a.x - b.x) <= SAME_PLACE && Math.abs(a.y - b.y) <= SAME_PLACE;
+
+/**
+ * The contour with every segment that goes nowhere taken out, or `null` where
+ * there is none.
+ *
+ * A segment goes nowhere when it starts and ends at one place and its handles,
+ * if it has any, are there too: a line from a point to itself, or a curve all
+ * four of whose points are one. Nothing draws it and it has no direction, and
+ * every operation that walks the outline has to step round it. They come from
+ * a point dropped on another, and from fonts cut out of a variable font where a
+ * corner's radius went to nothing — Material Symbols' counters are made of
+ * them.
+ *
+ * The point it arrives at is taken out and the one it leaves from kept, given
+ * the handle that left the point taken out, so the outline is the same. A
+ * handle left lying on its own point is retracted, which is what one there
+ * means. A contour is never taken below two points.
+ */
+export function withoutEmptySegments(c: Contour): Contour | null {
+  const nodes = [...c.nodes];
+  let removed = false;
+
+  // From the end, so taking a point out leaves the ones still to be looked at
+  // where they were. The first point arrives from the last only on a closed contour.
+  for (let i = nodes.length - 1; i >= (c.closed ? 0 : 1) && nodes.length > 2; i--) {
+    const here = nodes[i]!;
+    const before = nodes[(i - 1 + nodes.length) % nodes.length]!;
+    const going = before.out ?? before.pt;
+    const coming = here.in ?? here.pt;
+    if (
+      !samePlace(before.pt, here.pt) ||
+      !samePlace(going, before.pt) ||
+      !samePlace(coming, here.pt)
+    ) {
+      continue;
+    }
+    const out = here.out === null || samePlace(here.out, before.pt) ? null : here.out;
+    const into = before.in === null || samePlace(before.in, before.pt) ? null : before.in;
+    nodes[(i - 1 + nodes.length) % nodes.length] = {
+      ...before,
+      in: into,
+      out,
+      // A point with a handle on one side only is a corner, whatever it was.
+      type: into === null || out === null ? "corner" : before.type,
+    };
+    nodes.splice(i, 1);
+    removed = true;
+  }
+
+  return removed ? { ...c, nodes } : null;
+}
+
 /**
  * The contour with every point taken out that can be, or `null` if none can.
  *

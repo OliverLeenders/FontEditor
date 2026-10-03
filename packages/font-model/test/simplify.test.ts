@@ -11,7 +11,7 @@ import {
 } from "../src/contour.js";
 import { counterIds } from "../src/ids.js";
 import { node } from "../src/node.js";
-import { keptByPolicy, simplifyContour } from "../src/simplify.js";
+import { keptByPolicy, simplifyContour, withoutEmptySegments } from "../src/simplify.js";
 import { ellipseContour, rectContour } from "../src/shapes.js";
 
 const ids = counterIds("simp");
@@ -166,5 +166,59 @@ describe("how far it goes", () => {
     }
     const out = simplifyContour(more, 0.5);
     if (out !== null) expect(apart(out, more)).toBeLessThan(2);
+  });
+});
+
+describe("segments that go nowhere", () => {
+  const at = (x: number, y: number, init: Parameters<typeof node>[2] = {}) =>
+    node(ids.node(), { x, y }, init);
+
+  it("takes out a line from a point to itself, and keeps the shape", () => {
+    const square = contour(
+      ids.contour(),
+      [at(0, 0), at(100, 0), at(100, 0), at(100, 100), at(0, 100)],
+      true,
+    );
+    const tidied = withoutEmptySegments(square)!;
+    expect(tidied.nodes.map((n) => [n.pt.x, n.pt.y])).toEqual([
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [0, 100],
+    ]);
+  });
+
+  it("takes out a corner rounded to nothing, as a font cut from a variable one has it", () => {
+    // Material Symbols' counters: each corner a curve whose handles lie on its
+    // ends, which are one point.
+    const corner = (x: number, y: number) => [
+      at(x, y, { in: { x, y } }),
+      at(x, y, { out: { x, y } }),
+    ];
+    const counter = contour(
+      ids.contour(),
+      [...corner(157, 237), ...corner(803, 237), ...corner(803, 723), ...corner(157, 723)],
+      true,
+    );
+    const tidied = withoutEmptySegments(counter)!;
+    expect(tidied.nodes).toHaveLength(4);
+    // What is left is a plain rectangle: no handles, every point a corner.
+    expect(tidied.nodes.every((n) => n.in === null && n.out === null && n.type === "corner")).toBe(
+      true,
+    );
+  });
+
+  it("leaves a loop alone, which starts and ends at one place but goes somewhere", () => {
+    const loop = contour(
+      ids.contour(),
+      [at(0, 0, { out: { x: 100, y: 100 } }), at(0, 0, { in: { x: -100, y: 100 } }), at(50, -50)],
+      true,
+    );
+    expect(withoutEmptySegments(loop)).toBeNull();
+  });
+
+  it("never takes a contour below two points", () => {
+    const dot = contour(ids.contour(), [at(5, 5), at(5, 5), at(5, 5)], true);
+    expect(withoutEmptySegments(dot)!.nodes).toHaveLength(2);
   });
 });

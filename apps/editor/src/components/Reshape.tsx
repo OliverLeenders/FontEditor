@@ -139,7 +139,7 @@ export function Reshape(): React.JSX.Element {
         title={
           reading
             ? "Another tab is saving this project"
-            : "Take out the points the outline does not need, keeping corners and extremes"
+            : "Tidy the outline: take out points that go nowhere or are not needed, and add the extremes it lacks"
         }
         aria-label={chosen ? "Simplify selection" : "Simplify"}
         onClick={() => apply("simplify")}
@@ -173,9 +173,7 @@ const JOIN_NAMES: Record<OffsetJoin, string> = {
 function said(outcome: ReshapeReport, what: "offset" | "simplify", scoped: boolean): string {
   if (outcome === "nothing") {
     if (what === "simplify") {
-      return scoped
-        ? "The selected outlines need every point they have."
-        : "The outline needs every point it has.";
+      return scoped ? "The selected outlines are already tidy." : "The outline is already tidy.";
     }
     return "Nothing here can be offset.";
   }
@@ -184,5 +182,8 @@ function said(outcome: ReshapeReport, what: "offset" | "simplify", scoped: boole
       ? "Offset 1 outline."
       : `Offset ${String(outcome.contours)} outlines.`;
   }
-  return outcome.points === 1 ? "Took out 1 point." : `Took out ${String(outcome.points)} points.`;
+  const points = (n: number): string => (n === 1 ? "1 point" : `${String(n)} points`);
+  if (outcome.extremes === 0) return `Took out ${points(outcome.points)}.`;
+  if (outcome.points <= 0) return `Added ${points(outcome.extremes)} at extremes.`;
+  return `Took out ${points(outcome.points)} and added ${String(outcome.extremes)} at extremes.`;
 }

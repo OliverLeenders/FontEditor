@@ -226,7 +226,7 @@ function contoursIn(state: EditorState): ContourId[] {
  * Walked from the last segment back, because inserting into one renumbers the
  * segments after it and nothing before it.
  */
-function turned(c: Contour, kind: Turn, ids: IdFactory): Contour | null {
+export function turned(c: Contour, kind: Turn, ids: IdFactory): Contour | null {
   let next = c;
   let changed = false;
   for (let index = segmentCount(c) - 1; index >= 0; index--) {

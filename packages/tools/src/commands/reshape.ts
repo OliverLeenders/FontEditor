@@ -11,10 +11,12 @@ import {
   removeOverlap,
   simplifyContour,
   withLayer,
+  withoutEmptySegments,
 } from "@typewright/font-model";
 
 import { type ToolResult, result } from "../effects.js";
 import type { EditorState } from "../state.js";
+import { turned } from "./contours.js";
 import { done } from "./shared.js";
 
 /**
@@ -34,7 +36,13 @@ const reshapeIds = randomIds();
 export type ReshapeReport =
   | "nothing"
   | { readonly kind: "offset"; readonly contours: number }
-  | { readonly kind: "simplified"; readonly points: number };
+  | {
+      readonly kind: "simplified";
+      /** Points taken out, net of those put in at extremes. */
+      readonly points: number;
+      /** Points put in at extremes that the outline lacked. */
+      readonly extremes: number;
+    };
 
 export type OffsetRequest = {
   readonly x: number;
@@ -98,20 +106,30 @@ export function offsetAt(
 }
 
 /**
- * Take out the points the outline does not need.
+ * Tidy the outline: take out the points it does not need, and put in the ones
+ * it should have.
+ *
+ * Four steps, in the order that makes each worth doing. Segments that go
+ * nowhere first — a point on top of its neighbour — since nothing measured
+ * across one means anything. Then the points the outline does not need; then
+ * a point at every extreme it lacks, which every font format wants and which
+ * the first pass may have uncovered by taking out a point that happened to be
+ * near one; and the points the outline does not need once more, since a new
+ * extreme can make a neighbour redundant. Simplifying keeps extremes, so the
+ * last pass never undoes the third.
  *
  * The tolerance is in design units and comes from the caller, because what counts
  * as invisible depends on the em: a unit is a thousandth of the square on a
  * thousand-unit em and a two-thousandth on a 2048 one.
  *
- * `"nothing"` where every point is one the outline needs, which is what a tidy
- * drawing looks like from here.
+ * `"nothing"` where the outline is already tidy.
  */
 export function simplifyAt(
   state: EditorState,
   name: GlyphName,
   tolerance: number,
   only: ReadonlySet<ContourId> | null = null,
+  ids: IdFactory = reshapeIds,
 ): { readonly outcome: ReshapeReport; readonly result: ToolResult } {
   const whole = state.document.glyphs[name];
   if (whole === undefined) return { outcome: "nothing", result: result(state) };
@@ -120,14 +138,19 @@ export function simplifyAt(
   const g = inLayer(whole, layer);
 
   let taken = 0;
+  let extremes = 0;
   const contours = g.contours.map((c) => {
     if (only !== null && !only.has(c.id)) return c;
-    const tidier = simplifyContour(c, tolerance);
-    if (tidier === null) return c;
-    taken += c.nodes.length - tidier.nodes.length;
+    const emptied = withoutEmptySegments(c) ?? c;
+    const simpler = simplifyContour(emptied, tolerance) ?? emptied;
+    const turnedOut = turned(simpler, "extreme", ids) ?? simpler;
+    const tidier = simplifyContour(turnedOut, tolerance) ?? turnedOut;
+    if (tidier === c) return c;
+    extremes += turnedOut.nodes.length - simpler.nodes.length;
+    taken += c.nodes.length + (turnedOut.nodes.length - simpler.nodes.length) - tidier.nodes.length;
     return tidier;
   });
-  if (taken === 0) return { outcome: "nothing", result: result(state) };
+  if (taken === 0 && extremes === 0) return { outcome: "nothing", result: result(state) };
 
   const after = {
     ...state,
@@ -138,7 +161,7 @@ export function simplifyAt(
   };
 
   return {
-    outcome: { kind: "simplified", points: taken },
+    outcome: { kind: "simplified", points: taken, extremes },
     result: done(state, after, only === null ? "Simplify" : "Simplify selection"),
   };
 }
