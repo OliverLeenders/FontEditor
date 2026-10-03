@@ -1,6 +1,7 @@
 import type { FontDocument } from "@typewright/font-model";
 
 import { type FontHost, showDocument } from "./fonts.js";
+import { written } from "./masters.js";
 
 /**
  * How long the font has to be worked on before another copy of it is kept.
@@ -24,6 +25,33 @@ const SNAPSHOT_EVERY_MS = 5 * 60 * 1000;
  * because it has something to remember between calls: when the last copy was
  * kept, and of what.
  */
+/**
+ * The master a copy kept now is a copy of, or `null` in a font drawn once.
+ *
+ * Nothing to tell apart with one master, and saying nothing there means its
+ * copies are still its copies whatever its one master comes to be called.
+ */
+function openMaster(host: FontHost): string | null {
+  const project = host.state().project;
+  return project.masters.length > 1 ? project.current : null;
+}
+
+/**
+ * Whether a copy may be put back into the master that is open.
+ *
+ * One that says it is this master's, one that does not say — every copy from
+ * before they said, and every copy of a font while it had one master — and one
+ * of a master the font no longer has, which belongs nowhere else. Only a copy
+ * of another master the font still has is not this one's.
+ */
+export function copyOfOpenMaster(
+  entry: { readonly master: string | null },
+  project: { readonly current: string; readonly masters: readonly { readonly id: string }[] },
+): boolean {
+  if (entry.master === null || entry.master === project.current) return true;
+  return !project.masters.some((m) => m.id === entry.master);
+}
+
 export class Snapshots {
   /**
    * When the last copy of the whole font was kept, and of what.
@@ -60,7 +88,7 @@ export class Snapshots {
   async keep(document: FontDocument): Promise<void> {
     this.at = Date.now();
     this.kept = document;
-    const entries = await this.host.disk.snapshot(document, this.at);
+    const entries = await this.host.disk.snapshot(document, this.at, openMaster(this.host));
     this.host.patch({ snapshots: entries });
   }
 
@@ -80,12 +108,25 @@ export class Snapshots {
    * restored would describe glyphs that are no longer open.
    */
   async restore(at: number): Promise<{ glyphs: number; problems: readonly string[] } | null> {
+    // A copy of another master is that master's drawing, and put back here it
+    // would make this master a second one of that. The list does not offer
+    // one; this is for a list that was read before a master was gone to.
+    const entry = this.host.state().snapshots.find((it) => it.at === at);
+    const project = this.host.state().project;
+    if (entry !== undefined && !copyOfOpenMaster(entry, project)) {
+      const other = project.masters.find((m) => m.id === entry.master)?.name ?? "another master";
+      throw new Error(`That is a copy of ${other}. Go to that master to put it back.`);
+    }
+
     const found = await this.host.disk.readSnapshot(at);
     if (found === null) return null;
 
     await this.keep(this.host.state().session.editor.document);
+    // A master gone to a moment ago may still be on its way into the working
+    // copy; this one is written after it, and as the same master.
+    await written(this.host);
     showDocument(this.host, found.document, false);
-    await this.host.disk.replaceAll(found.document);
+    await this.host.disk.replaceAll(found.document, this.host.state().project.current);
     await this.refresh();
 
     return { glyphs: found.document.glyphOrder.length, problems: found.problems };

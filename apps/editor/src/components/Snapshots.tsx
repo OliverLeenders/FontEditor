@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { copyOfOpenMaster } from "../store/snapshots.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import styles from "./Snapshots.module.css";
@@ -19,7 +20,15 @@ import { CameraIcon, HistoryIcon, RotateCcwIcon } from "./icons.js";
  */
 export function Snapshots(): React.JSX.Element {
   const store = useEditorStore();
-  const entries = useStoreValue((s) => s.snapshots);
+  const all = useStoreValue((s) => s.snapshots);
+  const project = useStoreValue((s) => s.project);
+  // The open master's. A copy is of one master's drawing, and put back into
+  // another it would make that one a second of this.
+  const entries = all.filter((entry) => copyOfOpenMaster(entry, project));
+  const master =
+    project.masters.length > 1
+      ? (project.masters.find((m) => m.id === project.current)?.name ?? null)
+      : null;
   const reading = useStoreValue((s) => s.ownership === "reading");
 
   const [busy, setBusy] = useState(false);
@@ -56,7 +65,7 @@ export function Snapshots(): React.JSX.Element {
       onOpen={() => void store.refreshSnapshots()}
     >
       <div className={styles.head}>
-        <span>Copies of this font</span>
+        <span>{master === null ? "Copies of this font" : `Copies of ${master}`}</span>
         <button
           type="button"
           className={styles.keep}

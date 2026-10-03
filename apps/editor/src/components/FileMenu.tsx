@@ -335,12 +335,16 @@ function reportOf(done: {
   family: string;
   glyphs: number;
   warnings: readonly string[];
+  master: string | null;
 }): string {
   const warnings =
     done.warnings.length === 0
       ? ""
       : ` · ${String(done.warnings.length)} warning${done.warnings.length === 1 ? "" : "s"}`;
-  return `${done.family} · ${String(done.glyphs)} glyphs from ${done.name}${warnings}`;
+  // Said where it is so, since it is not what reading a folder used to do.
+  const into =
+    done.master === null ? "" : ` into ${done.master}; the other masters are as they were`;
+  return `${done.family} · ${String(done.glyphs)} glyphs from ${done.name}${into}${warnings}`;
 }
 
 /** How long ago the font was written, for the line under the menu. */

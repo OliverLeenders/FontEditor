@@ -226,6 +226,17 @@ round it and a small chevron on the outline just past it, pointing the way the c
 both are stronger on a contour with a point selected. The Masters panel's compatibility check
 opens the glyph and selects the contour a line is about.
 
+**Going between masters.** **Draw** in the Masters panel puts another master in front of you.
+It is done once that master's drawing is on screen; making it the working copy is every glyph
+written again, which for a large font is some seconds and goes on afterwards, shown as
+_saving_ in the status bar. Each master is a font of its own in three places worth knowing.
+The copies under **History** are the open master's: a copy kept in the Regular is offered in
+the Regular and not in the Bold, each master has its own twenty, and a copy from before the
+font had a second master is offered to either. The font's folder on disk is one master's — the
+one that was open when it was last saved — so **Re-read** replaces the drawing in front of you
+and leaves the other masters as they are. And the undo history is the open master's, starting
+again each time you arrive.
+
 **Between the masters.** The Spacing line and the Proof have a **Between** switch and a
 slider for each axis: the text is then set with the family worked out at that place rather
 than with the master being edited. It is the same location the canvas draws its ghost weight

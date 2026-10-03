@@ -26,7 +26,7 @@ import {
 import { editorState } from "@typewright/tools";
 
 import type { Persistence } from "../persistence.js";
-import { adoptFamily, beginFresh } from "./masters.js";
+import { adoptFamily, beginFresh, written } from "./masters.js";
 import { painted, shown, tell } from "./opening.js";
 import { UNTITLED } from "./projects.js";
 import type { StoreHost, StoreState } from "./state.js";
@@ -356,7 +356,38 @@ export async function adoptDocument(
   await host.disk.putLayers([]);
   // The font as it is by now: the one opened, with whatever was changed in it
   // in the moments since it was shown.
-  await host.disk.replaceAll(host.state().session.editor.document);
+  const now = host.state();
+  await host.disk.replaceAll(now.session.editor.document, now.project.current);
+}
+
+/**
+ * Make a document the open master's, leaving the font's other masters alone.
+ *
+ * What reading a folder again does to a font drawn more than once. The folder
+ * is one master's — the one that was open when it was last saved to — so what
+ * it holds replaces the drawing in front of you and nothing else. It used to
+ * be taken for the whole font: the project began again around it, one master,
+ * and every other master was dropped without a copy kept.
+ */
+export async function adoptAsOpenMaster(host: FontHost, document: FontDocument): Promise<void> {
+  const replaced = host.state().session.editor.document;
+  const project = host.state().project;
+
+  showDocument(host, document, false, {
+    project: { ...project, sources: { ...project.sources, [project.current]: document } },
+  });
+  host.setCatalogQuery(DEFAULT_QUERY);
+  shown(host);
+  await painted();
+
+  // A copy of the drawing it replaces, as this master's.
+  await host.keepSnapshot(replaced);
+  await host.disk.putLayers([]);
+  // After a master still on its way into the working copy, and as the master
+  // that is open by then.
+  await written(host);
+  const now = host.state();
+  await host.disk.replaceAll(now.session.editor.document, now.project.current);
 }
 
 /**

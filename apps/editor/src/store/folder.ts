@@ -20,7 +20,7 @@ import {
 import { crc32, entryBytes, readUfo, ufoFiles, ufoFolderName } from "@typewright/font-io";
 import { type FontDocument, randomIds } from "@typewright/font-model";
 
-import { type FontHost, adoptDocument, adoptImages } from "./fonts.js";
+import { type FontHost, adoptAsOpenMaster, adoptDocument, adoptImages } from "./fonts.js";
 import { count, tell } from "./opening.js";
 import { type FolderState, NO_FOLDER } from "./state.js";
 
@@ -44,6 +44,11 @@ export type FolderReport = {
   readonly family: string;
   readonly glyphs: number;
   readonly warnings: readonly string[];
+  /**
+   * The master it was read into, in a font drawn more than once: the others
+   * are as they were. `null` where the folder is the whole font.
+   */
+  readonly master: string | null;
 };
 
 /** What writing one did. */
@@ -111,7 +116,15 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
   // A copy of what was on screen is kept only when it is being replaced. Moved
   // out of, it is still in its own working copy, and a copy of it here would be
   // a snapshot of another font.
-  await adoptDocument(host, read.document, project.id === before);
+  //
+  // A font drawn more than once, read again from its folder, has the drawing
+  // in front of you replaced and its other masters left as they are: the
+  // folder is one master's.
+  const again = project.id === before;
+  const masters = host.state().project.masters;
+  const into = again && masters.length > 1;
+  if (into) await adoptAsOpenMaster(host, read.document);
+  else await adoptDocument(host, read.document, again);
   await adoptImages(host, read.images);
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
@@ -125,6 +138,9 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
     family: `${info.familyName} ${info.styleName}`.trim(),
     glyphs: glyphOrder.length,
     warnings: read.warnings.map((w) => (w.glyph === null ? w.message : `${w.glyph}: ${w.message}`)),
+    master: into
+      ? (masters.find((m) => m.id === host.state().project.current)?.name ?? null)
+      : null,
   };
 }
 

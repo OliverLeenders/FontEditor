@@ -1302,7 +1302,7 @@ export class EditorStore {
         // The axes and the masters, if this project has any. What was loaded is
         // the master that was open when the tab last closed; the rest stay
         // parked until they are asked for.
-        project: projectFrom(await this.disk.getDesignspace(), loaded.document),
+        project: projectFrom(await this.disk.getDesignspace(), loaded.document, loaded.master),
       });
       this.fitGlyph();
     }
@@ -1356,7 +1356,7 @@ export class EditorStore {
     // The other tab may have added or removed masters as readily as glyphs.
     this.patch({
       saveStatus: this.disk.status,
-      project: projectFrom(await this.disk.getDesignspace(), loaded.document),
+      project: projectFrom(await this.disk.getDesignspace(), loaded.document, loaded.master),
     });
   }
 

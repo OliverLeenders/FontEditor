@@ -255,7 +255,11 @@ export class Persistence {
    * font would otherwise land after the replacement and put its glyphs back, so
    * the font just discarded returns on the next load.
    */
-  async replaceAll(document: FontDocument): Promise<void> {
+  async replaceAll(
+    document: FontDocument,
+    /** The master this document is, written with it: see `MASTER_PATH` in storage. */
+    master: string | null = null,
+  ): Promise<void> {
     const client = this.client;
     // A tab that does not own the project must not replace it. The buttons that
     // lead here are disabled, so this is the backstop rather than the message.
@@ -263,7 +267,7 @@ export class Persistence {
 
     await this.autosave.abandon();
     this.report({ saveStatus: "saving" });
-    await client.replaceAll(document);
+    await client.replaceAll(document, master);
 
     // Disk now holds exactly this document, so autosave starts from it rather
     // than believing every glyph is still unwritten — and keeps whatever was
@@ -294,10 +298,12 @@ export class Persistence {
   async snapshot(
     document: FontDocument,
     at: number = Date.now(),
+    /** The master it is a copy of, where the font has several. */
+    master: string | null = null,
   ): Promise<readonly SnapshotEntry[]> {
     const client = this.client;
     if (client === null || !this.owner) return [];
-    return await client.snapshot(document, at);
+    return await client.snapshot(document, at, master);
   }
 
   async snapshots(): Promise<readonly SnapshotEntry[]> {

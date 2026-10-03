@@ -136,7 +136,7 @@ export async function switchMaster(host: FontHost, id: MasterId): Promise<Master
  */
 async function makeCurrent(host: FontHost, id: MasterId, document: FontDocument): Promise<void> {
   try {
-    await host.disk.replaceAll(document);
+    await host.disk.replaceAll(document, id);
     // The project as it is by now, with this master the one open — unless the
     // font has been replaced meanwhile and this master is not in it at all.
     const project = host.state().project;
@@ -239,7 +239,7 @@ export async function removeMaster(host: FontHost, id: MasterId): Promise<void> 
   // project saying so, and the file of the one removed last — so stopping part
   // of the way leaves a font that still has it rather than one that names a
   // master whose drawing is not there.
-  await host.disk.replaceAll(found.document);
+  await host.disk.replaceAll(found.document, next.current);
   await rememberDesignspace(host);
   await host.disk.dropMaster(id);
 }
@@ -438,11 +438,23 @@ export function projectFrom(
     kept?: KeptXml | null;
   } | null,
   document: FontDocument,
+  /**
+   * The master the working copy says the document is, where it says.
+   *
+   * Believed over what the designspace calls open. The two are written apart —
+   * every glyph of the master, then the designspace — and this was written
+   * with the glyphs, so where they disagree it is the designspace that is a
+   * step behind.
+   */
+  held: MasterId | null = null,
 ): ReturnType<typeof makeProject> {
   if (stored === null || stored.masters.length === 0) return makeProject(document);
 
   const current =
-    stored.masters.find((m) => m.id === stored.current)?.id ?? stored.masters[0]?.id ?? "";
+    stored.masters.find((m) => m.id === held)?.id ??
+    stored.masters.find((m) => m.id === stored.current)?.id ??
+    stored.masters[0]?.id ??
+    "";
   return {
     axes: stored.axes,
     masters: stored.masters,

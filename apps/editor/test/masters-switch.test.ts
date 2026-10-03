@@ -1,5 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
+import { FakeFolder } from "../../../packages/disk/test/fake-folder.js";
+import { installFakeIdb } from "../../../packages/disk/test/fake-idb.js";
 import { FakeWorker } from "../../../packages/storage/test/fake-worker.js";
 import { clearStoredSettings, installBrowserGlobals } from "./browser-globals.js";
 
@@ -7,6 +9,10 @@ installBrowserGlobals();
 
 const { EditorStore } = await import("../src/store/index.js");
 const { MemoryFileStore } = await import("@typewright/storage");
+const { ufoFiles } = await import("@typewright/font-io");
+const { writeFolder } = await import("@typewright/disk");
+
+const { copyOfOpenMaster } = await import("../src/store/snapshots.js");
 
 type Store = InstanceType<typeof EditorStore>;
 
@@ -226,6 +232,151 @@ describe("removing the master being drawn", () => {
     await expect(store.removeMaster("bold")).rejects.toThrow(/could not be read back/);
     expect(store.getState().project.masters).toHaveLength(2);
     expect(store.getState().project.current).toBe("bold");
+    expect(drawing(store)).toBe("# the bold");
+  });
+});
+describe("a working copy and a designspace that disagree", () => {
+  it("opens as the master the working copy says it holds", async () => {
+    const files = new MemoryFileStore();
+    const { store, regular } = await twoMasters(files);
+    await store.switchMaster(regular);
+    await store.flushNow();
+
+    // Stopped between the two writes of a switch: the glyphs are the regular's,
+    // and the designspace still calls the bold the one open.
+    const designspace = JSON.parse((await files.read("designspace.json"))!) as { current: string };
+    expect(designspace.current).toBe(regular);
+    await files.write("designspace.json", JSON.stringify({ ...designspace, current: "bold" }));
+
+    const again = await opened(files);
+    expect(again.getState().project.current).toBe(regular);
+    expect(drawing(again)).toBe("# the regular");
+
+    // And so the bold is still the bold, when it is gone to.
+    await again.switchMaster("bold");
+    expect(drawing(again)).toBe("# the bold");
+  });
+
+  it("goes by the designspace where the working copy does not say", async () => {
+    const files = new MemoryFileStore();
+    await twoMasters(files);
+    // A working copy from before it said.
+    for (const name of await files.list("")) {
+      if (name.endsWith("master.txt")) await files.remove(name);
+    }
+
+    const again = await opened(files);
+    expect(again.getState().project.current).toBe("bold");
+    expect(drawing(again)).toBe("# the bold");
+  });
+});
+
+describe("copies of the font, in a font drawn more than once", () => {
+  /** The copies the History menu would list, as which master each is of. */
+  const listed = (store: Store): (string | null)[] =>
+    store
+      .getState()
+      .snapshots.filter((entry) => copyOfOpenMaster(entry, store.getState().project))
+      .map((entry) => entry.master);
+
+  it("are each master's own: kept in one, not offered in the other", async () => {
+    const { store, regular } = await twoMasters(new MemoryFileStore());
+
+    // Beside whatever was kept while the font had one master, which does not
+    // say and is offered to both.
+    await store.snapshot();
+    expect(listed(store)).toContain("bold");
+
+    await store.switchMaster(regular);
+    await store.refreshSnapshots();
+    expect(listed(store)).not.toContain("bold");
+
+    await store.snapshot();
+    expect(listed(store)).toContain(regular);
+    expect(listed(store)).not.toContain("bold");
+
+    await store.switchMaster("bold");
+    await store.refreshSnapshots();
+    expect(listed(store)).toContain("bold");
+    expect(listed(store)).not.toContain(regular);
+  });
+
+  it("cannot be put back into another master", async () => {
+    const { store, regular } = await twoMasters(new MemoryFileStore());
+    await store.snapshot();
+    const at = store.getState().snapshots[0]!.at;
+
+    await store.switchMaster(regular);
+    await store.refreshSnapshots();
+
+    await expect(store.restoreSnapshot(at)).rejects.toThrow(/copy of Bold/);
+    expect(drawing(store)).toBe("# the regular");
+  });
+
+  it("are put back into the master they are of, which stays that master", async () => {
+    const files = new MemoryFileStore();
+    const { store, regular } = await twoMasters(files);
+    await store.snapshot();
+    const at = store.getState().snapshots[0]!.at;
+    store.setFeatures("# the bold, spoiled");
+
+    await store.restoreSnapshot(at);
+    expect(drawing(store)).toBe("# the bold");
+    expect(store.getState().project.current).toBe("bold");
+
+    await store.flushNow();
+    const again = await opened(files);
+    expect(again.getState().project.current).toBe("bold");
+    expect(drawing(again)).toBe("# the bold");
+    await again.switchMaster(regular);
+    expect(drawing(again)).toBe("# the regular");
+  });
+
+  it("offers a copy from before there was a second master to either", async () => {
+    const store = await opened(new MemoryFileStore());
+    store.setFeatures("# drawn once");
+    await store.snapshot();
+    await store.setAxes([WEIGHT]);
+    await store.addMaster("bold", "Bold", { wght: 900 });
+
+    expect(listed(store)).toEqual([null]);
+    await store.switchMaster("bold");
+    await store.refreshSnapshots();
+    expect(listed(store)).toEqual([null]);
+  });
+});
+
+describe("a folder read again, in a font drawn more than once", () => {
+  it("replaces the drawing in front of you and leaves the other masters", async () => {
+    const { restore } = installFakeIdb();
+    onTestFinished(restore);
+    const files = new MemoryFileStore();
+    const store = await opened(files);
+
+    // The font as its folder has it, opened from there.
+    store.setFeatures("# in the folder");
+    const folder = new FakeFolder("Test.ufo");
+    await writeFolder(folder, ufoFiles(store.editor.document));
+    (globalThis as { showDirectoryPicker?: unknown }).showDirectoryPicker = () =>
+      Promise.resolve(folder);
+    await store.openFolder();
+    const regular = store.getState().project.current;
+
+    await store.setAxes([WEIGHT]);
+    await store.addMaster("bold", "Bold", { wght: 900 });
+    await store.switchMaster("bold");
+    store.setFeatures("# the bold");
+    await store.switchMaster(regular);
+    store.setFeatures("# the regular, changed since");
+
+    const report = await store.reopenFolder();
+
+    expect(report?.master).toBe("Regular");
+    expect(store.getState().project.masters.map((m) => m.name)).toEqual(["Regular", "Bold"]);
+    expect(store.getState().project.current).toBe(regular);
+    expect(drawing(store)).toBe("# in the folder");
+
+    await store.switchMaster("bold");
     expect(drawing(store)).toBe("# the bold");
   });
 });

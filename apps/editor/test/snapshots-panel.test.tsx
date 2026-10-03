@@ -8,6 +8,7 @@ import { freshStore, installDomStubs, render } from "./render.js";
 installBrowserGlobals();
 
 const { Snapshots } = await import("../src/components/Snapshots.js");
+const { WEIGHT, master, project, setAxes } = await import("@typewright/font-model");
 
 /**
  * The copies of the font, on screen.
@@ -29,7 +30,13 @@ afterEach(() => {
 
 const MINUTE = 60_000;
 
-async function openPanel(store = freshStore(), snapshots: { at: number; glyphs: number }[] = []) {
+async function openPanel(
+  store = freshStore(),
+  // Which master a copy is of is left out where it does not matter: a font
+  // drawn once does not say.
+  copies: { at: number; glyphs: number; master?: string | null }[] = [],
+) {
+  const snapshots = copies.map((copy) => ({ master: null, ...copy }));
   const shown = render(<Snapshots />, store);
   fireEvent.click(screen.getByRole("button", { name: "History" }));
 
@@ -99,5 +106,51 @@ describe("the history panel", () => {
     expect(screen.getByRole<HTMLButtonElement>("button", { name: "Keep one now" }).disabled).toBe(
       true,
     );
+  });
+});
+
+describe("a font drawn more than once", () => {
+  /** A store drawing the bold of two masters. */
+  function inBold() {
+    const store = freshStore();
+    act(() => {
+      const one = setAxes(project(store.editor.document, { id: "regular" }), [WEIGHT]);
+      store.patch({
+        project: {
+          ...one,
+          masters: [
+            master("regular", "Regular", { wght: 400 }),
+            master("bold", "Bold", { wght: 900 }),
+          ],
+          current: "bold",
+        },
+      });
+    });
+    return store;
+  }
+
+  it("lists the copies of the master being drawn, and says whose they are", async () => {
+    const now = Date.now();
+    await openPanel(inBold(), [
+      { at: now - 2 * MINUTE, glyphs: 41, master: "bold" },
+      { at: now - 5 * MINUTE, glyphs: 42, master: "regular" },
+      // From before they said, and of a master the font no longer has: either
+      // may be this master's, and neither is another's.
+      { at: now - 9 * MINUTE, glyphs: 43 },
+      { at: now - 20 * MINUTE, glyphs: 44, master: "gone" },
+    ]);
+
+    expect(screen.getByText("Copies of Bold")).toBeTruthy();
+    expect(screen.getByText("41 glyphs")).toBeTruthy();
+    expect(screen.queryByText("42 glyphs")).toBeNull();
+    expect(screen.getByText("43 glyphs")).toBeTruthy();
+    expect(screen.getByText("44 glyphs")).toBeTruthy();
+  });
+
+  it("says there are none where the only copies are another master's", async () => {
+    await openPanel(inBold(), [{ at: Date.now() - MINUTE, glyphs: 42, master: "regular" }]);
+
+    expect(screen.getByText(/One is kept every few minutes of work/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Restore" })).toBeNull();
   });
 });
