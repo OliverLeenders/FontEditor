@@ -593,7 +593,12 @@ taken out, whatever else is. A point at an extreme stays — it is what hinting 
 grid, what an interpolation needs on both sides to have anything to pair, and what several
 renderers read a glyph's extent from — and a corner stays, because taking one out would round it
 off. So a circle drawn on its four extremes and a rectangle both come back untouched, and the
-button says so rather than appearing to do nothing.
+button says so rather than appearing to do nothing. It tidies as well, in the same undo step:
+a segment that goes nowhere — a point on top of its neighbour, or a corner rounded to nothing,
+as fonts cut from a variable font often have — is taken out first; a contour that then draws
+nothing at all, a closed line there and back or a point on its own, goes whole; and a point is
+put in at every extreme the outline lacks, before the points that leaves unneeded come out. A
+pen stroke is never taken out, since a pen leaves ink along a line.
 
 **The knife and components.** A stroke drawn across a component cuts it as it would any
 contour: a reference cannot be cut, so the component becomes outlines first, and the undo menu
@@ -712,8 +717,9 @@ tools can read it, save it from the File menu, or with Ctrl-S.
 starts another font and **Switch font** opens one of the others: both keep the font that
 was open, in this browser, on the list of fonts — nothing is thrown away by starting a new
 one. **Open UFO folder** works on a font where it is kept on disk and saves back to it;
-**Import font file** reads a TTF, OTF, WOFF, zipped UFO or family in as a copy, in place of
-the font that is open; **Import SVGs as glyphs** adds glyphs to it. **Save** (or **Save to
+**Import font file** reads a TTF, OTF, WOFF, zipped UFO or family in as a copy, opened as a
+new font beside the one that was open, which stays on the list; dropping a font file on the
+File menu does the same. **Import SVGs as glyphs** adds glyphs to the font that is open. **Save** (or **Save to
 folder** the first time) and **Save to another folder** write it to disk, and **Open another
 window** is last.
 
@@ -728,5 +734,6 @@ picker opens where you last kept a font, not inside the last font's own folder, 
 not save one font into another font's UFO. An empty folder whose name ends in `.ufo` is taken
 as the font's own, if you would rather make the folder yourself. **Open UFO folder** is the
 other way round: there you pick the `.ufo` itself. The list under **Switch font** names the UFO each font is
-kept in, or says it has not been saved to disk yet, and its **Open a .ufo** button opens a
-font kept anywhere on disk straight from the list.
+kept in, or says it has not been saved to disk yet. Its **Open UFO folder** button opens a
+font kept anywhere on disk straight from the list, and **Import font file** opens a TTF, OTF,
+WOFF or zipped UFO there as a new font, the same as in the File menu.

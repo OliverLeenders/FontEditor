@@ -20,7 +20,6 @@ import {
   FolderOutputIcon,
   ImageIcon,
   SaveIcon,
-  TriangleAlertIcon,
   UploadIcon,
 } from "./icons.js";
 
@@ -33,10 +32,11 @@ import {
  * person opens a font once a session and saves it a few times an hour: this is
  * not what the bar's width is for.
  *
- * Three distinctions worth keeping while reading it. *Open font* reads a copy —
- * a binary or an archive — and nothing connects the two afterwards. *Open
- * folder* opens the file the work lives in, saved back to the same place and
- * remembered for next time. *Export* writes a copy out and is its own menu.
+ * Three distinctions worth keeping while reading it. *Import font file* reads
+ * a copy — a binary or an archive — as a new font, and nothing connects the two
+ * afterwards. *Open UFO folder* opens the file the work lives in, saved back to
+ * the same place and remembered for next time. *Export* writes a copy out and
+ * is its own menu.
  */
 export function FileMenu(): React.JSX.Element {
   const store = useEditorStore();
@@ -50,7 +50,6 @@ export function FileMenu(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  const [asking, setAsking] = useState(false);
 
   const folders = canOpenFolders();
 
@@ -178,7 +177,7 @@ export function FileMenu(): React.JSX.Element {
     kind: "item",
     label: "Import font file…",
     icon: UploadIcon,
-    hint: "A copy of a TTF, OTF, WOFF, zipped UFO or family, in place of the font that is open",
+    hint: "A TTF, OTF, WOFF, zipped UFO or family, opened as a new font. This one stays in this browser, under Switch font",
     disabled: working,
     run: () => inputRef.current?.click(),
   });
@@ -258,7 +257,7 @@ export function FileMenu(): React.JSX.Element {
       <input
         ref={inputRef}
         type="file"
-        accept={ACCEPT}
+        accept={FONT_FILES}
         className={styles.input}
         onChange={(event) => {
           const file = event.target.files?.[0];
@@ -305,35 +304,6 @@ export function FileMenu(): React.JSX.Element {
         )}
       </BarMenu>
 
-      {/* Discarding a font is not undoable — new and import both replace the
-          history rather than extend it — so it asks first, and asks in place
-          rather than through a `window.confirm` nobody reads. */}
-      {asking ? (
-        <span className={styles.confirm} role="group" aria-label="Discard this font?">
-          <span className={styles.note}>
-            <TriangleAlertIcon />
-            Discard this font?
-          </span>
-          <button
-            type="button"
-            className={`${styles.button} ${styles.danger}`}
-            autoFocus
-            onClick={() => {
-              setAsking(false);
-              void attempt(async () => {
-                await store.newFont();
-                return "Started a new font";
-              });
-            }}
-          >
-            Discard
-          </button>
-          <button type="button" className={styles.button} onClick={() => setAsking(false)}>
-            Keep
-          </button>
-        </span>
-      ) : null}
-
       {failed !== null ? (
         <span className={styles.error} role="alert">
           {failed}
@@ -357,7 +327,7 @@ export function FileMenu(): React.JSX.Element {
  * alternative is a button per format, and a wrong file is answered immediately
  * by the reader rather than being a state anyone gets stuck in.
  */
-const ACCEPT = ".ttf,.otf,.woff,.ufoz,.zip,.sit,font/ttf,font/otf,font/woff";
+export const FONT_FILES = ".ttf,.otf,.woff,.ufoz,.zip,.sit,font/ttf,font/otf,font/woff";
 
 /** What opening a folder found, said in one line. */
 function reportOf(done: {

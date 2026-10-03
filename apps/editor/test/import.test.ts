@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished } from "vitest";
 
+import { installFakeIdb } from "../../../packages/disk/test/fake-idb.js";
 import { installBrowserGlobals } from "./browser-globals.js";
 import { duplicateNameFont, threeGlyphFont } from "./fonts.js";
 
@@ -77,6 +78,34 @@ describe("importing a font into the store", () => {
     expect(result.glyphs).toBe(3);
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(result.warnings[0]).toMatch(/more than once/);
+  });
+
+  it("opens it as a new font, leaving the one that was open on the list", async () => {
+    const { restore } = installFakeIdb();
+    onTestFinished(restore);
+    const { listProjects, newProject, saveProject } = await import("@typewright/disk");
+    const store: Store = new EditorStore();
+    const open = newProject("Open Regular");
+    await saveProject(open);
+    store.patch({ projects: { ...store.getState().projects, current: open.id } });
+
+    await store.importFont(threeGlyphFont(), "Imported.ttf");
+
+    const { current } = store.getState().projects;
+    expect(current).not.toBe(open.id);
+    const names = (await listProjects()).map((it) => it.name);
+    expect(names).toEqual(expect.arrayContaining(["Open Regular", "Imported Regular"]));
+  });
+
+  it("opens nothing new for a file that is not a font", async () => {
+    const { restore } = installFakeIdb();
+    onTestFinished(restore);
+    const { listProjects, newProject, saveProject } = await import("@typewright/disk");
+    await saveProject(newProject("Open Regular"));
+    const store: Store = new EditorStore();
+
+    await expect(store.importFont(new Uint8Array(8).buffer, "junk.ttf")).rejects.toThrow();
+    expect((await listProjects()).map((it) => it.name)).toEqual(["Open Regular"]);
   });
 
   it("brings a font's substitutions with it, from a WOFF as from a plain file", async () => {

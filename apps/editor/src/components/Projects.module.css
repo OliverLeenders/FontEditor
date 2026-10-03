@@ -140,6 +140,11 @@
   gap: 0.4rem;
 }
 
+/* Four buttons are wider than the sheet on a narrow window. */
+.actions {
+  flex-wrap: wrap;
+}
+
 /* The shared secondary button (Button.module.css), at a dialog's size. */
 .go {
   composes: large from "./Button.module.css";

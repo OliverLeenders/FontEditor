@@ -120,6 +120,7 @@ import {
   chosenOnReload,
   forgetProject,
   sweepForgotten,
+  noteEntered,
   noteProjects,
   requestedArrival,
   showChooser,
@@ -272,6 +273,7 @@ export class EditorStore {
       setCatalogQuery: (changes) => {
         this.setCatalogQuery(changes);
       },
+      enterProject: (id) => this.enterProject(id),
     };
     this.snapshots = new Snapshots(this.host);
   }
@@ -816,8 +818,38 @@ export class EditorStore {
    * loaded, no lock taken, no folder linked. Answering the question is what
    * starts the editor.
    */
-  offerProjects(all: readonly ProjectSummary[]): void {
+  offerProjects(all: readonly ProjectSummary[], worker: Worker | null = null): void {
+    this.waitingWorker = worker;
     this.patch({ projects: { all, current: null, showing: true, arriving: false } });
+  }
+
+  /**
+   * The storage worker, while the list of fonts is up at startup and no font
+   * has been opened through it yet. Opening one from the list by reloading
+   * does not need it; opening a font file or a folder there does, since that
+   * happens in this page.
+   */
+  private waitingWorker: Worker | null = null;
+
+  /**
+   * Make another font the open one, without a reload.
+   *
+   * At startup nothing is open: there is no working copy to move out of, and
+   * the store has not been opened at all, so it is opened now, on this font.
+   * Otherwise what is pending is written to the font that was open, and the
+   * working copy and the lock become this one's.
+   */
+  private async enterProject(id: string): Promise<void> {
+    const worker = this.waitingWorker;
+    this.waitingWorker = null;
+    if (this.state.projects.current === null && worker !== null) {
+      await this.connectStorage(worker, id);
+    } else {
+      await this.disk.moveTo(id);
+    }
+    await noteEntered(this.host, id);
+    // The copies kept of the font that was open are that font's, not this one's.
+    await this.refreshSnapshots();
   }
 
   /**

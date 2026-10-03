@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { openWindow } from "../windows.js";
+import { FONT_FILES } from "./FileMenu.js";
 import styles from "./Projects.module.css";
 import { AppWindowIcon } from "./icons.js";
 
@@ -26,7 +27,10 @@ export function Projects(): React.JSX.Element {
   // The font whose Forget is being asked about, if one is.
   const [confirming, setConfirming] = useState<string | null>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // The font file being read, while one is: a large one takes seconds.
+  const [reading, setReading] = useState<string | null>(null);
 
   useEffect(() => {
     continueRef.current?.focus();
@@ -42,7 +46,7 @@ export function Projects(): React.JSX.Element {
 
         {first === undefined ? (
           <p className={styles.empty}>
-            No fonts yet. Start one here, or open a UFO folder from the File menu.
+            No fonts yet. Start one here, or open a UFO folder or a font file.
           </p>
         ) : (
           <button
@@ -176,12 +180,13 @@ export function Projects(): React.JSX.Element {
               New font…
             </button>
             {/* A font already on disk, as its .ufo folder. The same as File →
-                Open folder, here because this is where somebody arrives with
-                one. */}
+                Open UFO folder, here because this is where somebody arrives
+                with one. */}
             {canOpenFolders() ? (
               <button
                 type="button"
                 className={styles.go}
+                disabled={reading !== null}
                 onClick={() => {
                   setFailed(null);
                   void store
@@ -194,9 +199,43 @@ export function Projects(): React.JSX.Element {
                     });
                 }}
               >
-                Open a .ufo…
+                Open UFO folder…
               </button>
             ) : null}
+            {/* A TTF, an OTF, a WOFF or a zipped UFO, opened as a new font: the
+                same as File → Import font file, for somebody arriving with a
+                font file rather than a folder. */}
+            <button
+              type="button"
+              className={styles.go}
+              disabled={reading !== null}
+              onClick={() => fileRef.current?.click()}
+            >
+              Import font file…
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept={FONT_FILES}
+              hidden
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                // Cleared so choosing the same file twice fires a second change.
+                event.target.value = "";
+                if (file === undefined) return;
+                setFailed(null);
+                setReading(file.name);
+                void file
+                  .arrayBuffer()
+                  .then((bytes) => store.importFont(bytes, file.name))
+                  .catch((error: unknown) => {
+                    setFailed(error instanceof Error ? error.message : String(error));
+                  })
+                  .finally(() => {
+                    setReading(null);
+                  });
+              }}
+            />
             {current === null ? null : (
               <button
                 type="button"
@@ -211,6 +250,11 @@ export function Projects(): React.JSX.Element {
           </div>
         )}
 
+        {reading === null ? null : (
+          <p className={styles.empty} role="status">
+            Reading {reading}…
+          </p>
+        )}
         {failed === null ? null : (
           <p className={styles.failed} role="alert">
             {failed}

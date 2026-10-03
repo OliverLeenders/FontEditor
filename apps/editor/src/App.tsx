@@ -378,7 +378,9 @@ export function App(): React.JSX.Element {
       void store.sweepForgotten();
 
       if (arrival.kind === "choose") {
-        store.offerProjects(arrival.all);
+        // The worker goes with the list: a font file or a folder opened from it
+        // is opened in this page, and opens the store as it does.
+        store.offerProjects(arrival.all, worker);
         return;
       }
 

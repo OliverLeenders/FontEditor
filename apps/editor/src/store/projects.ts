@@ -130,6 +130,18 @@ export async function noteProjects(host: FontHost, current: string | null): Prom
   await confirmSaved(host, project.savedHash);
 }
 
+/**
+ * Note in the store that a font has been moved into, without a reload: opened
+ * from a folder or a file as a font of its own. It is listed among the others,
+ * and the list of fonts, if it was up, has been answered.
+ */
+export async function noteEntered(host: FontHost, id: string): Promise<void> {
+  const all = await listProjects();
+  host.patch({
+    projects: { all: all.map(summaryOf), current: id, showing: false, arriving: false },
+  });
+}
+
 /** Put the chooser on screen, or take it away. */
 export function showChooser(host: FontHost, showing: boolean): void {
   host.patch({ projects: { ...host.state().projects, showing } });

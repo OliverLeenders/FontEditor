@@ -96,9 +96,13 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
   // A font of its own, in a working copy of its own. This is the moment the
   // editor stopped being a single-font program: opening a second font used to
   // write over the first one's working copy, and now it moves to another.
+  const before = host.state().projects.current;
   const project = await moveToProjectFor(host, folder, read.document);
 
-  await adoptDocument(host, read.document);
+  // A copy of what was on screen is kept only when it is being replaced. Moved
+  // out of, it is still in its own working copy, and a copy of it here would be
+  // a snapshot of another font.
+  await adoptDocument(host, read.document, project.id === before);
   await adoptImages(host, read.images);
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
@@ -135,8 +139,7 @@ async function moveToProjectFor(
 
   if (host.state().projects.current === project.id) return project;
 
-  await host.disk.moveTo(project.id);
-  host.patch({ projects: { ...host.state().projects, current: project.id } });
+  await host.enterProject(project.id);
   return project;
 }
 

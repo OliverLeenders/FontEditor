@@ -1,5 +1,5 @@
 import { type CatalogQuery, DEFAULT_QUERY } from "@typewright/catalog";
-import type { DiskFolder } from "@typewright/disk";
+import { type DiskFolder, newProject, saveProject } from "@typewright/disk";
 import { session as newSession } from "@typewright/edit-core";
 import {
   type ExtraLayer,
@@ -27,6 +27,7 @@ import { editorState } from "@typewright/tools";
 
 import type { Persistence } from "../persistence.js";
 import { adoptFamily, startFresh } from "./masters.js";
+import { UNTITLED } from "./projects.js";
 import type { StoreHost } from "./state.js";
 
 /**
@@ -48,6 +49,12 @@ export type FontHost = StoreHost & {
   /** The folder on disk this font came from, if it came from one. */
   folder: () => DiskFolder | null;
   setFolder: (folder: DiskFolder | null, name?: string) => void;
+  /**
+   * Make another font the open one: its working copy the one written to, its
+   * lock the one held. From the list of fonts at startup, where nothing is open
+   * yet, this is what opens the store at all.
+   */
+  enterProject: (id: string) => Promise<void>;
   /** The glyph to open once the font is on screen, and the camera to frame it. */
   showGlyph: (name: GlyphName) => void;
   setCatalogQuery: (changes: Partial<CatalogQuery>) => void;
@@ -74,7 +81,13 @@ export async function newFont(host: FontHost): Promise<void> {
 }
 
 /**
- * Replace the document with a font read from a file.
+ * Open a font read from a file, as a new font of its own.
+ *
+ * New, because a font file is a copy: nothing connects it to where it came
+ * from, so there is nothing for it to replace. The font that was open stays
+ * where it was, on the list of fonts, and this one is added beside it — in a
+ * working copy of its own, which is moved into once the file has been read, so
+ * a file that cannot be read leaves no empty font behind.
  *
  * Which reader is used comes from the file's name rather than from sniffing
  * its bytes: a UFO is a zip and a zip could be anything, so the only honest
@@ -101,7 +114,9 @@ export async function importFont(
 
   const read = await readSomething(bytes, fileName);
 
-  await adoptDocument(host, read.document);
+  await moveToNewFont(host, read.document);
+  // No copy of what was open is kept: it is still open, as a font of its own.
+  await adoptDocument(host, read.document, false);
   await adoptImages(host, read.images);
 
   const { info, glyphOrder } = read.document;
@@ -110,6 +125,17 @@ export async function importFont(
     glyphs: glyphOrder.length,
     warnings: read.warnings,
   };
+}
+
+/**
+ * Put a font on the list of fonts, named for what it calls itself, and make it
+ * the open one. What it holds is written into it afterwards.
+ */
+async function moveToNewFont(host: FontHost, document: FontDocument): Promise<void> {
+  const { familyName, styleName } = document.info;
+  const project = newProject(`${familyName} ${styleName}`.trim() || UNTITLED);
+  await saveProject(project);
+  await host.enterProject(project.id);
 }
 
 /**
@@ -184,7 +210,7 @@ async function adoptFamilyFrom(host: FontHost, family: FamilyImport): Promise<Im
   const first = family.masters[0];
   if (first === undefined) throw new Error("the family has no masters");
 
-  await host.keepSnapshot();
+  await moveToNewFont(host, first.document);
   showDocument(host, first.document, false);
   host.setCatalogQuery(DEFAULT_QUERY);
   host.setFolder(null);
@@ -276,12 +302,20 @@ export async function adoptImages(
  * Shared by opening a font and by starting a new one, because they differ only
  * in where the document came from. The history is replaced rather than
  * appended to, for the reason `importFont` gives.
+ *
+ * `keep` is false where the font on screen is not being replaced but left: a
+ * font moved out of into another working copy is still in its own, and a copy
+ * of it kept in the new one would be a snapshot of some other font.
  */
-export async function adoptDocument(host: FontHost, document: FontDocument): Promise<void> {
-  // A copy of what is open before it stops being open. Opening a font is the
+export async function adoptDocument(
+  host: FontHost,
+  document: FontDocument,
+  keep = true,
+): Promise<void> {
+  // A copy of what is open before it stops being open. Replacing a font is the
   // most destructive thing this editor does — it replaces every glyph on disk —
   // and it is exactly the moment someone discovers they meant the other file.
-  await host.keepSnapshot();
+  if (keep) await host.keepSnapshot();
 
   // One master again, and the old font's masters gone with it: they are
   // drawings of a typeface that is no longer open.

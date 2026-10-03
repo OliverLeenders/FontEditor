@@ -4,6 +4,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { installFakeIdb } from "../../../packages/disk/test/fake-idb.js";
 import { installBrowserGlobals } from "./browser-globals.js";
+import { threeGlyphFont } from "./fonts.js";
 import { freshStore, installDomStubs, render } from "./render.js";
 
 installBrowserGlobals();
@@ -17,8 +18,9 @@ const { newProject, projectById, saveProject } = await import("@typewright/disk"
  * Which font to open is decided in the store and tested there. What this asks
  * is what the list says to somebody choosing: the last font first and ready for
  * Enter, where each of the others is kept, and — before anything is forgotten —
- * whether that font's copy here is the only one there is. Nothing in these
- * tests opens a font, because opening one reloads the page.
+ * whether that font's copy here is the only one there is. None of these tests
+ * opens a font from the list, because that reloads the page; a font file
+ * imported from it opens in the page, and is.
  */
 
 type Store = ReturnType<typeof freshStore>;
@@ -146,6 +148,40 @@ describe("starting a font", () => {
 
     fireEvent.change(screen.getByLabelText("Family name"), { target: { value: "Grotesk" } });
     expect(start.disabled).toBe(false);
+  });
+});
+
+describe("importing a font file", () => {
+  it("opens it as a new font, put on the list beside the others", async () => {
+    const store = await offering([latest, kept]);
+    const { container } = render(<Projects />, store);
+
+    expect(screen.getByRole("button", { name: "Import font file…" })).toBeTruthy();
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    const file = new File([threeGlyphFont()], "Imported.ttf");
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(store.getState().projects.showing).toBe(false);
+    });
+    expect(store.editor.document.info.familyName).toBe("Imported");
+    const { current, all } = store.getState().projects;
+    expect(current).not.toBeNull();
+    expect(current).not.toBe(latest.id);
+    expect(all.find((it) => it.id === current)?.name).toBe("Imported Regular");
+    expect(all.map((it) => it.id)).toEqual(expect.arrayContaining([latest.id, kept.id]));
+  });
+
+  it("says what went wrong with a file that is not a font, and opens nothing", async () => {
+    const store = await offering([latest]);
+    const { container } = render(<Projects />, store);
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+    fireEvent.change(input, { target: { files: [new File([new Uint8Array(8)], "junk.ttf")] } });
+
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(store.getState().projects.current).toBeNull();
+    expect(store.getState().projects.showing).toBe(true);
   });
 });
 
