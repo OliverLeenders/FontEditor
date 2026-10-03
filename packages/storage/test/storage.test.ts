@@ -44,6 +44,7 @@ import {
   JOURNAL_PATH,
   KERNING_PATH,
   appendJournal,
+  appendJournalCommit,
   clearJournal,
   dirtyGlyphs,
   glyphPath,
@@ -582,6 +583,74 @@ describe("the journal", () => {
     await clearJournal(store);
     expect(await readJournal(store)).toEqual([]);
   });
+
+  it("takes a glyph out that it says was removed, though its file is still there", async () => {
+    const store = new MemoryFileStore();
+    const saved = fontDocument([glyph("a", { advance: 500 }), glyph("b", { advance: 520 })]);
+    await saveDocument(store, saved);
+
+    await appendJournalCommit(store, [], ["b"], 100);
+
+    const result = await loadDocument(store);
+    if (result.kind !== "loaded") throw new Error("nothing loaded");
+    expect(result.document.glyphOrder).toEqual(["a"]);
+    expect(result.recovered).toBe(true);
+    // Its file is for whoever saves this to take out.
+    expect(result.gone).toEqual(["b"]);
+  });
+
+  it("reads a glyph renamed as the one name gone and the other there", async () => {
+    const store = new MemoryFileStore();
+    await saveDocument(store, fontDocument([glyph("a", { advance: 500 })]));
+
+    // One commit: the old name gone and the new one arrived, together.
+    await appendJournalCommit(store, [glyph("a.alt", { advance: 500 })], ["a"], 100);
+
+    const result = await loadDocument(store);
+    if (result.kind !== "loaded") throw new Error("nothing loaded");
+    expect(result.document.glyphOrder).toEqual(["a.alt"]);
+    expect(result.gone).toEqual(["a"]);
+  });
+
+  it("does not bring back a glyph added and then taken back before anything was saved", async () => {
+    const store = new MemoryFileStore();
+    await saveDocument(store, fontDocument([glyph("a", { advance: 500 })]));
+
+    await appendJournalCommit(store, [glyph("fresh", { advance: 500 })], [], 100);
+    await appendJournalCommit(store, [], ["fresh"], 200);
+
+    const result = await loadDocument(store);
+    if (result.kind !== "loaded") throw new Error("nothing loaded");
+    expect(result.document.glyphOrder).toEqual(["a"]);
+  });
+
+  it("does not read a commit cut off as it was written, and reads the ones before it", async () => {
+    const store = new MemoryFileStore();
+    await saveDocument(store, fontDocument([glyph("a", { advance: 500 })]));
+
+    await appendJournalCommit(store, [glyph("b", { advance: 500 })], [], 100);
+    // A rename, stopped part of the way through its one line.
+    const whole = JSON.stringify({ at: 200, glyphs: [], removed: ["a"] });
+    await store.append("journal.ndjson", whole.slice(0, whole.length - 6));
+
+    const result = await loadDocument(store);
+    if (result.kind !== "loaded") throw new Error("nothing loaded");
+    expect([...result.document.glyphOrder].sort()).toEqual(["a", "b"]);
+  });
+
+  it("keeps a glyph removed and then put back, as it was put back", async () => {
+    const store = new MemoryFileStore();
+    await saveDocument(store, fontDocument([glyph("a", { advance: 500 })]));
+
+    await appendJournalCommit(store, [], ["a"], 100);
+    // And a record as every journal held before commits were one: still read.
+    await appendJournal(store, glyph("a", { advance: 777 }), 200);
+
+    const result = await loadDocument(store);
+    if (result.kind !== "loaded") throw new Error("nothing loaded");
+    expect(result.document.glyphs["a"]?.advance).toBe(777);
+    expect(result.gone).toEqual([]);
+  });
 });
 
 describe("autosave", () => {
@@ -624,6 +693,31 @@ describe("autosave", () => {
     tick();
     await settle();
     expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes nothing for an edit taken back before it was saved, and says the journal is done with", async () => {
+    const saved = vi.fn();
+    const save = vi.fn(async () => {});
+    const autosave = new Autosave(
+      { journal: async () => {}, save, saved },
+      { debounceMs: 1000, setTimer: () => 1, clearTimer: () => {} },
+    );
+    const before = document();
+    autosave.markSaved(before);
+
+    const edited = fontDocument([...orderedGlyphs(before), glyph("fresh", { advance: 500 })]);
+    autosave.commit(edited);
+    expect(autosave.dirty).toBe(true);
+
+    // Undone: the very document that is on disk.
+    autosave.commit(before);
+    expect(autosave.dirty).toBe(false);
+    expect(autosave.status).toBe("idle");
+    // What was journalled of the edit is of something no longer so.
+    expect(saved).toHaveBeenCalledWith(before);
+
+    await autosave.flush();
+    expect(save).not.toHaveBeenCalled();
   });
 
   // The whole point of debouncing: a burst of edits is one round of writes.

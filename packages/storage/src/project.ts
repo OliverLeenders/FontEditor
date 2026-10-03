@@ -251,14 +251,55 @@ async function writeWhole(
  * real exposure is the debounce window — an edit is committed, autosave waits a
  * second to batch, and the tab dies in between. The journal closes that gap with
  * one small append at commit time.
+ *
+ * A record is a commit: the glyphs it changed, as it left them, and the names
+ * of the ones it took away. The names are what make the journal true of a font
+ * rather than of its glyphs one by one — without them a glyph removed, renamed,
+ * or added and then undone could only be journalled as the glyph it had been,
+ * and reading the journal back brought it back. And a commit is one record, one
+ * line, because it is one thing: a rename written as a name gone and then a
+ * glyph arrived, and stopped between the two, was a glyph under neither name.
+ * A line cut off as it was written is not read, so a commit is in the journal
+ * whole or is not in it.
+ *
+ * The first kind, a single glyph, is what every journal held before this, and
+ * is still read.
  */
-export type JournalRecord = {
-  readonly at: number;
-  readonly glyph: StoredGlyph;
-};
+export type JournalRecord =
+  | { readonly at: number; readonly glyph: StoredGlyph }
+  | {
+      readonly at: number;
+      readonly glyphs: readonly StoredGlyph[];
+      readonly removed: readonly string[];
+      /**
+       * The order the glyphs are in after this commit, where it changed them:
+       * a glyph added, removed, renamed or moved. The saved order is in the
+       * font's information, which the journal does not hold, and read back
+       * without this a glyph renamed came back at the end of the font.
+       */
+      readonly order?: readonly string[];
+    };
 
 export async function appendJournal(store: FileStore, glyph: Glyph, at: number): Promise<void> {
   const record: JournalRecord = { at, glyph: encodeGlyph(glyph) };
+  await store.append(JOURNAL_PATH, `${JSON.stringify(record)}\n`);
+}
+
+/** Note a commit in the journal: the glyphs it changed, and the ones it took away. */
+export async function appendJournalCommit(
+  store: FileStore,
+  glyphs: readonly Glyph[],
+  removed: readonly string[],
+  at: number,
+  /** The order of the glyphs after the commit, where it changed it. */
+  order: readonly string[] | null = null,
+): Promise<void> {
+  const record: JournalRecord = {
+    at,
+    glyphs: glyphs.map(encodeGlyph),
+    removed,
+    ...(order === null ? {} : { order }),
+  };
   await store.append(JOURNAL_PATH, `${JSON.stringify(record)}\n`);
 }
 
@@ -283,7 +324,9 @@ export async function readJournal(store: FileStore): Promise<JournalRecord[]> {
     if (line.trim() === "") continue;
     try {
       const parsed: unknown = JSON.parse(line);
-      if (typeof parsed === "object" && parsed !== null && "glyph" in parsed) {
+      if (typeof parsed !== "object" || parsed === null) continue;
+      const commit = parsed as { glyphs?: unknown; removed?: unknown };
+      if ("glyph" in parsed || (Array.isArray(commit.glyphs) && Array.isArray(commit.removed))) {
         records.push(parsed as JournalRecord);
       }
     } catch {
@@ -306,6 +349,13 @@ export type LoadResult =
       readonly recovered: boolean;
       /** Files that could not be read, with the reason. Never fatal. */
       readonly problems: readonly string[];
+      /**
+       * Glyphs the journal says were removed, whose files may still be there.
+       *
+       * The document does not have them; the folder does until something
+       * takes them out, and a save that only writes what changed never would.
+       */
+      readonly gone: readonly string[];
     };
 
 /**
@@ -334,13 +384,29 @@ export async function loadDocument(store: FileStore, progress?: ReadProgress): P
   }
 
   let recovered = false;
+  // Glyphs the journal took away, and did not put back afterwards: their files
+  // are still there, and are for whoever saves this to take out.
+  const gone = new Set<string>();
+  // The order of the glyphs as the last commit to change it left it.
+  let journalled: readonly string[] | null = null;
   for (const record of await readJournal(store)) {
-    const decoded = decodeGlyph(record.glyph);
-    if (decoded.ok) {
-      glyphs.set(decoded.value.name, decoded.value);
+    if ("glyphs" in record && Array.isArray(record.order)) journalled = record.order;
+    // What it took away first, then what it left: a glyph renamed is its old
+    // name gone and its new one arrived, in one commit.
+    for (const name of "glyphs" in record ? record.removed : []) {
+      glyphs.delete(name);
+      gone.add(name);
       recovered = true;
-    } else {
-      problems.push(`${JOURNAL_PATH}: ${decoded.reason}`);
+    }
+    for (const stored of "glyphs" in record ? record.glyphs : [record.glyph]) {
+      const decoded = decodeGlyph(stored);
+      if (decoded.ok) {
+        glyphs.set(decoded.value.name, decoded.value);
+        gone.delete(decoded.value.name);
+        recovered = true;
+      } else {
+        problems.push(`${JOURNAL_PATH}: ${decoded.reason}`);
+      }
     }
   }
 
@@ -356,7 +422,7 @@ export async function loadDocument(store: FileStore, progress?: ReadProgress): P
 
   const ordered: Glyph[] = [];
   const seen = new Set<string>();
-  for (const name of glyphOrder) {
+  for (const name of journalled ?? glyphOrder) {
     const g = glyphs.get(name);
     if (g !== undefined && !seen.has(name)) {
       ordered.push(g);
@@ -386,7 +452,7 @@ export async function loadDocument(store: FileStore, progress?: ReadProgress): P
     ),
     layers,
   );
-  return { kind: "loaded", document, recovered, problems };
+  return { kind: "loaded", document, recovered, problems, gone: [...gone] };
 }
 
 function parseOrNull(raw: string | null): unknown {

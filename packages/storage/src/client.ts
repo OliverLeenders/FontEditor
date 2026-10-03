@@ -47,6 +47,8 @@ export type LoadedProject =
       readonly problems: readonly string[];
       /** The master the working copy says its glyphs are, or `null` where it does not say. */
       readonly master: string | null;
+      /** Glyphs the journal says were removed, whose files may still be there. */
+      readonly gone: readonly string[];
     };
 
 /**
@@ -149,6 +151,7 @@ export class StorageClient {
       recovered: payload.recovered,
       problems,
       master: payload.master,
+      gone: payload.gone,
     };
   }
 
@@ -328,6 +331,24 @@ export class StorageClient {
 
   async journal(glyph: Glyph, at: number = Date.now()): Promise<void> {
     await this.send({ kind: "journal", glyph: encodeGlyph(glyph), at });
+  }
+
+  /** Note a commit in the journal: the glyphs it changed, and the ones it took away. */
+  async journalCommit(
+    glyphs: readonly Glyph[],
+    removed: readonly string[],
+    /** The order of the glyphs after it, where it changed it. */
+    order: readonly string[] | null = null,
+    at: number = Date.now(),
+  ): Promise<void> {
+    if (glyphs.length === 0 && removed.length === 0 && order === null) return;
+    await this.send({
+      kind: "journalCommit",
+      glyphs: glyphs.map(encodeGlyph),
+      removed,
+      order,
+      at,
+    });
   }
 
   async clearJournal(): Promise<void> {

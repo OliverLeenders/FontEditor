@@ -61,6 +61,11 @@ export class Autosave {
     return this.state;
   }
 
+  /** The document committed and not yet written, or `null` where disk is up to date. */
+  get pending(): FontDocument | null {
+    return this.queued !== null && this.queued !== this.lastSaved ? this.queued : null;
+  }
+
   /** True when there are committed edits not yet written. */
   get dirty(): boolean {
     return this.queued !== null && this.queued !== this.lastSaved;
@@ -78,7 +83,31 @@ export class Autosave {
     // change at all — a glyph, the metrics, the order, the kerning — produces a
     // new object, and asking only about glyphs meant a kerning edit scheduled
     // no save whatsoever.
-    if (this.lastSaved === document) return;
+    if (this.lastSaved === document) {
+      // Back at what is on disk: an edit made and then undone. What was queued
+      // is the font *with* the edit, and left queued it was written at the next
+      // flush — so the edit taken back came back when the font was next opened.
+      const stale = this.queued !== document;
+      this.queued = document;
+      if (this.timer !== null) {
+        this.clearTimer(this.timer);
+        this.timer = null;
+      }
+      if (this.inFlight) {
+        // A write of something else is on its way to disk and will be what is
+        // there when it lands; this one has to follow it.
+        this.state = "pending";
+        this.timer = this.setTimer(() => {
+          this.timer = null;
+          void this.flush();
+        }, this.debounceMs);
+        return;
+      }
+      this.state = "idle";
+      // And the journal of that edit is of something no longer so.
+      if (stale) this.hooks.saved?.(document);
+      return;
+    }
 
     this.queued = document;
     this.state = "pending";

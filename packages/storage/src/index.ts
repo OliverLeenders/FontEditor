@@ -53,6 +53,7 @@ export {
   KERNING_PATH,
   MASTER_PATH,
   appendJournal,
+  appendJournalCommit,
   clearJournal,
   dirtyGlyphs,
   glyphPath,

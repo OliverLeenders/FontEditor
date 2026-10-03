@@ -68,13 +68,7 @@ export class Persistence {
    */
   constructor(private readonly report: (changes: PersistenceReport) => void) {
     this.autosave = new Autosave({
-      journal: async (document) => {
-        if (!this.owner) return;
-        for (const g of dirtyGlyphs(this.lastJournalled, document)) {
-          await this.client?.journal(g);
-        }
-        this.lastJournalled = document;
-      },
+      journal: (document) => this.journal(document),
       save: async (document, previous) => {
         if (!this.owner) return;
         await this.client?.saveGlyphs(dirtyGlyphs(previous, document));
@@ -88,14 +82,86 @@ export class Persistence {
           await this.client?.saveKerning(document);
         }
       },
-      saved: () => {
-        void this.client?.clearJournal();
+      saved: (document) => {
+        this.journalSaved(document);
         this.report({ saveStatus: this.autosave.status });
       },
       failed: (error) => {
         this.report({ saveStatus: "failed", storageDetail: error.message });
       },
     });
+  }
+
+  /**
+   * The journal's writes, one after another in the order they were asked for.
+   *
+   * A record is a glyph as it was at one commit, and the journal is read back
+   * by taking the last record of each glyph — so the order they are written in
+   * is what they mean, and two commits journalled side by side could leave an
+   * older glyph after a newer one.
+   */
+  private journalling: Promise<void> = Promise.resolve();
+  /**
+   * Which emptying of the journal a write belongs before. A write still waiting
+   * its turn when the journal is emptied is of a font the save has since made
+   * true or untrue, and is let go rather than written into the empty journal —
+   * where it stayed, and brought a glyph since renamed or removed back the next
+   * time the font was opened.
+   */
+  private journalEpoch = 0;
+
+  /** Note what a commit changed, as one record, after the commits before it. */
+  private journal(document: FontDocument): Promise<void> {
+    if (!this.owner) return Promise.resolve();
+
+    // Worked out now, against the commit before this one, and not when the
+    // writing gets round to it: by then there may have been three more.
+    const changed = dirtyGlyphs(this.lastJournalled, document);
+    // And the glyphs it took away: removed, renamed, or added and undone.
+    const removed = removedGlyphs(this.lastJournalled, document);
+    // And the order they are in, where that is not the order they were in.
+    const order =
+      this.lastJournalled !== null && this.lastJournalled.glyphOrder !== document.glyphOrder
+        ? document.glyphOrder
+        : null;
+    this.lastJournalled = document;
+    const epoch = this.journalEpoch;
+
+    this.journalling = this.journalling
+      .then(async () => {
+        if (epoch !== this.journalEpoch) return;
+        // One record for the commit: whole in the journal, or not in it.
+        await this.client?.journalCommit(changed, removed, order);
+      })
+      .catch(() => {
+        // A journal write that failed is not worth stopping the next one for;
+        // the save that follows is what matters.
+      });
+    return this.journalling;
+  }
+
+  /**
+   * The font is on disk as `document`: the journal is of nothing any more.
+   *
+   * Emptied at once — asked for now, not once the records queued before it
+   * have had their turn. Those are let go by the epoch: the one being written
+   * as this is asked was asked first and so is written first, and none after
+   * it is asked for at all. Waiting behind them left the journal standing for
+   * as long as they took, and a window closed in that time opened next on a
+   * journal of the font before the save: a glyph added and then removed was
+   * back. What has been committed since that document — while it was being
+   * saved — is not on disk and is journalled again, against it.
+   */
+  private journalSaved(document: FontDocument): void {
+    this.journalEpoch += 1;
+    const cleared = this.client?.clearJournal().catch(() => undefined);
+    this.journalling = this.journalling.then(async () => {
+      await cleared;
+    });
+
+    this.lastJournalled = document;
+    const later = this.autosave.pending;
+    if (later !== null && later !== document) void this.journal(later);
   }
 
   /**
@@ -152,7 +218,8 @@ export class Persistence {
       this.owner = await this.lock.tryAcquire();
       this.report({ ownership: this.owner ? "owner" : "reading" });
 
-      const loaded = await client.load(progress);
+      const loaded = await this.read(progress);
+      if (loaded === null) return null;
       if (loaded.kind === "loaded") {
         for (const problem of loaded.problems) console.warn("[storage]", problem);
       }
@@ -173,6 +240,9 @@ export class Persistence {
   async settle(document: FontDocument, dirty: boolean): Promise<void> {
     try {
       this.autosave.markLoaded(document, dirty && this.owner);
+      // What a commit is measured against, from the first one. Left unset, the
+      // first edit after a font was opened journalled every glyph it has.
+      this.lastJournalled = document;
       if (dirty && this.owner) await this.autosave.flush();
       this.report({ storage: "ready", saveStatus: this.autosave.status });
 
@@ -210,10 +280,12 @@ export class Persistence {
       this.report({ ownership: this.owner ? "owner" : "reading" });
 
       // The journal compares against what it last wrote, and what it last wrote
-      // was to a different font. Nothing here is a change to this one.
+      // was to a different font. Nothing here is a change to this one, and
+      // nothing still waiting to be written there belongs here.
+      this.journalEpoch += 1;
       this.lastJournalled = null;
 
-      return (await this.client?.load()) ?? null;
+      return await this.read();
     } catch (error) {
       this.fail(error);
       return null;
@@ -231,7 +303,26 @@ export class Persistence {
 
   /** Read the project back from disk, or `null` when there is no store. */
   async reload(): Promise<LoadedProject | null> {
-    return (await this.client?.load()) ?? null;
+    return await this.read();
+  }
+
+  /**
+   * Read the font, and take out the files of glyphs the journal removed.
+   *
+   * The document read does not have them; their files are still there. Taken
+   * out here, by the tab that may write: the save that follows writes only what
+   * the document has, and would leave them to come back the time after.
+   */
+  private async read(
+    progress?: (done: number, total: number) => void,
+  ): Promise<LoadedProject | null> {
+    const client = this.client;
+    if (client === null) return null;
+    const loaded = await client.load(progress);
+    if (loaded.kind === "loaded" && this.owner && loaded.gone.length > 0) {
+      await client.removeGlyphs(loaded.gone);
+    }
+    return loaded;
   }
 
   /** Tell autosave the document moved. Cheap when it did not. */
@@ -242,6 +333,7 @@ export class Persistence {
   /** Adopt a document as exactly what is on disk, without writing anything. */
   markLoaded(document: FontDocument, dirty: boolean): void {
     this.autosave.markLoaded(document, dirty);
+    this.lastJournalled = document;
   }
 
   /**
@@ -267,25 +359,42 @@ export class Persistence {
 
     await this.autosave.abandon();
     this.report({ saveStatus: "saving" });
+
+    // The journal goes with the font it was of. A record still waiting its turn
+    // is of the font being replaced — another master, as often as not — and
+    // written after this it would be in the new font's journal, to be read back
+    // in the next time it was opened: a glyph of one master turning up in
+    // another. So what is waiting is let go, and from here a commit is measured
+    // against the document being written, which is what the journal it lands in
+    // will be beside.
+    this.journalEpoch += 1;
+    this.lastJournalled = document;
     await client.replaceAll(document, master);
 
     // Disk now holds exactly this document, so autosave starts from it rather
     // than believing every glyph is still unwritten — and keeps whatever was
     // committed while it was being written, which is newer than it.
     this.autosave.rebase(document);
-    // Disk holds every glyph of this document, so nothing is ahead of it and the
-    // font just replaced must not be what the next journal pass diffs against.
-    this.lastJournalled = document;
     this.report({ saveStatus: this.autosave.status });
   }
 
   flush(): void {
-    void this.autosave.flush();
+    void this.flushNow().catch(() => undefined);
   }
 
   /** The same, and finished: for when there may be no later to finish it in. */
   async flushNow(): Promise<void> {
+    // The journal of what is about to be saved, first. A save a second after
+    // an edit finds it long written; one asked for at once — a window closing
+    // on the heels of an edit — was writing the glyph files of three commits
+    // while the journal held the first of them, and stopped part of the way
+    // left files of the last commit beside a journal of the first: a glyph
+    // under its new name and its old one both.
+    await this.journalling;
     await this.autosave.flush();
+    // And the journal settled: emptied where the save has made it untrue, and
+    // every record that is still true written.
+    await this.journalling;
   }
 
   /**

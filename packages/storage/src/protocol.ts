@@ -58,6 +58,16 @@ export type StorageRequest =
       readonly glyph: StoredGlyph;
       readonly at: number;
     }
+  /** Note a commit in the journal: the glyphs it changed, and the ones it took away. */
+  | {
+      readonly id: number;
+      readonly kind: "journalCommit";
+      readonly glyphs: readonly StoredGlyph[];
+      readonly removed: readonly string[];
+      /** The order of the glyphs after it, where it changed it. */
+      readonly order: readonly string[] | null;
+      readonly at: number;
+    }
   | { readonly id: number; readonly kind: "clearJournal" }
   /**
    * Keep a copy of the whole font, and drop the oldest copies.
@@ -145,6 +155,8 @@ export type LoadedPayload = {
   readonly problems: readonly string[];
   /** The master the working copy says its glyphs are, or `null` where it does not say. */
   readonly master: string | null;
+  /** Glyphs the journal says were removed, whose files may still be there. */
+  readonly gone: readonly string[];
 };
 
 export type StorageResponse =

@@ -34,6 +34,7 @@ import {
   FONT_INFO_PATH,
   KERNING_PATH,
   appendJournal,
+  appendJournalCommit,
   clearJournal,
   glyphPath,
   loadDocument,
@@ -149,6 +150,7 @@ async function runOn(
           recovered: false,
           problems: [],
           master: null,
+          gone: [],
         };
         return payload;
       }
@@ -159,6 +161,7 @@ async function runOn(
         recovered: result.recovered,
         problems: result.problems,
         master: await readHeldMaster(required()),
+        gone: result.gone,
       };
       return payload;
     }
@@ -247,6 +250,17 @@ async function runOn(
       const decoded = decodeGlyph(request.glyph);
       if (!decoded.ok) throw new Error(`refusing to journal: ${decoded.reason}`);
       await appendJournal(required(), decoded.value, request.at);
+      return null;
+    }
+
+    case "journalCommit": {
+      const glyphs: Glyph[] = [];
+      for (const stored of request.glyphs) {
+        const decoded = decodeGlyph(stored);
+        if (!decoded.ok) throw new Error(`refusing to journal: ${decoded.reason}`);
+        glyphs.push(decoded.value);
+      }
+      await appendJournalCommit(required(), glyphs, request.removed, request.at, request.order);
       return null;
     }
 
