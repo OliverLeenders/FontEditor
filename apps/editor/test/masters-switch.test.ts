@@ -320,7 +320,11 @@ describe("copies of the font, in a font drawn more than once", () => {
     await store.switchMaster(regular);
     await store.refreshSnapshots();
 
-    await expect(store.restoreSnapshot(at)).rejects.toThrow(/copy of Bold/);
+    // Named as the list names it, by its time and its master. By its time
+    // alone it is whichever copy of that moment may be put back here — and on
+    // a machine quick enough there is one of the regular in the same
+    // millisecond, which is the one that was.
+    await expect(store.restoreSnapshot(at, "bold")).rejects.toThrow(/copy of Bold/);
     expect(drawing(store)).toBe("# the regular");
   });
 
