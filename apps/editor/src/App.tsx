@@ -288,13 +288,20 @@ export function App(): React.JSX.Element {
       }
     };
     const onResize = (): void => store.reclampInspector();
+    // Whatever was begun and left, and failed with nobody waiting for it. Not
+    // prevented: the console still has it, with where it came from.
+    const onUnhandled = (event: PromiseRejectionEvent): void => {
+      store.reportFailure(event.reason);
+    };
 
+    window.addEventListener("unhandledrejection", onUnhandled);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     window.addEventListener("beforeunload", onUnload);
     window.addEventListener("resize", onResize);
     return () => {
+      window.removeEventListener("unhandledrejection", onUnhandled);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);

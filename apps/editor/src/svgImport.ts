@@ -33,6 +33,8 @@ export type Notice = {
   readonly summary: string;
   /** One line each: what was left out and why, what came in changed. */
   readonly details: readonly string[];
+  /** Whether it says something did not happen, rather than what did. */
+  readonly failed?: boolean;
 };
 
 const count = (n: number, one: string, many: string): string =>

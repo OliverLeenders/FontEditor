@@ -27,6 +27,34 @@ afterEach(() => {
   cleanup();
 });
 
+describe("something that failed with nobody waiting for it", () => {
+  it("is said on the line, as a warning, until it is read", () => {
+    const store = freshStore();
+    render(<StatusBar workspace="font" onShortcuts={() => undefined} />, store);
+
+    act(() => {
+      store.reportFailure(new Error("Another style is already at that place."));
+    });
+    const said = screen.getByRole("alert");
+    expect(said.textContent).toContain("Another style is already at that place.");
+    expect(said.getAttribute("title")).toContain("This was not done.");
+
+    act(() => {
+      said.click();
+    });
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says something even of a failure that says nothing", () => {
+    const store = freshStore();
+    render(<StatusBar workspace="font" onShortcuts={() => undefined} />, store);
+    act(() => {
+      store.reportFailure(new Error(""));
+    });
+    expect(screen.getByRole("alert").textContent).toContain("That did not work");
+  });
+});
+
 describe("what the status bar says the keys do", () => {
   it("names the canvas keys while drawing", () => {
     render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />);

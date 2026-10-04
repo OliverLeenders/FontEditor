@@ -584,6 +584,26 @@ export class EditorStore {
     if (this.state.notice !== null) this.patch({ notice: null });
   }
 
+  /**
+   * Say that something asked for did not happen, where nothing else will.
+   *
+   * Most of what can be refused or can fail is asked for from a menu that says
+   * so beside the button. The rest is begun and left — a style dragged along
+   * an axis, a rule added, a font forgotten — and what went wrong with it went
+   * nowhere: the thing simply had not happened. This is where it goes instead,
+   * from the one place every failure nobody caught arrives at.
+   */
+  reportFailure(error: unknown): void {
+    const said = error instanceof Error ? error.message : String(error);
+    this.patch({
+      notice: {
+        summary: said === "" ? "That did not work" : said,
+        details: ["This was not done."],
+        failed: true,
+      },
+    });
+  }
+
   // ---- masters ------------------------------------------------------------
 
   /** Go to another master, parking the one being drawn on the way. */

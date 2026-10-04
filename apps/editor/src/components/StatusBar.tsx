@@ -165,11 +165,12 @@ export function StatusBar({
       {notice === null ? null : (
         <button
           type="button"
-          className={styles.notice}
+          className={`${styles.notice} ${notice.failed === true ? styles.warn : ""}`}
+          role={notice.failed === true ? "alert" : undefined}
           title={[...notice.details, "Click to dismiss"].join("\n")}
           onClick={() => store.dismissNotice()}
         >
-          <InfoIcon />
+          {notice.failed === true ? <TriangleAlertIcon /> : <InfoIcon />}
           <span className={styles.problem}>{notice.summary}</span>
           <XIcon />
         </button>

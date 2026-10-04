@@ -186,6 +186,28 @@ describe("the editor, in a browser", () => {
     });
   });
 
+  it("says on the status line what failed with nobody waiting for it", async () => {
+    const p = await profile(browser);
+    try {
+      const page = await p.open();
+      await enter(page);
+
+      // Begun and left, as a dozen things in the editor are.
+      await page.evaluate(() => {
+        void Promise.reject(new Error("That place is taken."));
+      });
+      const said = page.getByRole("alert").filter({ hasText: "That place is taken." });
+      await said.waitFor();
+
+      // Still on the console, with where it came from; and put away by a click.
+      expect(p.problems).toEqual(["That place is taken."]);
+      await said.click();
+      await said.waitFor({ state: "detached" });
+    } finally {
+      await p.context.close();
+    }
+  });
+
   it("exports a font file that it can open again, as a font of its own", async () => {
     await inProfile(async (p) => {
       const page = await p.open();

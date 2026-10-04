@@ -65,6 +65,11 @@
   border-color: var(--rule-strong);
   color: var(--ink);
 }
+/* One that says something did not happen keeps the colour that says so. */
+.notice.warn,
+.notice.warn:hover {
+  color: var(--warn);
+}
 
 .hints {
   margin-left: auto;
