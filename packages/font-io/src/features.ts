@@ -19,6 +19,7 @@ import {
   chainContextPos,
   chainContextSubst,
   ligatureSubst,
+  ligatureSubtables,
   multipleSubst,
   reverseChainSubst,
   singleSubst,
@@ -397,7 +398,7 @@ class Compilation {
     const substitution = withParams(this.entries.sub);
     return {
       names: this.names,
-      table: layoutTable(substitution, lookups("sub"), this.systems),
+      table: layoutTable(substitution, lookups("sub"), this.systems, [], "GSUB"),
       substitution: { entries: substitution, lookups: lookups("sub") },
       positioning: { entries: withParams(this.entries.pos), lookups: lookups("pos") },
       systems: this.systems,
@@ -939,7 +940,7 @@ function written(builder: Builder): Lookup {
           ? [multipleSubst(builder.multiples)]
           : builder.type === 3
             ? [alternateSubst(builder.alternates)]
-            : [ligatureSubst(builder.ligatures)];
+            : ligatureSubtables(builder.ligatures);
   return under({ type: builder.type, subtables }, builder.flags);
 }
 

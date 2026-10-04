@@ -13,6 +13,7 @@ import {
   kernIndex,
   newGlyphAdvance,
   orderedGlyphs,
+  isEmptyContour,
   removeOverlap,
   resolveGlyphComponents,
   segments,
@@ -186,10 +187,19 @@ export function flattenedGlyphs(source: FontDocument): Glyph[] {
 
 function unioned(
   g: Glyph,
-  contours: readonly Contour[],
+  drawn: readonly Contour[],
   ids: IdFactory,
   warnings: string[],
 ): readonly Contour[] {
+  // Without the contours that draw nothing: a line there and back, a contour
+  // all at one place. A static cut of a variable icon font is full of them —
+  // the shapes one of its axes closes up — and each lies along the edge of
+  // something that does draw, where the union took it for a shape set flush
+  // against its neighbour and let go of the ink beside it: the eyes of a face,
+  // the hands of a clock. They are no ink, so the font is the same without
+  // them, and smaller.
+  const contours = drawn.filter((c) => !isEmptyContour(c));
+
   // Components are already resolved into `contours`; passing them again would
   // draw each of them twice.
   const union = removeOverlap({ ...g, contours, components: [] }, ids);
@@ -627,6 +637,8 @@ export function layoutTables(
     // Kerning and marks apply in every language system the feature file
     // declares, as they would had they been written in it.
     features.systems,
+    [],
+    "GPOS",
   );
   for (const problem of features.problems) {
     warnings.push(`features, line ${String(problem.line)}: ${problem.message}`);

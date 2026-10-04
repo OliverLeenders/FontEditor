@@ -1,4 +1,4 @@
-import { Writer, coverage } from "./gpos.js";
+import { SUBTABLE_LIMIT, Writer, coverage } from "./gpos.js";
 
 /**
  * The substitution subtables of GSUB.
@@ -53,6 +53,48 @@ export function singleSubst(sub: SingleSub): Uint8Array {
  * ligatures that start with it. Within a set the longest run must come first, or
  * a shaper matching `f` `f` `i` finds `ff` and stops.
  */
+/**
+ * The same ligatures, in as many subtables as it takes for each to be sayable.
+ *
+ * An icon font with a ligature for every name is four thousand of them, and one
+ * subtable of those is twice what its offsets can reach. Divided by first
+ * glyph, each with every ligature it begins: a run is matched by the subtable
+ * that covers its first glyph, which is one of them, so nothing depends on the
+ * order.
+ */
+export function ligatureSubtables(ligatures: readonly LigatureSub[]): Uint8Array[] {
+  const byFirst = new Map<number, LigatureSub[]>();
+  for (const lig of ligatures) {
+    const first = lig.from[0];
+    if (first === undefined || lig.from.length < 2) continue;
+    const list = byFirst.get(first) ?? [];
+    list.push(lig);
+    byFirst.set(first, list);
+  }
+
+  const out: Uint8Array[] = [];
+  let taken: LigatureSub[] = [];
+  // The header, and a coverage of at most two bytes a glyph and four of header.
+  let size = 10;
+  for (const first of [...byFirst.keys()].sort((l, r) => l - r)) {
+    const list = byFirst.get(first)!;
+    // An offset to the set, the glyph in the coverage and a count; then for
+    // each an offset, what it becomes, how long it is, and the rest of the run.
+    let more = 2 + 2 + 2;
+    for (const lig of list) more += 2 + 4 + (lig.from.length - 1) * 2;
+    if (taken.length > 0 && size + more > SUBTABLE_LIMIT) {
+      out.push(ligatureSubst(taken));
+      taken = [];
+      size = 10;
+    }
+    taken.push(...list);
+    size += more;
+  }
+  // Even of none, one: what a lookup with nothing in it has always been given.
+  if (taken.length > 0 || out.length === 0) out.push(ligatureSubst(taken));
+  return out;
+}
+
 export function ligatureSubst(ligatures: readonly LigatureSub[]): Uint8Array {
   const byFirst = new Map<number, LigatureSub[]>();
   for (const lig of ligatures) {

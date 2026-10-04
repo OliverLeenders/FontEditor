@@ -152,6 +152,7 @@ export function gsubWithSwaps(
     lookups,
     systems,
     variations satisfies readonly FeatureVariation[],
+    "GSUB",
   );
 }
 

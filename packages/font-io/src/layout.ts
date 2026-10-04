@@ -1,4 +1,4 @@
-import { Writer } from "./gpos.js";
+import { TableTooLarge, Writer } from "./gpos.js";
 
 /**
  * The shape GSUB and GPOS share.
@@ -88,6 +88,103 @@ export type FeatureVariation = {
 };
 
 /**
+ * The lookups, one after another, each with its subtables behind it.
+ *
+ * A lookup is found by a sixteen-bit offset from the start of the list, and a
+ * subtable by one from the start of its lookup. A font's kerning or an icon
+ * font's ligatures are more than either can reach, so where they are, every
+ * lookup is written as an extension instead: the lookups themselves stay small
+ * and near, each subtable a record of eight bytes saying what it really is and
+ * where — by thirty-two bits — and the subtables follow all of them.
+ *
+ * All of them or none: a reader unwraps an extension before it looks at
+ * anything else, so nothing is gained by leaving the near ones plain, and one
+ * way of laying the list out is one to get right.
+ */
+function lookupList(lookups: readonly Lookup[], kind?: "GSUB" | "GPOS"): Uint8Array {
+  // Two more bytes where the filtering flag is set: the set's index sits after
+  // the subtable offsets, and everything after it moves along.
+  const filtering = (lookup: Lookup): boolean => ((lookup.flags ?? 0) & 0x0010) !== 0;
+  const headOf = (lookup: Lookup): number =>
+    6 + lookup.subtables.length * 2 + (filtering(lookup) ? 2 : 0);
+  const header = 2 + lookups.length * 2;
+
+  // Whether it can be written plainly: every subtable within reach of its
+  // lookup, and every lookup within reach of the list.
+  let reach = header;
+  let near = true;
+  for (const lookup of lookups) {
+    if (reach > 0xffff) near = false;
+    let within = headOf(lookup);
+    for (const sub of lookup.subtables) {
+      if (within > 0xffff) near = false;
+      within += sub.length;
+    }
+    reach += within;
+  }
+
+  const w = new Writer();
+  w.u16(lookups.length);
+
+  if (near) {
+    let at = header;
+    for (const lookup of lookups) {
+      w.u16(at);
+      at += headOf(lookup) + lookup.subtables.reduce((sum, sub) => sum + sub.length, 0);
+    }
+    for (const lookup of lookups) {
+      // Subtables are tried in the order they are written, first match winning
+      // — which is what makes an exception rule work, and why the caller's
+      // order is kept rather than sorted.
+      let within = headOf(lookup);
+      w.u16(lookup.type);
+      w.u16(lookup.flags ?? 0);
+      w.u16(lookup.subtables.length);
+      for (const sub of lookup.subtables) {
+        w.u16(within);
+        within += sub.length;
+      }
+      if (filtering(lookup)) w.u16(lookup.markFilteringSet ?? 0);
+      for (const sub of lookup.subtables) w.bytesOf(sub);
+    }
+    return w.finish();
+  }
+
+  if (kind === undefined) throw new TableTooLarge();
+  const extension = kind === "GSUB" ? 7 : 9;
+  const RECORD = 8;
+
+  // Where each lookup is, and where the subtables begin after the last of them.
+  const lookupAt: number[] = [];
+  let at = header;
+  for (const lookup of lookups) {
+    lookupAt.push(at);
+    at += headOf(lookup) + lookup.subtables.length * RECORD;
+  }
+  for (const where of lookupAt) w.u16(where);
+
+  let subtableAt = at;
+  for (const [i, lookup] of lookups.entries()) {
+    const head = headOf(lookup);
+    w.u16(extension);
+    w.u16(lookup.flags ?? 0);
+    w.u16(lookup.subtables.length);
+    for (const j of lookup.subtables.keys()) w.u16(head + j * RECORD);
+    if (filtering(lookup)) w.u16(lookup.markFilteringSet ?? 0);
+    for (const [j, sub] of lookup.subtables.entries()) {
+      const recordAt = lookupAt[i]! + head + j * RECORD;
+      w.u16(1); // the only format
+      w.u16(lookup.type);
+      // From the start of this record, which is what an extension measures from.
+      w.u32(subtableAt - recordAt);
+      subtableAt += sub.length;
+    }
+  }
+  for (const lookup of lookups) for (const sub of lookup.subtables) w.bytesOf(sub);
+  return w.finish();
+}
+
+/**
  * Wrap lookups in the scaffolding a layout table needs.
  *
  * `systems` are the language systems the font declares, and every feature
@@ -109,6 +206,11 @@ export function layoutTable(
   lookups: readonly Lookup[],
   systems: readonly LanguageSystem[] = DEFAULT_SYSTEMS,
   variations: readonly FeatureVariation[] = [],
+  /**
+   * Which table this is, for a lookup list too large to be written plainly:
+   * the lookup type that says "further away" is a different number in each.
+   */
+  kind?: "GSUB" | "GPOS",
 ): Uint8Array {
   // A feature that only does something in part of the designspace is still in
   // the list everywhere, with no lookups of its own: a variation can only
@@ -162,44 +264,7 @@ export function layoutTable(
   }
   if (records.length === 0) return new Uint8Array(0);
 
-  const lookupTables = lookups.map((lookup) => {
-    // Subtables are tried in the order they are written, first match winning —
-    // which is what makes an exception rule work, and why the caller's order is
-    // kept rather than sorted.
-    // Two more bytes where the filtering flag is set: the set's index sits
-    // after the subtable offsets, and everything after it moves along.
-    const filtering = ((lookup.flags ?? 0) & 0x0010) !== 0;
-    const head = 6 + lookup.subtables.length * 2 + (filtering ? 2 : 0);
-    let at = head;
-    const offsets = lookup.subtables.map((sub) => {
-      const here = at;
-      at += sub.length;
-      return here;
-    });
-
-    const w = new Writer();
-    w.u16(lookup.type);
-    w.u16(lookup.flags ?? 0);
-    w.u16(lookup.subtables.length);
-    for (const off of offsets) w.u16(off);
-    if (filtering) w.u16(lookup.markFilteringSet ?? 0);
-    for (const sub of lookup.subtables) w.bytesOf(sub);
-    return w.finish();
-  });
-
-  const lookupHeader = 2 + lookupTables.length * 2;
-  let at = lookupHeader;
-  const lookupOffsets = lookupTables.map((l) => {
-    const here = at;
-    at += l.length;
-    return here;
-  });
-
-  const lookupList = new Writer();
-  lookupList.u16(lookupTables.length);
-  for (const off of lookupOffsets) lookupList.u16(off);
-  for (const l of lookupTables) lookupList.bytesOf(l);
-  const lookupBytes = lookupList.finish();
+  const lookupBytes = lookupList(lookups, kind);
 
   const sorted = [...records].sort((l, r) =>
     l.tag !== r.tag ? (l.tag < r.tag ? -1 : 1) : compareLists(l.lookups, r.lookups),

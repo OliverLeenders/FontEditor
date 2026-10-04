@@ -24,6 +24,29 @@ import {
  * format expresses it.
  */
 
+/**
+ * A part of a layout table lies further from what points at it than the format
+ * can say.
+ *
+ * Nearly everything in GSUB and GPOS is found by a sixteen-bit offset, and a
+ * number that does not fit was once written as its low sixteen bits: the font
+ * was made, with a table that pointed into the middle of itself, and nothing
+ * said so. What can be large — a font's ligatures, its kerning — is divided
+ * before it comes to this, so this is for what cannot be.
+ */
+export class TableTooLarge extends Error {
+  constructor() {
+    super(
+      "The font's features or kerning are too large for the font file to hold: " +
+        "part of a table is more than 65,535 bytes from where it is pointed at.",
+    );
+    this.name = "TableTooLarge";
+  }
+}
+
+/** The most a subtable may be for every offset inside it to be sayable. */
+export const SUBTABLE_LIMIT = 0xffff;
+
 export class Writer {
   private readonly bytes: number[] = [];
 
@@ -36,6 +59,7 @@ export class Writer {
   }
 
   u16(value: number): void {
+    if (value < 0 || value > 0xffff) throw new TableTooLarge();
     this.bytes.push((value >>> 8) & 0xff, value & 0xff);
   }
 
@@ -191,6 +215,79 @@ export function pairPosClasses(
   return w.finish();
 }
 
+/**
+ * The same matrix, in as many subtables as it takes for each to be sayable.
+ *
+ * The coverage and the class definitions come after the matrix and are found
+ * by sixteen-bit offsets, so the matrix cannot be more than that: two hundred
+ * groups against two hundred is already past it. Divided by its rows — the
+ * first glyph's classes — each subtable covers the glyphs of some of them and
+ * holds their rows against every second class. A pair is in exactly one, since
+ * its first glyph is covered by exactly one, so the order they are tried in
+ * changes nothing.
+ */
+export function pairPosClassSubtables(
+  firstCoverage: readonly number[],
+  class1: ReadonlyMap<number, number>,
+  class2: ReadonlyMap<number, number>,
+  class1Count: number,
+  class2Count: number,
+  values: ReadonlyMap<string, number>,
+): Uint8Array[] {
+  const whole = (): Uint8Array =>
+    pairPosClasses(firstCoverage, class1, class2, class1Count, class2Count, values);
+  const fixed = 16 + classDef(class2).length;
+  // A coverage and a class definition are at most six bytes a glyph and four
+  // of header each.
+  const sizeOf = (rows: number, glyphs: number): number =>
+    fixed + rows * class2Count * 2 + 2 * (4 + glyphs * 6);
+  if (sizeOf(class1Count, firstCoverage.length) <= SUBTABLE_LIMIT) return [whole()];
+
+  const glyphsOf = new Map<number, number[]>();
+  for (const id of firstCoverage) {
+    const klass = class1.get(id) ?? 0;
+    const list = glyphsOf.get(klass) ?? [];
+    list.push(id);
+    glyphsOf.set(klass, list);
+  }
+
+  const out: Uint8Array[] = [];
+  let taken: number[] = [];
+  let glyphs = 0;
+  const flush = (): void => {
+    if (taken.length === 0) return;
+    // Renumbered from one: zero is every covered glyph in no class, which here
+    // is none of them, and its row is nothing.
+    const renumbered = new Map(taken.map((klass, i) => [klass, i + 1]));
+    const covered: number[] = [];
+    const classes = new Map<number, number>();
+    for (const klass of taken) {
+      for (const id of glyphsOf.get(klass) ?? []) {
+        covered.push(id);
+        classes.set(id, renumbered.get(klass)!);
+      }
+    }
+    const rows = new Map<string, number>();
+    for (const [key, value] of values) {
+      const [c1, c2] = key.split(",");
+      const row = renumbered.get(Number(c1));
+      if (row !== undefined) rows.set(`${String(row)},${c2 ?? "0"}`, value);
+    }
+    out.push(pairPosClasses(covered, classes, class2, taken.length + 1, class2Count, rows));
+    taken = [];
+    glyphs = 0;
+  };
+
+  for (const klass of [...glyphsOf.keys()].sort((a, b) => a - b)) {
+    const more = glyphsOf.get(klass)?.length ?? 0;
+    if (taken.length > 0 && sizeOf(taken.length + 2, glyphs + more) > SUBTABLE_LIMIT) flush();
+    taken.push(klass);
+    glyphs += more;
+  }
+  flush();
+  return out;
+}
+
 /** PairPos format 1: pairs listed per first glyph. Used for the exceptions. */
 export function pairPosGlyphs(pairs: ReadonlyMap<number, ReadonlyMap<number, number>>): Uint8Array {
   const firsts = [...pairs.keys()].sort((a, b) => a - b);
@@ -228,6 +325,35 @@ export function pairPosGlyphs(pairs: ReadonlyMap<number, ReadonlyMap<number, num
 }
 
 /**
+ * The same pairs, in as many subtables as it takes for each to be sayable.
+ *
+ * Divided by first glyph, each with every pair it begins: which subtable a pair
+ * is in is decided by its first glyph alone, so nothing depends on the order.
+ */
+export function pairPosGlyphSubtables(
+  pairs: ReadonlyMap<number, ReadonlyMap<number, number>>,
+): Uint8Array[] {
+  const out: Uint8Array[] = [];
+  let taken = new Map<number, ReadonlyMap<number, number>>();
+  // The header, and a coverage of at most two bytes a glyph and four of header.
+  let size = 14;
+  for (const first of [...pairs.keys()].sort((a, b) => a - b)) {
+    const seconds = pairs.get(first)!;
+    // An offset to the set, the glyph in the coverage, a count, and each pair.
+    const more = 2 + 2 + 2 + seconds.size * 4;
+    if (taken.size > 0 && size + more > SUBTABLE_LIMIT) {
+      out.push(pairPosGlyphs(taken));
+      taken = new Map();
+      size = 14;
+    }
+    taken.set(first, seconds);
+    size += more;
+  }
+  if (taken.size > 0) out.push(pairPosGlyphs(taken));
+  return out;
+}
+
+/**
  * Wrap subtables in the scaffolding GPOS requires.
  *
  * A script list saying "any script", a feature list with one `kern` feature, and
@@ -255,8 +381,11 @@ export function kerningLookups(subtables: readonly Uint8Array[]): Lookup[] {
 
 export function gposTable(subtables: readonly Uint8Array[]): Uint8Array {
   return layoutTable(
-    [{ tag: "kern", lookups: subtables.map((_, i) => i) }],
+    [{ tag: "kern", lookups: subtables.length === 0 ? [] : [0] }],
     kerningLookups(subtables),
+    undefined,
+    [],
+    "GPOS",
   );
 }
 
@@ -358,10 +487,10 @@ export function kerningSubtables(
   for (const id of class1.keys()) firstCoverage.add(id);
 
   const subtables: Uint8Array[] = [];
-  if (exceptions.size > 0) subtables.push(pairPosGlyphs(exceptions));
+  if (exceptions.size > 0) subtables.push(...pairPosGlyphSubtables(exceptions));
   if (matrix.size > 0 && firstCoverage.size > 0) {
     subtables.push(
-      pairPosClasses(
+      ...pairPosClassSubtables(
         [...firstCoverage],
         class1,
         class2,
