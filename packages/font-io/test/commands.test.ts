@@ -24,6 +24,24 @@ describe("contoursFromCommands", () => {
     expect(segmentCount(c!)).toBe(3);
   });
 
+  it("draws nothing for a line to where the pen already is", () => {
+    // What a TrueType outline read back has after nearly every curve.
+    const [c] = build([
+      { type: "M", x: 0, y: 0 },
+      { type: "L", x: 100, y: 0 },
+      { type: "L", x: 100, y: 0 },
+      { type: "Q", x1: 100, y1: 80, x: 50, y: 80 },
+      { type: "L", x: 50, y: 80 },
+      { type: "L", x: 0, y: 0 },
+      { type: "Z" },
+    ]);
+
+    expect(c?.nodes).toHaveLength(3);
+    expect(segmentCount(c!)).toBe(3);
+    const places = c!.nodes.map((n) => `${String(n.pt.x)},${String(n.pt.y)}`);
+    expect(new Set(places).size).toBe(3);
+  });
+
   it("adds the implicit closing segment when a path does not draw back", () => {
     const [c] = build([
       { type: "M", x: 0, y: 0 },

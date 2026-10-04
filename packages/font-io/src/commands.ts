@@ -179,6 +179,13 @@ export function contoursFromCommands(
     if (from === null) continue;
 
     if (command.type === "L") {
+      // A line to where the pen already is draws nothing, and a TrueType
+      // outline read back is full of them: one after nearly every curve. Kept,
+      // each was a second node on top of the first — twenty to a glyph in an
+      // icon font — with a segment of no length between them, which is nothing
+      // to look at and something for every tool that walks an outline to trip
+      // on.
+      if (near(from, { x: command.x, y: command.y }, epsilon)) continue;
       draft.spans.push({ c1: null, c2: null });
       draft.points.push({ x: command.x, y: command.y });
       continue;
