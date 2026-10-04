@@ -910,6 +910,23 @@ export class EditorStore {
     return this.state.folder.name !== null && unsaved(this.state.folder, this.editor.document);
   }
 
+  /**
+   * Whether a font just opened is still being written into the working copy.
+   *
+   * The one time the working copy does not have everything: a font is shown
+   * before it is written, and a large one is seconds in the writing. A window
+   * closed in them would open next time on the font that was there before, so
+   * this is worth stopping for as a folder left behind is.
+   */
+  get writingWholeFont(): boolean {
+    return this.disk.replacingNow;
+  }
+
+  /** That writing, finished: at once where there is none. */
+  async wholeFontWritten(): Promise<void> {
+    await this.disk.replaced();
+  }
+
   /** Say which font is open, and what else there is to open. */
   async noteProjects(current: string | null): Promise<void> {
     await noteProjects(this.host, current);

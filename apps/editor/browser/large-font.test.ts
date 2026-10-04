@@ -45,6 +45,20 @@ describe("a large font, in a browser", () => {
       await opening(page).waitFor();
       await glyphs(page, LARGE_FONT_GLYPHS);
       await opening(page).waitFor({ state: "detached" });
+
+      // Shown, and seconds from written. A reload now would open the sample
+      // under this font's name, so the browser is asked to ask — which it only
+      // does of a page somebody has touched.
+      await page.locator("body").click({ position: { x: 5, y: 5 } });
+      const asked: string[] = [];
+      page.on("dialog", (dialog) => {
+        asked.push(dialog.type());
+        void dialog.dismiss();
+      });
+      await page.evaluate(() => {
+        location.reload();
+      });
+      await expect.poll(() => asked).toEqual(["beforeunload"]);
       // Shown before it is written, and not called saved until it is: a reload
       // on that word once opened the font that was there before.
       await saved(page);

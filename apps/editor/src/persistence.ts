@@ -216,8 +216,31 @@ export class Persistence {
       done = true;
       this.replacing -= 1;
       this.report({ saveStatus: this.status });
+      if (this.replacing > 0) return;
+      for (const told of this.waitingForReplaced.splice(0)) told();
     };
   }
+
+  /**
+   * Whether a whole font is on screen that the working copy does not hold yet.
+   *
+   * Unlike an edit, which the journal has within a moment and a flush finishes,
+   * this is seconds of writing that a closing tab cannot wait for — and what is
+   * on disk until it ends is the font that was there before.
+   */
+  get replacingNow(): boolean {
+    return this.replacing > 0 && this.owner;
+  }
+
+  /** Resolved once no whole font is on its way to disk: at once, where none is. */
+  replaced(): Promise<void> {
+    if (!this.replacingNow) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.waitingForReplaced.push(resolve);
+    });
+  }
+
+  private readonly waitingForReplaced: (() => void)[] = [];
 
   /**
    * Open the store and take the lock if it is free.

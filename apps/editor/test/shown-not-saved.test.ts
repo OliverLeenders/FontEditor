@@ -23,11 +23,26 @@ describe("a font shown and not yet written", () => {
 
     // What the status was at every moment the new font was the one on screen.
     const said: string[] = [];
+    const writing: boolean[] = [];
     const unwatch = store.subscribe(() => {
-      if (store.editor.document !== before) said.push(store.getState().saveStatus);
+      if (store.editor.document === before) return;
+      said.push(store.getState().saveStatus);
+      writing.push(store.writingWholeFont);
     });
-    await store.newFont();
+    expect(store.writingWholeFont).toBe(false);
+    const opening = store.newFont();
+    // Whoever waits for the writing is told when it is done, and not before.
+    let told = false;
+    const waited = store.wholeFontWritten().then(() => {
+      told = store.getState().saveStatus === "idle";
+    });
+    await opening;
+    await waited;
     unwatch();
+
+    expect(told, "told once it was written").toBe(true);
+    expect(writing.slice(0, -1), "a window closed then is worth asking about").not.toContain(false);
+    expect(store.writingWholeFont, "and not after").toBe(false);
 
     expect(said.length).toBeGreaterThan(0);
     expect(said.slice(0, -1), "while it was being written").not.toContain("idle");

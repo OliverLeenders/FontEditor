@@ -280,7 +280,11 @@ export function App(): React.JSX.Element {
       // question to be asked at all.
       // In the desktop window the question is asked by `CloseWarning` instead,
       // with the three answers this dialog cannot offer.
-      if (store.unsavedOnDisk && desktop() === null) event.preventDefault();
+      // And a font opened a moment ago and still being written: the flush
+      // above is the edits, which is all a closing page has time for.
+      if ((store.unsavedOnDisk || store.writingWholeFont) && desktop() === null) {
+        event.preventDefault();
+      }
     };
     const onResize = (): void => store.reclampInspector();
 

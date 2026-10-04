@@ -32,7 +32,9 @@ export function CloseWarning(): React.JSX.Element | null {
     const onRequest = (): void => {
       void (async () => {
         // The working copy first, whatever happens next: this may be the last
-        // moment there is a page to write it from.
+        // moment there is a page to write it from. A font opened a moment ago
+        // is waited for; the window holds the request for as long as that is.
+        await store.wholeFontWritten();
         await store.flushNow();
         if (store.unsavedOnDisk) {
           setAsking(true);

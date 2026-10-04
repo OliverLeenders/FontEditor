@@ -742,6 +742,8 @@ the font's name, a bar, and how far it has got, such as _Reading glyphs · 1,280
 is shown when the program starts on a font, when a UFO folder is opened and when a font file
 is imported, and goes as soon as the font is on screen; a font that was opened or imported is
 then written to the browser's store in the background, which the status bar shows as _saving_.
+Until it says _saved_ the font is only on screen, so closing or reloading the tab in those
+seconds is asked about first, and the desktop window waits for the writing before it closes.
 
 **The File menu** is in four groups, each named for what happens to files. **New font**
 starts another font and **Switch font** opens one of the others: both keep the font that
