@@ -1288,7 +1288,78 @@ const HAIR = 0.01;
  */
 function windsAsItNests(contours: readonly Contour[]): boolean {
   const turned = correctDirections(contours);
-  return turned === contours || sameInk(contours, turned);
+  if (turned === contours) return true;
+
+  // The same contours, some of them turned: so each is flattened once, and how
+  // it winds round a place is asked once and counted both ways. Flattened more
+  // coarsely than they were to be turned: there are fewer sides to ask, and
+  // asking is most of this.
+  const reach = PROBE * tolerance(contours);
+  const outlines = contours.map((c, i) => ({ ...boxed(c, reach / 2), turned: turned[i] !== c }));
+  const same = (p: Vec2): boolean => {
+    let asWound = 0;
+    let asNested = 0;
+    for (const o of outlines) {
+      if (p.x < o.minX || p.x > o.maxX || p.y < o.minY || p.y > o.maxY) continue;
+      const w = windingOf(p, o.points);
+      asWound += w;
+      asNested += o.turned ? -w : w;
+    }
+    return (asWound !== 0) === (asNested !== 0);
+  };
+  for (const c of contours) {
+    for (const p of besides(c, reach)) if (!same(p)) return false;
+  }
+  return true;
+}
+
+/** A contour flattened to within a tolerance, with the box it lies in. */
+function boxed(
+  c: Contour,
+  within: number,
+): { points: Vec2[]; minX: number; minY: number; maxX: number; maxY: number } {
+  const points: Vec2[] = [];
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < segmentCount(c); i++) {
+    const segment = segmentAt(c, i);
+    if (segment === null) continue;
+    const flat = flatten(segmentCubic(segment), within);
+    // Each piece ends where the next begins, so the shared point is dropped.
+    for (let k = 0; k < flat.length - 1; k++) {
+      const p = flat[k]!;
+      points.push(p);
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+  }
+  return { points, minX, minY, maxX, maxY };
+}
+
+/** The places a little to each side of a contour, at three along each of its segments. */
+function besides(c: Contour, reach: number): Vec2[] {
+  const out: Vec2[] = [];
+  for (let i = 0; i < segmentCount(c); i++) {
+    const segment = segmentAt(c, i);
+    if (segment === null) continue;
+    const cubic = segmentCubic(segment);
+    for (const t of [0.25, 0.5, 0.75]) {
+      const before = evaluate(cubic, t - 0.05);
+      const after = evaluate(cubic, t + 0.05);
+      const length = Math.hypot(after.x - before.x, after.y - before.y);
+      // A segment of no length has no side to be on.
+      if (length === 0) continue;
+      const at = evaluate(cubic, t);
+      const nx = (-(after.y - before.y) / length) * reach;
+      const ny = ((after.x - before.x) / length) * reach;
+      out.push({ x: at.x + nx, y: at.y + ny }, { x: at.x - nx, y: at.y - ny });
+    }
+  }
+  return out;
 }
 
 /**
@@ -1315,28 +1386,8 @@ export function sameInk(a: readonly Contour[], b: readonly Contour[], allowed = 
 
   // Flattened more coarsely than a union wants, and each with its box: a place
   // outside a contour's box is not wound round by it.
-  const boxed = (contours: readonly Contour[]) =>
-    contours.map((c) => {
-      const points: Vec2[] = [];
-      for (let i = 0; i < segmentCount(c); i++) {
-        const segment = segmentAt(c, i);
-        if (segment !== null)
-          points.push(...flatten(segmentCubic(segment), reach / 2).slice(0, -1));
-      }
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-      for (const p of points) {
-        if (p.x < minX) minX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y > maxY) maxY = p.y;
-      }
-      return { points, minX, minY, maxX, maxY };
-    });
-  const first = boxed(one);
-  const second = boxed(other);
+  const first = one.map((c) => boxed(c, reach / 2));
+  const second = other.map((c) => boxed(c, reach / 2));
   const inked = (p: Vec2, outlines: typeof first): boolean => {
     let winding = 0;
     for (const o of outlines) {
@@ -1349,29 +1400,11 @@ export function sameInk(a: readonly Contour[], b: readonly Contour[], allowed = 
   let asked = 0;
   let differ = 0;
   for (const c of [...one, ...other]) {
-    for (let i = 0; i < segmentCount(c); i++) {
-      const segment = segmentAt(c, i);
-      if (segment === null) continue;
-      const cubic = segmentCubic(segment);
-      for (const t of [0.25, 0.5, 0.75]) {
-        const before = evaluate(cubic, t - 0.05);
-        const after = evaluate(cubic, t + 0.05);
-        const length = Math.hypot(after.x - before.x, after.y - before.y);
-        // A segment of no length has no side to be on.
-        if (length === 0) continue;
-        const at = evaluate(cubic, t);
-        const nx = (-(after.y - before.y) / length) * reach;
-        const ny = ((after.x - before.x) / length) * reach;
-        for (const p of [
-          { x: at.x + nx, y: at.y + ny },
-          { x: at.x - nx, y: at.y - ny },
-        ]) {
-          asked += 1;
-          if (inked(p, first) !== inked(p, second)) {
-            differ += 1;
-            if (allowed === 0) return false;
-          }
-        }
+    for (const p of besides(c, reach)) {
+      asked += 1;
+      if (inked(p, first) !== inked(p, second)) {
+        differ += 1;
+        if (allowed === 0) return false;
       }
     }
   }

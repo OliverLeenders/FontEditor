@@ -25,15 +25,32 @@ import { inkRegions, isInk } from "./stroke.js";
  * anticlockwise is a positive signed area.
  */
 
-/** A contour as a closed polygon, fine enough for area and containment. */
-function polygon(c: Contour): Vec2[] {
+/**
+ * A contour as a closed polygon, fine enough for area and containment.
+ *
+ * Worked out once for each contour. A contour does not change — an edit makes
+ * another — and this was asked for three times over to turn one glyph's
+ * contours by their nesting: once to see what holds what, and twice more for
+ * which way each runs. Flattening every curve is most of what that costs, and
+ * for a font of four thousand glyphs read in it was seconds.
+ *
+ * Nobody may write to what comes back, which is the same array each time.
+ */
+const flattened = new WeakMap<Contour, readonly Vec2[]>();
+
+function polygon(c: Contour): readonly Vec2[] {
+  const known = flattened.get(c);
+  if (known !== undefined) return known;
+
   const points: Vec2[] = [];
   for (let i = 0; i < segmentCount(c); i++) {
     const segment = segmentAt(c, i);
     if (segment === null) continue;
     // Each piece ends where the next begins, so the shared point is dropped.
-    points.push(...flatten(segmentCubic(segment), 0.05).slice(0, -1));
+    const flat = flatten(segmentCubic(segment), 0.05);
+    for (let k = 0; k < flat.length - 1; k++) points.push(flat[k]!);
   }
+  flattened.set(c, points);
   return points;
 }
 
@@ -307,7 +324,7 @@ export function shapesOf(contours: readonly Contour[]): ContourShape[] {
 }
 
 /** A closed contour as a flat polygon, for asking what is inside it. */
-export function contourPolygon(c: Contour): Vec2[] {
+export function contourPolygon(c: Contour): readonly Vec2[] {
   return polygon(c);
 }
 
@@ -406,7 +423,7 @@ export function filledContours(g: Glyph): readonly Contour[] {
  * reason {@link filledContours} is: the model is persistent, so an unchanged
  * glyph is the same object and there is no invalidation to get wrong.
  */
-const polygons = new WeakMap<Glyph, Vec2[][]>();
+const polygons = new WeakMap<Glyph, (readonly Vec2[])[]>();
 
 export function glyphPolygons(g: Glyph): readonly (readonly Vec2[])[] {
   const known = polygons.get(g);
