@@ -394,25 +394,31 @@ export async function adoptFamily(
     rulesProcessing: family.rulesProcessing ?? "first",
     kept: family.kept ?? null,
   };
-  showDocument(host, opened.document, false, { project: next });
-  shown(host);
-  await painted();
+  // Not saved from the moment it is shown, and said so, until it is written.
+  const onDisk = host.disk.willReplace();
+  try {
+    showDocument(host, opened.document, false, { project: next });
+    shown(host);
+    await painted();
 
-  for (const id of gone) await host.disk.dropMaster(id);
-  for (const [i, m] of masters.entries()) {
-    const source = family.masters[i];
-    if (source !== undefined) await host.disk.putMaster(m.id, source.document);
+    for (const id of gone) await host.disk.dropMaster(id);
+    for (const [i, m] of masters.entries()) {
+      const source = family.masters[i];
+      if (source !== undefined) await host.disk.putMaster(m.id, source.document);
+    }
+
+    // Each master's layers are in its own document; the file they were once
+    // kept in beside the font is cleared.
+    await host.disk.putLayers([]);
+
+    // The working copy made the open master's, and then the project saying so:
+    // the order a switch writes them in, for the reason it does.
+    await written(host);
+    await host.disk.replaceAll(opened.document, next.current);
+    await rememberDesignspace(host, next);
+  } finally {
+    onDisk();
   }
-
-  // Each master's layers are in its own document; the file they were once
-  // kept in beside the font is cleared.
-  await host.disk.putLayers([]);
-
-  // The working copy made the open master's, and then the project saying so:
-  // the order a switch writes them in, for the reason it does.
-  await written(host);
-  await host.disk.replaceAll(opened.document, next.current);
-  await rememberDesignspace(host, next);
   // A master that draws only some glyphs is shown against the one it is a
   // layer of.
   await loadWhole(host);

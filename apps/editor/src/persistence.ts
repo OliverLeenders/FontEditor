@@ -84,7 +84,7 @@ export class Persistence {
       },
       saved: (document) => {
         this.journalSaved(document);
-        this.report({ saveStatus: this.autosave.status });
+        this.report({ saveStatus: this.status });
       },
       failed: (error) => {
         this.report({ saveStatus: "failed", storageDetail: error.message });
@@ -187,7 +187,36 @@ export class Persistence {
   }
 
   get status(): AutosaveStatus {
-    return this.autosave.status;
+    return this.replacing > 0 && this.owner ? "saving" : this.autosave.status;
+  }
+
+  /**
+   * How many whole fonts are on screen and not yet on disk.
+   *
+   * A font opened is shown first and written afterwards, and for a large one
+   * the writing is seconds. Autosave knows nothing of it — there is no edit to
+   * save — so for those seconds the status read `saved` over a working copy
+   * that still held the font before, and a tab closed on that word opened next
+   * time on the wrong font.
+   */
+  private replacing = 0;
+
+  /**
+   * Say that a whole font is about to be written, from the moment it is shown.
+   *
+   * Answers with what to call when it has been, or has failed to be: the
+   * status is `saving` in between, whatever autosave has to say.
+   */
+  willReplace(): () => void {
+    this.replacing += 1;
+    this.report({ saveStatus: this.status });
+    let done = false;
+    return () => {
+      if (done) return;
+      done = true;
+      this.replacing -= 1;
+      this.report({ saveStatus: this.status });
+    };
   }
 
   /**
@@ -375,7 +404,7 @@ export class Persistence {
     // than believing every glyph is still unwritten — and keeps whatever was
     // committed while it was being written, which is newer than it.
     this.autosave.rebase(document);
-    this.report({ saveStatus: this.autosave.status });
+    this.report({ saveStatus: this.status });
   }
 
   flush(): void {

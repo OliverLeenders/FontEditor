@@ -321,7 +321,21 @@ export async function adoptDocument(
   keep = true,
 ): Promise<void> {
   const replaced = host.state().session.editor.document;
+  // Not saved from the moment it is shown, and said so, until it is written.
+  const onDisk = host.disk.willReplace();
+  try {
+    await showAndWrite(host, document, replaced, keep);
+  } finally {
+    onDisk();
+  }
+}
 
+async function showAndWrite(
+  host: FontHost,
+  document: FontDocument,
+  replaced: FontDocument,
+  keep: boolean,
+): Promise<void> {
   // One master again, and the old font's masters gone with it: they are
   // drawings of a typeface that is no longer open.
   const writeFresh = beginFresh(host, document);
@@ -369,22 +383,27 @@ export async function adoptDocument(
 export async function adoptAsOpenMaster(host: FontHost, document: FontDocument): Promise<void> {
   const replaced = host.state().session.editor.document;
   const project = host.state().project;
+  const onDisk = host.disk.willReplace();
 
-  showDocument(host, document, false, {
-    project: { ...project, sources: { ...project.sources, [project.current]: document } },
-  });
-  host.setCatalogQuery(DEFAULT_QUERY);
-  shown(host);
-  await painted();
+  try {
+    showDocument(host, document, false, {
+      project: { ...project, sources: { ...project.sources, [project.current]: document } },
+    });
+    host.setCatalogQuery(DEFAULT_QUERY);
+    shown(host);
+    await painted();
 
-  // A copy of the drawing it replaces, as this master's.
-  await host.keepSnapshot(replaced);
-  await host.disk.putLayers([]);
-  // After a master still on its way into the working copy, and as the master
-  // that is open by then.
-  await written(host);
-  const now = host.state();
-  await host.disk.replaceAll(now.session.editor.document, now.project.current);
+    // A copy of the drawing it replaces, as this master's.
+    await host.keepSnapshot(replaced);
+    await host.disk.putLayers([]);
+    // After a master still on its way into the working copy, and as the master
+    // that is open by then.
+    await written(host);
+    const now = host.state();
+    await host.disk.replaceAll(now.session.editor.document, now.project.current);
+  } finally {
+    onDisk();
+  }
 }
 
 /**
