@@ -311,7 +311,14 @@ export {
 } from "./corner.js";
 export { isEmptyContour, keptByPolicy, simplifyContour, withoutEmptySegments } from "./simplify.js";
 export type { CombineOutcome, SetOperation } from "./overlap.js";
-export { combineContours, contoursMeet, removeOverlap } from "./overlap.js";
+export {
+  HAIRLINES,
+  combineContours,
+  contoursMeet,
+  nestedAsWound,
+  removeOverlap,
+  sameInk,
+} from "./overlap.js";
 
 export type { Guide } from "./guide.js";
 export {

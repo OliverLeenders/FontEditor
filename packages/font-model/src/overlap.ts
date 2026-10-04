@@ -12,12 +12,21 @@ import {
   tangent,
 } from "@typewright/geometry";
 
-import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import {
+  type Contour,
+  contour,
+  reverseContour,
+  segmentAt,
+  segmentCount,
+  segmentCubic,
+} from "./contour.js";
 import { corneredContour, hasContinuousCorners } from "./corner.js";
+import { contourWinding, correctDirections } from "./direction.js";
 import type { Glyph } from "./glyph.js";
 import type { ContourId, IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
 import { unionByPolygons } from "./polygon-union.js";
+import { isEmptyContour } from "./simplify.js";
 
 /**
  * Removing overlap: the outline of what a glyph's contours cover together.
@@ -1095,6 +1104,302 @@ function smooth(pt: Vec2, incoming: Vec2 | null, outgoing: Vec2 | null): boolean
 // ---------------------------------------------------------------------------
 // what is inside
 // ---------------------------------------------------------------------------
+
+/**
+ * A glyph drawn for the non-zero rule, as outlines this editor fills the same.
+ *
+ * A font file's outlines are filled by which way they wind: two contours that
+ * run the same way are ink where they overlap, and one inside another the same
+ * way round is ink too. This editor fills by nesting — a contour inside another
+ * is a counter, whichever way it was drawn — so a glyph built of overlapping
+ * pieces, read in as it is, is shown and exported with holes it never had.
+ *
+ * Where the two rules agree, which is nearly every glyph, the glyph comes back
+ * as it went in: the same object. Where they do not, its overlaps are joined
+ * as the file's own rule fills them and whatever is buried in ink is taken out,
+ * which leaves outlines that nest the way they wind. The contours that draw
+ * nothing go too, there being no telling what they were once it is redrawn.
+ *
+ * `null` where that could not be done — the union could not be made, or what
+ * it made is not the ink the file has — and the glyph is best left as it is.
+ */
+export function nestedAsWound(g: Glyph, ids: IdFactory): Glyph | null {
+  const outline = (c: Contour): boolean =>
+    c.closed && c.nodes.length >= 2 && c.nib === undefined && !isEmptyContour(c);
+  const drawn = g.contours.filter(outline);
+  if (plainlyWindsAsItNests(drawn) || windsAsItNests(drawn)) return g;
+
+  const others = g.contours.filter((c) => !c.closed || c.nib !== undefined);
+  const good = (redrawn: readonly Contour[]): boolean =>
+    sameInk(drawn, redrawn, HAIRLINES) && windsAsItNests(redrawn);
+
+  // By the union of curves, which keeps every point it does not have to cut.
+  const joined = removeOverlap({ ...g, contours: drawn }, ids);
+  if (joined !== null) {
+    // What is left that is not the edge of anything: a shape wholly inside
+    // another that winds the same way crosses nothing, so the union had
+    // nothing to do with it, and it is ink on both sides.
+    const outlines = joined.glyph.contours.map(polygon);
+    const eps = tolerance(joined.glyph.contours);
+    const edges = joined.glyph.contours.filter((c) => isEdge(c, outlines, eps));
+    if (good(edges)) return { ...g, contours: [...edges, ...others] };
+  }
+
+  // And where that came back wrong, by the union of polygons, which is not
+  // exact — every curve is fitted again — and does not lose its way. It joins
+  // what turns the way an outer contour turns here, so a file drawn the other
+  // way round is turned first.
+  let turning = 0;
+  for (const c of drawn) turning += contourWinding(c);
+  const facing = turning < 0 ? drawn.map(reverseContour) : drawn;
+  const fitted = unionByPolygons(facing, ids);
+  if (fitted !== null && good(fitted)) return { ...g, contours: [...fitted, ...others] };
+
+  return null;
+}
+
+/**
+ * How many places in a hundred a union may differ from what it was made of and
+ * still be that ink: the hairlines between shapes set flush, which it closes.
+ */
+export const HAIRLINES = 2;
+
+/**
+ * The same question, answered from the points alone, for the font that is as
+ * fonts are made: no contour across another, and each wound so that the two
+ * rules fill it alike.
+ *
+ * By the polygon through each contour's points, with no curve flattened. That
+ * is not the contour — a curve bulges past its chord — but it winds the way the
+ * contour does and holds what the contour holds, near enough to ask of it what
+ * is asked of the contours: whether there is ink to each side of every one
+ * under the one rule as under the other. Asked first because the exact
+ * answer flattens every curve of every glyph, which for a font of four thousand
+ * is seconds on the way in to learn that nothing was wrong.
+ *
+ * Only of contours that keep clear of each other: each wholly inside another
+ * or wholly outside it. Where two cross, the rules differ in the part they
+ * share, which is beside no contour's first side, and that is the exact
+ * answer's to find.
+ *
+ * `false` is not "they differ" but "ask properly".
+ */
+function plainlyWindsAsItNests(contours: readonly Contour[]): boolean {
+  const polys = contours.map((c) => c.nodes.map((n) => n.pt));
+  // Each one's box, handles and all: what the contour cannot be outside of.
+  const boxes = contours.map((c) => {
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const n of c.nodes) {
+      for (const p of [n.pt, n.in, n.out]) {
+        if (p === null) continue;
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+    }
+    return { minX, minY, maxX, maxY };
+  });
+
+  // Each one's way round, how many of the others it is inside, and the two
+  // places a hair to either side of the middle of its first side.
+  const turns: number[] = [];
+  const sides: (readonly [Vec2, Vec2])[] = [];
+  const depths: number[] = [];
+  for (const [i, poly] of polys.entries()) {
+    let area = 0;
+    for (let k = 0; k < poly.length; k++) {
+      const p = poly[k]!;
+      const q = poly[(k + 1) % poly.length]!;
+      area += p.x * q.y - q.x * p.y;
+    }
+    const a = poly[0]!;
+    const b = poly[1]!;
+    const length = Math.hypot(b.x - a.x, b.y - a.y);
+    if (area === 0 || length === 0) return false;
+
+    let depth = 0;
+    for (const [j, other] of polys.entries()) {
+      if (j === i) continue;
+      // All of its points inside the other, or none of them: one or two is a
+      // contour across another.
+      let inside = 0;
+      for (const p of poly) if (windingOf(p, other) !== 0) inside += 1;
+      if (inside !== 0 && inside !== poly.length) return false;
+      if (inside !== 0) depth += 1;
+      else {
+        // None of its points inside the other, and none of the other's inside
+        // it: clear of each other if their boxes are, and not known to be if
+        // they are not. Two shapes can cross with every corner of each outside
+        // the other, and one can sit in the bay of another, where what counts
+        // as inside is the fill's to say and not this guess's.
+        let holds = 0;
+        for (const p of other) if (windingOf(p, poly) !== 0) holds += 1;
+        const mine = boxes[i]!;
+        const theirs = boxes[j]!;
+        const apart =
+          mine.maxX < theirs.minX ||
+          theirs.maxX < mine.minX ||
+          mine.maxY < theirs.minY ||
+          theirs.maxY < mine.minY;
+        if (holds === 0 && !apart) return false;
+      }
+    }
+
+    const at = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const nx = (-(b.y - a.y) / length) * HAIR;
+    const ny = ((b.x - a.x) / length) * HAIR;
+    sides.push([
+      { x: at.x + nx, y: at.y + ny },
+      { x: at.x - nx, y: at.y - ny },
+    ]);
+    depths.push(depth);
+    turns.push(area > 0 ? 1 : -1);
+  }
+
+  // Turned by nesting, a contour runs one way at an even depth and the other at
+  // an odd: whether each already does, and so whether it would be turned.
+  const kept = turns.map((turn, i) => (turn === (depths[i]! % 2 === 0 ? 1 : -1) ? 1 : -1));
+
+  for (const pair of sides) {
+    for (const p of pair) {
+      let asWound = 0;
+      let asNested = 0;
+      for (const [j, poly] of polys.entries()) {
+        const w = windingOf(p, poly);
+        asWound += w;
+        asNested += kept[j]! * w;
+      }
+      if ((asWound !== 0) !== (asNested !== 0)) return false;
+    }
+  }
+  return true;
+}
+
+/** How far to either side of a contour the cheap answer looks, in units. */
+const HAIR = 0.01;
+
+/**
+ * Whether filling these by nesting is filling them as they wind: whether,
+ * turned by their nesting, they are the ink they were.
+ */
+function windsAsItNests(contours: readonly Contour[]): boolean {
+  const turned = correctDirections(contours);
+  return turned === contours || sameInk(contours, turned);
+}
+
+/**
+ * Whether two sets of outlines are the same ink, by the non-zero rule.
+ *
+ * Asked of the ink rather than of the outlines, which may be cut quite
+ * differently and fill the same. Every region of either has some contour of
+ * one of them for an edge, so each side of every contour of both is asked, at
+ * three places along each segment, and the two have to agree at all of them.
+ *
+ * It is what says a union did what a union does. That is worth asking: the
+ * search for where curves cross can come back with a glyph in pieces, and
+ * neither a font read in nor a font written out should take its word.
+ *
+ * `allowed` is how many places in a hundred may differ and the ink still be
+ * called the same: none, for a question about the drawing as it stands; a few,
+ * of a union, which closes the hairline between two shapes set flush.
+ */
+export function sameInk(a: readonly Contour[], b: readonly Contour[], allowed = 0): boolean {
+  const closed = (c: Contour): boolean => c.closed && c.nodes.length >= 2;
+  const one = a.filter(closed);
+  const other = b.filter(closed);
+  const reach = PROBE * tolerance([...one, ...other]);
+
+  // Flattened more coarsely than a union wants, and each with its box: a place
+  // outside a contour's box is not wound round by it.
+  const boxed = (contours: readonly Contour[]) =>
+    contours.map((c) => {
+      const points: Vec2[] = [];
+      for (let i = 0; i < segmentCount(c); i++) {
+        const segment = segmentAt(c, i);
+        if (segment !== null)
+          points.push(...flatten(segmentCubic(segment), reach / 2).slice(0, -1));
+      }
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      for (const p of points) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+      return { points, minX, minY, maxX, maxY };
+    });
+  const first = boxed(one);
+  const second = boxed(other);
+  const inked = (p: Vec2, outlines: typeof first): boolean => {
+    let winding = 0;
+    for (const o of outlines) {
+      if (p.x < o.minX || p.x > o.maxX || p.y < o.minY || p.y > o.maxY) continue;
+      winding += windingOf(p, o.points);
+    }
+    return winding !== 0;
+  };
+
+  let asked = 0;
+  let differ = 0;
+  for (const c of [...one, ...other]) {
+    for (let i = 0; i < segmentCount(c); i++) {
+      const segment = segmentAt(c, i);
+      if (segment === null) continue;
+      const cubic = segmentCubic(segment);
+      for (const t of [0.25, 0.5, 0.75]) {
+        const before = evaluate(cubic, t - 0.05);
+        const after = evaluate(cubic, t + 0.05);
+        const length = Math.hypot(after.x - before.x, after.y - before.y);
+        // A segment of no length has no side to be on.
+        if (length === 0) continue;
+        const at = evaluate(cubic, t);
+        const nx = (-(after.y - before.y) / length) * reach;
+        const ny = ((after.x - before.x) / length) * reach;
+        for (const p of [
+          { x: at.x + nx, y: at.y + ny },
+          { x: at.x - nx, y: at.y - ny },
+        ]) {
+          asked += 1;
+          if (inked(p, first) !== inked(p, second)) {
+            differ += 1;
+            if (allowed === 0) return false;
+          }
+        }
+      }
+    }
+  }
+  return differ * 100 <= asked * allowed;
+}
+
+/** Whether a contour has ink on one side of it and none on the other. */
+function isEdge(c: Contour, outlines: readonly Vec2[][], eps: number): boolean {
+  const reach = PROBE * eps;
+  for (let i = 0; i < segmentCount(c); i++) {
+    const segment = segmentAt(c, i);
+    if (segment === null) continue;
+    const cubic = segmentCubic(segment);
+    const before = evaluate(cubic, 0.45);
+    const after = evaluate(cubic, 0.55);
+    const length = Math.hypot(after.x - before.x, after.y - before.y);
+    // A segment of no length has no side to be on; the next one has.
+    if (length === 0) continue;
+    const at = evaluate(cubic, 0.5);
+    const nx = (-(after.y - before.y) / length) * reach;
+    const ny = ((after.x - before.x) / length) * reach;
+    return (
+      filled({ x: at.x + nx, y: at.y + ny }, outlines) !==
+      filled({ x: at.x - nx, y: at.y - ny }, outlines)
+    );
+  }
+  return false;
+}
 
 /** Whether a point is inside the shape, by the non-zero rule. */
 function filled(p: Vec2, outlines: readonly Vec2[][]): boolean {

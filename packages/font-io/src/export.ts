@@ -13,8 +13,10 @@ import {
   kernIndex,
   newGlyphAdvance,
   orderedGlyphs,
+  HAIRLINES,
   isEmptyContour,
   removeOverlap,
+  sameInk,
   resolveGlyphComponents,
   segments,
   inkOf,
@@ -203,10 +205,22 @@ function unioned(
   // Components are already resolved into `contours`; passing them again would
   // draw each of them twice.
   const union = removeOverlap({ ...g, contours, components: [] }, ids);
-  if (union !== null) return union.glyph.contours;
+  if (union === null) {
+    warnings.push(
+      `${g.name}: contours overlap along an edge and could not be joined, so the overlap is in the font.`,
+    );
+    return contours;
+  }
+  if (union.crossings === 0) return union.glyph.contours;
 
+  // Joined, and asked whether what was made is the ink it was made of. The
+  // search for where curves cross can come back with a glyph in pieces — a
+  // clock that was a ring and two hands, written out as two slivers — and a
+  // font with an overlap in it draws as it should nearly everywhere, where a
+  // font with a glyph missing does not.
+  if (sameInk(contours, union.glyph.contours, HAIRLINES)) return union.glyph.contours;
   warnings.push(
-    `${g.name}: contours overlap along an edge and could not be joined, so the overlap is in the font.`,
+    `${g.name}: its overlapping contours could not be joined without changing its shape, so the overlap is in the font.`,
   );
   return contours;
 }

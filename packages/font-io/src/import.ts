@@ -17,6 +17,7 @@ import {
   setFixedPitch,
   setFontInfo,
   setKern,
+  nestedAsWound,
   setFeatures,
   setKernGroup,
   setKerning,
@@ -172,17 +173,28 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
       components.push(component(ids.component(), base, reference.transform));
     }
 
-    glyphs.push(
-      glyph(name, {
-        unicodes: g.unicodes,
-        advance: g.advance,
-        contours: contoursFromCommands(g.commands, ids, epsilon),
-        components,
-        anchors: (layout?.anchors.get(index) ?? []).map((a) =>
-          anchor(ids.anchor(), a.name, { x: a.x, y: a.y }),
-        ),
-      }),
-    );
+    const read = glyph(name, {
+      unicodes: g.unicodes,
+      advance: g.advance,
+      contours: contoursFromCommands(g.commands, ids, epsilon),
+      components,
+      anchors: (layout?.anchors.get(index) ?? []).map((a) =>
+        anchor(ids.anchor(), a.name, { x: a.x, y: a.y }),
+      ),
+    });
+    // A font file fills its outlines by which way they wind, and this editor
+    // by how they nest. Where a glyph is built of pieces that overlap, the two
+    // are different pictures, and it is redrawn as the one the file meant.
+    const drawn = nestedAsWound(read, ids);
+    if (drawn === null) {
+      warnings.push({
+        glyph: name,
+        message:
+          "Its contours overlap, and are filled here by how they nest rather than which way " +
+          "they wind: it may not look as it does in the font it came from.",
+      });
+    }
+    glyphs.push(drawn ?? read);
   });
 
   if (glyphs.length === 0) {
