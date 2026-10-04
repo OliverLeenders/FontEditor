@@ -474,8 +474,9 @@ export class Persistence {
   /** One snapshot as a document again, or `null` where it has gone. */
   async readSnapshot(
     at: number,
+    master?: string | null,
   ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
-    return (await this.client?.readSnapshot(at)) ?? null;
+    return (await this.client?.readSnapshot(at, master)) ?? null;
   }
 
   // ---- the masters that are not being drawn -------------------------------

@@ -231,8 +231,13 @@ export class StorageClient {
    */
   async readSnapshot(
     at: number,
+    master?: string | null,
   ): Promise<{ document: FontDocument; problems: readonly string[] } | null> {
-    const stored = (await this.send({ kind: "readSnapshot", at })) as StoredSnapshot | null;
+    const stored = (await this.send({
+      kind: "readSnapshot",
+      at,
+      ...(master === undefined ? {} : { master }),
+    })) as StoredSnapshot | null;
     return stored === null ? null : documentOf(stored);
   }
 

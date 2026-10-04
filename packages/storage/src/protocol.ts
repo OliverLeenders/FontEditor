@@ -77,7 +77,13 @@ export type StorageRequest =
    */
   | { readonly id: number; readonly kind: "snapshot"; readonly snapshot: StoredSnapshot }
   | { readonly id: number; readonly kind: "snapshots" }
-  | { readonly id: number; readonly kind: "readSnapshot"; readonly at: number }
+  | {
+      readonly id: number;
+      readonly kind: "readSnapshot";
+      readonly at: number;
+      /** The master it is a copy of, where the time alone may not say which. */
+      readonly master?: string | null;
+    }
   /**
    * The pictures a font is traced from.
    *

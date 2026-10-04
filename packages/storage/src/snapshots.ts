@@ -170,10 +170,21 @@ export async function pruneSnapshots(
  *
  * A snapshot that will not parse is treated as gone rather than thrown: it is a
  * copy, and the answer to a corrupt copy is the next one down the list.
+ *
+ * By its time and the master it is of. The time alone is not which copy: two
+ * masters can each have one kept in the same millisecond, and asked for by
+ * time the first found was put back, which was as often the other master's.
+ * Without a master said, it is the first at that time, as it always was.
  */
-export async function readSnapshot(store: FileStore, at: number): Promise<StoredSnapshot | null> {
+export async function readSnapshot(
+  store: FileStore,
+  at: number,
+  master?: string | null,
+): Promise<StoredSnapshot | null> {
   const entries = await listSnapshots(store);
-  const wanted = entries.find((entry) => entry.at === at);
+  const wanted = entries.find(
+    (entry) => entry.at === at && (master === undefined || entry.master === master),
+  );
   if (wanted === undefined) return null;
 
   const text = await store.read(pathOf(wanted));

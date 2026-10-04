@@ -109,18 +109,30 @@ export class Snapshots {
    * silently swapped the whole font back would be alarming, and the history it
    * restored would describe glyphs that are no longer open.
    */
-  async restore(at: number): Promise<{ glyphs: number; problems: readonly string[] } | null> {
+  async restore(
+    at: number,
+    master?: string | null,
+  ): Promise<{ glyphs: number; problems: readonly string[] } | null> {
+    // Which copy, where the time does not say: two masters can each have one
+    // kept in the same millisecond. The one named; or, with none named, the
+    // open master's before one that does not say whose it is, before another's.
+    const project = this.host.state().project;
+    const kept = this.host
+      .state()
+      .snapshots.filter((it) => it.at === at && (master === undefined || it.master === master));
+    const entry =
+      kept.find((it) => it.master === project.current) ??
+      kept.find((it) => copyOfOpenMaster(it, project)) ??
+      kept[0];
     // A copy of another master is that master's drawing, and put back here it
     // would make this master a second one of that. The list does not offer
     // one; this is for a list that was read before a master was gone to.
-    const entry = this.host.state().snapshots.find((it) => it.at === at);
-    const project = this.host.state().project;
     if (entry !== undefined && !copyOfOpenMaster(entry, project)) {
       const other = project.masters.find((m) => m.id === entry.master)?.name ?? "another master";
       throw new Error(`That is a copy of ${other}. Go to that master to put it back.`);
     }
 
-    const found = await this.host.disk.readSnapshot(at);
+    const found = await this.host.disk.readSnapshot(at, entry?.master ?? master);
     if (found === null) return null;
 
     await this.keep(this.host.state().session.editor.document);

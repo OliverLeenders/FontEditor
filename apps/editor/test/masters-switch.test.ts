@@ -1,4 +1,4 @@
-import { describe, expect, it, onTestFinished } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { FakeFolder } from "../../../packages/disk/test/fake-folder.js";
 import { installFakeIdb } from "../../../packages/disk/test/fake-idb.js";
@@ -341,6 +341,36 @@ describe("copies of the font, in a font drawn more than once", () => {
     expect(drawing(again)).toBe("# the bold");
     await again.switchMaster(regular);
     expect(drawing(again)).toBe("# the regular");
+  });
+
+  it("puts back this master's copy where another's was kept in the same millisecond", async () => {
+    const { store, regular } = await twoMasters(new MemoryFileStore());
+
+    // One moment, for both: a copy was asked for by its time alone, and the
+    // first found at that time was as often the other master's.
+    const at = 5_000_000_000_000;
+    const clock = vi.spyOn(Date, "now").mockReturnValue(at);
+    onTestFinished(() => {
+      clock.mockRestore();
+    });
+    await store.switchMaster(regular);
+    await store.snapshot();
+    await store.switchMaster("bold");
+    await store.snapshot();
+    clock.mockRestore();
+    expect(store.getState().snapshots.filter((it) => it.at === at)).toHaveLength(2);
+
+    draw(store, "# the bold, spoiled");
+    await store.restoreSnapshot(at);
+    expect(drawing(store)).toBe("# the bold");
+
+    await store.switchMaster(regular);
+    draw(store, "# the regular, spoiled");
+    await store.restoreSnapshot(at);
+    expect(drawing(store)).toBe("# the regular");
+
+    // And named outright, as the list names it, the other master's is refused.
+    await expect(store.restoreSnapshot(at, "bold")).rejects.toThrow(/copy of Bold/);
   });
 
   it("offers a copy from before there was a second master to either", async () => {

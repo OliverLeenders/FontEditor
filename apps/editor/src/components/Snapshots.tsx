@@ -34,11 +34,11 @@ export function Snapshots(): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
 
-  const restore = async (at: number): Promise<void> => {
+  const restore = async (at: number, master: string | null): Promise<void> => {
     setBusy(true);
     setSaid(null);
     try {
-      const done = await store.restoreSnapshot(at);
+      const done = await store.restoreSnapshot(at, master);
       setSaid(
         done === null
           ? "That copy has gone."
@@ -86,7 +86,7 @@ export function Snapshots(): React.JSX.Element {
       ) : (
         <ul className={styles.list}>
           {entries.map((entry) => (
-            <li key={entry.at} className={styles.row}>
+            <li key={`${String(entry.at)} ${entry.master ?? ""}`} className={styles.row}>
               <span className={styles.when}>{when(entry.at)}</span>
               <span className={styles.size}>{entry.glyphs} glyphs</span>
               <button
@@ -98,7 +98,7 @@ export function Snapshots(): React.JSX.Element {
                     ? "Another tab is saving this project"
                     : "Put this copy back, keeping the one that is open"
                 }
-                onClick={() => void restore(entry.at)}
+                onClick={() => void restore(entry.at, entry.master)}
               >
                 <RotateCcwIcon />
                 Restore

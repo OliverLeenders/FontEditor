@@ -332,7 +332,7 @@ async function runOn(
       return await listSnapshots(required());
 
     case "readSnapshot":
-      return await readSnapshot(required(), request.at);
+      return await readSnapshot(required(), request.at, request.master);
 
     case "clearJournal":
       await clearJournal(required());

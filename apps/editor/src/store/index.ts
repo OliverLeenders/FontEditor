@@ -400,8 +400,10 @@ export class EditorStore {
   /** Put an older copy of the font back on screen and on disk. */
   async restoreSnapshot(
     at: number,
+    /** The master it is a copy of, as the list has it: see `restore`. */
+    master?: string | null,
   ): Promise<{ glyphs: number; problems: readonly string[] } | null> {
-    return await this.snapshots.restore(at);
+    return await this.snapshots.restore(at, master);
   }
 
   /** Change something that is not the document — the camera, or which glyph. */
