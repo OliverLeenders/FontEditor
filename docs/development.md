@@ -92,6 +92,27 @@ pnpm typecheck
 The same checks run on every push, with fontTools and FreeType reading and drawing what the
 exporter writes; see `.github/workflows/ci.yml`.
 
+### The editor in a browser
+
+`pnpm test` runs the store against storage made of a Map. What that cannot say is whether
+the built editor keeps a font in a real browser's storage, so a second, smaller suite does
+what a person does — opens the sample font, edits it, reloads, closes the tab, opens a second
+one, adds a master, exports, imports a font of four thousand glyphs — in a headless Chromium:
+
+```bash
+pnpm test:browser
+```
+
+This builds the editor, serves the build on port 4317 under the content security policy the
+desktop window has, and runs `apps/editor/browser/*.test.ts`. Each test begins with an empty
+profile. It needs the Chromium described below, and is a job of its own in CI.
+
+Opening and saving a folder is not covered: the browser's folder picker cannot be driven, and
+a stand-in for it would test the stand-in.
+
+The large font is Material Symbols Outlined, in `apps/editor/browser/fixtures/` with its
+licence (Apache 2.0). It is read by the tests and is in nothing that is shipped.
+
 ### Pictures of the editor
 
 A change to a stylesheet passes every test whether or not it looks right. To look instead:

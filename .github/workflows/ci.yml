@@ -61,6 +61,34 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # The built editor, in a browser.
+  #
+  # The suite above runs the store against storage made of a Map, which is most
+  # of what can go wrong and none of what a browser adds: its own storage kept
+  # across a reload, the worker as it is bundled, a tab closed with nothing
+  # asked of it, two tabs and the lock between them. The first time these ran
+  # they found a font called saved that was not yet written.
+  #
+  # Chromium only, and headless: it is the engine the browser build is offered
+  # for, since the others have no way to open a folder.
+  browser:
+    name: In a browser
+    runs-on: ubuntu-latest
+    env:
+      # Playwright's Chromium inside node_modules, where the tests look for it.
+      PLAYWRIGHT_BROWSERS_PATH: "0"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Fetch Chromium, and the libraries it wants
+        run: pnpm --filter @typewright/editor exec playwright install --with-deps --only-shell chromium
+      - run: pnpm test:browser
+
   # The two things this repository actually ships, built.
   #
   # Neither is covered by the suite above: the tests import TypeScript source
