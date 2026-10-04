@@ -191,7 +191,8 @@ export function App(): React.JSX.Element {
         // Saving the page is never what somebody wants from a font editor.
         event.preventDefault();
         if (!canOpenFolders() || !store.canSaveToFolder) return;
-        void store.saveToFolder();
+        // What went wrong is in the store, where the File menu says it.
+        void store.saveToFolder().catch(() => undefined);
         return;
       }
 
@@ -380,7 +381,7 @@ export function App(): React.JSX.Element {
 
       // Copies left by fonts forgotten while another window had them open. Not
       // awaited: nothing on screen waits for it.
-      void store.sweepForgotten();
+      void store.sweepForgotten().catch(() => undefined);
 
       if (arrival.kind === "choose") {
         // The worker goes with the list: a font file or a folder opened from it

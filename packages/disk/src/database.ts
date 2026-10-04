@@ -39,6 +39,72 @@ export async function inStore(store: string, mode: IDBTransactionMode, run: Run)
 }
 
 /**
+ * Change one record where it is: read and written in a single transaction.
+ *
+ * A record read with one request and written back with another is two
+ * transactions, and whatever was written between them is undone by the second —
+ * by this tab, which does several things at once, or by another window. Here
+ * the write is asked for while the read's transaction is still open, so nothing
+ * comes between the two.
+ *
+ * `change` answers with the record to keep, or `undefined` to leave it as it
+ * is. Resolves with what was written, or `null` where nothing was.
+ */
+export async function changeInStore(
+  store: string,
+  key: string,
+  change: (found: unknown) => unknown,
+): Promise<unknown> {
+  const factory = (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  if (factory === undefined) return null;
+
+  return await new Promise<unknown>((resolve) => {
+    let open: IDBOpenDBRequest;
+    try {
+      open = factory.open(DATABASE, VERSION);
+    } catch {
+      resolve(null);
+      return;
+    }
+
+    open.onupgradeneeded = () => {
+      for (const name of STORES) {
+        if (!open.result.objectStoreNames.contains(name)) open.result.createObjectStore(name);
+      }
+    };
+    open.onerror = () => resolve(null);
+    open.onsuccess = () => {
+      const opened = open.result;
+      const done = (value: unknown): void => {
+        opened.close();
+        resolve(value);
+      };
+      try {
+        const records = opened.transaction(store, "readwrite").objectStore(store);
+        const read = records.get(key);
+        read.onerror = () => done(null);
+        read.onsuccess = () => {
+          try {
+            const next = change((read.result as unknown) ?? null);
+            if (next === undefined) {
+              done(null);
+              return;
+            }
+            const write = records.put(next, key);
+            write.onerror = () => done(null);
+            write.onsuccess = () => done(next);
+          } catch {
+            done(null);
+          }
+        };
+      } catch {
+        done(null);
+      }
+    };
+  });
+}
+
+/**
  * The same, against a database named outright.
  *
  * Only the migration from the editor's former name needs this, and it needs it

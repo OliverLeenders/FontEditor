@@ -8,6 +8,7 @@ import {
   projectById,
   saveProject,
   touchProject,
+  updateProject,
 } from "@typewright/disk";
 
 import { deleteWorkingCopy, forgottenCopies, workingCopies } from "@typewright/storage";
@@ -105,7 +106,7 @@ export async function noteProjects(host: FontHost, current: string | null): Prom
   const { familyName, styleName } = host.state().session.editor.document.info;
   const named = `${familyName} ${styleName}`.trim();
   if (named !== "" && named !== project.name) {
-    await saveProject({ ...project, name: named, openedAt: Date.now() });
+    await updateProject(current, (it) => ({ ...it, name: named, openedAt: Date.now() }));
     host.patch({
       projects: {
         ...host.state().projects,
@@ -258,10 +259,16 @@ export async function forgetProject(host: FontHost, id: string): Promise<void> {
  * this copy" would then be true of every copy there is.
  */
 export async function sweepForgotten(): Promise<void> {
+  // The copies first, and then the fonts. A font is put on the list before its
+  // copy is made, so a copy found here whose font is not on a list read
+  // afterwards has none. The other way round, a font started in another window
+  // between the two readings was a copy with no font: its copy was deleted as
+  // it was being written.
+  const copies = await workingCopies();
   const known = new Set((await listProjects()).map((it) => it.id));
   if (known.size === 0) return;
 
-  for (const name of forgottenCopies(await workingCopies(), known)) {
+  for (const name of forgottenCopies(copies, known)) {
     await deleteWorkingCopy(name);
   }
 }

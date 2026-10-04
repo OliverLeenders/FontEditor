@@ -208,18 +208,28 @@ export async function addMaster(
       : (project.sources[of] ?? (await host.disk.getMaster(of))?.document);
   if (from === undefined) throw new Error(masterProblemSays("missing"));
 
-  const now = host.state().project;
-  const out = addToProject(
-    { ...now, sources: { ...now.sources, [of]: from } },
-    id,
-    name,
-    location,
-    now.current,
-  );
-  if (!isProject(out)) throw new Error(masterProblemSays(out));
+  const added = (): FontProject => {
+    const now = host.state().project;
+    const out = addToProject(
+      { ...now, sources: { ...now.sources, [of]: from } },
+      id,
+      name,
+      location,
+      now.current,
+    );
+    if (!isProject(out)) throw new Error(masterProblemSays(out));
+    return out;
+  };
+  // Asked before anything is written: a name or a place that is taken is
+  // refused with no file left behind.
+  added();
 
   // Parked at once, and the same document the project now holds for it.
   await host.disk.putMaster(id, from);
+  // And added to the project as it is by now. A large font is seconds in the
+  // parking, and the project as it was before them, put back, undid whatever
+  // was done meanwhile: a style named, an axis changed, a master renamed.
+  const out = added();
   host.patch({ project: out });
   noteMasterAdded(host, id);
   await rememberDesignspace(host, out);

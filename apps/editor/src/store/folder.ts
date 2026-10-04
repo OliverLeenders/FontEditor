@@ -4,9 +4,9 @@ import {
   type ProjectRecord,
   type RememberedFolder,
   newProject,
-  projectById,
   projectFor,
   saveProject,
+  updateProject,
   accessTo,
   askAccess,
   forgetFolder,
@@ -148,7 +148,13 @@ async function adoptFolder(host: FontHost, folder: DiskFolder): Promise<FolderRe
   await adoptImages(host, read.images);
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
-  await saveProject({ ...project, name: nameOf(read.document, folder), folder });
+  // The record as it is by now: it was read before the font was, and has been
+  // touched since — by being opened, for one.
+  await updateProject(project.id, (it) => ({
+    ...it,
+    name: nameOf(read.document, folder),
+    folder,
+  }));
 
   host.patch({ folder: { ...host.state().folder, saved: read.document, savedAt: null } });
 
@@ -208,13 +214,13 @@ async function adoptFamilyFolder(
 
   host.setFolder(folder, folder.name);
   await rememberFolder(folder);
-  await saveProject({
-    ...project,
+  await updateProject(project.id, (it) => ({
+    ...it,
     name: nameOf(opened.document, folder),
     folder,
     family: true,
     unsavedMasters: [],
-  });
+  }));
   host.patch({
     folder: {
       ...host.state().folder,
@@ -417,19 +423,19 @@ async function writeTo(host: FontHost, folder: DiskFolder): Promise<SaveReport> 
     // last save to whenever the project was first recorded, and unable to say
     // whether the font on screen was the one on disk.
     const current = host.state().projects.current;
-    const project = current === null ? null : await projectById(current);
-    if (project !== null) {
+    if (current !== null) {
       const wrote = [...written.wrote];
-      await saveProject({
+      const savedAt = host.state().folder.savedAt;
+      await updateProject(current, (project) => ({
         ...project,
         folder,
         name: nameOf(document, folder),
-        savedAt: host.state().folder.savedAt,
+        savedAt,
         savedHash: hashOfWritten(wrote),
         wrote,
         family,
         unsavedMasters: [],
-      });
+      }));
     }
 
     return {

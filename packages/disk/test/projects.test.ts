@@ -12,6 +12,7 @@ import {
   projectFor,
   saveProject,
   touchProject,
+  updateProject,
 } from "../src/projects.js";
 import { rememberFolder } from "../src/remember.js";
 import { type FakeFactory, installFakeIdb } from "./fake-idb.js";
@@ -67,6 +68,28 @@ describe("the project list", () => {
 
     await touchProject("a", 400);
     expect((await listProjects())[0]?.name).toBe("Older");
+  });
+
+  it("changes a record as it stands, so changes begun together are all kept", async () => {
+    await saveProject({ ...newProject("One"), id: "a", openedAt: 100 });
+
+    // Each says only what it changes. Read and written back whole, the last of
+    // them to finish undid the others.
+    await Promise.all([
+      updateProject("a", (it) => ({ ...it, name: "Renamed" })),
+      touchProject("a", 500),
+      updateProject("a", (it) => ({ ...it, unsavedMasters: ["bold"] })),
+    ]);
+
+    const now = await projectById("a");
+    expect(now?.name).toBe("Renamed");
+    expect(now?.openedAt).toBe(500);
+    expect(now?.unsavedMasters).toEqual(["bold"]);
+  });
+
+  it("changes nothing where there is no record, and makes none", async () => {
+    expect(await updateProject("gone", (it) => ({ ...it, name: "Made" }))).toBeNull();
+    expect(await listProjects()).toEqual([]);
   });
 
   it("forgets one on request, and leaves the rest", async () => {

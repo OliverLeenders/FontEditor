@@ -2,9 +2,8 @@ import {
   type DiskFolder,
   type WrittenFile,
   hashOfWritten,
-  projectById,
   readFolder,
-  saveProject,
+  updateProject,
   textAt,
   writeFolder,
 } from "@typewright/disk";
@@ -412,11 +411,11 @@ export function noteDesignspace(host: FontHost): void {
 async function rememberUnsaved(host: StoreHost): Promise<void> {
   const current = host.state().projects.current;
   if (current === null) return;
+  // As the folder stands now, not as it does once the record has been read:
+  // two of these begun together are written in the order they were asked for.
+  const { family, others } = host.state().folder;
   try {
-    const record = await projectById(current);
-    if (record === null) return;
-    const folder = host.state().folder;
-    await saveProject({ ...record, family: folder.family, unsavedMasters: folder.others });
+    await updateProject(current, (record) => ({ ...record, family, unsavedMasters: others }));
   } catch {
     // A record that could not be written leaves the folder thought to be up to
     // date next time, for the masters not open; the open one is asked afresh.

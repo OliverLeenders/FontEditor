@@ -7,33 +7,72 @@
  * is real, though — every request settles in a later microtask, because the
  * code under test assigns its handlers after the call returns, and a fake that
  * settled synchronously would never run them.
+ *
+ * So are the transactions. One begins when the one before it on the database
+ * has finished, and has finished when a request of its own has settled with no
+ * other asked for: a record read in one is not read in the next until whatever
+ * the first went on to write is written. A fake without that would call two
+ * transactions begun together a race that a real database does not have.
  */
 
-function settled(result: unknown): unknown {
-  const request = { result, onsuccess: null as null | (() => void), onerror: null };
-  queueMicrotask(() => request.onsuccess?.());
-  return request;
+type FakeRequest = { result: unknown; onsuccess: null | (() => void); onerror: null };
+
+class FakeTransaction {
+  private pending = 0;
+  private finish: () => void = () => undefined;
+  readonly done = new Promise<void>((resolve) => {
+    this.finish = resolve;
+  });
+
+  constructor(private readonly begun: Promise<void>) {
+    // One that asked for nothing is over as soon as it began.
+    queueMicrotask(() => {
+      if (this.pending === 0) this.finish();
+    });
+  }
+
+  request(run: () => unknown): FakeRequest {
+    const request: FakeRequest = { result: undefined, onsuccess: null, onerror: null };
+    this.pending += 1;
+    void this.begun.then(() => {
+      request.result = run();
+      queueMicrotask(() => {
+        // Whatever this asks for next is asked for before the count is taken.
+        request.onsuccess?.();
+        this.pending -= 1;
+        if (this.pending === 0) this.finish();
+      });
+    });
+    return request;
+  }
 }
 
 export class FakeStore {
-  constructor(private readonly data: Map<string, unknown>) {}
+  constructor(
+    private readonly data: Map<string, unknown>,
+    private readonly within: FakeTransaction,
+  ) {}
 
   get(key: string): unknown {
-    return settled(this.data.get(key) ?? null);
+    return this.within.request(() => this.data.get(key) ?? null);
   }
 
   getAll(): unknown {
-    return settled([...this.data.values()]);
+    return this.within.request(() => [...this.data.values()]);
   }
 
   put(value: unknown, key: string): unknown {
-    this.data.set(key, value);
-    return settled(null);
+    return this.within.request(() => {
+      this.data.set(key, value);
+      return null;
+    });
   }
 
   delete(key: string): unknown {
-    this.data.delete(key);
-    return settled(null);
+    return this.within.request(() => {
+      this.data.delete(key);
+      return null;
+    });
   }
 }
 
@@ -55,8 +94,13 @@ export class FakeDatabase {
     return found;
   }
 
+  /** When the last transaction begun here has finished. */
+  private last: Promise<void> = Promise.resolve();
+
   transaction(_name: string, _mode: string): { objectStore: (name: string) => FakeStore } {
-    return { objectStore: (name) => new FakeStore(this.store(name)) };
+    const within = new FakeTransaction(this.last);
+    this.last = within.done;
+    return { objectStore: (name) => new FakeStore(this.store(name), within) };
   }
 
   close(): void {}

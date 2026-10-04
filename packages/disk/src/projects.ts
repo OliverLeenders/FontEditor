@@ -1,4 +1,4 @@
-import { PROJECTS, inStore } from "./database.js";
+import { PROJECTS, changeInStore, inStore } from "./database.js";
 import type { WrittenFile } from "./folder.js";
 import type { DiskFolder } from "./handles.js";
 import { recallFolder } from "./remember.js";
@@ -177,11 +177,33 @@ export async function dropProject(id: string): Promise<void> {
   await inStore(PROJECTS, "readwrite", (store) => store.delete(id));
 }
 
+/**
+ * Change a record as it stands, whatever else is changing it.
+ *
+ * What every change to a record that exists goes through. A record is several
+ * things kept by several parts of the editor — when it was opened, what it is
+ * called, what the last save left in its folder, which masters that folder
+ * lacks — and each used to read the record, wait, and write the whole of it
+ * back: a folder opened again was put back with the time it was opened before,
+ * because the record had been read before the font was, and written after.
+ * Here each says only what it changes, of the record as it is at that moment.
+ *
+ * Answers with the record as written, or `null` where there is none to change.
+ */
+export async function updateProject(
+  id: string,
+  change: (project: ProjectRecord) => ProjectRecord,
+): Promise<ProjectRecord | null> {
+  const written = await changeInStore(PROJECTS, id, (found) => {
+    const project = asProject(found);
+    return project === null ? undefined : change(project);
+  });
+  return asProject(written);
+}
+
 /** Say a project was opened now, so it sorts to the front next time. */
 export async function touchProject(id: string, at: number = Date.now()): Promise<void> {
-  const project = await projectById(id);
-  if (project === null) return;
-  await saveProject({ ...project, openedAt: at });
+  await updateProject(id, (project) => ({ ...project, openedAt: at }));
 }
 
 /**

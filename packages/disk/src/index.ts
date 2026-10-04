@@ -36,4 +36,5 @@ export {
   projectFor,
   saveProject,
   touchProject,
+  updateProject,
 } from "./projects.js";
