@@ -844,6 +844,10 @@ export type CurveMeeting = {
  * prune nothing, so every branch survives and the search would not end.
  */
 const MEET_TOLERANCE = 0.002;
+/** As many places as two different cubics can cross in: Bézout's nine. */
+const MOST_MEETINGS = 9;
+/** How near two meetings found are to be one meeting found twice. */
+const SAME_MEETING = 0.05;
 const MEET_DEPTH = 44;
 const MEET_BUDGET = 50_000;
 
@@ -870,12 +874,16 @@ export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
   // across their shared edge — and the search below can only find that out by
   // running out of its budget, fifty thousand steps later. Asked directly, it is a
   // handful of cross products.
-  if (straightAlong(a, b)) return null;
+  //
+  // Asked after whether they are anywhere near each other, which nearly every
+  // pair a union asks about is not: two that lie along each other have boxes
+  // that touch, so the answer is the same in either order, and this order is
+  // four comparisons for the many where the other was a dozen cross products.
+  //
   // Curves whose control points' boxes do not touch cannot meet, since each curve
-  // lies inside its own control points' hull. Most pairs a union asks about are
-  // nowhere near each other, and this is four comparisons where the search below
-  // would work out two exact bounding boxes first.
+  // lies inside its own control points' hull.
   if (apart(a, b)) return [];
+  if (straightAlong(a, b)) return null;
 
   const found: CurveMeeting[] = [];
   let steps = 0;
@@ -884,24 +892,33 @@ export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
   // narrowing does not follow an assignment made inside a closure.
   const ran = { out: false };
 
-  const search = (a0: number, a1: number, b0: number, b1: number, depth: number): void => {
+  // The piece of each curve is handed down with its parameters, halved as the
+  // search halves them, rather than cut out of the whole curve again at every
+  // step: that was four subdivisions a step where half of one will do, and it
+  // was most of the time a font of four thousand glyphs took to export.
+  const search = (
+    pa: Cubic,
+    a0: number,
+    a1: number,
+    pb: Cubic,
+    b0: number,
+    b1: number,
+    depth: number,
+  ): void => {
     if (ran.out) return;
     if (++steps > MEET_BUDGET) {
       ran.out = true;
       return;
     }
 
-    const ba = bounds(subcurve(a, a0, a1));
-    const bb = bounds(subcurve(b, b0, b1));
+    // The boxes round the control points first. A curve is inside its own, so
+    // two of those that miss are two exact boxes that miss, found without
+    // looking for either curve's extrema.
+    if (apartBy(controlBounds(pa), controlBounds(pb), MEET_TOLERANCE)) return;
 
-    if (
-      ba.maxX < bb.minX - MEET_TOLERANCE ||
-      bb.maxX < ba.minX - MEET_TOLERANCE ||
-      ba.maxY < bb.minY - MEET_TOLERANCE ||
-      bb.maxY < ba.minY - MEET_TOLERANCE
-    ) {
-      return;
-    }
+    const ba = bounds(pa);
+    const bb = bounds(pb);
+    if (apartBy(ba, bb, MEET_TOLERANCE)) return;
 
     const spanA = Math.max(ba.maxX - ba.minX, ba.maxY - ba.minY);
     const spanB = Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY);
@@ -911,10 +928,19 @@ export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
       const point = evaluate(a, t1);
       // Two boxes that both shrank to nothing around the same place are one
       // crossing found twice, not two crossings.
-      if (found.some((seen) => Math.hypot(seen.point.x - point.x, seen.point.y - point.y) < 0.05)) {
+      if (
+        found.some(
+          (seen) => Math.hypot(seen.point.x - point.x, seen.point.y - point.y) < SAME_MEETING,
+        )
+      ) {
         return;
       }
       found.push({ t1, t2: (b0 + b1) / 2, point });
+      // Two cubics that are not one curve cross in nine places at most. More
+      // than that is one place after another along a stretch they share, which
+      // is the answer the budget below would come to fifty thousand steps
+      // later — and did, for every pair of curves that run together.
+      if (found.length > MOST_MEETINGS) ran.out = true;
       return;
     }
 
@@ -927,19 +953,28 @@ export function intersectCubics(a: Cubic, b: Cubic): CurveMeeting[] | null {
 
     if (spanA >= spanB) {
       const m = (a0 + a1) / 2;
-      search(a0, m, b0, b1, depth + 1);
-      search(m, a1, b0, b1, depth + 1);
+      const [near, far] = split(pa, 0.5);
+      search(near, a0, m, pb, b0, b1, depth + 1);
+      search(far, m, a1, pb, b0, b1, depth + 1);
     } else {
       const m = (b0 + b1) / 2;
-      search(a0, a1, b0, m, depth + 1);
-      search(a0, a1, m, b1, depth + 1);
+      const [near, far] = split(pb, 0.5);
+      search(pa, a0, a1, near, b0, m, depth + 1);
+      search(pa, a0, a1, far, m, b1, depth + 1);
     }
   };
 
-  search(0, 1, 0, 1, 0);
+  search(a, 0, 1, b, 0, 1, 0);
   if (ran.out) return null;
 
   return found.sort((l, r) => l.t1 - r.t1);
+}
+
+/** Whether two boxes are further apart than a tolerance, on either axis. */
+function apartBy(l: Rect, r: Rect, by: number): boolean {
+  return (
+    l.maxX < r.minX - by || r.maxX < l.minX - by || l.maxY < r.minY - by || r.maxY < l.minY - by
+  );
 }
 
 /**
@@ -972,16 +1007,7 @@ function straightAlong(a: Cubic, b: Cubic): boolean {
 
 /** Whether two cubics' control-point boxes are further apart than the meeting tolerance. */
 function apart(a: Cubic, b: Cubic): boolean {
-  const ax = [a.a.x, a.c1.x, a.c2.x, a.b.x];
-  const ay = [a.a.y, a.c1.y, a.c2.y, a.b.y];
-  const bx = [b.a.x, b.c1.x, b.c2.x, b.b.x];
-  const by = [b.a.y, b.c1.y, b.c2.y, b.b.y];
-  return (
-    Math.max(...ax) < Math.min(...bx) - MEET_TOLERANCE ||
-    Math.max(...bx) < Math.min(...ax) - MEET_TOLERANCE ||
-    Math.max(...ay) < Math.min(...by) - MEET_TOLERANCE ||
-    Math.max(...by) < Math.min(...ay) - MEET_TOLERANCE
-  );
+  return apartBy(controlBounds(a), controlBounds(b), MEET_TOLERANCE);
 }
 
 /** Whether a cubic is a straight segment: both handles on the line between its ends. */
