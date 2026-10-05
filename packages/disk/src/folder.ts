@@ -163,10 +163,12 @@ export type WriteOptions = {
  *
  * Deleting is the part that needs a rule, because the folder is the user's and
  * may hold things this editor knows nothing about — a `data` directory, a
- * second layer, a designspace beside it. The rule is: only `.glif` files, only
- * in the default layer, and only ones the *previous* save listed in
- * `contents.plist`. A glyph that was deleted in the editor therefore stops
- * existing on disk, and a file we never claimed to own is never touched.
+ * layer it was not told of, a designspace beside it. The rule is: only `.glif`
+ * files, only in a layer this save writes the list of, and only ones that
+ * layer's `contents.plist` listed before. A glyph that was deleted in the
+ * editor therefore stops existing on disk — in the layer it was deleted from,
+ * the drawing or a sketch behind it — and a file we never claimed to own is
+ * never touched.
  *
  * Anything else that looks stale is reported rather than removed. A note the
  * user can act on is worth more than a deletion they did not ask for.
@@ -178,8 +180,16 @@ export async function writeFolder(
 ): Promise<WriteReport> {
   const notes: string[] = [];
 
-  // Read before writing: both of these are files we are about to overwrite.
-  const before = glifsListed(await textAt(folder, "glyphs/contents.plist"));
+  // Read before writing: all of these are files we are about to overwrite.
+  // Each layer this save writes the list of, with the glyph files that list
+  // named before: the drawing, and every other layer the font has.
+  const before = new Map<string, Set<string>>();
+  for (const entry of entries) {
+    if (!entry.path.endsWith("/contents.plist")) continue;
+    const directory = entry.path.slice(0, -"/contents.plist".length);
+    if (directory.includes("/")) continue;
+    before.set(directory, glifsListed(await textAt(folder, entry.path)));
+  }
   const layer = defaultLayer(await textAt(folder, "layercontents.plist"));
   if (layer !== DEFAULT_LAYER_DIRECTORY) {
     notes.push(
@@ -228,24 +238,22 @@ export async function writeFolder(
     });
   }
 
-  const now = new Set(
-    entries
-      .filter((e) => e.path.startsWith("glyphs/") && e.path.endsWith(".glif"))
-      .map((e) => e.path.slice("glyphs/".length)),
-  );
+  const now = new Set(entries.map((e) => e.path));
 
   const removed: string[] = [];
-  if (before.size > 0) {
-    const glyphs = await folder.getDirectoryHandle("glyphs");
-    for (const file of before) {
-      if (now.has(file)) continue;
+  for (const [directory, listed] of before) {
+    const gone = [...listed].filter((file) => !now.has(`${directory}/${file}`));
+    if (gone.length === 0) continue;
+    const within = await folder.getDirectoryHandle(directory);
+    for (const file of gone) {
       try {
-        await glyphs.removeEntry(file);
-        removed.push(file);
+        await within.removeEntry(file);
+        // Named as it always was for the drawing, and by its layer for another.
+        removed.push(directory === "glyphs" ? file : `${directory}/${file}`);
       } catch {
         // Already gone, or the folder said no. Neither is worth failing a save
         // that has otherwise written every glyph.
-        notes.push(`could not remove glyphs/${file}`);
+        notes.push(`could not remove ${directory}/${file}`);
       }
     }
   }
