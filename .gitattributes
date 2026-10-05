@@ -4,3 +4,7 @@
 
 # Generated; keep it out of diffs and language statistics.
 pnpm-lock.yaml -diff linguist-generated=true
+
+# Real fonts the tests read, and their sources: kept byte for byte, line endings and all.
+fixtures/fonts/** -text
+fixtures/fonts/README.md text eol=lf

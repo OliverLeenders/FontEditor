@@ -14,7 +14,10 @@ const ORIGIN = `http://127.0.0.1:${String(PORT)}/`;
 
 /** Material Symbols Outlined: 4,042 glyphs, which is what a large font is here. */
 export const LARGE_FONT = fileURLToPath(
-  new URL("./fixtures/MaterialSymbolsOutlined_28pt-Regular.ttf", import.meta.url),
+  new URL(
+    "../../../fixtures/fonts/material-symbols/MaterialSymbolsOutlined_28pt-Regular.ttf",
+    import.meta.url,
+  ),
 );
 export const LARGE_FONT_GLYPHS = 4042;
 

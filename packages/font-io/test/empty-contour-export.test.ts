@@ -20,7 +20,7 @@ import { importFont } from "../src/import.js";
  */
 
 const FONT = new URL(
-  "../../../apps/editor/browser/fixtures/MaterialSymbolsOutlined_28pt-Regular.ttf",
+  "../../../fixtures/fonts/material-symbols/MaterialSymbolsOutlined_28pt-Regular.ttf",
   import.meta.url,
 );
 

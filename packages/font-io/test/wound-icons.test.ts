@@ -30,7 +30,7 @@ import { type SourceFont, parseFont } from "../src/source.js";
  */
 
 const FONT = new URL(
-  "../../../apps/editor/browser/fixtures/MaterialSymbolsOutlined_28pt-Regular.ttf",
+  "../../../fixtures/fonts/material-symbols/MaterialSymbolsOutlined_28pt-Regular.ttf",
   import.meta.url,
 );
 

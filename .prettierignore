@@ -4,3 +4,6 @@ dist
 
 # Written by tauri-build on every compile, from the capabilities beside it.
 apps/editor/src-tauri/gen
+
+# Real fonts the tests read, each as its makers released it.
+fixtures/fonts

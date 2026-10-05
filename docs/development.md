@@ -110,8 +110,27 @@ profile. It needs the Chromium described below, and is a job of its own in CI.
 Opening and saving a folder is not covered: the browser's folder picker cannot be driven, and
 a stand-in for it would test the stand-in.
 
-The large font is Material Symbols Outlined, in `apps/editor/browser/fixtures/` with its
+The large font is Material Symbols Outlined, in `fixtures/fonts/material-symbols/` with its
 licence (Apache 2.0). It is read by the tests and is in nothing that is shipped.
+
+### Real fonts
+
+`fixtures/fonts/` holds fonts somebody else made, each as it was released and with its licence
+beside it: a CFF text face, a TrueType one with wide coverage, a variable font, a face from
+the TeX world, an icon font of four thousand glyphs, and a family as a designspace and UFOs.
+`fixtures/fonts/README.md` says what each is and where it came from.
+
+They are there because a font this editor wrote and then read back proves only that it agrees
+with itself. `packages/font-io/test/corpus.test.ts` takes each binary font round — read in,
+written out — and has HarfBuzz set the same text in the font as released and the font as
+written: every character, thousands of pairs, accents on letters, each feature switched on.
+`corpus-family.test.ts` reads the family from its sources and asks a variable font made of it
+to be each master at its corner. They run with `pnpm test`.
+
+What a font is known to lose on the way is written in those tests — the warnings each is read
+and written with are the whole list — so a new loss fails, and so does one that has been
+mended without the list being told. A test of a feature that wants a real font should read
+one from here through `packages/font-io/test/real-fonts.ts` rather than add another.
 
 ### Pictures of the editor
 
