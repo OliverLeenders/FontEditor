@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import type { Browser } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -102,4 +104,61 @@ describe("a large font, in a browser", () => {
       await p.context.close();
     }
   });
+
+  it(
+    "is exported with the window still answering, and says how far it has got",
+    { timeout: 420_000 },
+    async () => {
+      const p = await profile(browser);
+      try {
+        const page = await p.open();
+        await resume(page).waitFor();
+        await importFont(page, LARGE_FONT);
+        await glyphs(page, LARGE_FONT_GLYPHS);
+
+        await page.getByRole("button", { name: "Export", exact: true }).click();
+        const arrived = page.waitForEvent("download", { timeout: 360_000 });
+        await page.getByRole("menuitemcheckbox", { name: /^OTF/ }).first().click();
+
+        // Counted as it goes: so many of four thousand and some glyphs.
+        const said = page.getByText(/^Exporting… [\d,]+ of [\d,]+ glyphs$/);
+        await said.waitFor({ timeout: 60_000 });
+
+        // And the window answers while it does. Half a minute of this was once
+        // half a minute of a page that would not: the font is compiled on
+        // another thread now. Asked of the page itself, by how long it goes
+        // between one frame and the next for two seconds of the export.
+        const longest = await page.evaluate(
+          () =>
+            new Promise<number>((resolve) => {
+              const began = performance.now();
+              let last = began;
+              let gap = 0;
+              const frame = (now: number): void => {
+                gap = Math.max(gap, now - last);
+                last = now;
+                if (now - began < 2000) requestAnimationFrame(frame);
+                else resolve(gap);
+              };
+              requestAnimationFrame(frame);
+            }),
+        );
+        expect(await said.isVisible(), "still exporting while the frames were counted").toBe(true);
+        expect(longest, "the longest the page went without drawing, in milliseconds").toBeLessThan(
+          500,
+        );
+
+        const download = await arrived;
+        const bytes = await readFile(await download.path());
+        // An OpenType font with CFF outlines begins with OTTO.
+        expect(String.fromCharCode(...bytes.subarray(0, 4))).toBe("OTTO");
+        expect(bytes.length).toBeGreaterThan(500_000);
+        await said.waitFor({ state: "detached" });
+
+        expect(p.problems, "what the pages threw or said was an error").toEqual([]);
+      } finally {
+        await p.context.close();
+      }
+    },
+  );
 });

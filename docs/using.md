@@ -667,6 +667,10 @@ holding a TrueType font rather than a bitmap one opens as that font.
 source, and — once a font has more than one master — a family as a designspace with a
 UFO each, one variable font, and every named style as an ordinary static font. The web
 formats are written from the TrueType flavour, which is what WOFF2's transform is for.
+A font file is compiled away from the window, which goes on answering while it is: a large
+font is some seconds in the making, and the menu says how far it has got, such as
+_Exporting… 1,280 of 4,042 glyphs_. A glyph whose overlapping contours cannot be joined
+without changing its shape keeps its overlap, and the export names it.
 
 **Which glyph is which.** A cell in the font's grid has room for a glyph name and a code
 point, which for a mark is `uni0308` above `U+0308` and says nothing about which mark it

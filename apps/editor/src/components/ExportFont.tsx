@@ -13,9 +13,10 @@ import {
   PRIVATE_USE_LAST,
   defaultLocation,
 } from "@typewright/font-model";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { desktop } from "../desktop.js";
+import { compile } from "../exporting.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import type { Item } from "./MenuItems.js";
@@ -24,6 +25,8 @@ import { DownloadIcon } from "./icons.js";
 
 type Status =
   | { readonly kind: "idle" }
+  /** Being made: how many glyphs are done, of how many, where that is counted. */
+  | { readonly kind: "working"; readonly done: number; readonly total: number }
   | { readonly kind: "done"; readonly file: string; readonly warnings: readonly string[] }
   | { readonly kind: "failed"; readonly message: string };
 
@@ -81,9 +84,19 @@ export function ExportFont(): React.JSX.Element {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
+  /**
+   * Whether an export is being made. One at a time: each is a font copied to
+   * another thread and compiled there, and a second asked for while the first
+   * is on its way is a click that did not see anything happen.
+   */
+  const working = useRef(false);
+
   const attemptAsync = async (
     run: () => Promise<{ file: string; warnings: readonly string[] }>,
   ): Promise<void> => {
+    if (working.current) return;
+    working.current = true;
+    setStatus({ kind: "working", done: 0, total: 0 });
     try {
       setStatus({ kind: "done", ...(await run()) });
     } catch (error) {
@@ -91,14 +104,20 @@ export function ExportFont(): React.JSX.Element {
         kind: "failed",
         message: error instanceof Error ? error.message : String(error),
       });
+    } finally {
+      working.current = false;
     }
+  };
+
+  /** How far an export has got, said beside the menu as it goes. */
+  const told = (done: number, total: number): void => {
+    setStatus({ kind: "working", done, total });
   };
 
   const otf = (): void =>
     void attemptAsync(async () => {
-      const { exportFont } = await binary();
       const document = store.editor.document;
-      const { bytes, warnings } = exportFont(document);
+      const { bytes, warnings } = await compile({ kind: "otf", document }, told);
       const file = exportFileName(document);
       download(bytes, file, "font/otf");
       return { file, warnings };
@@ -144,8 +163,10 @@ export function ExportFont(): React.JSX.Element {
         ...m,
         sparse: m.sparse !== undefined,
       }));
-      const { exportInstances } = await binary();
-      const out = exportInstances(project.axes, masters, project.instances, project.rules);
+      const out = await compile({
+        kind: "instances",
+        args: [project.axes, masters, project.instances, project.rules],
+      });
       download(out.bytes.slice().buffer, out.fileName, "application/zip");
       return { file: `${out.fileName} · ${String(out.files)} fonts`, warnings: out.warnings };
     });
@@ -179,10 +200,14 @@ export function ExportFont(): React.JSX.Element {
       const project = store.getState().project;
       const ordered = await variableMasters();
 
-      const { exportVariableFont } = await binary();
-      const out = exportVariableFont(project.axes, ordered, project.instances, {
-        rules: project.rules,
-        rulesProcessing: project.rulesProcessing,
+      const out = await compile({
+        kind: "variable",
+        args: [
+          project.axes,
+          ordered,
+          project.instances,
+          { rules: project.rules, rulesProcessing: project.rulesProcessing },
+        ],
       });
       const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.otf");
       download(out.bytes, file, "font/otf");
@@ -204,10 +229,14 @@ export function ExportFont(): React.JSX.Element {
       const project = store.getState().project;
       const ordered = await variableMasters();
 
-      const { exportVariableTrueType } = await binary();
-      const out = exportVariableTrueType(project.axes, ordered, project.instances, {
-        rules: project.rules,
-        rulesProcessing: project.rulesProcessing,
+      const out = await compile({
+        kind: "variableTtf",
+        args: [
+          project.axes,
+          ordered,
+          project.instances,
+          { rules: project.rules, rulesProcessing: project.rulesProcessing },
+        ],
       });
       const file = exportFileName(store.editor.document).replace(/\.otf$/, "-VF.ttf");
       download(out.bytes, file, "font/ttf");
@@ -224,9 +253,8 @@ export function ExportFont(): React.JSX.Element {
    */
   const truetype = (): void =>
     void attemptAsync(async () => {
-      const { exportTrueType } = await binary();
       const document = store.editor.document;
-      const { bytes, warnings } = exportTrueType(document);
+      const { bytes, warnings } = await compile({ kind: "ttf", document }, told);
       const file = exportFileName(document).replace(/\.otf$/, ".ttf");
       download(bytes, file, "font/ttf");
       return { file, warnings };
@@ -244,9 +272,8 @@ export function ExportFont(): React.JSX.Element {
     void attemptAsync(async () => {
       const host = desktop();
       if (host === null) throw new Error("Hinting needs the desktop application.");
-      const { exportTrueType } = await binary();
       const document = store.editor.document;
-      const { bytes, warnings } = exportTrueType(document);
+      const { bytes, warnings } = await compile({ kind: "ttf", document }, told);
       const hinted = await host.invoke("hint_truetype", new Uint8Array(bytes));
       if (!(hinted instanceof ArrayBuffer)) throw new Error("ttfautohint gave nothing back.");
       const file = exportFileName(document).replace(/\.otf$/, "-hinted.ttf");
@@ -268,9 +295,8 @@ export function ExportFont(): React.JSX.Element {
    */
   const woff = (): void =>
     void attemptAsync(async () => {
-      const { exportTrueType } = await binary();
       const document = store.editor.document;
-      const made = exportTrueType(document);
+      const made = await compile({ kind: "ttf", document }, told);
       const bytes = await toWoff(new Uint8Array(made.bytes));
       const file = exportFileName(document).replace(/\.otf$/, ".woff");
       download(bytes.slice().buffer, file, "font/woff");
@@ -286,9 +312,8 @@ export function ExportFont(): React.JSX.Element {
    */
   const woff2 = (): void =>
     void attemptAsync(async () => {
-      const { exportTrueType } = await binary();
       const document = store.editor.document;
-      const made = exportTrueType(document);
+      const made = await compile({ kind: "ttf", document }, told);
       const out = await toWoff2(new Uint8Array(made.bytes));
       const file = exportFileName(document).replace(/\.otf$/, ".woff2");
       download(out.bytes.slice().buffer, file, "font/woff2");
@@ -317,9 +342,9 @@ export function ExportFont(): React.JSX.Element {
    */
   const iconKit = (): void =>
     void attemptAsync(async () => {
-      const { exportTrueType, iconKitFiles } = await binary();
+      const { iconKitFiles } = await binary();
       const document = store.editor.document;
-      const made = exportTrueType(document);
+      const made = await compile({ kind: "ttf", document }, told);
       const out = await toWoff2(new Uint8Array(made.bytes));
       const files = iconKitFiles(document, out.bytes);
       const file = `${fontFileStem(document)}-kit.zip`;
@@ -330,9 +355,8 @@ export function ExportFont(): React.JSX.Element {
   /** Every glyph that draws something as a picture of its own, as compiled. */
   const svgs = (): void =>
     void attemptAsync(async () => {
-      const { glyphSvgFiles } = await binary();
       const document = store.editor.document;
-      const files = glyphSvgFiles(document);
+      const files = await compile({ kind: "svgs", document });
       if (files.length === 0) throw new Error("No glyph in this font draws anything.");
       const file = `${fontFileStem(document)}-svg.zip`;
       download(zip(files).slice().buffer, file, "application/zip");
@@ -471,6 +495,13 @@ export function ExportFont(): React.JSX.Element {
         panelLabel="Export"
         items={items}
       />
+      {status.kind === "working" ? (
+        <span className={styles.note} role="status" aria-busy="true">
+          {status.total > 0
+            ? `Exporting… ${count(status.done)} of ${count(status.total)} glyphs`
+            : "Exporting…"}
+        </span>
+      ) : null}
       {status.kind === "done" ? (
         <span className={styles.note} role="status">
           {status.file}
@@ -490,6 +521,9 @@ export function ExportFont(): React.JSX.Element {
     </div>
   );
 }
+
+/** A number of glyphs as it is read: 4,042. */
+const count = (n: number): string => n.toLocaleString("en-US");
 
 /** Whether a master sits where every axis has its default: the font's home. */
 function atHome(

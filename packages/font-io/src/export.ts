@@ -13,10 +13,8 @@ import {
   kernIndex,
   newGlyphAdvance,
   orderedGlyphs,
-  HAIRLINES,
   isEmptyContour,
   removeOverlap,
-  sameInk,
   resolveGlyphComponents,
   segments,
   inkOf,
@@ -187,7 +185,39 @@ export function flattenedGlyphs(source: FontDocument): Glyph[] {
     : glyphs;
 }
 
+/**
+ * What a glyph's outlines were joined into, kept with the glyph.
+ *
+ * The TrueType flavour is the CFF flavour made and then given other outlines,
+ * so every glyph was joined twice: once for the font that is thrown away, and
+ * once for the one that is kept. Joining is nearly all an export costs. A glyph
+ * does not change — an edit makes another — so what it joined into the first
+ * time is what it joins into the second.
+ *
+ * Only of a glyph that places no other: what a composite joins into depends on
+ * the glyphs it places, which may have changed while it has not.
+ */
+const joined = new WeakMap<Glyph, { contours: readonly Contour[]; warnings: readonly string[] }>();
+
 function unioned(
+  g: Glyph,
+  drawn: readonly Contour[],
+  ids: IdFactory,
+  warnings: string[],
+): readonly Contour[] {
+  if (g.components.length > 0) return unionOf(g, drawn, ids, warnings);
+
+  let known = joined.get(g);
+  if (known === undefined) {
+    const said: string[] = [];
+    known = { contours: unionOf(g, drawn, ids, said), warnings: said };
+    joined.set(g, known);
+  }
+  warnings.push(...known.warnings);
+  return known.contours;
+}
+
+function unionOf(
   g: Glyph,
   drawn: readonly Contour[],
   ids: IdFactory,
@@ -204,21 +234,14 @@ function unioned(
 
   // Components are already resolved into `contours`; passing them again would
   // draw each of them twice.
+  //
+  // The union answers for what it makes: it asks of its own result whether it
+  // is the ink it was made of, and says it could not where it is not. A font
+  // with an overlap in it draws as it should nearly everywhere, where a font
+  // with a glyph in pieces does not.
   const union = removeOverlap({ ...g, contours, components: [] }, ids);
-  if (union === null) {
-    warnings.push(
-      `${g.name}: contours overlap along an edge and could not be joined, so the overlap is in the font.`,
-    );
-    return contours;
-  }
-  if (union.crossings === 0) return union.glyph.contours;
+  if (union !== null) return union.glyph.contours;
 
-  // Joined, and asked whether what was made is the ink it was made of. The
-  // search for where curves cross can come back with a glyph in pieces — a
-  // clock that was a ring and two hands, written out as two slivers — and a
-  // font with an overlap in it draws as it should nearly everywhere, where a
-  // font with a glyph missing does not.
-  if (sameInk(contours, union.glyph.contours, HAIRLINES)) return union.glyph.contours;
   warnings.push(
     `${g.name}: its overlapping contours could not be joined without changing its shape, so the overlap is in the font.`,
   );
@@ -451,7 +474,18 @@ export type ExportOptions = {
    * is written with them in it, switched on where they apply.
    */
   readonly swaps?: SwapVariations | null;
+  /**
+   * Told how many glyphs have had their outlines prepared, of how many.
+   *
+   * Preparing them is nearly all of the time a large font takes to export —
+   * every overlap joined, a glyph at a time — and is the part with something
+   * to count. Told every few glyphs rather than every one.
+   */
+  readonly progress?: (done: number, total: number) => void;
 };
+
+/** How many glyphs go by between one word of progress and the next. */
+const PROGRESS_EVERY = 16;
 
 export function exportFont(
   source: FontDocument,
@@ -488,7 +522,9 @@ export function exportFont(
     );
   }
 
-  for (const name of names) {
+  options.progress?.(0, names.length);
+  for (const [done, name] of names.entries()) {
+    if (done > 0 && done % PROGRESS_EVERY === 0) options.progress?.(done, names.length);
     const g = document.glyphs[name];
     if (g === undefined) continue;
 
