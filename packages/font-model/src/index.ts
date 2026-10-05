@@ -250,6 +250,8 @@ export {
 } from "./glyph.js";
 
 export { UNIT_GRID, roundFont, roundGlyph, unroundedGlyphs } from "./round.js";
+export type { FillAsWound } from "./tidy.js";
+export { fillAsWound, tidyContour, tidyFont, tidyGlyph, untidyGlyphs } from "./tidy.js";
 
 export type { Grid } from "./grid.js";
 export {

@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 
 import {
   type Contour,
+  type FontDocument,
   correctDirections,
   counterIds,
+  fillAsWound,
   glyph,
   isEmptyContour,
   removeOverlap,
@@ -92,6 +94,35 @@ describe("icons drawn as pieces that overlap", () => {
 
   it("are read without a word where they could be redrawn", () => {
     expect(read.warnings).toEqual([]);
+  });
+
+  it("are put right in a font that was read before they were, without reading it again", () => {
+    // What a font read in before this held: each glyph as the file draws it,
+    // contour for contour, filled here by its nesting.
+    const order = [".notdef", ...ICONS];
+    const old: FontDocument = {
+      ...read.document,
+      glyphOrder: order,
+      glyphs: Object.fromEntries(
+        order.map((name) => [
+          name,
+          name === ".notdef"
+            ? read.document.glyphs[name]!
+            : { ...read.document.glyphs[name]!, contours: inFile(name) },
+        ]),
+      ),
+    };
+    const plan = fillAsWound(old, counterIds("fill"));
+
+    // The ones that were wrong, and not the two that never were.
+    expect(plan.left).toEqual([]);
+    expect(plan.redrawn).not.toContain("robot");
+    expect(plan.redrawn).not.toContain("delete");
+    expect(plan.redrawn.length).toBeGreaterThan(5);
+    for (const name of ICONS) {
+      const mine = plan.document.glyphs[name]!;
+      expect(sameInk(inFile(name), correctDirections(mine.contours), 2), name).toBe(true);
+    }
   });
 
   it("leaves alone the ones that were never wrong", () => {

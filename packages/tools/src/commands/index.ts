@@ -193,6 +193,9 @@ export {
   workingTension,
 } from "./contours.js";
 
+export type { FillPlan } from "./tidy.js";
+export { planFill, takeFill, tidyOutlines, untidyCount } from "./tidy.js";
+
 export type { WalkDirection } from "./walk.js";
 export { stepSelection } from "./walk.js";
 

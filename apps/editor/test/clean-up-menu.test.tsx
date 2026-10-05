@@ -9,7 +9,8 @@ installBrowserGlobals();
 
 const { CleanUpMenu } = await import("../src/components/CleanUpMenu.js");
 const { begin, commit, result, roundCoordinates } = await import("@typewright/tools");
-const { updateGlyph } = await import("@typewright/font-model");
+const { contour, counterIds, glyph, node, putGlyph, updateGlyph } =
+  await import("@typewright/font-model");
 
 /**
  * The whole-font tidies.
@@ -102,5 +103,111 @@ describe("re-attaching accents", () => {
     render(<CleanUpMenu />, freshStore());
     choose("Re-attach accents");
     expect(screen.getByRole("status").textContent).toBe("Every accent was already on its anchors.");
+  });
+});
+
+describe("a font read from a font file, brought up to date", () => {
+  const ids = counterIds("menu");
+  const at = (x: number, y: number) => node(ids.node(), { x, y });
+  const square = (left: number, bottom: number, size: number) =>
+    contour(
+      ids.contour(),
+      [
+        at(left, bottom),
+        at(left + size, bottom),
+        at(left + size, bottom + size),
+        at(left, bottom + size),
+      ],
+      true,
+    );
+
+  /** Chosen by how its name begins: these two say more about themselves after it. */
+  function pick(label: RegExp): void {
+    fireEvent.click(screen.getByRole("button", { name: /Clean up/ }));
+    fireEvent.click(screen.getByRole("menuitemcheckbox", { name: label }));
+  }
+
+  /** The starter font with a glyph as an old import left one, and one of ink inside ink. */
+  function imported() {
+    const store = freshStore();
+    let document = store.editor.document;
+    // A point on the point before it.
+    const doubled = contour(
+      ids.contour(),
+      [at(0, 0), at(200, 0), at(200, 0), at(200, 200), at(0, 200)],
+      true,
+    );
+    document = putGlyph(document, glyph("doubled", { advance: 500, contours: [doubled] }));
+    // Two shapes the same way round, one inside the other: ink to a font file.
+    document = putGlyph(
+      document,
+      glyph("buried", { advance: 500, contours: [square(0, 0, 400), square(100, 100, 200)] }),
+    );
+    store.applyTool(result({ ...store.editor, document }, [begin("Import", false), commit]));
+    return store;
+  }
+
+  it("tidies what draws nothing, says how many glyphs, and takes it back in one step", () => {
+    const store = imported();
+    render(<CleanUpMenu />, store);
+
+    pick(/^Tidy imported outlines/);
+    expect(screen.getByRole("status").textContent).toBe("Tidied 1 glyph.");
+    expect(store.editor.document.glyphs["doubled"]?.contours[0]?.nodes).toHaveLength(4);
+
+    act(() => {
+      store.undo();
+    });
+    expect(store.editor.document.glyphs["doubled"]?.contours[0]?.nodes).toHaveLength(5);
+  });
+
+  it("says so when there was nothing to tidy", () => {
+    const store = freshStore();
+    const before = store.editor.document;
+    render(<CleanUpMenu />, store);
+
+    pick(/^Tidy imported outlines/);
+    expect(screen.getByRole("status").textContent).toBe("There was nothing to tidy.");
+    expect(store.editor.document).toBe(before);
+  });
+
+  it("says what filling as the file did would change, and changes nothing until told to", () => {
+    const store = imported();
+    const before = store.editor.document;
+    render(<CleanUpMenu />, store);
+
+    pick(/^Fill as the font file did/);
+    const asked = screen.getByRole("group", { name: "Fill as the font file did?" });
+    expect(asked.textContent).toContain("1 glyph would be redrawn: buried");
+    expect(store.editor.document).toBe(before);
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("group", { name: "Fill as the font file did?" })).toBeNull();
+    expect(store.editor.document).toBe(before);
+  });
+
+  it("redraws them when told to, as one step", () => {
+    const store = imported();
+    render(<CleanUpMenu />, store);
+
+    pick(/^Fill as the font file did/);
+    fireEvent.click(screen.getByRole("button", { name: "Redraw them" }));
+
+    expect(screen.getByRole("status").textContent).toBe("Redrew 1 glyph.");
+    expect(store.editor.document.glyphs["buried"]?.contours).toHaveLength(1);
+    expect(store.editor.document.glyphs["doubled"]?.contours[0]?.nodes).toHaveLength(5);
+
+    act(() => {
+      store.undo();
+    });
+    expect(store.editor.document.glyphs["buried"]?.contours).toHaveLength(2);
+  });
+
+  it("says so when every glyph already fills as its file did", () => {
+    render(<CleanUpMenu />, freshStore());
+    pick(/^Fill as the font file did/);
+    expect(screen.getByRole("status").textContent).toBe(
+      "Every glyph already fills as its file did.",
+    );
   });
 });
