@@ -159,23 +159,56 @@ function settledKeys(state: EditorState): EditorState {
  * leave the gesture holding a snapshot of a document that no longer exists.
  * Press Escape to abandon the drag first — that is what Escape is for.
  */
+/**
+ * The editor somewhere the font it has been given has.
+ *
+ * A step taken back or done again changes the font under the editor, and may
+ * take away what the editor was on: a glyph made is gone again, a glyph renamed
+ * has its old name back, a layer added is no longer one. Left where it was, the
+ * editor was on a glyph that is not in the font — an empty canvas and an
+ * inspector with nothing in it, where the letter had been a moment before.
+ *
+ * So it is moved to the glyph that is where that one was: for a rename, the
+ * same glyph under its other name; for a glyph that is gone, its neighbour.
+ * `was` is the font as it stood before the step, which is what says where
+ * that is.
+ */
+function placed(editor: EditorState, was: FontDocument): EditorState {
+  const document = editor.document;
+  let next = editor;
+
+  if (document.glyphs[editor.currentGlyph] === undefined) {
+    const order = document.glyphOrder;
+    const at = was.glyphOrder.indexOf(editor.currentGlyph);
+    const there = at < 0 ? undefined : order[Math.min(at, order.length - 1)];
+    next = { ...next, currentGlyph: there ?? order[0] ?? "" };
+  }
+  if (next.layer !== null && !document.layers.some((layer) => layer.name === next.layer)) {
+    next = { ...next, layer: null };
+  }
+  return next;
+}
+
 export function undo(s: EditSession): EditSession {
   if (s.pending !== null) return s;
   const entry = pendingUndo(s.history);
   if (entry === null) return s;
 
   return {
-    editor: {
-      ...s.editor,
-      document: entry.before,
-      selection: entry.selectionBefore,
-      gesture: null,
-      // The box round the selection stands upright again: how far the points
-      // were turned is not in the history, so after stepping through it the
-      // editor no longer knows, and a box left at an angle would be drawn round
-      // a shape that is no longer at that angle.
-      boxFrame: null,
-    },
+    editor: placed(
+      {
+        ...s.editor,
+        document: entry.before,
+        selection: entry.selectionBefore,
+        gesture: null,
+        // The box round the selection stands upright again: how far the points
+        // were turned is not in the history, so after stepping through it the
+        // editor no longer knows, and a box left at an angle would be drawn round
+        // a shape that is no longer at that angle.
+        boxFrame: null,
+      },
+      s.editor.document,
+    ),
     history: stepBack(s.history),
     pending: null,
   };
@@ -187,13 +220,16 @@ export function redo(s: EditSession): EditSession {
   if (entry === null) return s;
 
   return {
-    editor: {
-      ...s.editor,
-      document: entry.after,
-      selection: entry.selectionAfter,
-      gesture: null,
-      boxFrame: null,
-    },
+    editor: placed(
+      {
+        ...s.editor,
+        document: entry.after,
+        selection: entry.selectionAfter,
+        gesture: null,
+        boxFrame: null,
+      },
+      s.editor.document,
+    ),
     history: stepForward(s.history),
     pending: null,
   };
@@ -217,13 +253,16 @@ export function goToStep(s: EditSession, index: number): EditSession {
   if (first === undefined) return s;
 
   return {
-    editor: {
-      ...s.editor,
-      document: last === null ? first.before : last.after,
-      selection: last === null ? first.selectionBefore : last.selectionAfter,
-      gesture: null,
-      boxFrame: null,
-    },
+    editor: placed(
+      {
+        ...s.editor,
+        document: last === null ? first.before : last.after,
+        selection: last === null ? first.selectionBefore : last.selectionAfter,
+        gesture: null,
+        boxFrame: null,
+      },
+      s.editor.document,
+    ),
     history: next,
     pending: null,
   };

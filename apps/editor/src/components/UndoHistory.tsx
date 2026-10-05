@@ -53,7 +53,6 @@ export function UndoHistory({
   const store = useEditorStore();
   const history = useStoreValue((s) => s.session.history);
   const busy = useStoreValue((s) => s.session.pending !== null);
-  const current = useStoreValue((s) => s.session.editor.currentGlyph);
   const ref = useRef<HTMLDivElement>(null);
   const here = useRef<HTMLButtonElement>(null);
 
@@ -89,11 +88,18 @@ export function UndoHistory({
    * first step, which is what going there takes back.
    */
   const goTo = (index: number): void => {
+    // The glyph on screen before going there, which is what says whether the
+    // step's own glyph still has to be opened.
+    const was = store.editor.currentGlyph;
     store.goToStep(index);
     const entry = history.entries[Math.max(0, index - 1)];
     if (entry === undefined) return;
-    const names = glyphsChanged(entry);
-    if (names.length > 0 && !names.includes(current)) onOpenGlyph(names[0]!);
+    // Of the glyphs the step changed, the ones the font has where it now
+    // stands: a step that made a glyph changed it, and gone back past, there
+    // is no such glyph to open.
+    const document = store.editor.document;
+    const names = glyphsChanged(entry).filter((name) => document.glyphs[name] !== undefined);
+    if (names.length > 0 && !names.includes(was)) onOpenGlyph(names[0]!);
   };
 
   const now = Date.now();
