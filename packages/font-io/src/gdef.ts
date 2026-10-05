@@ -29,6 +29,13 @@ export type GdefParts = {
   readonly markSets?: readonly (readonly number[])[];
   /** Ligature glyph id to the caret positions in it, in design units. */
   readonly carets?: ReadonlyMap<number, readonly number[]>;
+  /**
+   * How values in the layout tables change along a variable font's axes: an
+   * item variation store, which GPOS points into by delta set. Kept here
+   * because this is where the format keeps it — one store for every table
+   * that has something that varies.
+   */
+  readonly variationStore?: Uint8Array;
 };
 
 /** Nothing to say, which is written as no table at all. */
@@ -42,13 +49,20 @@ export function gdefTable(parts: GdefParts): Uint8Array {
   const sets = parts.markSets ?? [];
   const markSets = sets.length === 0 ? NOTHING : markGlyphSets(sets);
 
-  if (classes.length === 0 && attach.length === 0 && carets.length === 0 && markSets.length === 0) {
+  const store = parts.variationStore ?? NOTHING;
+  if (
+    classes.length === 0 &&
+    attach.length === 0 &&
+    carets.length === 0 &&
+    markSets.length === 0 &&
+    store.length === 0
+  ) {
     return NOTHING;
   }
 
-  // Version 1.2 has one more offset in its header, so where each table lands
-  // depends on which version this is.
-  const header = markSets.length === 0 ? 12 : 14;
+  // Version 1.2 has one more offset in its header and 1.3 another, of four
+  // bytes, so where each table lands depends on which version this is.
+  const header = store.length > 0 ? 18 : markSets.length === 0 ? 12 : 14;
   let at = header;
   const place = (table: Uint8Array): number => {
     if (table.length === 0) return 0;
@@ -63,19 +77,22 @@ export function gdefTable(parts: GdefParts): Uint8Array {
   const caretsAt = place(carets);
   const markAttachAt = place(attach);
   const markSetsAt = place(markSets);
+  const storeAt = place(store);
 
   const w = new Writer();
   w.u16(1);
-  w.u16(markSets.length === 0 ? 0 : 2);
+  w.u16(store.length > 0 ? 3 : markSets.length === 0 ? 0 : 2);
   w.u16(classesAt);
   w.u16(attachListAt);
   w.u16(caretsAt);
   w.u16(markAttachAt);
-  if (markSets.length > 0) w.u16(markSetsAt);
+  if (markSets.length > 0 || store.length > 0) w.u16(markSetsAt);
+  if (store.length > 0) w.u32(storeAt);
   w.bytesOf(classes);
   w.bytesOf(carets);
   w.bytesOf(attach);
   w.bytesOf(markSets);
+  w.bytesOf(store);
   return w.finish();
 }
 

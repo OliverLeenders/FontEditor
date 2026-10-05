@@ -1,4 +1,6 @@
 import {
+  type Axis,
+  type Support,
   type ComponentSource,
   type Contour,
   type FontDocument,
@@ -21,7 +23,8 @@ import {
   withResolvedMetrics,
 } from "@typewright/font-model";
 
-import { kerningLookups, kerningSubtables } from "./gpos.js";
+import { type KerningMasters, DELTA_SETS_EACH, kerningLookups, kerningTables } from "./gpos.js";
+import { itemVariationStore } from "./varstore.js";
 import { withNameLigatures } from "./name-ligatures.js";
 import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
@@ -490,6 +493,16 @@ export type ExportOptions = {
    */
   readonly swaps?: SwapVariations | null;
   /**
+   * The kerning of every master of a variable font, the default master's
+   * first, and how a value in each becomes a change in each region. With it
+   * the font is kerned at each place in its designspace as the master drawn
+   * there is; without it, as this document is, everywhere.
+   */
+  readonly kerning?: KerningMasters & {
+    readonly axes: readonly Axis[];
+    readonly regions: readonly Support[];
+  };
+  /**
    * Told how many glyphs have had their outlines prepared, of how many.
    *
    * Preparing them is nearly all of the time a large font takes to export —
@@ -650,6 +663,22 @@ export function exportFont(
   return { bytes: withLayoutTables(bytes, layout), warnings };
 }
 
+/**
+ * The store the kerning's changes are kept in: every delta set, over every
+ * region the masters make, in as many parts as their number takes.
+ */
+function kerningStore(
+  varying: { readonly axes: readonly Axis[]; readonly regions: readonly Support[] },
+  deltaSets: readonly (readonly number[])[],
+): Uint8Array {
+  const regions = varying.regions.map((_, i) => i);
+  const parts: { regions: number[]; rows: (readonly number[])[] }[] = [];
+  for (let from = 0; from < deltaSets.length; from += DELTA_SETS_EACH) {
+    parts.push({ regions, rows: deltaSets.slice(from, from + DELTA_SETS_EACH) });
+  }
+  return itemVariationStore(varying.axes, varying.regions, parts);
+}
+
 /** The three layout tables a font is compiled with, each empty where it has nothing to say. */
 export type LayoutTables = {
   readonly gpos: Uint8Array;
@@ -679,7 +708,8 @@ export function layoutTables(
   // One GPOS from two sources: the kerning the editor keeps in its own model,
   // and whatever positioning the feature file asks for. A second table is not a
   // thing a font can have, and a second `kern` feature is one a shaper ignores.
-  const kernSubtables = kerningSubtables(kernIndex(document.kerning), glyphIdOf);
+  const kern = kerningTables(kernIndex(document.kerning), glyphIdOf, options.kerning);
+  const kernSubtables = kern.subtables;
   const kernLookups = kerningLookups(kernSubtables);
 
   // The third source: the anchors. A component placed by them puts the accent
@@ -723,6 +753,9 @@ export function layoutTables(
     attach: features.gdef.attach,
     markSets: features.gdef.markSets,
     carets: features.gdef.carets,
+    ...(options.kerning === undefined || kern.deltaSets.length === 0
+      ? {}
+      : { variationStore: kerningStore(options.kerning, kern.deltaSets) }),
   });
 
   const gsub =

@@ -17,7 +17,7 @@ import {
 } from "@typewright/font-model";
 
 import { cff2Table, sameShape } from "./cff2.js";
-import { type ExportResult, exportFont, writtenOrder } from "./export.js";
+import { type ExportOptions, type ExportResult, exportFont, writtenOrder } from "./export.js";
 import { swapVariationsFor, type SwapVariations } from "./feature-variations.js";
 import { type NamedInstance, avarTable, fvarTable, statTable } from "./fvar.js";
 import { withNameLigatures } from "./name-ligatures.js";
@@ -75,6 +75,8 @@ export type PreparedVariable = {
   readonly masters: readonly VariableMaster[];
   readonly instances: readonly NamedInstance[];
   readonly swaps: SwapVariations | null;
+  /** The masters' kerning and how it changes between them: nothing where they are kerned alike. */
+  readonly kerning: ExportOptions["kerning"];
   readonly warnings: readonly string[];
 };
 
@@ -98,21 +100,6 @@ export function prepareVariable(
   const warnings: string[] = [];
   const kept = masters.filter((m) => onStop(m.location));
 
-  // The kerning is the default master's, the whole way along every axis. What
-  // a variable font says about spacing between its masters is how wide each
-  // glyph is; how a pair is kerned is written once, and a bold kerned more
-  // tightly than its light comes out kerned as the light is. Said, since a
-  // family whose masters are kerned alike loses nothing and one whose masters
-  // are not loses something nobody would otherwise be told of.
-  const whole = kept.filter((m) => m.sparse !== true);
-  const kerned = (m: VariableMaster): string => JSON.stringify(m.document.kerning.pairs);
-  const first = whole[0];
-  if (first !== undefined && whole.some((m) => kerned(m) !== kerned(first))) {
-    warnings.push(
-      `the masters are kerned differently, and the font is kerned as ${first.name} is at every ` +
-        "weight and width: kerning that changes along an axis is not written",
-    );
-  }
   if (kept.length < masters.length) {
     warnings.push(
       `left out ${String(masters.length - kept.length)} master(s) at other stops of ` +
@@ -149,7 +136,66 @@ export function prepareVariable(
     masters: spelled,
     instances,
     swaps: swapVariationsFor(along, axes, options.rules ?? [], options.rulesProcessing ?? "first"),
+    kerning: kerningOf(along, spelled, warnings),
     warnings,
+  };
+}
+
+/**
+ * The kerning of the masters drawn whole, where they are not kerned alike.
+ *
+ * A bold kerned more tightly than its light is a family whose kerning changes
+ * with its weight, and a variable font says so: each pair's value at the
+ * default, and what it changes by towards each master. The masters drawn as
+ * layers have no kerning of their own and take no part.
+ *
+ * Nothing where every master is kerned as the first is, which is a font with
+ * nothing to say. And nothing, with a word about it, where the masters do not
+ * agree what is in each group — a pair of groups is then a different set of
+ * pairs in each, and the font is kerned as its default master is throughout.
+ */
+function kerningOf(
+  axes: readonly Axis[],
+  masters: readonly VariableMaster[],
+  warnings: string[],
+): ExportOptions["kerning"] {
+  const whole = masters.filter((m) => m.sparse !== true);
+  const first = whole[0];
+  if (first === undefined) return undefined;
+
+  const pairs = (m: VariableMaster): string => JSON.stringify(m.document.kerning.pairs);
+  if (whole.every((m) => pairs(m) === pairs(first))) return undefined;
+
+  const groups = (m: VariableMaster): string =>
+    JSON.stringify([m.document.kerning.firstGroups, m.document.kerning.secondGroups]);
+  if (whole.some((m) => groups(m) !== groups(first))) {
+    warnings.push(
+      `the masters do not have the same kerning groups, and the font is kerned as ${first.name} ` +
+        "is at every weight and width",
+    );
+    return undefined;
+  }
+
+  // One plan for a thing every whole master has, as each glyph has one for its
+  // outline: the regions the masters make, and what a value in each master is
+  // as a change in each region.
+  const plan = planVariations(
+    axes,
+    whole.map((m) => m.location),
+    [whole.map(() => true)],
+  );
+  const each = plan.glyphs[0];
+  if (each === undefined) return undefined;
+  return {
+    masters: whole.map((m) => m.document.kerning),
+    axes,
+    regions: plan.regions,
+    deltasOf: (values) => {
+      const row = new Array<number>(plan.regions.length).fill(0);
+      const deltas = deltasOf(each, values);
+      for (const [k, region] of each.regions.entries()) row[region] = deltas[k] ?? 0;
+      return row;
+    },
   };
 }
 
@@ -176,7 +222,10 @@ export function exportVariableFont(
 
   // The whole font, compiled from the default master, the rules with it.
   // Everything but the outlines is right already after this.
-  const base = exportFont(first.document, undefined, { swaps: prepared.swaps });
+  const base = exportFont(first.document, undefined, {
+    swaps: prepared.swaps,
+    ...(prepared.kerning === undefined ? {} : { kerning: prepared.kerning }),
+  });
   let bytes: Uint8Array = new Uint8Array(base.bytes);
 
   // The outlines of every master, prepared identically — or the deltas are

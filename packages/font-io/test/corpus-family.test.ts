@@ -1,4 +1,10 @@
-import { type FontDocument, counterIds, defaultLocation } from "@typewright/font-model";
+import {
+  type FontDocument,
+  counterIds,
+  defaultLocation,
+  kernIndex,
+  kernValue,
+} from "@typewright/font-model";
 import { Blob, Face, Font } from "harfbuzzjs";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -134,11 +140,8 @@ describe("MutatorSans, read from its sources", () => {
       font = new Font(new Face(new Blob(made.bytes)));
     });
 
-    it("is made with every glyph varying, and says the one thing it leaves behind", () => {
-      expect(made.warnings).toEqual([
-        "the masters are kerned differently, and the font is kerned as LightCondensed is at " +
-          "every weight and width: kerning that changes along an axis is not written",
-      ]);
+    it("is made with every glyph varying, and nothing to say", () => {
+      expect(made.warnings).toEqual([]);
       expect(made.notVarying).toEqual([]);
     });
 
@@ -152,21 +155,51 @@ describe("MutatorSans, read from its sources", () => {
       }
     });
 
-    it("is kerned as its default master is, at every corner", () => {
-      // What is known not to be carried: kerning that changes along an axis.
-      // The bold condensed pulls V fifty units under A by a pair of its own,
-      // and the font does not — it kerns A and V by what the light condensed
-      // says of them, here as at its own corner. The export says so.
-      const bold = whole("BoldCondensed");
-      expect(bold.kerning.pairs["A"]?.["V"]).toBe(-50);
+    /** How far HarfBuzz pulls the second of two letters towards the first, at a place. */
+    const kernAt = (pair: string, at: Readonly<Record<string, number>>): number => {
+      const [together] = set(font, pair, [], at);
+      const [alone] = set(font, pair.charAt(0), [], at);
+      return (together?.advance ?? 0) - (alone?.advance ?? 0);
+    };
+    // But I and S, which the family's rules swap for another glyph over part of
+    // its designspace: set there, the letter is not the glyph its kerning names.
+    const CAPITALS = [..."ABCDEFGHJKLMNOPQRTUVWXYZ"];
 
-      const kernAt = (at: Readonly<Record<string, number>>): number => {
-        const [together] = set(font, "AV", [], at);
-        const [alone] = set(font, "A", [], at);
-        return (together?.advance ?? 0) - (alone?.advance ?? 0);
-      };
-      const atHome = kernAt({ wdth: 0, wght: 0 });
-      for (const { at } of CORNERS) expect(kernAt(at), JSON.stringify(at)).toBe(atHome);
+    it.each(CORNERS)(
+      "is kerned as $name is at its corner, every pair of capitals",
+      ({ name, at }) => {
+        // The masters are not kerned alike: the bold condensed pulls V fifty
+        // units under A by a pair of its own, and the light condensed does not
+        // kern the two at all. The font was once kerned as its default master
+        // is, everywhere; it is kerned at each corner as the master drawn there.
+        const index = kernIndex(whole(name).kerning);
+        const wrong: string[] = [];
+        let kerned = 0;
+        for (const left of CAPITALS) {
+          for (const right of CAPITALS) {
+            const want = kernValue(index, left, right);
+            if (want !== 0) kerned += 1;
+            const got = kernAt(left + right, at);
+            if (got !== want) wrong.push(`${left}${right}: ${String(got)}, not ${String(want)}`);
+          }
+        }
+        expect(wrong).toEqual([]);
+        expect(kerned, `pairs ${name} kerns`).toBeGreaterThan(0);
+      },
+    );
+
+    it("is kerned between two masters by what lies between their kerning", () => {
+      // Half way from the light condensed, which pulls V fifteen under A by the
+      // group A is in, to the bold condensed, which pulls it fifty by a pair of
+      // its own: two kinds of rule, and one value changing between them.
+      const light = kernValue(kernIndex(whole("LightCondensed").kerning), "A", "V");
+      const bold = kernValue(kernIndex(whole("BoldCondensed").kerning), "A", "V");
+      expect([light, bold]).toEqual([-15, -50]);
+      expect(kernAt("AV", { wdth: 0, wght: 0 })).toBe(light);
+      expect(kernAt("AV", { wdth: 0, wght: 1000 })).toBe(bold);
+      expect(
+        Math.abs(kernAt("AV", { wdth: 0, wght: 500 }) - (light + bold) / 2),
+      ).toBeLessThanOrEqual(1);
     });
 
     it("swaps a glyph where its rules say, and nowhere else", () => {

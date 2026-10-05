@@ -667,6 +667,10 @@ holding a TrueType font rather than a bitmap one opens as that font.
 source, and — once a font has more than one master — a family as a designspace with a
 UFO each, one variable font, and every named style as an ordinary static font. The web
 formats are written from the TrueType flavour, which is what WOFF2's transform is for.
+A variable font is kerned at each master's place as that master is, and between two of
+them by what lies between: a bold kerned more tightly than its light stays so. The masters
+have to agree what is in each kerning group, which the editor keeps the same across them;
+where they do not, the font is kerned as its default master is and the export says so.
 A font file is compiled away from the window, which goes on answering while it is: a large
 font is some seconds in the making, and the status bar says how far it has got, such as
 _Exporting… 1,280 of 4,042 glyphs_, in whichever workspace is open. When it is done the
@@ -679,6 +683,19 @@ hold points between whole units, and opening and saving them leaves those where 
 A font file is on whole units, as the format is. To put a drawing on them — or on a coarser
 grid — use **Round coordinates** in the Clean up menu, a step you take rather than one a save
 takes for you.
+
+**A font imported a while ago.** Reading a font file has got better at two things, and a font
+read in before it did keeps what it was given then. Two items in the Clean up menu bring one
+up to what it would be read as now, without importing it again and losing what has been
+drawn in it since. **Tidy imported outlines** takes out what draws nothing — a point sitting
+on the point before it, of which a TrueType outline once came in with one after nearly every
+curve, and a handle sitting on its own point. No shape changes. **Fill as the font file did**
+is for glyphs built of pieces laid over each other, which a font file fills by which way
+their contours run and this editor by how they nest: an icon drawn that way was shown here
+with holes where its pieces met. It says how many glyphs it would redraw, and which, and
+redraws them when you say so — asked first because it is right for a glyph as it came in and
+wrong for one you have redrawn since, where the directions are whatever they happen to be.
+Each is one step to take back.
 
 **Which glyph is which.** A cell in the font's grid has room for a glyph name and a code
 point, which for a mark is `uni0308` above `U+0308` and says nothing about which mark it

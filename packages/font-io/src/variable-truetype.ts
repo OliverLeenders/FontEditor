@@ -47,7 +47,10 @@ export function exportVariableTrueType(
 
   // The whole font from the default master, in the flavour it will stay in.
   // Everything but the outlines and the variation tables is right after this.
-  const base = exportTrueType(first.document, { swaps: prepared.swaps });
+  const base = exportTrueType(first.document, {
+    swaps: prepared.swaps,
+    ...(prepared.kerning === undefined ? {} : { kerning: prepared.kerning }),
+  });
   let bytes: Uint8Array = new Uint8Array(base.bytes);
 
   // As the font compiled above numbers them: `.notdef` first, given or not.
