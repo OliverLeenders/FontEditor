@@ -66,7 +66,7 @@ export function ligatureSubtables(ligatures: readonly LigatureSub[]): Uint8Array
   const byFirst = new Map<number, LigatureSub[]>();
   for (const lig of ligatures) {
     const first = lig.from[0];
-    if (first === undefined || lig.from.length < 2) continue;
+    if (first === undefined) continue;
     const list = byFirst.get(first) ?? [];
     list.push(lig);
     byFirst.set(first, list);
@@ -99,7 +99,7 @@ export function ligatureSubst(ligatures: readonly LigatureSub[]): Uint8Array {
   const byFirst = new Map<number, LigatureSub[]>();
   for (const lig of ligatures) {
     const first = lig.from[0];
-    if (first === undefined || lig.from.length < 2) continue;
+    if (first === undefined) continue;
     const list = byFirst.get(first) ?? [];
     list.push(lig);
     byFirst.set(first, list);

@@ -296,6 +296,21 @@ function notdefFirst(document: FontDocument): { names: string[]; synthesised: bo
 }
 
 /**
+ * The glyphs a font is written with, by name, in the order it is written in:
+ * `.notdef` first, and there whether or not the document has one.
+ *
+ * For whatever writes a table beside the ones this does. Every table of a font
+ * numbers its glyphs the same way, and one made from the document's own order
+ * is one place out, all the way down, in a font that was given its `.notdef`:
+ * a variable font made of sources without one had every letter's outline, and
+ * every letter's change of width, under the letter before it.
+ */
+export function writtenOrder(document: FontDocument): string[] {
+  const { names, synthesised } = notdefFirst(document);
+  return synthesised ? [".notdef", ...names] : names;
+}
+
+/**
  * Build a font binary from a document.
  *
  * Throws {@link FontExportError} only when there is nothing that could be

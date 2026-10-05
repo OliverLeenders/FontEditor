@@ -1,6 +1,6 @@
 import { type Anchor, type Glyph, type GlyphName, isMarkAnchor } from "@typewright/font-model";
 
-import { Writer, coverage } from "./gpos.js";
+import { SUBTABLE_LIMIT, Writer, coverage } from "./gpos.js";
 import type { Lookup } from "./layout.js";
 
 /**
@@ -97,6 +97,43 @@ function baseArray(bases: readonly BaseEntry[], classCount: number): Uint8Array 
   }
   for (const t of tables) w.bytesOf(t);
   return w.finish();
+}
+
+/**
+ * The same attachment, in as many subtables as it takes for each to be sayable.
+ *
+ * Everything in one is found by a sixteen-bit offset, and the letters of a font
+ * with wide coverage are past that: three thousand of them with a place or two
+ * each for an accent. Divided by the glyphs attached to, each subtable with
+ * every mark: a mark is set on a letter by the subtable that covers the
+ * letter, which is one of them, so nothing depends on the order.
+ */
+function attachmentSubtables(
+  marks: readonly MarkEntry[],
+  bases: readonly BaseEntry[],
+  classCount: number,
+): Uint8Array[] {
+  // What every subtable carries whoever it attaches to: its header, the marks
+  // and their coverage. A coverage is at most two bytes a glyph and four of
+  // header; a mark is a record of four bytes and an anchor of six.
+  const fixed = 12 + (4 + marks.length * 2) + (2 + marks.length * 10) + 4 + 2;
+  const out: Uint8Array[] = [];
+  let taken: BaseEntry[] = [];
+  let size = fixed;
+  for (const base of [...bases].sort((l, r) => l.id - r.id)) {
+    // Its place in the coverage, its row of offsets, and an anchor for each
+    // class it has a place for.
+    const more = 2 + classCount * 2 + base.anchors.filter((anchor) => anchor !== null).length * 6;
+    if (taken.length > 0 && size + more > SUBTABLE_LIMIT) {
+      out.push(attachmentSubtable(marks, taken, classCount));
+      taken = [];
+      size = fixed;
+    }
+    taken.push(base);
+    size += more;
+  }
+  if (taken.length > 0) out.push(attachmentSubtable(marks, taken, classCount));
+  return out;
 }
 
 /**
@@ -242,11 +279,11 @@ export function compileMarks(
 
   if (bases.length > 0) {
     // Type 4, and marks are not ignored: the whole job is to position them.
-    lookups.push({ type: 4, subtables: [attachmentSubtable(marks, bases, classIndex.size)] });
+    lookups.push({ type: 4, subtables: attachmentSubtables(marks, bases, classIndex.size) });
     features.push("mark");
   }
   if (stacked.length > 0) {
-    lookups.push({ type: 6, subtables: [attachmentSubtable(marks, stacked, classIndex.size)] });
+    lookups.push({ type: 6, subtables: attachmentSubtables(marks, stacked, classIndex.size) });
     features.push("mkmk");
   }
   if (lookups.length === 0) return NOTHING;

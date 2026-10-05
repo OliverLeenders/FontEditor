@@ -468,7 +468,10 @@ function number0(raw: string | undefined): number | null {
 }
 
 /** Whole where it is whole, and short where it is not. */
-const number = (n: number): string => String(Math.round(n * 1000) / 1000);
+// To a millionth, which is as fine as a designspace is written by anything:
+// to a thousandth, a style placed at 569.078003 came back from being saved a
+// hair from where it was put.
+const number = (n: number): string => String(Math.round(n * 1e6) / 1e6);
 
 function escapeXml(value: string): string {
   return value

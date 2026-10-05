@@ -202,7 +202,8 @@ const NO_FLAGS: Flags = { bits: 0, set: null };
 
 type Builder = {
   readonly table: Table;
-  readonly type: number;
+  /** Not fixed: a lookup of single substitutions becomes one of ligatures when it is given one. */
+  type: number;
   readonly flags: Flags;
   readonly index: number;
   readonly singles: Map<number, number>;
@@ -265,8 +266,13 @@ class Compilation {
     this.systems = parsed.languageSystems.length > 0 ? parsed.languageSystems : DEFAULT_SYSTEMS;
     for (const block of parsed.blocks) {
       if (block.kind === "lookup") this.lookupBlock(block.lookup);
-      // Gathered at the end, from features that may come after it.
-      else if (block.feature.tag !== "aalt")
+      // Gathered at the end, from features that may come after it — where it
+      // gathers. One that names no feature is written out in full, as a font
+      // read in has it: its own lookups, in their own place in the order, which
+      // is before the ligatures. Gathered again into lookups put last, it was
+      // other alternates and came after them, and `ff` with it on was a
+      // ligature where the font it came from set two alternates.
+      else if (block.feature.tag !== "aalt" || !gathers(block.feature))
         this.feature(block.feature.tag, block.feature.statements);
       if (block.kind === "feature") this.parametersOf(block.feature);
     }
@@ -332,6 +338,8 @@ class Compilation {
   private aalt(parsed: FeaSource): void {
     const written = parsed.features.find((f) => f.tag === "aalt");
     if (written === undefined && this.options.gatherAalt !== true) return;
+    // Written out in full, and compiled where it stands.
+    if (written !== undefined && !gathers(written)) return;
     const gathered: string[] =
       written === undefined
         ? [...new Set(parsed.features.map((f) => f.tag).filter(gathersByDefault))]
@@ -533,6 +541,22 @@ class Compilation {
       if (prepared === null) continue;
       if (builder === null) {
         builder = this.builder(prepared.table, prepared.type, flags);
+      } else if (
+        builder.table === "sub" &&
+        prepared.table === "sub" &&
+        ((builder.type === 1 && prepared.type === 4) || (builder.type === 4 && prepared.type === 1))
+      ) {
+        // One glyph for one, among ligatures: a ligature of one glyph, which
+        // is what a font that has both in one lookup has written it as. A
+        // stylistic set that makes a hand of `(` and another of `fine` is one
+        // lookup of ligatures, and read in it is these two kinds of rule; taken
+        // for a mistake, the one-for-one rules were left out when it was
+        // written again.
+        this.rules += prepared.add(builder);
+        for (const [from, to] of builder.singles) builder.ligatures.push({ from: [from], to });
+        builder.singles.clear();
+        builder.type = 4;
+        continue;
       } else if (builder.table !== prepared.table || builder.type !== prepared.type) {
         this.problems.push({
           line: statement.rule.line,
@@ -927,6 +951,11 @@ class Compilation {
       }
     }
   }
+}
+
+/** Whether an `aalt` is one that gathers: it names a feature to take alternates from. */
+function gathers(feature: { readonly statements: readonly { readonly kind: string }[] }): boolean {
+  return feature.statements.some((s) => s.kind === "feature");
 }
 
 /** A lookup as the table stores it. */

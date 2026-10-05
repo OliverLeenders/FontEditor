@@ -1,6 +1,6 @@
 import type { Axis } from "@typewright/font-model";
-import { orderedGlyphs } from "@typewright/font-model";
 
+import { writtenOrder } from "./export.js";
 import type { NamedInstance } from "./fvar.js";
 import { type Drawn, compatiblePoints, glyfTable } from "./glyf.js";
 import { type GlyphVariation, flatPoints, gvarTable } from "./gvar.js";
@@ -50,7 +50,8 @@ export function exportVariableTrueType(
   const base = exportTrueType(first.document, { swaps: prepared.swaps });
   let bytes: Uint8Array = new Uint8Array(base.bytes);
 
-  const order = orderedGlyphs(first.document).map((g) => g.name);
+  // As the font compiled above numbers them: `.notdef` first, given or not.
+  const order = writtenOrder(first.document);
   const drawn = prepared.masters.map((m) => flattened(m.document, order, first.document));
 
   // Every glyph converted across the masters that take part in it at once.

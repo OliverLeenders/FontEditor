@@ -12,13 +12,12 @@ import {
   counterIds,
   glyph,
   isDiscrete,
-  orderedGlyphs,
   resolveGlyphComponents,
   sameLocation,
 } from "@typewright/font-model";
 
 import { cff2Table, sameShape } from "./cff2.js";
-import { type ExportResult, exportFont } from "./export.js";
+import { type ExportResult, exportFont, writtenOrder } from "./export.js";
 import { swapVariationsFor, type SwapVariations } from "./feature-variations.js";
 import { type NamedInstance, avarTable, fvarTable, statTable } from "./fvar.js";
 import { withNameLigatures } from "./name-ligatures.js";
@@ -98,6 +97,22 @@ export function prepareVariable(
 
   const warnings: string[] = [];
   const kept = masters.filter((m) => onStop(m.location));
+
+  // The kerning is the default master's, the whole way along every axis. What
+  // a variable font says about spacing between its masters is how wide each
+  // glyph is; how a pair is kerned is written once, and a bold kerned more
+  // tightly than its light comes out kerned as the light is. Said, since a
+  // family whose masters are kerned alike loses nothing and one whose masters
+  // are not loses something nobody would otherwise be told of.
+  const whole = kept.filter((m) => m.sparse !== true);
+  const kerned = (m: VariableMaster): string => JSON.stringify(m.document.kerning.pairs);
+  const first = whole[0];
+  if (first !== undefined && whole.some((m) => kerned(m) !== kerned(first))) {
+    warnings.push(
+      `the masters are kerned differently, and the font is kerned as ${first.name} is at every ` +
+        "weight and width: kerning that changes along an axis is not written",
+    );
+  }
   if (kept.length < masters.length) {
     warnings.push(
       `left out ${String(masters.length - kept.length)} master(s) at other stops of ` +
@@ -173,7 +188,8 @@ export function exportVariableFont(
   // changes how many points a contour has, which would leave two masters
   // describing the same letter with different numbers of them and no way to
   // put a delta between them.
-  const order = orderedGlyphs(first.document).map((g) => g.name);
+  // As the font compiled above numbers them: `.notdef` first, given or not.
+  const order = writtenOrder(first.document);
   const drawn = prepared.masters.map((m) => flattened(m.document, order, first.document));
 
   // Which masters take part in each glyph: all of them, a sparse one only where

@@ -88,7 +88,7 @@ export function recoverLayout(
 
   // ---- kerning -----------------------------------------------------------------
   const gpos = tables.gpos;
-  const kernLookups = gpos === null ? new Set<number>() : kerningLookups(gpos);
+  const kernLookups = gpos === null ? new Set<number>() : kerningLookups(gpos, warn);
   const kerning = gpos === null || kernLookups.size === 0 ? null : kerningFrom(gpos, kernLookups);
 
   // ---- anchors -----------------------------------------------------------------
@@ -118,7 +118,7 @@ export function recoverLayout(
  * feature. Those go into the kerning model; any other pair adjustment is kept
  * as source.
  */
-function kerningLookups(gpos: ReadLayout): Set<number> {
+function kerningLookups(gpos: ReadLayout, warn: (message: string) => void): Set<number> {
   const out = new Set<number>();
   const usedElsewhere = new Set<number>();
   for (const feature of gpos.features) {
@@ -132,17 +132,33 @@ function kerningLookups(gpos: ReadLayout): Set<number> {
       const lookup = gpos.lookups[index];
       if (lookup === null || lookup === undefined || lookup.type !== 2) continue;
       if (usedElsewhere.has(index) || (lookup.flags & 0xff10) !== 0) continue;
+      // Kerning that changes along an axis is still kerning. A variable font
+      // says how each pair moves across its designspace, which is not read:
+      // what is read is the font where every axis is at its default, and there
+      // a pair is a number like any other. Taken for something other than
+      // kerning, all of it was kept as source this editor does not compile —
+      // seventeen thousand pairs of a text face, in, and none of them out.
       const pure = lookup.subtables.every(
-        (s) => s.kind === "pairPos" && s.pairs.every((p) => onlyAdvance(p.one) && isEmpty(p.two)),
+        (s) =>
+          s.kind === "pairPos" &&
+          s.pairs.every((p) => advancesOnly(p.one) && advancesOnly(p.two) && p.two.xAdvance === 0),
       );
-      if (pure) out.add(index);
+      if (!pure) continue;
+      out.add(index);
+      const varies = lookup.subtables.some(
+        (s) => s.kind === "pairPos" && s.pairs.some((p) => p.one.device || p.two.device),
+      );
+      if (varies) warn("device and variation adjustments in positioning are not imported");
     }
   }
   return out;
 }
 
-const onlyAdvance = (v: ValueRecord): boolean =>
-  v.xPlacement === 0 && v.yPlacement === 0 && v.yAdvance === 0 && !v.device;
+/** Moves nothing but how far the glyph advances, whatever it says of other sizes and axes. */
+const advancesOnly = (v: ValueRecord): boolean =>
+  v.xPlacement === 0 && v.yPlacement === 0 && v.yAdvance === 0;
+
+const onlyAdvance = (v: ValueRecord): boolean => advancesOnly(v) && !v.device;
 
 const isEmpty = (v: ValueRecord): boolean => onlyAdvance(v) && v.xAdvance === 0;
 
@@ -246,9 +262,20 @@ function anchorsFrom(
           const a = b.anchors[c];
           return a === null || a === undefined ? [] : [a];
         });
-        if (spots.some((a) => a.device || a.point !== null)) {
+        // A place given by a point of the outline moves with the outline,
+        // which an anchor does not: that stays as it was written. A place that
+        // changes along an axis is still a place. A variable font says how each
+        // moves across its designspace, which is not read — what is read is the
+        // font with every axis at its default, where an anchor is two numbers.
+        // Taken for something an anchor cannot say, every accent of a variable
+        // text face was kept as source this editor does not compile, and sat
+        // on the baseline when the font was written again.
+        if (spots.some((a) => a.point !== null)) {
           fits = false;
           break;
+        }
+        if (spots.some((a) => a.device) || marks.some((m) => m.anchor.device)) {
+          warn("device and variation adjustments in positioning are not imported");
         }
 
         const known = marks.map((m) => markName.get(m.glyph)).find((n) => n !== undefined);

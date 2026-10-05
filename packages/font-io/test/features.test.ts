@@ -844,8 +844,25 @@ describe("compiling the rest of the language", () => {
   });
 
   it("refuses a named lookup holding two kinds of rule", () => {
-    const compiled = compile("lookup MIXED { sub a by a.sc; sub f i by fi; } MIXED;");
+    const compiled = compile("lookup MIXED { sub a by a.sc; sub f from [a.sc fi]; } MIXED;");
     expect(compiled.problems.some((p) => p.message.includes("one kind of rule"))).toBe(true);
+  });
+
+  it("takes one glyph for one among ligatures as a ligature of one glyph", () => {
+    // What a font with both in one lookup has written, and what a stylistic set
+    // read in from one is: taken for two kinds of rule, the one-for-one rules
+    // were left out when the font was written again.
+    for (const source of [
+      "lookup BOTH { sub f i by fi; sub a by a.sc; } BOTH;",
+      "lookup BOTH { sub a by a.sc; sub f i by fi; } BOTH;",
+    ]) {
+      const compiled = compile(source);
+      expect(compiled.problems, source).toEqual([]);
+      expect(
+        compiled.substitution.lookups.map((l) => l.type),
+        source,
+      ).toEqual([4]);
+    }
   });
 
   it("puts positioning in a context in GPOS, with the adjustment it points at", () => {
