@@ -4,7 +4,9 @@ import {
   type Contour,
   correctDirections,
   counterIds,
+  glyph,
   isEmptyContour,
+  removeOverlap,
   sameInk,
 } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
@@ -40,6 +42,10 @@ const ICONS = [
   "table_edit",
   "face_5",
   "door_open",
+  "video_stable",
+  "hdr_plus",
+  "agriculture",
+  "mobile_off",
   "robot",
   "delete",
 ];
@@ -74,6 +80,16 @@ describe("icons drawn as pieces that overlap", () => {
     expect(sameInk(inFile(name), correctDirections(mine.contours), 2)).toBe(true);
   });
 
+  it.each(ICONS)("%s joined is the ink it was, or is said not to be joined", (name) => {
+    // The union itself, of the file's own contours as they wind. It came back
+    // with some of these in pieces and said nothing; what it makes is asked
+    // now whether it is the ink it was made of.
+    const drawn = inFile(name);
+    const union = removeOverlap(glyph(name, { contours: drawn }), counterIds("join"));
+    expect(union).not.toBeNull();
+    expect(sameInk(drawn, union!.glyph.contours, 2)).toBe(true);
+  });
+
   it("are read without a word where they could be redrawn", () => {
     expect(read.warnings).toEqual([]);
   });
@@ -88,6 +104,7 @@ describe("icons drawn as pieces that overlap", () => {
 
   it.each(ICONS)("%s is written out as the ink it is in the file", (name) => {
     const out = exportFont({ ...read.document, features: "" }, counterIds("out"));
+    expect(out.warnings).toEqual([]);
     const back = importFont(out.bytes, counterIds("back")).document.glyphs[name]!;
     // On the whole-unit grid a font file is written to, and with the hairlines
     // a union closes.

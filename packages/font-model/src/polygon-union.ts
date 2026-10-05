@@ -71,6 +71,89 @@ export function unionByPolygons(
   return out.length === 0 ? null : out;
 }
 
+/**
+ * The union by the non-zero rule proper: ink wherever the contours wind round a
+ * place a number of times that is not nothing, whichever way they run.
+ *
+ * {@link unionByPolygons} takes every contour turning one way for a shape and
+ * every one turning the other for a counter, and cuts all of the counters out
+ * of all of the shapes. That is the non-zero rule only where nothing overlaps a
+ * counter: a bar laid across an `o` is cut through where it crosses the
+ * counter, and an island inside a counter is cut away with it. Nor does it know
+ * a font drawn the other way round, whose shapes it takes for counters.
+ *
+ * Here the contours are counted. How many of those turning one way a place is
+ * inside, and how many of those turning the other: it is ink where the two
+ * numbers differ. "Inside at least so many" is built up a contour at a time —
+ * inside at least two once this one is added is what was inside at least two
+ * before, and what was inside at least one and is inside this — and a place is
+ * ink where, for some number, it is inside at least that many one way and fewer
+ * the other.
+ *
+ * `null` where there is nothing left, or the polygons could not be joined.
+ */
+export function unionAsWound(contours: readonly Contour[], ids: IdFactory): Contour[] | null {
+  const up: clipping.Polygon[] = [];
+  const down: clipping.Polygon[] = [];
+  for (const c of contours) {
+    const ring = ringOf(c);
+    if (ring.length < 3) continue;
+    const turning = area(ring);
+    if (turning === 0) continue;
+    (turning > 0 ? up : down).push([ring]);
+  }
+  if (up.length === 0 && down.length === 0) return null;
+
+  let joined: clipping.MultiPolygon;
+  try {
+    const above = atLeast(up);
+    const below = atLeast(down);
+    const parts: clipping.MultiPolygon[] = [];
+    for (let k = 0; k < Math.max(above.length, below.length); k++) {
+      const a = above[k];
+      const b = below[k];
+      if (a !== undefined && b !== undefined) parts.push(pc.difference(a, b), pc.difference(b, a));
+      else if (a !== undefined) parts.push(a);
+      else if (b !== undefined) parts.push(b);
+    }
+    const inked = parts.filter((part) => part.length > 0);
+    const first = inked[0];
+    if (first === undefined) return null;
+    joined = inked.length === 1 ? first : pc.union(first, ...inked.slice(1));
+  } catch {
+    // Edges it could not sort into a ring: said to be nothing, which the caller
+    // takes for "could not".
+    return null;
+  }
+
+  const out: Contour[] = [];
+  for (const polygon of joined) {
+    for (const ring of polygon) {
+      const fitted = contourOfRing(ring, ids);
+      if (fitted !== null) out.push(fitted);
+    }
+  }
+  return out.length === 0 ? null : out;
+}
+
+/** Where a place is inside at least one of these, at least two, and so on. */
+function atLeast(rings: readonly clipping.Polygon[]): clipping.MultiPolygon[] {
+  const levels: clipping.MultiPolygon[] = [];
+  for (const ring of rings) {
+    // From the deepest down, so that each is built from the one below it as it
+    // was before this ring.
+    for (let k = levels.length; k >= 1; k--) {
+      const both = pc.intersection(levels[k - 1]!, ring);
+      if (both.length === 0) continue;
+      const known = levels[k];
+      levels[k] = known === undefined ? both : pc.union(known, both);
+    }
+    const known = levels[0];
+    levels[0] = known === undefined ? pc.union(ring) : pc.union(known, ring);
+  }
+  return levels;
+}
+
 /** A closed contour as one ring of points, its curves flattened. */
 function ringOf(c: Contour): clipping.Ring {
   const points: clipping.Ring = [];

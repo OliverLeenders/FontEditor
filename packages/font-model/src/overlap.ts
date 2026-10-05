@@ -12,20 +12,13 @@ import {
   tangent,
 } from "@typewright/geometry";
 
-import {
-  type Contour,
-  contour,
-  reverseContour,
-  segmentAt,
-  segmentCount,
-  segmentCubic,
-} from "./contour.js";
+import { type Contour, contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
 import { corneredContour, hasContinuousCorners } from "./corner.js";
-import { contourWinding, correctDirections } from "./direction.js";
+import { correctDirections } from "./direction.js";
 import type { Glyph } from "./glyph.js";
 import type { ContourId, IdFactory } from "./ids.js";
 import { type Node, node } from "./node.js";
-import { unionByPolygons } from "./polygon-union.js";
+import { unionAsWound } from "./polygon-union.js";
 import { isEmptyContour } from "./simplify.js";
 
 /**
@@ -71,6 +64,15 @@ export type OverlapResult = {
    */
   readonly crossings: number;
 };
+
+/** Whether any one segment of a contour crosses itself. */
+function loopsOnItself(c: Contour): boolean {
+  for (let i = 0; i < segmentCount(c); i++) {
+    const segment = segmentAt(c, i);
+    if (segment !== null && selfIntersection(segmentCubic(segment)) !== null) return true;
+  }
+  return false;
+}
 
 /**
  * How far to either side of a piece the fill is sampled, against the tolerance.
@@ -191,8 +193,24 @@ export function removeOverlap(
   const kept = onBoundary(pieces, outlines(), eps);
   // Where the union of curves cannot close the boundary — edges lying all but on
   // top of each other, which it cannot sort into buried and not — the polygon
-  // union settles it, refitted; see unionByPolygons.
-  const loops = (kept.length === 0 ? null : walk(kept, ids, eps)) ?? unionByPolygons(closed, ids);
+  // union settles it, refitted; see unionAsWound.
+  //
+  // And where it closed one that is not the ink the contours are. A boundary
+  // that closes is not proof: with a meeting missed, or a stretch taken for
+  // buried that was not, the walk goes round something else and comes back to
+  // where it began — a clock that was a ring and two halves, as two slivers.
+  // So what it made is asked whether it is the ink it was made of, here, for
+  // everything that takes a union: the tool, the export, a font on its way in.
+  //
+  // Not of a curve looped over itself. The loop a handle dragged too far makes
+  // is taken off, on purpose, and is ink by the letter of the rule: there the
+  // union is meant to change the shape, and is taken at its word as it was.
+  const made = (loops: Contour[] | null): Contour[] | null =>
+    loops !== null && sameInk(closed, loops, HAIRLINES) ? loops : null;
+  const walked = kept.length === 0 ? null : walk(kept, ids, eps);
+  const loops =
+    (walked !== null && closed.some(loopsOnItself) ? walked : made(walked)) ??
+    made(unionAsWound(closed, ids));
   if (loops === null) return null;
 
   // The union lands where the working set began, and everything else keeps the
@@ -1145,14 +1163,9 @@ export function nestedAsWound(g: Glyph, ids: IdFactory): Glyph | null {
     if (good(edges)) return { ...g, contours: [...edges, ...others] };
   }
 
-  // And where that came back wrong, by the union of polygons, which is not
-  // exact — every curve is fitted again — and does not lose its way. It joins
-  // what turns the way an outer contour turns here, so a file drawn the other
-  // way round is turned first.
-  let turning = 0;
-  for (const c of drawn) turning += contourWinding(c);
-  const facing = turning < 0 ? drawn.map(reverseContour) : drawn;
-  const fitted = unionByPolygons(facing, ids);
+  // And where that could not be made, by the union of polygons alone, which
+  // is not exact — every curve is fitted again — and does not lose its way.
+  const fitted = unionAsWound(drawn, ids);
   if (fitted !== null && good(fitted)) return { ...g, contours: [...fitted, ...others] };
 
   return null;
@@ -1340,6 +1353,10 @@ function boxed(
   return { points, minX, minY, maxX, maxY };
 }
 
+/** How far from straight out the places beside a contour are looked for: about a sixth of a right angle. */
+const ASKEW_COS = Math.cos(0.27);
+const ASKEW_SIN = Math.sin(0.27);
+
 /** The places a little to each side of a contour, at three along each of its segments. */
 function besides(c: Contour, reach: number): Vec2[] {
   const out: Vec2[] = [];
@@ -1354,8 +1371,14 @@ function besides(c: Contour, reach: number): Vec2[] {
       // A segment of no length has no side to be on.
       if (length === 0) continue;
       const at = evaluate(cubic, t);
-      const nx = (-(after.y - before.y) / length) * reach;
-      const ny = ((after.x - before.x) / length) * reach;
+      // To each side, and a little askew of straight out. Straight out from
+      // where two edges cross at right angles is along the other edge: a place
+      // on an outline, of which "is it ink" has no answer, and two drawings of
+      // one shape give different ones.
+      const ux = (after.x - before.x) / length;
+      const uy = (after.y - before.y) / length;
+      const nx = (-uy * ASKEW_COS + ux * ASKEW_SIN) * reach;
+      const ny = (ux * ASKEW_COS + uy * ASKEW_SIN) * reach;
       out.push({ x: at.x + nx, y: at.y + ny }, { x: at.x - nx, y: at.y - ny });
     }
   }

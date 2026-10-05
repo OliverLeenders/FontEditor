@@ -449,4 +449,4 @@ export { componentLanding } from "./composites.js";
 
 export type { MarkColor } from "./mark-color.js";
 export { MARK_COLORS, parseMarkColor, sameMarkColor } from "./mark-color.js";
-export { joinsFurther, unionByPolygons } from "./polygon-union.js";
+export { joinsFurther, unionAsWound, unionByPolygons } from "./polygon-union.js";
