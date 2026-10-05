@@ -95,15 +95,12 @@ describe("MutatorSans, read from its sources", () => {
       family.masters.map((m) => [m.name, m.location, m.sparse?.layer]),
     );
 
-    // Each master the same font — on the whole-unit grid a UFO is written to
-    // here. These sources are not all on it: the layers were made by a tool
-    // that worked them out between the masters, and hold points at 45.68544.
-    // They come back at 46. That is what is known to be changed by saving
-    // somebody's sources, and everything else is as it was.
+    // Each master the same font, to the last point. These sources are not on
+    // whole units: the layers were made by a tool that worked them out between
+    // the masters, and hold points at 45.68544. Saved, they once came back at
+    // 46 — somebody's sources, changed by being opened and kept.
     const plain = (d: FontDocument): string =>
-      JSON.stringify(d, (key, value: unknown) =>
-        key === "id" ? undefined : typeof value === "number" ? Math.round(value) : value,
-      );
+      JSON.stringify(d, (key, value: unknown) => (key === "id" ? undefined : value));
     for (const [i, m] of family.masters.entries()) {
       expect(plain(again.masters[i]!.document), m.name).toBe(plain(m.document));
     }

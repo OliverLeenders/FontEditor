@@ -47,8 +47,20 @@ function escapeXml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** Coordinates are integers in a UFO, as they are in the compiled font. */
+/** A whole number, where a property list is given one. */
 const round = (n: number): number => Math.round(n);
+
+/**
+ * A glyph's own number — where a point is, how wide the glyph is — as it is.
+ *
+ * Not put on a grid. A UFO holds whatever number it is given, and the sources
+ * people bring hold fractions: a layer worked out between two masters has a
+ * point at 45.68544, and an outline read from a TrueType font has its handles
+ * a third of the way along. Written to whole units, as these once were,
+ * saving somebody's sources moved their points. The font's grid is a thing a
+ * designer asks for, in Font info, and rounds to when they say.
+ */
+const exact = (n: number): number => (Object.is(n, -0) ? 0 : n);
 
 function plist(body: string): string {
   return [
@@ -135,14 +147,14 @@ export function contourPoints(c: Contour): Point[] {
   if (c.closed) {
     const closing = all[all.length - 1];
     points.push({
-      x: round(first.pt.x),
-      y: round(first.pt.y),
+      x: exact(first.pt.x),
+      y: exact(first.pt.y),
       type: closing?.kind === "curve" ? "curve" : "line",
       smooth: smooth(0),
     });
   } else {
     // An open contour starts with a `move`, which is what makes it open.
-    points.push({ x: round(first.pt.x), y: round(first.pt.y), type: "move", smooth: smooth(0) });
+    points.push({ x: exact(first.pt.x), y: exact(first.pt.y), type: "move", smooth: smooth(0) });
   }
 
   const upTo = c.closed ? all.length - 1 : all.length;
@@ -155,12 +167,12 @@ export function contourPoints(c: Contour): Point[] {
     if (curve) {
       const out = segment.out ?? segment.a;
       const incoming = segment.in ?? segment.b;
-      points.push({ x: round(out.x), y: round(out.y) });
-      points.push({ x: round(incoming.x), y: round(incoming.y) });
+      points.push({ x: exact(out.x), y: exact(out.y) });
+      points.push({ x: exact(incoming.x), y: exact(incoming.y) });
     }
     points.push({
-      x: round(segment.b.x),
-      y: round(segment.b.y),
+      x: exact(segment.b.x),
+      y: exact(segment.b.y),
       type: curve ? "curve" : "line",
       smooth: smooth(i + 1),
     });
@@ -174,8 +186,8 @@ export function contourPoints(c: Contour): Point[] {
       // file claims a curve and gives it nothing to curve through.
       const out = closing.out ?? closing.a;
       const incoming = closing.in ?? closing.b;
-      points.push({ x: round(out.x), y: round(out.y) });
-      points.push({ x: round(incoming.x), y: round(incoming.y) });
+      points.push({ x: exact(out.x), y: exact(out.y) });
+      points.push({ x: exact(incoming.x), y: exact(incoming.y) });
     }
   }
 
@@ -200,8 +212,8 @@ function componentAttributes(c: Component): string {
   put("xyScale", t.xyScale, 0);
   put("yxScale", t.yxScale, 0);
   put("yScale", t.yScale, 1);
-  put("xOffset", round(t.xOffset), 0);
-  put("yOffset", round(t.yOffset), 0);
+  put("xOffset", exact(t.xOffset), 0);
+  put("yOffset", exact(t.yOffset), 0);
   return parts.join("");
 }
 
@@ -209,7 +221,7 @@ export function glif(g: Glyph): string {
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<glyph name="${escapeXml(g.name)}" format="2">`,
-    `\t<advance width="${String(round(g.advance))}"/>`,
+    `\t<advance width="${String(exact(g.advance))}"/>`,
   ];
 
   for (const code of g.unicodes) {
@@ -265,7 +277,7 @@ export function glif(g: Glyph): string {
   for (const a of g.anchors) {
     if (a.name === "") continue;
     lines.push(
-      `\t<anchor name="${escapeXml(a.name)}" x="${String(round(a.pt.x))}" y="${String(round(a.pt.y))}"/>`,
+      `\t<anchor name="${escapeXml(a.name)}" x="${String(exact(a.pt.x))}" y="${String(exact(a.pt.y))}"/>`,
     );
   }
 
@@ -478,8 +490,8 @@ export function guideline(g: Guide): string {
   );
 }
 
-/** A coordinate as an attribute: whole where it is whole, and short where not. */
-const number = (n: number): string => String(Math.round(n * 1000) / 1000);
+/** A coordinate as an attribute: the number it is. */
+const number = (n: number): string => String(exact(n));
 
 /** Where a glyph's spacing comes from, in a lib key of this editor's own. */
 const METRIC_KEYS = "org.typewright.metricKeys";

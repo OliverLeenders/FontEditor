@@ -202,27 +202,31 @@ describe.each(CASES)("$name, taken round", ({ path, readWith, writtenWith }) => 
     };
     const once = round(document);
 
-    // What a UFO keeps of the font as read: its glyphs by name, what each is
-    // typed as and how wide it is, the kerning, and the features as written.
+    // The font as read, to the last point: its glyphs by name and what each is
+    // typed as, every outline and anchor where it was, the kerning, and the
+    // features as written. Not on a grid — an outline read from a TrueType
+    // font has its handles a third of the way along, and they stay there.
+    const plain = (d: FontDocument): string =>
+      JSON.stringify(d, (key, value: unknown) => (key === "id" ? undefined : value));
     expect(once.glyphOrder).toEqual(document.glyphOrder);
     for (const name of document.glyphOrder) {
       const was = document.glyphs[name]!;
       const is = once.glyphs[name]!;
       expect(is.unicodes, name).toEqual(was.unicodes);
-      expect(is.advance, name).toBe(Math.round(was.advance));
-      expect(is.contours.length, name).toBe(was.contours.length);
+      expect(is.advance, name).toBe(was.advance);
       expect(
-        is.anchors.map((a) => a.name),
+        JSON.stringify(is.contours.map((c) => c.nodes.map((n) => [n.pt, n.in, n.out]))),
         name,
-      ).toEqual(was.anchors.map((a) => a.name));
+      ).toBe(JSON.stringify(was.contours.map((c) => c.nodes.map((n) => [n.pt, n.in, n.out]))));
+      expect(
+        is.anchors.map((a) => [a.name, a.pt]),
+        name,
+      ).toEqual(was.anchors.map((a) => [a.name, a.pt]));
     }
     expect(once.kerning).toEqual(document.kerning);
     expect(once.features).toBe(document.features);
 
-    // And twice round is once round, to the last point: the grid a UFO is
-    // written to moves a point once, and not again.
-    const plain = (d: FontDocument): string =>
-      JSON.stringify(d, (key, value: unknown) => (key === "id" ? undefined : value));
+    // And twice round is once round.
     expect(plain(round(once))).toBe(plain(once));
   });
 });

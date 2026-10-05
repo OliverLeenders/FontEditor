@@ -145,15 +145,21 @@ describe("glif", () => {
     expect(text).toContain('name="a&lt;b&amp;c"');
   });
 
-  it("rounds coordinates to the integer grid", () => {
+  it("writes a glyph's numbers as they are, and not on a grid", () => {
+    // Whole units were what it wrote, and saving somebody's sources moved
+    // their points: a layer worked out between two masters has one at
+    // 45.68544, and it came back at 46.
     const c = contour(
       ids.contour(),
-      [node(ids.node(), { x: 10.4, y: 0.6 }), node(ids.node(), { x: 99.5, y: 3 })],
+      [node(ids.node(), { x: 10.4, y: 0.6 }), node(ids.node(), { x: 45.68544, y: 3 })],
       true,
     );
     const text = glif(glyph("t", { advance: 100.7, contours: [c] }));
-    expect(text).toContain('<advance width="101"/>');
-    expect(text).toContain('x="10" y="1"');
+    expect(text).toContain('<advance width="100.7"/>');
+    expect(text).toContain('x="10.4" y="0.6"');
+    expect(text).toContain('x="45.68544" y="3"');
+    // And a whole number as a whole number.
+    expect(glif(glyph("w", { advance: 600 }))).toContain('<advance width="600"/>');
   });
 });
 

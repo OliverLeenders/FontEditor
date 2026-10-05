@@ -124,8 +124,15 @@ function finish(draft: Draft, id: IdFactory, epsilon: number): Contour | null {
       : i === 0
         ? null
         : (spans[i - 1] ?? null);
-    const out = leaving?.c1 ?? null;
-    const incoming = arriving?.c2 ?? null;
+    // A handle on its own point is no handle. A font file writes one where a
+    // curve leaves a point straight — it has no other way to say so — and a
+    // point here says the same by having none. Kept, it was a handle of no
+    // length: nothing to see, nothing to drag, and gone the first time the
+    // font was saved, which made a font saved and read again a different one.
+    const handle = (at: Vec2 | null): Vec2 | null =>
+      at === null || near(at, pt, epsilon) ? null : at;
+    const out = handle(leaving?.c1 ?? null);
+    const incoming = handle(arriving?.c2 ?? null);
     return node(id.node(), pt, { type: inferType(pt, incoming, out), in: incoming, out });
   });
 

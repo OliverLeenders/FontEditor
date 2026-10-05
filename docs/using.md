@@ -674,6 +674,12 @@ status bar names the file, with what the export had to say about it in the toolt
 it is clicked away; a failure is said there too. A glyph whose overlapping contours cannot
 be joined without changing its shape keeps its overlap, and the export names it.
 
+A UFO is written with every point where it is, to the fraction: sources made by other tools
+hold points between whole units, and opening and saving them leaves those where they were.
+A font file is on whole units, as the format is. To put a drawing on them — or on a coarser
+grid — use **Round coordinates** in the Clean up menu, a step you take rather than one a save
+takes for you.
+
 **Which glyph is which.** A cell in the font's grid has room for a glyph name and a code
 point, which for a mark is `uni0308` above `U+0308` and says nothing about which mark it
 is. Rest the pointer on a cell and a tip beside it gives the character, the name the

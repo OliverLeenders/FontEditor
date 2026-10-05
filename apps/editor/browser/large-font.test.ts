@@ -22,9 +22,10 @@ import {
  * enough to look stopped: brought in from the start page, written to the
  * browser's storage, and read back out of it.
  *
- * The times asked for are several of what it takes, on a machine slower than
- * the one it was measured on. They are there to notice a font that takes a
- * minute again, not one that takes a second longer.
+ * The times asked for are many of what it takes: three seconds where this was
+ * written is half a minute on the machine the tests are run on for everybody,
+ * and thirty-three of them once, which failed a limit of thirty. They are there
+ * to notice a font that takes minutes again, not one that takes a second longer.
  */
 
 let browser: Browser;
@@ -85,7 +86,7 @@ describe("a large font, in a browser", () => {
       const took = Date.now() - began;
 
       expect(counted.length, "the pane counted while it read").toBeGreaterThan(0);
-      expect(took, "opened in a time nobody would call stopped").toBeLessThan(30_000);
+      expect(took, "opened in a time nobody would call stopped").toBeLessThan(90_000);
 
       // The feature file of a font this size: there, and typed into without a wait.
       await workspace(page, "Features");
