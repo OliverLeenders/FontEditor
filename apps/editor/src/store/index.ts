@@ -584,6 +584,52 @@ export class EditorStore {
     if (this.state.notice !== null) this.patch({ notice: null });
   }
 
+  // ---- an export on its way -----------------------------------------------
+
+  /**
+   * Begin an export, or answer `false` where one is already being made.
+   *
+   * One at a time: each is a font copied to another thread and compiled there,
+   * and a second asked for while the first is on its way is a click that did
+   * not see anything happen.
+   */
+  beginExport(): boolean {
+    if (this.state.exporting !== null) return false;
+    this.patch({ exporting: { done: 0, total: 0 }, notice: null });
+    return true;
+  }
+
+  /** Say how far the export has got. */
+  tellExport(done: number, total: number): void {
+    if (this.state.exporting !== null) this.patch({ exporting: { done, total } });
+  }
+
+  /**
+   * The export is over: what it made, and what it had to say about it; or
+   * what it failed with. Said on the status line, where it stays until read.
+   */
+  endExport(
+    said:
+      | { readonly file: string; readonly warnings: readonly string[] }
+      | { readonly failed: unknown },
+  ): void {
+    this.patch({ exporting: null });
+    if ("failed" in said) {
+      this.reportFailure(said.failed);
+      return;
+    }
+    const many = said.warnings.length;
+    this.patch({
+      notice: {
+        summary:
+          many === 0
+            ? `Exported ${said.file}`
+            : `Exported ${said.file} · ${String(many)} warning${many === 1 ? "" : "s"}`,
+        details: said.warnings.slice(0, 20),
+      },
+    });
+  }
+
   /**
    * Say that something asked for did not happen, where nothing else will.
    *

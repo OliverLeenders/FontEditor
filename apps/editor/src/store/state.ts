@@ -47,6 +47,15 @@ export type StoreState = {
    */
   readonly notice: Notice | null;
   /**
+   * The export being made: how many glyphs are done, of how many, with nothing
+   * for a total where the export does not count them. `null` when none is.
+   *
+   * Here rather than beside the Export menu, which is only in the font view.
+   * An export of a large font is half a minute, and somebody who starts one
+   * and goes back to drawing should still be told how it is getting on.
+   */
+  readonly exporting: { readonly done: number; readonly total: number } | null;
+  /**
    * The copies of the whole font kept beside it, newest first.
    *
    * Read on demand rather than watched: the list is what someone looks at while
@@ -347,6 +356,7 @@ export function initialState(preferences: Preferences): StoreState {
     recovered: false,
     opening: null,
     notice: null,
+    exporting: null,
     snapshots: [],
     project: project(starter),
     preview: null,

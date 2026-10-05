@@ -126,7 +126,10 @@ describe("pressing a format", () => {
     expect(downloads[0]?.file).toBe(exportFileName(store.editor.document));
     expect(downloads[0]?.type).toBe("font/otf");
     expect(downloads[0]?.size).toBeGreaterThan(0);
-    expect(screen.getByRole("status").textContent).toContain(downloads[0]?.file);
+    // Said on the status line, which is the store's to show: the menu is only
+    // in the font view, and the export is not over when somebody leaves it.
+    expect(store.getState().notice?.summary).toContain(downloads[0]?.file);
+    expect(store.getState().exporting).toBeNull();
   });
 
   it("hands over the TrueType flavour under the same name", async () => {
@@ -164,8 +167,10 @@ describe("pressing a format", () => {
     press(/^UFO/);
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toBe("the working copy could not be read");
+      expect(store.getState().notice?.summary).toBe("the working copy could not be read");
     });
+    expect(store.getState().notice?.failed).toBe(true);
+    expect(store.getState().exporting).toBeNull();
     expect(downloads).toHaveLength(0);
   });
 });

@@ -27,6 +27,61 @@ afterEach(() => {
   cleanup();
 });
 
+describe("an export on its way", () => {
+  it("is said on the line in every workspace, counted where it is counted", () => {
+    const store = freshStore();
+    // The glyph view, where the Export menu is not.
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />, store);
+    expect(screen.queryByText(/^Exporting/)).toBeNull();
+
+    act(() => {
+      expect(store.beginExport()).toBe(true);
+    });
+    expect(screen.getByText("Exporting…")).toBeTruthy();
+
+    act(() => {
+      store.tellExport(1280, 4042);
+    });
+    expect(screen.getByText("Exporting… 1,280 of 4,042 glyphs")).toBeTruthy();
+  });
+
+  it("is one at a time", () => {
+    const store = freshStore();
+    expect(store.beginExport()).toBe(true);
+    expect(store.beginExport()).toBe(false);
+    store.endExport({ file: "Font-Regular.otf", warnings: [] });
+    expect(store.beginExport()).toBe(true);
+  });
+
+  it("says what it made when it is over, and what it had to say about it", () => {
+    const store = freshStore();
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />, store);
+    act(() => {
+      store.beginExport();
+      store.endExport({
+        file: "Font-Regular.otf",
+        warnings: ["a: overlap kept", "b: overlap kept"],
+      });
+    });
+
+    expect(screen.queryByText(/^Exporting/)).toBeNull();
+    const said = screen.getByRole("button", { name: /Exported Font-Regular\.otf · 2 warnings/ });
+    expect(said.getAttribute("title")).toContain("a: overlap kept");
+  });
+
+  it("says what it failed with, as a warning", () => {
+    const store = freshStore();
+    render(<StatusBar workspace="glyph" onShortcuts={() => undefined} />, store);
+    act(() => {
+      store.beginExport();
+      store.endExport({ failed: new Error("This font has no glyphs to export.") });
+    });
+
+    expect(screen.queryByText(/^Exporting/)).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain("This font has no glyphs to export.");
+  });
+});
+
 describe("something that failed with nobody waiting for it", () => {
   it("is said on the line, as a warning, until it is read", () => {
     const store = freshStore();

@@ -148,12 +148,19 @@ describe("a large font, in a browser", () => {
           500,
         );
 
+        // Said on the status line, so still said from another workspace: the
+        // Export menu is only in the font view, and took its word with it.
+        await workspace(page, "Glyph");
+        await page.getByRole("textbox", { name: "Advance", exact: true }).waitFor();
+        expect(await said.isVisible(), "still said, away from the menu").toBe(true);
+
         const download = await arrived;
         const bytes = await readFile(await download.path());
         // An OpenType font with CFF outlines begins with OTTO.
         expect(String.fromCharCode(...bytes.subarray(0, 4))).toBe("OTTO");
         expect(bytes.length).toBeGreaterThan(500_000);
         await said.waitFor({ state: "detached" });
+        await page.getByRole("button", { name: /^Exported .+\.otf/ }).waitFor();
 
         expect(p.problems, "what the pages threw or said was an error").toEqual([]);
       } finally {

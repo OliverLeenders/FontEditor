@@ -84,12 +84,14 @@ describe("the hinted TrueType export", () => {
     });
     globals["__TAURI_INTERNALS__"] = { invoke };
 
-    render(<ExportFont />);
+    const { store } = render(<ExportFont />);
     openMenu();
     fireEvent.click(hinted()!);
 
     await waitFor(() => expect(invoke).toHaveBeenCalled());
-    await waitFor(() => expect(screen.queryByText(/bad table/)).not.toBeNull());
+    // Said on the status line, which is the store's to show.
+    await waitFor(() => expect(store.getState().notice?.summary).toMatch(/bad table/));
+    expect(store.getState().notice?.failed).toBe(true);
     expect(downloads).toEqual([]);
   });
 });

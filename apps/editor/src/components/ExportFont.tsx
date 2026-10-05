@@ -13,7 +13,7 @@ import {
   PRIVATE_USE_LAST,
   defaultLocation,
 } from "@typewright/font-model";
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 
 import { desktop } from "../desktop.js";
 import { compile } from "../exporting.js";
@@ -22,13 +22,6 @@ import { BarMenu } from "./BarMenu.js";
 import type { Item } from "./MenuItems.js";
 import styles from "./OpenFont.module.css";
 import { DownloadIcon } from "./icons.js";
-
-type Status =
-  | { readonly kind: "idle" }
-  /** Being made: how many glyphs are done, of how many, where that is counted. */
-  | { readonly kind: "working"; readonly done: number; readonly total: number }
-  | { readonly kind: "done"; readonly file: string; readonly warnings: readonly string[] }
-  | { readonly kind: "failed"; readonly message: string };
 
 /**
  * Export the font as a file you can install.
@@ -66,8 +59,6 @@ export function ExportFont(): React.JSX.Element {
       ).length,
     [document],
   );
-  const [status, setStatus] = useState<Status>({ kind: "idle" });
-
   /**
    * Hand a file to the browser.
    *
@@ -85,33 +76,25 @@ export function ExportFont(): React.JSX.Element {
   };
 
   /**
-   * Whether an export is being made. One at a time: each is a font copied to
-   * another thread and compiled there, and a second asked for while the first
-   * is on its way is a click that did not see anything happen.
+   * Make an export, and say on the status line how it goes and how it ended.
+   *
+   * On the status line and not beside this menu, which is only in the font
+   * view: the export goes on when somebody leaves it, and so does the telling.
    */
-  const working = useRef(false);
-
   const attemptAsync = async (
     run: () => Promise<{ file: string; warnings: readonly string[] }>,
   ): Promise<void> => {
-    if (working.current) return;
-    working.current = true;
-    setStatus({ kind: "working", done: 0, total: 0 });
+    if (!store.beginExport()) return;
     try {
-      setStatus({ kind: "done", ...(await run()) });
+      store.endExport(await run());
     } catch (error) {
-      setStatus({
-        kind: "failed",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      working.current = false;
+      store.endExport({ failed: error });
     }
   };
 
-  /** How far an export has got, said beside the menu as it goes. */
+  /** How far an export has got. */
   const told = (done: number, total: number): void => {
-    setStatus({ kind: "working", done, total });
+    store.tellExport(done, total);
   };
 
   const otf = (): void =>
@@ -495,35 +478,9 @@ export function ExportFont(): React.JSX.Element {
         panelLabel="Export"
         items={items}
       />
-      {status.kind === "working" ? (
-        <span className={styles.note} role="status" aria-busy="true">
-          {status.total > 0
-            ? `Exporting… ${count(status.done)} of ${count(status.total)} glyphs`
-            : "Exporting…"}
-        </span>
-      ) : null}
-      {status.kind === "done" ? (
-        <span className={styles.note} role="status">
-          {status.file}
-          {status.warnings.length > 0 ? (
-            <span className={styles.warn} title={status.warnings.slice(0, 20).join("\n")}>
-              {" "}
-              · {status.warnings.length} warning{status.warnings.length === 1 ? "" : "s"}
-            </span>
-          ) : null}
-        </span>
-      ) : null}
-      {status.kind === "failed" ? (
-        <span className={styles.error} role="alert">
-          {status.message}
-        </span>
-      ) : null}
     </div>
   );
 }
-
-/** A number of glyphs as it is read: 4,042. */
-const count = (n: number): string => n.toLocaleString("en-US");
 
 /** Whether a master sits where every axis has its default: the font's home. */
 function atHome(

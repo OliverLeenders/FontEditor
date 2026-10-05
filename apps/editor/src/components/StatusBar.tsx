@@ -69,6 +69,11 @@ export function StatusBar({
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
   const store = useEditorStore();
   const notice = useStoreValue((s) => s.notice);
+  // Two numbers rather than the object, which is a new one at every word of
+  // progress whether or not this line has anything new to say.
+  const exporting = useStoreValue((s) => s.exporting !== null);
+  const exported = useStoreValue((s) => s.exporting?.done ?? 0);
+  const exportTotal = useStoreValue((s) => s.exporting?.total ?? 0);
 
   // Three scalar selectors rather than one returning the measurement: it is a
   // fresh object every time, and comparing it by identity would re-render this
@@ -146,6 +151,18 @@ export function StatusBar({
         </span>
         {saved}
       </span>
+      {/* An export on its way, which is seconds for a large font and goes on
+          whichever workspace is open. */}
+      {exporting ? (
+        <span className={styles.state} role="status" aria-busy="true">
+          <span className={styles.turning}>
+            <LoaderCircleIcon />
+          </span>
+          {exportTotal > 0
+            ? `Exporting… ${count(exported)} of ${count(exportTotal)} glyphs`
+            : "Exporting…"}
+        </span>
+      ) : null}
       {recovered ? (
         <span className={`${styles.state} ${styles.warn}`}>
           <HistoryIcon />
@@ -215,6 +232,9 @@ const HINTS: Record<ViewId, string> = {
  * something failed, everything is where it should be. The word beside it says
  * which, and this says at a glance whether to care.
  */
+/** A number of glyphs as it is read: 4,042. */
+const count = (n: number): string => n.toLocaleString("en-US");
+
 function SaveMark({
   storage,
   saveStatus,
