@@ -42,6 +42,38 @@ describe("contoursFromCommands", () => {
     expect(new Set(places).size).toBe(3);
   });
 
+  it("draws nothing for a curve all of whose points are where the pen already is", () => {
+    // A corner of an icon cut from a variable font, where its rounding went to
+    // nothing: two curves and a line, none of them going anywhere.
+    const [c] = build([
+      { type: "M", x: 0, y: 0 },
+      { type: "L", x: 100, y: 0 },
+      { type: "Q", x1: 100, y1: 0, x: 100, y: 0 },
+      { type: "Q", x1: 100, y1: 0, x: 100, y: 0 },
+      { type: "L", x: 100, y: 0 },
+      { type: "C", x1: 100, y1: 0, x2: 100, y2: 0, x: 100, y: 0 },
+      { type: "L", x: 50, y: 80 },
+      { type: "Z" },
+    ]);
+
+    expect(c?.nodes.map((n) => [n.pt.x, n.pt.y, n.in, n.out])).toEqual([
+      [0, 0, null, null],
+      [100, 0, null, null],
+      [50, 80, null, null],
+    ]);
+  });
+
+  it("keeps a curve that leaves a point and comes back to it, which is a loop", () => {
+    const [c] = build([
+      { type: "M", x: 0, y: 0 },
+      { type: "L", x: 100, y: 0 },
+      { type: "C", x1: 160, y1: 60, x2: 40, y2: 60, x: 100, y: 0 },
+      { type: "L", x: 50, y: 80 },
+      { type: "Z" },
+    ]);
+    expect(c?.nodes).toHaveLength(4);
+  });
+
   it("adds the implicit closing segment when a path does not draw back", () => {
     const [c] = build([
       { type: "M", x: 0, y: 0 },

@@ -198,20 +198,33 @@ export function contoursFromCommands(
       continue;
     }
 
+    // And a curve all of whose points are where the pen is draws as little. A
+    // cut of a variable icon font has them at every corner whose rounding went
+    // to nothing: a corner came in as three points on one place.
+    const to = { x: command.x, y: command.y };
+    const stays = (at: Vec2): boolean => near(from, at, epsilon);
     if (command.type === "C") {
+      if (
+        stays(to) &&
+        stays({ x: command.x1, y: command.y1 }) &&
+        stays({ x: command.x2, y: command.y2 })
+      ) {
+        continue;
+      }
       draft.spans.push({
         c1: { x: command.x1, y: command.y1 },
         c2: { x: command.x2, y: command.y2 },
       });
-      draft.points.push({ x: command.x, y: command.y });
+      draft.points.push(to);
       continue;
     }
+
+    if (stays(to) && stays({ x: command.x1, y: command.y1 })) continue;
 
     // Raising a quadratic to a cubic is exact, so a TrueType outline arrives
     // with its shape intact. What it does change is node structure, since
     // TrueType's implied on-curve points have to become explicit — but the
     // parser has already made them so by the time the commands reach us.
-    const to = { x: command.x, y: command.y };
     const { c1, c2 } = quadraticToCubic({ a: from, q: { x: command.x1, y: command.y1 }, b: to });
     draft.spans.push({ c1, c2 });
     draft.points.push(to);
