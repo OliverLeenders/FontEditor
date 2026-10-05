@@ -203,6 +203,15 @@ describe("the editor, in a browser", () => {
       expect(p.problems).toEqual(["That place is taken."]);
       await said.click();
       await said.waitFor({ state: "detached" });
+
+      // And what is thrown at once, by something clicked, is said as well.
+      await page.evaluate(() => {
+        setTimeout(() => {
+          throw new Error("That glyph is gone.");
+        }, 0);
+      });
+      await page.getByRole("alert").filter({ hasText: "That glyph is gone." }).waitFor();
+      expect(p.problems).toEqual(["That place is taken.", "That glyph is gone."]);
     } finally {
       await p.context.close();
     }

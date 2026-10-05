@@ -293,7 +293,16 @@ export function App(): React.JSX.Element {
     const onUnhandled = (event: PromiseRejectionEvent): void => {
       store.reportFailure(event.reason);
     };
+    // And what was thrown there and then, by a click or a key: the same thing
+    // not having happened, with the same nobody told. Only what was thrown as
+    // an error — the browser says other things here that are not failures of
+    // anything asked for, a script it will not describe or an observer that
+    // ran out of frame.
+    const onError = (event: ErrorEvent): void => {
+      if (event.error instanceof Error) store.reportFailure(event.error);
+    };
 
+    window.addEventListener("error", onError);
     window.addEventListener("unhandledrejection", onUnhandled);
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
@@ -301,6 +310,7 @@ export function App(): React.JSX.Element {
     window.addEventListener("beforeunload", onUnload);
     window.addEventListener("resize", onResize);
     return () => {
+      window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onUnhandled);
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
