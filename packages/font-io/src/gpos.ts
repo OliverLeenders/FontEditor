@@ -445,7 +445,19 @@ export function kerningSubtables(
   const exceptions = new Map<number, Map<number, number>>();
   const firstCoverage = new Set<number>();
 
-  for (const pair of all) {
+  // The least particular first, so that the most particular is written last
+  // and is the one that stands: a group against a glyph, then a glyph against
+  // a group, then a glyph against a glyph. Each of the first two is written as
+  // the pairs of glyphs it means, and in whatever order the kerning happened
+  // to list them a pair named outright could be written over by one that only
+  // took it in — `A V` at −10, and `A` against the group `V` is in at −30
+  // after it. The editor says the pair named outright wins, and showed −10
+  // over a font that kerned −30.
+  const particular = (pair: { first: string; second: string }): number =>
+    (isGroupKey(pair.first) ? 0 : 2) + (isGroupKey(pair.second) ? 0 : 1);
+  const ordered = [...all].sort((l, r) => particular(l) - particular(r));
+
+  for (const pair of ordered) {
     const firstIsGroup = isGroupKey(pair.first);
     const secondIsGroup = isGroupKey(pair.second);
 

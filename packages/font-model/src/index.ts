@@ -147,6 +147,7 @@ export {
   kernGroupPairCount,
   kernIndex,
   kernMatch,
+  removeGlyphFromKerning,
   renameGlyphInKerning,
   kernPairCount,
   kernPairs,

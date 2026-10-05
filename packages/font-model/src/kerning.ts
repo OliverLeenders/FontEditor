@@ -357,6 +357,54 @@ export function kernPairCount(k: Kerning): number {
  * Group *names* are untouched: a group is not a glyph, and one called "O" that
  * happens to contain a glyph called "O" is a coincidence rather than a link.
  */
+/**
+ * Take a glyph out of the kerning: out of every group it is in, and every pair
+ * that names it.
+ *
+ * What a glyph removed leaves behind otherwise. A pair naming a glyph that is
+ * gone kerns nothing, is written to the font's files where another tool is told
+ * of a glyph that is not there — and waits: a glyph made later under the same
+ * name is kerned by it at once, against whatever the old one was kerned
+ * against. A group left with nobody in it is kept, with its pairs: it is still
+ * a group somebody made, and can be given glyphs again.
+ *
+ * The same kerning where the glyph was not in it.
+ */
+export function removeGlyphFromKerning(k: Kerning, name: GlyphName): Kerning {
+  let changed = false;
+
+  const without = (groups: Kerning["firstGroups"]): Kerning["firstGroups"] => {
+    const next: Record<string, readonly GlyphName[]> = {};
+    for (const [group, members] of Object.entries(groups)) {
+      if (members.includes(name)) {
+        changed = true;
+        next[group] = members.filter((member) => member !== name);
+      } else next[group] = members;
+    }
+    return next;
+  };
+  const firstGroups = without(k.firstGroups);
+  const secondGroups = without(k.secondGroups);
+
+  const pairs: Record<string, Readonly<Record<string, number>>> = {};
+  for (const [first, row] of Object.entries(k.pairs)) {
+    if (first === name) {
+      changed = true;
+      continue;
+    }
+    if (!(name in row)) {
+      pairs[first] = row;
+      continue;
+    }
+    changed = true;
+    const kept: Record<string, number> = {};
+    for (const [second, value] of Object.entries(row)) if (second !== name) kept[second] = value;
+    if (Object.keys(kept).length > 0) pairs[first] = kept;
+  }
+
+  return changed ? { firstGroups, secondGroups, pairs } : k;
+}
+
 export function renameGlyphInKerning(k: Kerning, from: GlyphName, to: GlyphName): Kerning {
   if (from === to) return k;
 

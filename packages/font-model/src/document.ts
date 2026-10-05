@@ -2,7 +2,12 @@ import type { Glyph } from "./glyph.js";
 import { type Grid, DEFAULT_GRID } from "./grid.js";
 import type { Guide } from "./guide.js";
 import type { LayerInfo } from "./layers.js";
-import { type Kerning, EMPTY_KERNING, renameGlyphInKerning } from "./kerning.js";
+import {
+  type Kerning,
+  EMPTY_KERNING,
+  removeGlyphFromKerning,
+  renameGlyphInKerning,
+} from "./kerning.js";
 import { renamedMetricKey } from "./metric-key-text.js";
 import { type TextToken, codePointFromName, textTokens } from "./text.js";
 
@@ -366,6 +371,8 @@ export function removeGlyph(document: FontDocument, name: GlyphName): FontDocume
     ...document,
     glyphOrder: document.glyphOrder.filter((candidate) => candidate !== name),
     glyphs,
+    // Its kerning goes with it, as it goes with a glyph renamed.
+    kerning: removeGlyphFromKerning(document.kerning, name),
   };
 }
 
