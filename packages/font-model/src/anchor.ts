@@ -52,6 +52,27 @@ export function isMarkAnchor(a: Anchor): boolean {
   return a.name.startsWith("_");
 }
 
+/**
+ * The part of a ligature an anchor is on, where its name says one.
+ *
+ * A ligature is several letters in one glyph, and an accent typed after the
+ * second of them belongs over the second. So a ligature offers a place for
+ * each part: `top_1` over the first, `top_2` over the second — the name the
+ * accents attach by, and which part, counted from one. That is the convention
+ * the sources of other tools keep, and it is all that says a glyph is a
+ * ligature as far as its anchors go.
+ *
+ * Only the spelling is read here. Whether `top` is a name anything attaches
+ * by is for whoever asks to know.
+ */
+export function ligaturePart(
+  name: string,
+): { readonly stem: string; readonly part: number } | null {
+  const found = /^([^_].*)_([1-9][0-9]*)$/.exec(name);
+  if (found === null) return null;
+  return { stem: found[1]!, part: Number(found[2]) };
+}
+
 /** The base-side name an accent's mark anchor pairs with, or `null`. */
 export function pairedName(a: Anchor): string | null {
   return isMarkAnchor(a) ? a.name.slice(1) : null;

@@ -5,6 +5,7 @@ import {
   groupNameOf,
   isGroupKey,
   isMarkAnchor,
+  ligaturePart,
   orderedGlyphs,
   pairedName,
   withResolvedMetrics,
@@ -154,7 +155,13 @@ function kerningFindings(document: FontDocument): Finding[] {
 function markFindings(document: FontDocument): Finding[] {
   const offered = new Set<string>();
   for (const g of orderedGlyphs(document)) {
-    for (const a of g.anchors) if (!isMarkAnchor(a)) offered.add(a.name);
+    for (const a of g.anchors) {
+      if (isMarkAnchor(a)) continue;
+      offered.add(a.name);
+      // A ligature offers it on a part: `top_2` is a place for `_top`.
+      const numbered = ligaturePart(a.name);
+      if (numbered !== null) offered.add(numbered.stem);
+    }
   }
 
   const out: Finding[] = [];

@@ -23,7 +23,14 @@ export {
 } from "./names.js";
 
 export type { Anchor } from "./anchor.js";
-export { anchor, isMarkAnchor, movedAnchor, pairedName, renamedAnchor } from "./anchor.js";
+export {
+  anchor,
+  isMarkAnchor,
+  ligaturePart,
+  movedAnchor,
+  pairedName,
+  renamedAnchor,
+} from "./anchor.js";
 
 export type { AnchorId, ComponentId, ContourId, GuideId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";

@@ -208,9 +208,9 @@ describe("what the Marks file refuses", () => {
       "in no mark class",
     ],
     [
-      "a ligature",
-      `${MARK}feature mark { pos ligature f_i <anchor 1 2> mark @MC_top; } mark;`,
-      "ligature",
+      "cursive attachment",
+      `${MARK}feature mark { pos cursive a <anchor 1 2> <anchor 3 4>; } mark;`,
+      "only pos base, pos ligature and pos mark",
     ],
     [
       "a lookup flag",

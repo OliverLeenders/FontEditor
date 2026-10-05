@@ -1,4 +1,10 @@
-import { type Anchor, type Glyph, type GlyphName, isMarkAnchor } from "@typewright/font-model";
+import {
+  type Anchor,
+  type Glyph,
+  type GlyphName,
+  isMarkAnchor,
+  ligaturePart,
+} from "@typewright/font-model";
 
 import { SUBTABLE_LIMIT, Writer, coverage } from "./gpos.js";
 import type { Lookup } from "./layout.js";
@@ -11,10 +17,12 @@ import type { Lookup } from "./layout.js";
  * shaper do the same thing at typesetting time, for the sequence `a` + combining
  * acute, where there is no composite glyph to place anything into.
  *
- * Two lookups come out of the same anchors. Mark-to-base attaches a mark to a
- * letter — `a` carrying `top`, an accent carrying `_top`. Mark-to-mark stacks a
- * second mark on the first, which is why an accent that itself carries `top` is
- * written into both.
+ * Three lookups come out of the same anchors. Mark-to-base attaches a mark to a
+ * letter — `a` carrying `top`, an accent carrying `_top`. Mark-to-ligature
+ * attaches it to one part of a ligature — `f_i` carrying `top_1` and `top_2`,
+ * and the accent going over whichever of the two letters it was typed after.
+ * Mark-to-mark stacks a second mark on the first, which is why an accent that
+ * itself carries `top` is written into both.
  *
  * A `GDEF` glyph class table goes with them. Without it a shaper does not know
  * which glyphs are marks, and mark attachment is not reliably applied — it is
@@ -99,6 +107,108 @@ function baseArray(bases: readonly BaseEntry[], classCount: number): Uint8Array 
   return w.finish();
 }
 
+/** One ligature: for each of its parts, an anchor per mark class. */
+type LigatureEntry = {
+  readonly id: number;
+  readonly parts: readonly (readonly (Anchor | null)[])[];
+};
+
+/**
+ * A LigatureAttach: how many parts, and for each a row like a base's.
+ *
+ * Its anchors are found from its own start, and not from the array's as a
+ * base's are, so each ligature is a table to itself.
+ */
+function ligatureAttach(entry: LigatureEntry, classCount: number): Uint8Array {
+  let at = 2 + entry.parts.length * classCount * 2;
+  const tables: Uint8Array[] = [];
+  const rows = entry.parts.map((part) =>
+    Array.from({ length: classCount }, (_, c) => {
+      const anchor = part[c] ?? null;
+      if (anchor === null) return 0;
+      const table = anchorTable(anchor);
+      const here = at;
+      at += table.length;
+      tables.push(table);
+      return here;
+    }),
+  );
+
+  const w = new Writer();
+  w.u16(entry.parts.length);
+  for (const row of rows) for (const off of row) w.u16(off);
+  for (const t of tables) w.bytesOf(t);
+  return w.finish();
+}
+
+/** A MarkLigPos subtable: the marks, and every ligature given with its parts. */
+function ligatureSubtable(
+  marks: readonly MarkEntry[],
+  ligatures: readonly LigatureEntry[],
+  classCount: number,
+): Uint8Array {
+  const sorted = [...ligatures].sort((l, r) => l.id - r.id);
+  const markCoverage = coverage([...marks].map((m) => m.id).sort((a, b) => a - b));
+  const ligatureCoverage = coverage(sorted.map((l) => l.id));
+  const markTable = markArray(marks);
+
+  const attached = sorted.map((l) => ligatureAttach(l, classCount));
+  const array = new Writer();
+  array.u16(attached.length);
+  let at = 2 + attached.length * 2;
+  for (const a of attached) {
+    array.u16(at);
+    at += a.length;
+  }
+  for (const a of attached) array.bytesOf(a);
+  const ligatureTable = array.finish();
+
+  const markCoverageAt = 12;
+  const ligatureCoverageAt = markCoverageAt + markCoverage.length;
+  const markArrayAt = ligatureCoverageAt + ligatureCoverage.length;
+  const ligatureArrayAt = markArrayAt + markTable.length;
+
+  const w = new Writer();
+  w.u16(1); // format 1
+  w.u16(markCoverageAt);
+  w.u16(ligatureCoverageAt);
+  w.u16(classCount);
+  w.u16(markArrayAt);
+  w.u16(ligatureArrayAt);
+  w.bytesOf(markCoverage);
+  w.bytesOf(ligatureCoverage);
+  w.bytesOf(markTable);
+  w.bytesOf(ligatureTable);
+  return w.finish();
+}
+
+/** Ligatures divided as letters are, each subtable with every mark. */
+function ligatureSubtables(
+  marks: readonly MarkEntry[],
+  ligatures: readonly LigatureEntry[],
+  classCount: number,
+): Uint8Array[] {
+  const fixed = 12 + (4 + marks.length * 2) + (2 + marks.length * 10) + 4 + 2;
+  const out: Uint8Array[] = [];
+  let taken: LigatureEntry[] = [];
+  let size = fixed;
+  for (const ligature of [...ligatures].sort((l, r) => l.id - r.id)) {
+    // Its place in the coverage, its offset in the array, its count of parts,
+    // a row of offsets for each part and an anchor for each place it has.
+    const places = ligature.parts.flat().filter((anchor) => anchor !== null).length;
+    const more = 2 + 2 + 2 + ligature.parts.length * classCount * 2 + places * 6;
+    if (taken.length > 0 && size + more > SUBTABLE_LIMIT) {
+      out.push(ligatureSubtable(marks, taken, classCount));
+      taken = [];
+      size = fixed;
+    }
+    taken.push(ligature);
+    size += more;
+  }
+  if (taken.length > 0) out.push(ligatureSubtable(marks, taken, classCount));
+  return out;
+}
+
 /**
  * The same attachment, in as many subtables as it takes for each to be sayable.
  *
@@ -173,12 +283,47 @@ function attachmentSubtable(
   return w.finish();
 }
 
-/** GDEF glyph classes. The two this font can tell apart are base and mark. */
+/** GDEF glyph classes. The three the anchors can tell apart. */
 const GDEF_BASE = 1;
+const GDEF_LIGATURE = 2;
 const GDEF_MARK = 3;
 
+/**
+ * The places a glyph offers on its parts, where it is a ligature: one row of
+ * classes for each part, as far as the highest part any anchor names.
+ *
+ * An anchor is on a part when its name is a class and a number — `top_2` where
+ * something attaches by `_top` — and is not itself a name something attaches
+ * by, which is a class of its own and an ordinary place. A glyph with no such
+ * anchor is not a ligature, and `null`.
+ *
+ * As many parts as the highest one named, and not as many as the ligature has
+ * letters. A mark typed after a part past the last is set by a shaper on the
+ * last, which is what the fonts made from such sources do: a long s and i
+ * with one place over the two of them takes its accent there whichever letter
+ * it follows.
+ */
+export function ligatureParts(
+  g: Glyph,
+  classOf: (name: string) => number | undefined,
+  classCount: number,
+): (Anchor | null)[][] | null {
+  const parts: (Anchor | null)[][] = [];
+  for (const a of g.anchors) {
+    if (isMarkAnchor(a) || classOf(a.name) !== undefined) continue;
+    const numbered = ligaturePart(a.name);
+    const at = numbered === null ? undefined : classOf(numbered.stem);
+    if (numbered === null || at === undefined) continue;
+    while (parts.length < numbered.part) {
+      parts.push(Array.from({ length: classCount }, () => null));
+    }
+    parts[numbered.part - 1]![at] ??= a;
+  }
+  return parts.length === 0 ? null : parts;
+}
+
 export type MarkCompilation = {
-  /** Mark-to-base and mark-to-mark, in that order; either may be absent. */
+  /** Mark-to-base, mark-to-ligature and mark-to-mark, in that order; any may be absent. */
   readonly lookups: readonly Lookup[];
   /** The feature tags to register, aligned with `lookups`. */
   readonly features: readonly string[];
@@ -263,10 +408,25 @@ export function compileMarks(
 
   const bases: BaseEntry[] = [];
   const stacked: BaseEntry[] = [];
+  const ligatures: LigatureEntry[] = [];
+  const ligatureNames = new Set<GlyphName>();
   for (const g of glyphs) {
-    const row = placesOn(g);
     const id = glyphIdOf(g.name);
-    if (row === null || id === undefined) continue;
+    if (id === undefined) continue;
+    // A glyph with a place on a part is a ligature, and a mark is set on it by
+    // the part it follows. A place it has that names no part is where a
+    // component lands, and is not written: a shaper asks one lookup about a
+    // ligature, and it is this one.
+    const parts = marksOf.has(g.name)
+      ? null
+      : ligatureParts(g, (name) => classIndex.get(name), classIndex.size);
+    if (parts !== null) {
+      ligatures.push({ id, parts });
+      ligatureNames.add(g.name);
+      continue;
+    }
+    const row = placesOn(g);
+    if (row === null) continue;
     // A mark that also offers a place is where a second mark stacks — an accent
     // with a `top` of its own. It belongs to the mark-to-mark lookup, and a
     // letter belongs to mark-to-base; nothing is in both.
@@ -282,25 +442,35 @@ export function compileMarks(
     lookups.push({ type: 4, subtables: attachmentSubtables(marks, bases, classIndex.size) });
     features.push("mark");
   }
+  if (ligatures.length > 0) {
+    lookups.push({ type: 5, subtables: ligatureSubtables(marks, ligatures, classIndex.size) });
+    features.push("mark");
+  }
   if (stacked.length > 0) {
     lookups.push({ type: 6, subtables: attachmentSubtables(marks, stacked, classIndex.size) });
     features.push("mkmk");
   }
   if (lookups.length === 0) return NOTHING;
 
-  return { lookups, features, classes: glyphClasses(glyphs, marksOf, glyphIdOf), warnings };
+  return {
+    lookups,
+    features,
+    classes: glyphClasses(glyphs, marksOf, ligatureNames, glyphIdOf),
+    warnings,
+  };
 }
 
 /**
  * Which glyphs are marks, and which are ordinary, for GDEF.
  *
- * Everything that attaches is a mark; everything else that takes part in the
- * attachment is a base. Glyphs mentioned by neither are left out, which class
- * zero already means.
+ * Everything that attaches is a mark; a glyph with a place on a part is a
+ * ligature; everything else that takes part in the attachment is a base.
+ * Glyphs mentioned by none are left out, which class zero already means.
  */
 function glyphClasses(
   glyphs: readonly Glyph[],
   marks: ReadonlyMap<GlyphName, Anchor>,
+  ligatures: ReadonlySet<GlyphName>,
   glyphIdOf: (name: GlyphName) => number | undefined,
 ): Map<number, number> {
   const classes = new Map<number, number>();
@@ -308,6 +478,7 @@ function glyphClasses(
     const id = glyphIdOf(g.name);
     if (id === undefined) continue;
     if (marks.has(g.name)) classes.set(id, GDEF_MARK);
+    else if (ligatures.has(g.name)) classes.set(id, GDEF_LIGATURE);
     else if (g.anchors.length > 0) classes.set(id, GDEF_BASE);
   }
   return classes;

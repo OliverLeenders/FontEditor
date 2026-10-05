@@ -206,7 +206,8 @@ function kerningFrom(gpos: ReadLayout, lookups: ReadonlySet<number>): SourceKern
  * Mark attachment, as anchors on the glyphs.
  *
  * Each class of marks in a mark-to-base lookup is an anchor name: the letters
- * carry it and the marks carry it with an underscore. The name says where the
+ * carry it and the marks carry it with an underscore. A ligature carries it
+ * once for each of its parts, numbered: `top_1`, `top_2`. The name says where the
  * class sits — `top`, `bottom` or `center`, from where the letters' anchors are
  * against the x-height — and is numbered where two classes would share one. A
  * mark-to-mark class whose marks already have a name keeps it, which is what
@@ -232,14 +233,51 @@ function anchorsFrom(
     if (MARK_FEATURES.has(feature.tag)) for (const i of feature.lookups) inMarkFeature.add(i);
   }
 
-  // Mark-to-base before mark-to-mark, so the second can take the first's names.
+  // Mark-to-base first, then ligatures, then mark-to-mark, so each can take
+  // the names of the one before.
   const order = gpos.lookups
     .map((lookup, index) => ({ lookup, index }))
     .filter(
       (it): it is { lookup: ReadLookup; index: number } =>
-        it.lookup !== null && (it.lookup.type === 4 || it.lookup.type === 6),
+        it.lookup !== null && it.lookup.type >= 4 && it.lookup.type <= 6,
     )
     .sort((a, b) => a.lookup.type - b.lookup.type || a.index - b.index);
+
+  type Attachment = Extract<Subtable, { kind: "markBase" | "markMark" | "markLigature" }>;
+  const attaches = (sub: Subtable): sub is Attachment =>
+    sub.kind === "markBase" || sub.kind === "markMark" || sub.kind === "markLigature";
+
+  // What the marks of a subtable attach to, each with the name its places are
+  // given after the class's: a letter's are the class's own, and a ligature's
+  // the class's and which part.
+  const holdersOf = (sub: Attachment) =>
+    sub.kind === "markLigature"
+      ? sub.ligatures.flatMap((l) =>
+          l.components.map((anchors, part) => ({
+            glyph: l.glyph,
+            anchors,
+            suffix: `_${String(part + 1)}`,
+          })),
+        )
+      : sub.bases.map((b) => ({ ...b, suffix: "" }));
+
+  // Where a mark is given a place anywhere in the font. Every subtable of a
+  // lookup carries every mark, and a mark only ligatures have a place for is
+  // in the letters' lookup with nothing to attach to: named from there it was
+  // named from nothing, which came out as the top.
+  const placesFor = (mark: number): AnchorPoint[] =>
+    order.flatMap(({ lookup, index }) =>
+      !inMarkFeature.has(index)
+        ? []
+        : lookup.subtables.flatMap((sub) => {
+            const found = attaches(sub) ? sub.marks.find((m) => m.glyph === mark) : undefined;
+            if (found === undefined || !attaches(sub)) return [];
+            return holdersOf(sub).flatMap((h) => {
+              const a = h.anchors[found.klass];
+              return a === null || a === undefined ? [] : [a];
+            });
+          }),
+    );
 
   for (const { lookup, index } of order) {
     if (!inMarkFeature.has(index)) continue;
@@ -247,10 +285,11 @@ function anchorsFrom(
     let fits = true;
 
     for (const sub of lookup.subtables) {
-      if (sub.kind !== "markBase" && sub.kind !== "markMark") {
+      if (!attaches(sub)) {
         fits = false;
         break;
       }
+      const holders = holdersOf(sub);
       for (let c = 0; c < sub.classCount; c++) {
         const marks = sub.marks.filter((m) => m.klass === c);
         if (marks.length === 0) continue;
@@ -258,7 +297,7 @@ function anchorsFrom(
           .map((m) => m.glyph)
           .sort((a, b) => a - b)
           .join(",");
-        const spots = sub.bases.flatMap((b) => {
+        const spots = holders.flatMap((b) => {
           const a = b.anchors[c];
           return a === null || a === undefined ? [] : [a];
         });
@@ -279,7 +318,9 @@ function anchorsFrom(
         }
 
         const known = marks.map((m) => markName.get(m.glyph)).find((n) => n !== undefined);
-        const name = known ?? nameFor(spots, xHeight, key, taken);
+        const name =
+          known ??
+          nameFor(spots.length > 0 ? spots : placesFor(marks[0]!.glyph), xHeight, key, taken);
         taken.set(name, key);
 
         for (const m of marks) {
@@ -289,10 +330,12 @@ function anchorsFrom(
             fits = false;
           }
         }
-        for (const b of sub.bases) {
+        for (const b of holders) {
           const a = b.anchors[c];
           if (a === null || a === undefined) continue;
-          if (!place(proposal, anchors, b.glyph, { name, x: a.x, y: a.y })) fits = false;
+          if (!place(proposal, anchors, b.glyph, { name: name + b.suffix, x: a.x, y: a.y })) {
+            fits = false;
+          }
         }
       }
       if (!fits) break;

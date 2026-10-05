@@ -455,11 +455,15 @@ describe("a font that does more than this editor compiles", () => {
 
     // The rest as source, and what is not compiled named.
     expect(features, features).toMatch(/pos cursive f <anchor 0 0> <anchor 500 100>;/);
-    expect(features).toMatch(/pos ligature f_i <anchor 120 600> mark @MC_1 ligComponent/);
+    // A ligature's places are anchors on it, one for each part, and no longer source.
+    expect(features).not.toMatch(/pos ligature/);
+    expect(read.document.glyphs["f_i"]?.anchors.filter((a) => /_1$/.test(a.name))).toEqual([
+      expect.objectContaining({ pt: { x: 120, y: 600 } }),
+    ]);
     expect(features).toMatch(/pos A B <5 0 10 0>/);
     expect(features).toMatch(/script arab;/);
     expect(warnings).toMatch(/cursive attachment/);
-    expect(warnings).toMatch(/mark attachment to ligatures/);
+    expect(warnings).not.toMatch(/mark attachment to ligatures/);
     expect(warnings).toMatch(/pair adjustments other than kerning/);
     // A stylistic set's name comes back as the block it was written in, and is not
     // a thing to warn about any more.

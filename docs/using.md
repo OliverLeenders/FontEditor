@@ -65,6 +65,16 @@ cleanly, and Ctrl-Z takes it back; while it has a problem, no anchor changes. It
 again from the anchors when you switch files or an anchor moves elsewhere, so comments typed
 there are not kept.
 
+**Accents on a ligature.** A ligature is several letters in one glyph, and an accent typed
+after the second of them belongs over the second. Give the ligature an anchor for each part,
+numbered from one: `top_1` over the first letter, `top_2` over the second, the same for
+`bottom` or whatever name the accents attach by. The exported font then puts an accent on the
+part it was typed after, and the Marks tab shows the glyph as `pos ligature`, its parts
+separated by `ligComponent`. Number as far as the last part that needs a place; a part in
+between with none is written `<anchor NULL>`. An anchor on the ligature with no number, a
+plain `top`, is still where a component lands in the drawing and is left out of the font's
+rules.
+
 **Which way the text runs.** The Spacing bar and the Proof bar each end with three pickers:
 direction, script and language. All three start at Auto, which reads them from the text —
 type Arabic and it is set right to left, with any Latin or numbers inside it in their own
@@ -475,8 +485,8 @@ takes it away, and it stays where it was put while you work under it.
 **What comes in.** An OTF, TTF or WOFF opened here brings what the font does as well as
 its outlines: kerning into the Spacing workspace, mark attachment as anchors on the glyphs,
 and every substitution and positioning rule as feature source in the Features workspace.
-What this editor cannot compile yet — cursive attachment, marks on ligatures — is kept in
-the source and named in the import report.
+Marks on ligatures come in as numbered anchors on the ligature. What this editor cannot
+compile yet — cursive attachment — is kept in the source and named in the import report.
 
 **Drawing with a pen.** Any contour can be drawn with a pen instead of being the edge of the
 ink. Select it and open the **Pen** section in the inspector, then choose **Stroke**: the contour

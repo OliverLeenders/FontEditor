@@ -4,6 +4,7 @@ import {
   correctDirections,
   counterIds,
   isEmptyContour,
+  ligaturePart,
 } from "@typewright/font-model";
 import { Blob, Face, Font } from "harfbuzzjs";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -63,18 +64,13 @@ const CASES: readonly Case[] = [
   {
     name: "Noto Sans",
     path: "noto-sans/NotoSans-Regular.ttf",
-    readWith: [
-      "mark attachment to ligatures is kept as feature source, which this editor does not compile",
-    ],
+    readWith: [],
     writtenWith: [ANCHORS_SAY, NULL_KEPT],
   },
   {
     name: "EB Garamond",
     path: "eb-garamond/EBGaramond[wght].ttf",
-    readWith: [
-      "device and variation adjustments in positioning are not imported",
-      "mark attachment to ligatures is kept as feature source, which this editor does not compile",
-    ],
+    readWith: ["device and variation adjustments in positioning are not imported"],
     writtenWith: [ANCHORS_SAY, NULL_KEPT],
   },
   {
@@ -157,6 +153,35 @@ describe.each(CASES)("$name, taken round", ({ path, readWith, writtenWith }) => 
     expect(setDifferently(before, after, [...one, ...two]).slice(0, 5)).toEqual([]);
   });
 
+  it("puts an accent on the part of a ligature it was typed after", () => {
+    // Every ligature the font offers a place on, by the letters its own rules
+    // make it of, with an accent after each of them in turn and after all.
+    const marks = MARKS.filter((c) => codes.includes(c)).map((c) => String.fromCodePoint(c));
+    const typed = (name: string): string | null => {
+      const [code] = document.glyphs[name]?.unicodes ?? [];
+      return code === undefined ? null : String.fromCodePoint(code);
+    };
+    const texts: string[] = [];
+    let ligatures = 0;
+    for (const name of document.glyphOrder) {
+      if (!document.glyphs[name]!.anchors.some((a) => ligaturePart(a.name) !== null)) continue;
+      const rule = new RegExp(`^\\s*sub ([^;']+) by ${name.replace(/\./g, "\\.")};`, "m");
+      const letters = rule.exec(document.features)?.[1]?.trim().split(/\s+/).map(typed);
+      if (letters === undefined || letters.includes(null)) continue;
+      ligatures += 1;
+      for (const mark of marks) {
+        for (let after = 0; after < letters.length; after++) {
+          texts.push(letters.map((l, i) => (i === after ? l! + mark : l!)).join(""));
+        }
+        texts.push(letters.map((l) => l! + mark).join(""));
+      }
+    }
+    const tags = ["liga", "dlig", "hlig", "ccmp"];
+    expect(setDifferently(before, after, texts, tags).slice(0, 5)).toEqual([]);
+    // Asked of something: the two faces that offer places on their ligatures.
+    if (/Noto|Garamond/i.test(path)) expect(ligatures).toBeGreaterThan(4);
+  });
+
   it("does with each of its features what the font it came from does", () => {
     const tags = [
       ...new Set([...document.features.matchAll(/^feature (\w{4}) \{/gm)].map((m) => m[1]!)),
@@ -190,7 +215,7 @@ describe.each(CASES)("$name, taken round", ({ path, readWith, writtenWith }) => 
     });
     expect(asked).toBeGreaterThan(80);
     expect(wrong).toEqual([]);
-  });
+  }, 120_000);
 
   it("comes back from a UFO as it went into one", () => {
     const round = (d: FontDocument): FontDocument => {
