@@ -36,6 +36,38 @@ const whole = () =>
     false,
   );
 
+describe("a glyph's layers behind the drawing", () => {
+  const sketch = {
+    advance: 500.5,
+    contours: [fractional()],
+    components: [],
+    anchors: [],
+    guides: [],
+    image: null,
+    kept: [],
+  };
+
+  it("are rounded with it", () => {
+    const g = glyph("a", { advance: 500, contours: [whole()], layers: { background: sketch } });
+    const rounded = roundGlyph(g);
+    expect(rounded).not.toBe(g);
+    // The drawing was on whole units already, and is the drawing it was.
+    expect(rounded.contours).toBe(g.contours);
+    const behind = rounded.layers["background"]!;
+    expect(behind.advance).toBe(501);
+    expect(behind.contours[0]!.nodes[0]!.pt).toEqual({ x: 100, y: 201 });
+    // And once rounded is rounded.
+    expect(roundGlyph(rounded)).toBe(rounded);
+  });
+
+  it("are counted, a glyph with only a layer off the grid being one to round", () => {
+    const g = glyph("a", { advance: 500, contours: [whole()], layers: { background: sketch } });
+    const d = fontDocument([g], DEFAULT_FONT_INFO);
+    expect(unroundedGlyphs(d)).toBe(1);
+    expect(unroundedGlyphs(roundFont(d))).toBe(0);
+  });
+});
+
 describe("roundGlyph", () => {
   it("puts anchors and handles on whole units", () => {
     const g = roundGlyph(addContour(glyph("a", { advance: 500 }), fractional()));

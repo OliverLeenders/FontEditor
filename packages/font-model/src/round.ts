@@ -78,20 +78,40 @@ function roundComponent(c: Component, grid: number): Component {
   return { ...c, transform: { ...c.transform, xOffset, yOffset } };
 }
 
-/** Round every coordinate of one glyph, its advance included. */
-export function roundGlyph(g: Glyph, grid: number = UNIT_GRID): Glyph {
-  const contours = g.contours.map((c) => roundContour(c, grid));
-  const components = g.components.map((c) => roundComponent(c, grid));
-  const anchors = g.anchors.map((a) => roundAnchor(a, grid));
-  const advance = roundTo(g.advance, grid);
+/** What of a drawing sits on the grid: a glyph's own, or the one it has in a layer. */
+type Drawn = Pick<Glyph, "advance" | "contours" | "components" | "anchors">;
+
+/** A drawing with every coordinate rounded; the same drawing where they all were. */
+function roundDrawing<D extends Drawn>(d: D, grid: number): D {
+  const contours = d.contours.map((c) => roundContour(c, grid));
+  const components = d.components.map((c) => roundComponent(c, grid));
+  const anchors = d.anchors.map((a) => roundAnchor(a, grid));
+  const advance = roundTo(d.advance, grid);
 
   const same =
-    advance === g.advance &&
-    contours.every((c, i) => c === g.contours[i]) &&
-    components.every((c, i) => c === g.components[i]) &&
-    anchors.every((a, i) => a === g.anchors[i]);
+    advance === d.advance &&
+    contours.every((c, i) => c === d.contours[i]) &&
+    components.every((c, i) => c === d.components[i]) &&
+    anchors.every((a, i) => a === d.anchors[i]);
 
-  return same ? g : { ...g, contours, components, anchors, advance };
+  return same ? d : { ...d, contours, components, anchors, advance };
+}
+
+/**
+ * Round every coordinate of one glyph, its advance included.
+ *
+ * And of what it is in the layers behind the drawing. A sketch in the
+ * background is kept in the same files to the same exactness, and a font put
+ * on whole units with a layer of it left between them was not put on them.
+ */
+export function roundGlyph(g: Glyph, grid: number = UNIT_GRID): Glyph {
+  const main = roundDrawing(g, grid);
+  let layers = g.layers;
+  for (const [name, drawing] of Object.entries(g.layers)) {
+    const rounded = roundDrawing(drawing, grid);
+    if (rounded !== drawing) layers = { ...layers, [name]: rounded };
+  }
+  return layers === g.layers ? main : { ...main, layers };
 }
 
 /** An anchor sits on the grid like anything else a font writes down. */
