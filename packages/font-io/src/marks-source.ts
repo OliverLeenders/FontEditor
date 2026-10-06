@@ -19,7 +19,7 @@ import {
   tokenize,
 } from "./fea.js";
 import { ENTRY, EXIT, joinsOf } from "./cursive.js";
-import { ligatureParts } from "./marks.js";
+import { ligatureParts, markRounds } from "./marks.js";
 
 /**
  * The Marks file: mark attachment written as feature source, from the anchors.
@@ -153,12 +153,20 @@ function isJoin(g: Glyph, a: Anchor, classes: ReadonlySet<string>): boolean {
 export function writeMarks(glyphs: readonly Glyph[], master: string | null = null): string {
   const classes = writtenClasses(glyphs);
   const markLines = new Map<string, string[]>([...classes].map((c) => [c, []]));
-  const bases: string[] = [];
-  const ligatures: string[] = [];
-  const stacked: string[] = [];
   const joined: string[] = [];
   const skipped: string[] = [];
   const order = [...classes];
+
+  // A mark that attaches by two anchors is in two classes, and a lookup has
+  // room for one of them: the classes are in rounds, as the compiler has
+  // them, and what the letters offer is written a round at a time.
+  const rounds = markRounds(glyphs.filter((g) => !leftOut(g)));
+  const roundOf = (name: string): number => rounds.get(name) ?? 0;
+  const roundCount = Math.max(0, ...rounds.values()) + 1;
+  const perRound = (): string[][] => Array.from({ length: roundCount }, () => []);
+  const bases = perRound();
+  const ligatures = perRound();
+  const stacked = perRound();
 
   for (const g of glyphs) {
     if (leftOut(g)) {
@@ -176,22 +184,31 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
     if (parts !== null) {
       // Each part on lines of its own, the parts told apart by the word
       // between them; a part with no place says so, since it is counted.
-      const lines = parts.flatMap((row, part) => {
-        const places = row.flatMap((a, c) =>
-          a === null ? [] : [`${anchorText(a.pt)} mark ${MARK_CLASS_PREFIX}${order[c]!}`],
+      for (let round = 0; round < roundCount; round++) {
+        // The places of this round's classes, as far as the last part that
+        // has one of them.
+        const here = parts.map((row) =>
+          row.map((a, c) => (roundOf(order[c]!) === round ? a : null)),
         );
-        return [
-          ...(part === 0 ? [] : ["ligComponent"]),
-          ...(places.length === 0 ? ["<anchor NULL>"] : places),
-        ];
-      });
-      ligatures.push(
-        [`    pos ligature ${spelled(g.name)}`, ...lines.map((l) => `        ${l}`)].join("\n") +
-          ";",
-      );
+        while (here.length > 0 && here[here.length - 1]!.every((a) => a === null)) here.pop();
+        if (here.length === 0) continue;
+        const lines = here.flatMap((row, part) => {
+          const places = row.flatMap((a, c) =>
+            a === null ? [] : [`${anchorText(a.pt)} mark ${MARK_CLASS_PREFIX}${order[c]!}`],
+          );
+          return [
+            ...(part === 0 ? [] : ["ligComponent"]),
+            ...(places.length === 0 ? ["<anchor NULL>"] : places),
+          ];
+        });
+        ligatures[round]!.push(
+          [`    pos ligature ${spelled(g.name)}`, ...lines.map((l) => `        ${l}`)].join("\n") +
+            ";",
+        );
+      }
       continue;
     }
-    const offers: string[] = [];
+    const offers = perRound();
     for (const a of g.anchors) {
       if (!written(g, a, classes) || a === joins?.entry || a === joins?.exit) continue;
       if (isMarkAnchor(a)) {
@@ -200,19 +217,48 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
           .get(c)!
           .push(`markClass ${spelled(g.name)} ${anchorText(a.pt)} ${MARK_CLASS_PREFIX}${c};`);
       } else {
-        offers.push(`${anchorText(a.pt)} mark ${MARK_CLASS_PREFIX}${a.name}`);
+        offers[roundOf(a.name)]!.push(`${anchorText(a.pt)} mark ${MARK_CLASS_PREFIX}${a.name}`);
       }
     }
-    if (offers.length === 0) continue;
 
     const kind = g.anchors.some(isMarkAnchor) ? "mark" : "base";
-    const rule =
-      offers.length === 1
-        ? `    pos ${kind} ${spelled(g.name)} ${offers[0]!};`
-        : [`    pos ${kind} ${spelled(g.name)}`, ...offers.map((o) => `        ${o}`)].join("\n") +
-          ";";
-    (kind === "mark" ? stacked : bases).push(rule);
+    for (const [round, offered] of offers.entries()) {
+      if (offered.length === 0) continue;
+      const rule =
+        offered.length === 1
+          ? `    pos ${kind} ${spelled(g.name)} ${offered[0]!};`
+          : [`    pos ${kind} ${spelled(g.name)}`, ...offered.map((o) => `        ${o}`)].join(
+              "\n",
+            ) + ";";
+      (kind === "mark" ? stacked : bases)[round]!.push(rule);
+    }
   }
+
+  // A feature's rules: as they are where the font is one round, and where it
+  // is several, each lot in a lookup of its own, in order. A lot is one kind
+  // of rule — a named lookup holds one kind, so a round's letters and its
+  // ligatures are two.
+  const feature = (tag: string, lots: readonly string[][]): string[] => {
+    const filled = lots.filter((rules) => rules.length > 0);
+    if (filled.length === 0) return [];
+    if (roundCount === 1 || filled.length === 1) {
+      return ["", `feature ${tag} {`, ...filled.flat(), `} ${tag};`];
+    }
+    const deeper = (rule: string): string =>
+      rule
+        .split("\n")
+        .map((line) => `    ${line}`)
+        .join("\n");
+    return [
+      "",
+      `feature ${tag} {`,
+      ...filled.flatMap((rules, i) => {
+        const name = `${tag}_${String(i + 1)}`;
+        return [`    lookup ${name} {`, ...rules.map(deeper), `    } ${name};`];
+      }),
+      `} ${tag};`,
+    ];
+  };
 
   const out: string[] = [
     master === null ? "# Marks, from the anchors." : `# Marks, from the anchors of ${master}.`,
@@ -224,15 +270,26 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
     "# position to move that anchor, or add or remove a line to add or remove one.",
     "# The file is written again from the anchors, so comments here are not kept.",
   ];
+  if (roundCount > 1) {
+    out.push(
+      "#",
+      "# A mark with two attaching anchors is in two classes, and the rules for them are",
+      "# in lookups of their own, in the order the anchors are in on the mark: where a",
+      "# glyph offers a place for both, the later lookup is the one that stands.",
+    );
+  }
   if (skipped.length > 0) {
     out.push("#", `# Left out, as names a feature file cannot spell: ${skipped.join(" ")}`);
   }
 
   for (const lines of markLines.values()) out.push("", ...lines);
-  if (bases.length + ligatures.length > 0) {
-    out.push("", "feature mark {", ...bases, ...ligatures, "} mark;");
-  }
-  if (stacked.length > 0) out.push("", "feature mkmk {", ...stacked, "} mkmk;");
+  out.push(
+    ...feature(
+      "mark",
+      bases.flatMap((rules, round) => [rules, ligatures[round]!]),
+    ),
+  );
+  out.push(...feature("mkmk", stacked));
   if (joined.length > 0) {
     out.push("", "feature curs {", `    ${JOINED_UNDER}`, ...joined, "} curs;");
   }
@@ -508,14 +565,32 @@ export function readMarks(source: string, hasGlyph: (name: GlyphName) => boolean
       r.complain(keyword.line, `expected "{" after feature ${tag.text}`);
       return skipInside(r);
     }
+    // A lookup inside the feature is a round of classes, which is worked out
+    // again from the anchors: its rules are read as the feature's own.
+    const inside: string[] = [];
     for (;;) {
       const token = r.take();
       if (token === undefined) {
         r.complain(keyword.line, `feature ${tag.text} is never closed`);
         return;
       }
-      if (token.text === "}") return closeBlock(r, "feature", tag.text);
+      if (token.text === "}") {
+        const lookup = inside.pop();
+        if (lookup === undefined) return closeBlock(r, "feature", tag.text);
+        closeBlock(r, "lookup", lookup);
+        continue;
+      }
       if (token.text === ";") continue;
+      if (token.text === "lookup" && tag.text !== "curs" && inside.length === 0) {
+        const name = r.take();
+        if (name === undefined || r.take()?.text !== "{") {
+          r.complain(token.line, "a lookup here is a block of rules: lookup name { … } name;");
+          skipInside(r);
+          continue;
+        }
+        inside.push(name.text);
+        continue;
+      }
       if (token.text === "pos" || token.text === "position") {
         readOffer(token, tag.text);
         continue;

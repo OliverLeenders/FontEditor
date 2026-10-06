@@ -284,8 +284,8 @@ jobs:
       # is in the proof file, and HarfBuzz sets both fonts string by string.
       # fontTools is also given the Marks file written from the font's anchors,
       # so its mark attachment has to agree with the one compiled from them:
-      # accents on letters, on accents, and on each part of a ligature, and
-      # letters joined one to the next.
+      # accents on letters, on accents, and on each part of a ligature, one
+      # that attaches two ways, and letters joined one to the next.
       - name: Export the feature proof font
         run: FEATURES_OUT="$RUNNER_TEMP/fea" pnpm --filter @typewright/font-io exec vitest run proof-features
 

@@ -47,7 +47,10 @@ compiles attachment from the anchors themselves, so the accents landing in the s
 in both fonts proves the Marks file says what the anchors do. Two of the proof font's
 glyphs are ligatures with a place on their parts, one of them with none on its middle
 part, and the strings put an accent after each letter of both. Three more are joined one
-to the next by an `entry` and an `exit`, which the file says as `pos cursive`.
+to the next by an `entry` and an `exit`, which the file says as `pos cursive`. And one
+accent attaches two ways, by two anchors: it is in two mark classes, and the file puts the
+rules for each in a named lookup of its own, since feaLib — like the font format — gives a
+mark one class to a lookup.
 
 ```bash
 FEATURES_OUT=/tmp/fea pnpm --filter @typewright/font-io exec vitest run proof-features

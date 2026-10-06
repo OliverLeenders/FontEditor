@@ -44,7 +44,6 @@ export type CheckId =
   | "empty-kern-group"
   | "unnamed-anchor"
   | "duplicate-anchor"
-  | "two-mark-anchors"
   | "mark-without-base"
   | "missing-image";
 
@@ -160,12 +159,6 @@ export const CHECKS: readonly Check[] = [
     severity: "warning",
     title: "Two anchors with one name",
     why: "An accent looking for that name finds whichever comes first, which is an accident of the order they were placed in.",
-  },
-  {
-    id: "two-mark-anchors",
-    severity: "warning",
-    title: "A mark that attaches two ways",
-    why: "Mark attachment gives a glyph one class, so only one of its attaching anchors reaches the compiled font.",
   },
   {
     id: "missing-image",

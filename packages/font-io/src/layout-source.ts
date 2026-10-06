@@ -95,8 +95,7 @@ export function recoverLayout(
   // ---- anchors -----------------------------------------------------------------
   const anchors = new Map<number, RecoveredAnchor[]>();
   const joinLookups = gpos === null ? new Set<number>() : joinsFrom(gpos, anchors, warn);
-  const markLookups =
-    gpos === null ? new Set<number>() : anchorsFrom(gpos, anchors, xHeight, names, warn);
+  const markLookups = gpos === null ? new Set<number>() : anchorsFrom(gpos, anchors, xHeight, warn);
 
   // ---- everything else, as source ---------------------------------------------
   const writer = new SourceWriter(nameOf, tables.gdef, warn, tables.names ?? []);
@@ -214,8 +213,15 @@ function kerningFrom(gpos: ReadLayout, lookups: ReadonlySet<number>): SourceKern
  * once for each of its parts, numbered: `top_1`, `top_2`. The name says where the
  * class sits — `top`, `bottom` or `center`, from where the letters' anchors are
  * against the x-height — and is numbered where two classes would share one. A
- * mark-to-mark class whose marks already have a name keeps it, which is what
- * makes an accent stack on an accent of its own kind.
+ * class whose marks already have a name, and attach by the same points under
+ * it, keeps it: which is what makes an accent stack on an accent of its own
+ * kind, and a ligature take the accents its letters take.
+ *
+ * A mark may be in several lookups and attach by a different point in each — a
+ * dot that sits at one height on round letters and at another on tall ones.
+ * It is then in several classes, and carries an attaching anchor for each, in
+ * the order of the lookups: the compiler writes them back as lookups in that
+ * order, the later standing where a letter has a place for both.
  *
  * A lookup that would put two different places under one name on one glyph, or
  * that the compiler here would not rebuild the same way, is left to be written
@@ -225,11 +231,9 @@ function anchorsFrom(
   gpos: ReadLayout,
   anchors: Map<number, RecoveredAnchor[]>,
   xHeight: number,
-  names: readonly string[],
   warn: (message: string) => void,
 ): Set<number> {
   const taken = new Map<string, string>(); // name → the sorted mark set it stands for
-  const markName = new Map<number, string>(); // mark glyph → its class name
   const used = new Set<number>();
 
   const inMarkFeature = new Set<number>();
@@ -294,6 +298,9 @@ function anchorsFrom(
         break;
       }
       const holders = holdersOf(sub);
+      // The names this subtable's classes have been given: two classes of one
+      // lookup are two names, whatever else agrees.
+      const namedHere = new Set<string>();
       for (let c = 0; c < sub.classCount; c++) {
         const marks = sub.marks.filter((m) => m.klass === c);
         if (marks.length === 0) continue;
@@ -321,11 +328,40 @@ function anchorsFrom(
           warn("device and variation adjustments in positioning are not imported");
         }
 
-        const known = marks.map((m) => markName.get(m.glyph)).find((n) => n !== undefined);
+        // Whether a name can be this class's: nothing that has it already —
+        // settled by a lookup before, or put forward by a subtable of this
+        // one — has it somewhere else than this class would.
+        const has = (glyph: number, anchor: string): RecoveredAnchor | undefined =>
+          proposal.get(glyph)?.find((a) => a.name === anchor) ??
+          anchors.get(glyph)?.find((a) => a.name === anchor);
+        const same = (a: RecoveredAnchor | undefined, x: number, y: number): boolean =>
+          a === undefined || (a.x === x && a.y === y);
+        const agrees = (name: string): boolean =>
+          !namedHere.has(name) &&
+          marks.every((m) => same(has(m.glyph, `_${name}`), m.anchor.x, m.anchor.y)) &&
+          holders.every((b) => {
+            const a = b.anchors[c];
+            return a === null || a === undefined || same(has(b.glyph, name + b.suffix), a.x, a.y);
+          });
+
+        // A name its marks have already, where it agrees; and a new one where
+        // none does, which is a mark attaching somewhere else by another point.
+        const carried = marks.flatMap((m) =>
+          [...(anchors.get(m.glyph) ?? []), ...(proposal.get(m.glyph) ?? [])]
+            .filter((a) => a.name.startsWith("_"))
+            .map((a) => a.name.slice(1)),
+        );
         const name =
-          known ??
-          nameFor(spots.length > 0 ? spots : placesFor(marks[0]!.glyph), xHeight, key, taken);
-        taken.set(name, key);
+          carried.find(agrees) ??
+          nameFor(
+            spots.length > 0 ? spots : placesFor(marks[0]!.glyph),
+            xHeight,
+            key,
+            taken,
+            agrees,
+          );
+        if (!taken.has(name)) taken.set(name, key);
+        namedHere.add(name);
 
         for (const m of marks) {
           if (
@@ -354,23 +390,10 @@ function anchorsFrom(
 
     for (const [glyph, list] of proposal) {
       const existing = anchors.get(glyph) ?? [];
-      for (const a of list) {
-        if (!existing.some((e) => e.name === a.name)) existing.push(a);
-        if (a.name.startsWith("_")) markName.set(glyph, a.name.slice(1));
-      }
+      for (const a of list) if (!existing.some((e) => e.name === a.name)) existing.push(a);
       anchors.set(glyph, existing);
     }
     used.add(index);
-  }
-
-  // A mark with two attaching anchors is one the compiler here gives one class;
-  // the font's other attachment is kept, but say which glyphs are affected.
-  for (const [glyph, list] of anchors) {
-    if (list.filter((a) => a.name.startsWith("_")).length > 1) {
-      warn(
-        `${names[glyph] ?? String(glyph)} attaches by more than one anchor, which export gives one class`,
-      );
-    }
   }
 
   return used;
@@ -462,6 +485,7 @@ function nameFor(
   xHeight: number,
   key: string,
   taken: ReadonlyMap<string, string>,
+  free: (name: string) => boolean,
 ): string {
   const ys = spots.map((s) => s.y).sort((a, b) => a - b);
   const middle = ys.length === 0 ? xHeight : ys[Math.floor(ys.length / 2)]!;
@@ -470,7 +494,7 @@ function nameFor(
   for (let n = 1; ; n++) {
     const name = n === 1 ? base : `${base}${String(n)}`;
     const holder = taken.get(name);
-    if (holder === undefined || holder === key) return name;
+    if ((holder === undefined || holder === key) && free(name)) return name;
   }
 }
 

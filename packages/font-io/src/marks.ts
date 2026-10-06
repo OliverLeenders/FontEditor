@@ -323,7 +323,10 @@ export function ligatureParts(
 }
 
 export type MarkCompilation = {
-  /** Mark-to-base, mark-to-ligature and mark-to-mark, in that order; any may be absent. */
+  /**
+   * Mark-to-base and mark-to-ligature, for each round of classes, and then
+   * mark-to-mark for each; any may be absent.
+   */
   readonly lookups: readonly Lookup[];
   /** The feature tags to register, aligned with `lookups`. */
   readonly features: readonly string[];
@@ -346,6 +349,67 @@ const NOTHING: MarkCompilation = {
 };
 
 /**
+ * Which lookup each class of marks is written in, counted from nought.
+ *
+ * A lookup gives a mark one class and one anchor. A mark that attaches by two
+ * — a dot that sits at one height on round letters and another on tall ones,
+ * carrying `_top` and `_top2` — is in two classes, and so in two lookups: the
+ * classes are sorted into rounds, no mark in two classes of one round, and each
+ * round is a lookup. Where a letter offers a place for both, the later lookup
+ * is the one that stands, so the order matters and is the order the anchors
+ * are in on the mark: a class is put after every class that comes before it on
+ * any mark.
+ *
+ * A font whose marks each attach by one anchor is one round, which is every
+ * font there was before a mark could have two.
+ */
+export function markRounds(glyphs: readonly Glyph[]): Map<string, number> {
+  // The classes in the order first met, and for each the classes that come
+  // before it on some mark.
+  const before = new Map<string, Set<string>>();
+  const shared = new Map<string, Set<string>>();
+  for (const g of glyphs) {
+    const names = [...new Set(g.anchors.filter(isMarkAnchor).map((a) => a.name.slice(1)))];
+    for (const [i, name] of names.entries()) {
+      if (!before.has(name)) before.set(name, new Set());
+      if (!shared.has(name)) shared.set(name, new Set());
+      for (const earlier of names.slice(0, i)) before.get(name)!.add(earlier);
+      for (const other of names) if (other !== name) shared.get(name)!.add(other);
+    }
+  }
+
+  // After the latest of the classes before it. Two marks that carry the same
+  // two anchors in opposite orders ask for a circle, which is cut where it is
+  // come back to.
+  const rounds = new Map<string, number>();
+  const visiting = new Set<string>();
+  const roundOf = (name: string): number => {
+    const known = rounds.get(name);
+    if (known !== undefined) return known;
+    visiting.add(name);
+    let round = 0;
+    for (const earlier of before.get(name) ?? []) {
+      if (!visiting.has(earlier)) round = Math.max(round, roundOf(earlier) + 1);
+    }
+    visiting.delete(name);
+    rounds.set(name, round);
+    return round;
+  };
+  for (const name of before.keys()) roundOf(name);
+
+  // And where a circle was cut, two classes of one mark may have landed in one
+  // round: the later met is moved on until it is by itself.
+  const settled: string[] = [];
+  for (const name of before.keys()) {
+    let round = rounds.get(name)!;
+    while (settled.some((s) => rounds.get(s) === round && shared.get(name)!.has(s))) round += 1;
+    rounds.set(name, round);
+    settled.push(name);
+  }
+  return rounds;
+}
+
+/**
  * Compile every glyph's anchors into mark attachment.
  *
  * The classes are the names the marks use: an accent carrying `_top` makes a
@@ -358,105 +422,100 @@ export function compileMarks(
   glyphs: readonly Glyph[],
   glyphIdOf: (name: GlyphName) => number | undefined,
 ): MarkCompilation {
-  const warnings: string[] = [];
+  const rounds = markRounds(glyphs);
+  if (rounds.size === 0) return NOTHING;
 
-  // A mark is a glyph that attaches by an anchor. Which class it is in is that
-  // anchor's name without the underscore.
-  const marksOf = new Map<GlyphName, Anchor>();
-  const classIndex = new Map<string, number>();
+  // A mark is a glyph that attaches by an anchor: by each of them, where it
+  // has several, the first of a name where a name is there twice.
+  const markNames = new Set<GlyphName>();
+  for (const g of glyphs) if (g.anchors.some(isMarkAnchor)) markNames.add(g.name);
 
-  for (const g of glyphs) {
-    const attaching = g.anchors.filter(isMarkAnchor);
-    const first = attaching[0];
-    if (first === undefined) continue;
-
-    if (attaching.length > 1) {
-      // The format gives a mark one class and one anchor. Two would need the
-      // glyph in two lookups, which is a different rule than the one drawn.
-      warnings.push(
-        `${g.name}: has ${String(attaching.length)} attaching anchors; using ${first.name}`,
-      );
-    }
-    marksOf.set(g.name, first);
-    const name = first.name.slice(1);
-    if (!classIndex.has(name)) classIndex.set(name, classIndex.size);
-  }
-
-  if (classIndex.size === 0) return NOTHING;
-
-  const marks: MarkEntry[] = [];
-  for (const [name, anchor] of marksOf) {
-    const id = glyphIdOf(name);
-    if (id === undefined) continue;
-    marks.push({ id, class: classIndex.get(anchor.name.slice(1))!, anchor });
-  }
-  if (marks.length === 0) return NOTHING;
-
-  /** The attaching places a glyph offers, one slot per class. */
-  const placesOn = (g: Glyph): (Anchor | null)[] | null => {
-    const row = Array.from({ length: classIndex.size }, () => null as Anchor | null);
-    let any = false;
-    for (const a of g.anchors) {
-      if (isMarkAnchor(a)) continue;
-      const at = classIndex.get(a.name);
-      if (at === undefined) continue;
-      row[at] = a;
-      any = true;
-    }
-    return any ? row : null;
-  };
-
-  const bases: BaseEntry[] = [];
-  const stacked: BaseEntry[] = [];
-  const ligatures: LigatureEntry[] = [];
+  // A glyph with a place on a part is a ligature, and a mark is set on it by
+  // the part it follows. A place it has that names no part is where a
+  // component lands, and is not written: a shaper asks the ligature lookups
+  // about a ligature, and no other.
   const ligatureNames = new Set<GlyphName>();
   for (const g of glyphs) {
-    const id = glyphIdOf(g.name);
-    if (id === undefined) continue;
-    // A glyph with a place on a part is a ligature, and a mark is set on it by
-    // the part it follows. A place it has that names no part is where a
-    // component lands, and is not written: a shaper asks one lookup about a
-    // ligature, and it is this one.
-    const parts = marksOf.has(g.name)
-      ? null
-      : ligatureParts(g, (name) => classIndex.get(name), classIndex.size);
-    if (parts !== null) {
-      ligatures.push({ id, parts });
-      ligatureNames.add(g.name);
-      continue;
+    if (markNames.has(g.name)) continue;
+    const isClass = (name: string): number | undefined => (rounds.has(name) ? 0 : undefined);
+    if (ligatureParts(g, isClass, 1) !== null) ligatureNames.add(g.name);
+  }
+
+  const attaching: Lookup[] = [];
+  const stacking: Lookup[] = [];
+  const count = Math.max(...rounds.values()) + 1;
+  for (let round = 0; round < count; round++) {
+    // This round's classes, numbered as its lookups number them.
+    const classIndex = new Map<string, number>();
+    for (const [name, at] of rounds) if (at === round) classIndex.set(name, classIndex.size);
+
+    const marks: MarkEntry[] = [];
+    for (const g of glyphs) {
+      const id = glyphIdOf(g.name);
+      const anchor = g.anchors.find((a) => isMarkAnchor(a) && classIndex.has(a.name.slice(1)));
+      if (id === undefined || anchor === undefined) continue;
+      marks.push({ id, class: classIndex.get(anchor.name.slice(1))!, anchor });
     }
-    const row = placesOn(g);
-    if (row === null) continue;
-    // A mark that also offers a place is where a second mark stacks — an accent
-    // with a `top` of its own. It belongs to the mark-to-mark lookup, and a
-    // letter belongs to mark-to-base; nothing is in both.
-    if (marksOf.has(g.name)) stacked.push({ id, anchors: row });
-    else bases.push({ id, anchors: row });
-  }
+    if (marks.length === 0) continue;
 
-  const lookups: Lookup[] = [];
-  const features: string[] = [];
+    /** The attaching places a glyph offers, one slot per class. */
+    const placesOn = (g: Glyph): (Anchor | null)[] | null => {
+      const row = Array.from({ length: classIndex.size }, () => null as Anchor | null);
+      let any = false;
+      for (const a of g.anchors) {
+        if (isMarkAnchor(a)) continue;
+        const at = classIndex.get(a.name);
+        if (at === undefined) continue;
+        row[at] ??= a;
+        any = true;
+      }
+      return any ? row : null;
+    };
 
-  if (bases.length > 0) {
-    // Type 4, and marks are not ignored: the whole job is to position them.
-    lookups.push({ type: 4, subtables: attachmentSubtables(marks, bases, classIndex.size) });
-    features.push("mark");
-  }
-  if (ligatures.length > 0) {
-    lookups.push({ type: 5, subtables: ligatureSubtables(marks, ligatures, classIndex.size) });
-    features.push("mark");
-  }
-  if (stacked.length > 0) {
-    lookups.push({ type: 6, subtables: attachmentSubtables(marks, stacked, classIndex.size) });
-    features.push("mkmk");
-  }
-  if (lookups.length === 0) return NOTHING;
+    const bases: BaseEntry[] = [];
+    const stacked: BaseEntry[] = [];
+    const ligatures: LigatureEntry[] = [];
+    for (const g of glyphs) {
+      const id = glyphIdOf(g.name);
+      if (id === undefined) continue;
+      if (ligatureNames.has(g.name)) {
+        const parts = ligatureParts(g, (name) => classIndex.get(name), classIndex.size);
+        if (parts !== null) ligatures.push({ id, parts });
+        continue;
+      }
+      const row = placesOn(g);
+      if (row === null) continue;
+      // A mark that also offers a place is where a second mark stacks — an
+      // accent with a `top` of its own. It belongs to the mark-to-mark lookup,
+      // and a letter belongs to mark-to-base; nothing is in both.
+      if (markNames.has(g.name)) stacked.push({ id, anchors: row });
+      else bases.push({ id, anchors: row });
+    }
 
+    if (bases.length > 0) {
+      // Type 4, and marks are not ignored: the whole job is to position them.
+      attaching.push({ type: 4, subtables: attachmentSubtables(marks, bases, classIndex.size) });
+    }
+    if (ligatures.length > 0) {
+      attaching.push({
+        type: 5,
+        subtables: ligatureSubtables(marks, ligatures, classIndex.size),
+      });
+    }
+    if (stacked.length > 0) {
+      stacking.push({ type: 6, subtables: attachmentSubtables(marks, stacked, classIndex.size) });
+    }
+  }
+  if (attaching.length + stacking.length === 0) return NOTHING;
+
+  // Every round's letters and ligatures, and then every round's marks on
+  // marks: an accent on an accent is set after it has been set on the letter,
+  // whichever round either was in.
   return {
-    lookups,
-    features,
-    classes: glyphClasses(glyphs, marksOf, ligatureNames, glyphIdOf),
-    warnings,
+    lookups: [...attaching, ...stacking],
+    features: [...attaching.map(() => "mark"), ...stacking.map(() => "mkmk")],
+    classes: glyphClasses(glyphs, markNames, ligatureNames, glyphIdOf),
+    warnings: [],
   };
 }
 
@@ -469,7 +528,7 @@ export function compileMarks(
  */
 function glyphClasses(
   glyphs: readonly Glyph[],
-  marks: ReadonlyMap<GlyphName, Anchor>,
+  marks: ReadonlySet<GlyphName>,
   ligatures: ReadonlySet<GlyphName>,
   glyphIdOf: (name: GlyphName) => number | undefined,
 ): Map<number, number> {

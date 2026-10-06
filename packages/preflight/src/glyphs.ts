@@ -7,7 +7,7 @@ import type {
   Node,
   NodeId,
 } from "@typewright/font-model";
-import { isMarkAnchor, wouldRecurse } from "@typewright/font-model";
+import { wouldRecurse } from "@typewright/font-model";
 
 import { type Finding, finding } from "./finding.js";
 
@@ -263,11 +263,6 @@ function anchorFindings(g: Glyph): Finding[] {
       out.push(finding("duplicate-anchor", g.name, `Two anchors named ${a.name}.`));
     }
     seen.add(a.name);
-  }
-
-  const attaching = g.anchors.filter(isMarkAnchor).map((a) => a.name);
-  if (attaching.length > 1) {
-    out.push(finding("two-mark-anchors", g.name, `It attaches by ${attaching.join(" and ")}.`));
   }
 
   return out;

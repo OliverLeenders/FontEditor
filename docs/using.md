@@ -65,6 +65,14 @@ cleanly, and Ctrl-Z takes it back; while it has a problem, no anchor changes. It
 again from the anchors when you switch files or an anchor moves elsewhere, so comments typed
 there are not kept.
 
+**An accent that attaches two ways.** A dot may sit at one height on round letters and at
+another on tall ones. Give the mark an attaching anchor for each — `_top` and, say,
+`_high` — and give each letter the place it offers, `top` or `high`. The exported font sets
+the mark by whichever the letter has. Where a letter has both, the anchor that comes later on
+the mark is the one that stands; the order is the order the anchors were added to the mark.
+The Marks tab shows the mark in a class for each anchor, and the letters' rules in a lookup
+for each.
+
 **Letters joined to the next.** In a script written joined up and on a slope, such as
 Nastaliq, a letter sits where the one before it left off. Give a glyph an anchor named
 `entry` where it is joined to and one named `exit` where the next joins it; a letter that
@@ -493,10 +501,11 @@ takes it away, and it stays where it was put while you work under it.
 **What comes in.** An OTF, TTF or WOFF opened here brings what the font does as well as
 its outlines: kerning into the Spacing workspace, mark attachment as anchors on the glyphs,
 and every substitution and positioning rule as feature source in the Features workspace.
-Marks on ligatures come in as numbered anchors on the ligature, and the joins of a script
-written joined up as an `entry` and an `exit` on each glyph. What does not fit the anchors —
-a second set of joins, an accent placed by more lookups than a glyph has anchors for — is
-kept in the source and named in the import report.
+Marks on ligatures come in as numbered anchors on the ligature, a mark that attaches by
+different points in different lookups as an attaching anchor for each, and the joins of a
+script written joined up as an `entry` and an `exit` on each glyph. What does not fit the
+anchors — a second set of joins, an anchor tied to a point of the outline — is kept in the
+source and named in the import report.
 
 **Drawing with a pen.** Any contour can be drawn with a pen instead of being the edge of the
 ink. Select it and open the **Pen** section in the inspector, then choose **Stroke**: the contour

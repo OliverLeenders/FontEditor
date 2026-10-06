@@ -142,9 +142,9 @@ The gaps worth naming, in the order they would bite someone using this:
   mark-to-mark where an accent offers a `top` of its own for a second one to stack on,
   and the `GDEF` glyph classes without which a shaper does not know which glyphs are
   marks. So `a` + U+0301 typed as two characters is positioned by the font, with no
-  composite glyph involved. The UFO carries the anchors both ways, format 1 and 2. What
-  is not there is a mark glyph in two classes at once — the format gives it one, and a
-  glyph with two attaching anchors is named in the export warnings.
+  composite glyph involved. The UFO carries the anchors both ways, format 1 and 2. A
+  mark glyph with two attaching anchors is in two classes, each written in a lookup of
+  its own, since the format gives a mark one class to a lookup.
 
 - **Contour directions are corrected where the font is compiled, not in the drawing.**
   A rasteriser fills one path by the non-zero winding rule, so two contours that overlap

@@ -7,7 +7,7 @@ import { exportFont, layoutTables, writtenOrder } from "../src/export.js";
 import { type ImportResult, importFont } from "../src/import.js";
 import { withTable } from "../src/sfnt.js";
 import { type SourceFont, parseFont } from "../src/source.js";
-import { type Placed, fontBytes, set } from "./real-fonts.js";
+import { type Placed, fontBytes, set, setDifferently } from "./real-fonts.js";
 
 /**
  * A Nastaliq, for the letters joined one to the next.
@@ -17,17 +17,16 @@ import { type Placed, fontBytes, set } from "./real-fonts.js";
  * cursive attachment on seven hundred glyphs, and it is the font of the corpus
  * that is here for that.
  *
- * It is also the most intricate font there is, and not everything it does
- * comes through this editor: its dots are placed by more lookups than a glyph
- * has anchors for. That is said when it is read, and listed below. So what is
- * asked is its letters, and not its dots.
+ * It is also the most intricate font there is. Eleven thousand rules in a
+ * context choose the form of each letter, and its dots are placed by one
+ * lookup after another, the same dot attaching by a different point in each.
  *
- * Twice. The joining by itself: the positioning this editor writes from the
- * font as read is put into the font as released, in place of its own, and
- * HarfBuzz sets Urdu with both; the substitutions are then the font's own. And
- * the font taken round whole, where they are not: eleven thousand rules in a
- * context, read in as source and compiled again, have to choose the same form
- * of every letter for the joining to have anything to join.
+ * Asked twice. The joining by itself: the positioning this editor writes from
+ * the font as read is put into the font as released, in place of its own, and
+ * HarfBuzz sets Urdu with both; the substitutions are then the font's own, and
+ * every letter has to be where it was. And the font taken round whole — read
+ * in, written out, and set beside the font it came from: the same glyphs, each
+ * letter and each dot where it was. But for one thing, which is named below.
  */
 
 const PATH = "noto-nastaliq-urdu/NotoNastaliqUrdu[wght].ttf";
@@ -38,19 +37,20 @@ const WORDS =
     " ",
   );
 
-/** What the font is read with: everything known not to come through, and nothing of its joins. */
-const READ_WITH = [
-  "device and variation adjustments in positioning are not imported",
-  "mark attachment lookup 20 could not be made into anchors, and is kept as feature source",
-  "mark attachment lookup 21 could not be made into anchors, and is kept as feature source",
-  "mark attachment lookup 22 could not be made into anchors, and is kept as feature source",
-  "mark attachment lookup 26 could not be made into anchors, and is kept as feature source",
-  "mark attachment lookup 27 could not be made into anchors, and is kept as feature source",
-  "mark attachment lookup 28 could not be made into anchors, and is kept as feature source",
-  "uni08E3_AltNS attaches by more than one anchor, which export gives one class",
-  "uni08F2_AltNS attaches by more than one anchor, which export gives one class",
-  "mark attachment to ligatures is kept as feature source, which this editor does not compile",
-];
+/** With the marks a reader of the Quran or a learner writes: short vowels, doubling, and a stack of two. */
+const VOWELLED = ["بِسْمِ", "اللّٰہ", "مُحَمَّد", "کِتَابٌ", "قُرْآن", "اَلْحَمْدُ", "عَلَیْہِ"];
+
+/**
+ * Known not to come through yet: a vowel below a letter that has a dot below
+ * and a doubling sign above. The font as released stacks the vowel on the dot
+ * by a lookup that passes over every mark but those below — a mark filtering
+ * set — and this editor writes its marks on marks without one, so the sign
+ * between the two is in the way and the vowel is set on the letter instead.
+ */
+const NOT_YET = ["رَبِّ"];
+
+/** What the font is read with: the one thing known not to come through. */
+const READ_WITH = ["device and variation adjustments in positioning are not imported"];
 
 describe("Noto Nastaliq Urdu, and its letters joined", () => {
   let bytes: ArrayBuffer;
@@ -150,42 +150,27 @@ describe("Noto Nastaliq Urdu, and its letters joined", () => {
     expect(lifted).toBeGreaterThan(40);
   }, 120_000);
 
-  it("is the same letters in the same places, read in and written out whole", () => {
+  it("is the same glyphs in the same places, read in and written out whole", () => {
     const written = exportFont(document, counterIds("out"));
-    // Nothing said of its substitutions or its joins: only of the dots, which
-    // the anchors place and the source it was read with does not.
-    const strange = written.warnings.filter(
-      (w) =>
-        !/attachment is where the glyphs' anchors say/.test(w) &&
-        !/has 2 attaching anchors/.test(w) &&
-        !/is left out of the character map/.test(w),
-    );
+    // Nothing said of its substitutions, its joins or its dots.
+    const strange = written.warnings.filter((w) => !/is left out of the character map/.test(w));
     expect(strange.slice(0, 5)).toEqual([]);
 
     const before = new Font(new Face(new Blob(bytes)));
     const after = new Font(new Face(new Blob(written.bytes)));
+    const texts = [...WORDS, ...VOWELLED];
+    expect(setDifferently(before, after, texts).slice(0, 3)).toEqual([]);
+    // And what is known not to: said here, so that mending it is noticed.
+    expect(setDifferently(before, after, NOT_YET)).toHaveLength(NOT_YET.length);
+
+    // Asked of something: there are dots in these words, off the line, and
+    // more than one on a letter.
     const marks = new Set<string>();
     for (const [id, kind] of source.layout?.gdef?.classes ?? []) {
       if (kind === 3) marks.add(source.glyphs[id]!.name ?? "");
     }
-    const letters = (placed: readonly Placed[]): string =>
-      placed
-        .filter((g) => !marks.has(g.name))
-        .map((g) => `${g.name}+${String(g.advance)}@${String(g.x)},${String(g.y)}`)
-        .join(" ");
-    const named = (placed: readonly Placed[]): string => placed.map((g) => g.name).join(" ");
-
-    const wrong: string[] = [];
-    for (const word of WORDS) {
-      const was = set(before, word);
-      const is = set(after, word);
-      // Every glyph, the dots among them, is the glyph it was; and every
-      // letter is where it was.
-      if (named(was) !== named(is)) wrong.push(`${word}: ${named(was)}  IS  ${named(is)}`);
-      else if (letters(was) !== letters(is)) {
-        wrong.push(`${word}: ${letters(was)}  IS  ${letters(is)}`);
-      }
-    }
-    expect(wrong.slice(0, 3)).toEqual([]);
+    const dots = texts.flatMap((text) => set(before, text).filter((g) => marks.has(g.name)));
+    expect(dots.length).toBeGreaterThan(60);
+    expect(dots.filter((g) => g.y !== 0).length).toBeGreaterThan(40);
   }, 300_000);
 });

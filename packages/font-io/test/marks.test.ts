@@ -148,12 +148,26 @@ describe("compiling anchors into GPOS", () => {
     ]);
   });
 
-  it("uses one anchor of a mark that has several, and says which", () => {
+  it("writes a mark that has two attaching anchors into a lookup for each", () => {
+    // The letter offers a top and a bottom, and the accent attaches by either:
+    // two classes, and a lookup has room for one of them to a mark.
     const twice = addAnchor(accent(), anchor("second", "_bottom", { x: 10, y: 20 }));
-    const out = compileMarks([letter(), twice], idOf);
+    const below = addAnchor(letter(), anchor("a-bottom", "bottom", { x: 240, y: -10 }));
+    const out = compileMarks([below, twice], idOf);
 
-    expect(out.warnings[0]).toContain("acutecomb");
-    expect(out.warnings[0]).toContain("_top");
+    expect(out.warnings).toEqual([]);
+    expect(out.features).toEqual(["mark", "mark"]);
+    const anchorOf = (sub: Uint8Array) => {
+      const array = u16(sub, 8);
+      const at = array + u16(sub, array + 4);
+      return [i16(sub, at + 2), i16(sub, at + 4)];
+    };
+    // In the order the anchors are in on the mark: the later is the one that
+    // stands where a letter has a place for both.
+    expect(out.lookups.map((l) => anchorOf(l.subtables[0]!))).toEqual([
+      [40, 0],
+      [10, 20],
+    ]);
   });
 
   it("leaves out a glyph the font does not have", () => {

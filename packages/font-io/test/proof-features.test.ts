@@ -97,14 +97,20 @@ const ANCHORS: Readonly<Record<string, readonly (readonly [string, number, numbe
     ["top", 250, 480],
     ["bottom", 240, 0],
   ],
-  o: [["top", 260, 500]],
+  // A second place above, which only one of the accents attaches by.
+  o: [
+    ["top", 260, 500],
+    ["high", 260, 590],
+  ],
   "a.sc": [["top", 250, 400]],
   acutecomb: [
     ["_top", 0, 500],
     ["top", 0, 700],
   ],
+  // Two ways of attaching: a class for each, and a lookup for each.
   gravecomb: [
     ["_top", 10, 520],
+    ["_high", 10, 500],
     ["top", 10, 720],
   ],
   cedillacomb: [["_bottom", 0, 0]],
@@ -254,6 +260,12 @@ const STRINGS: readonly Setting[] = [
   { text: "á̧" },
   { text: "ná" },
   { text: "f́i" },
+  // An accent that attaches two ways: by the later where a letter has a place for both.
+  { text: "o\u0300" },
+  { text: "a\u0300" },
+  { text: "o\u0301" },
+  { text: "o\u0300\u0301" },
+  { text: "o\u0301\u0300" },
   // Two lookups called at one glyph, and one glyph for one among one for several.
   { text: "Aa" },
   { text: "AaTa" },

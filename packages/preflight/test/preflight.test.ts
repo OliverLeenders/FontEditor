@@ -298,14 +298,14 @@ describe("anchors", () => {
     expect(checks.has("unnamed-anchor")).toBe(true);
   });
 
-  it("finds a mark that attaches two ways", () => {
+  it("has nothing to say of a mark that attaches two ways, which a font may do", () => {
     const document = font(
       addAnchor(addAnchor(glyph("acute", { advance: 0 }), at("_top")), at("_bottom")),
       addAnchor(glyph("A", { advance: 600 }), at("top")),
       addAnchor(glyph("B", { advance: 600 }), at("bottom")),
     );
 
-    expect(tripped(document).has("two-mark-anchors")).toBe(true);
+    expect([...tripped(document)]).toEqual([]);
   });
 
   it("finds a mark with nowhere to land, and not one that has somewhere", () => {
