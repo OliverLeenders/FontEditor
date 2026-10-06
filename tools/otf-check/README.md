@@ -42,9 +42,12 @@ font. HarfBuzz then sets a list of strings with both, and every glyph and positi
 agree.
 
 The file fontTools is given ends with the Marks file the editor writes from the proof
-font's anchors — `markClass`, `pos base` and `pos mark`. The editor compiles attachment
-from the anchors themselves, so the accents landing in the same place in both fonts proves
-the Marks file says what the anchors do.
+font's anchors — `markClass`, `pos base`, `pos ligature` and `pos mark`. The editor
+compiles attachment from the anchors themselves, so the accents landing in the same place
+in both fonts proves the Marks file says what the anchors do. Two of the proof font's
+glyphs are ligatures with a place on their parts, one of them with none on its middle
+part, and the strings put an accent after each letter of both. Three more are joined one
+to the next by an `entry` and an `exit`, which the file says as `pos cursive`.
 
 ```bash
 FEATURES_OUT=/tmp/fea pnpm --filter @typewright/font-io exec vitest run proof-features
@@ -95,6 +98,22 @@ TrueType one against it as a shape — and what `rvrn` substitutes is compared w
 ```sh
 DESIGNSPACE_OUT=/tmp/ds pnpm --filter @typewright/font-io exec vitest run proof-designspace
 python check_designspace_vf.py /tmp/ds
+```
+
+## Kerning that varies
+
+`check_vf_kerning.py` is for kerning that is not the same in every master. The editor
+writes each pair's value at the default and what it changes by — a variation store in
+GDEF, and a device table on each value in GPOS pointing into it — and HarfBuzz reading
+that back is asked in the suite. Here fontTools' instancer pins the font at each master
+and at two places between them, which works every device table out into a plain number,
+and each pair of the letters is then looked up the way a shaper does and compared with
+what the masters' own kerning says it should be there.
+
+```sh
+VARYING_KERNING_OUT=/tmp/kern pnpm --filter @typewright/font-io exec vitest run varying-kerning
+python check_vf_kerning.py /tmp/kern/Kern-VF.otf /tmp/kern/kerning.json
+python check_vf_kerning.py /tmp/kern/Kern-VF.ttf /tmp/kern/kerning.json
 ```
 
 ## The TrueType flavour

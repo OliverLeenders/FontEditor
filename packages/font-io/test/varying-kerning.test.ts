@@ -1,3 +1,6 @@
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import {
   DEFAULT_FONT_INFO,
   type FontDocument,
@@ -7,6 +10,8 @@ import {
   fontDocument,
   glyph,
   groupKey,
+  kernIndex,
+  kernValue,
   node,
 } from "@typewright/font-model";
 import { Blob, Face, Font } from "harfbuzzjs";
@@ -25,7 +30,13 @@ import { set } from "./real-fonts.js";
  * them by what lies between — each pair's value at the default, and what it
  * changes by, kept in a store beside the font's classes and pointed at from
  * the pair. HarfBuzz is asked, since it did not write any of it.
+ *
+ * And fontTools, on CI: with `VARYING_KERNING_OUT` set the fonts are written
+ * out with what each pair should be at each place, and
+ * `tools/otf-check/check_vf_kerning.py` pins them there and reads the pairs.
  */
+
+const OUT = process.env["VARYING_KERNING_OUT"] ?? "";
 
 const ids = counterIds("vk");
 const WEIGHT = { tag: "wght", name: "Weight", min: 400, default: 400, max: 900 };
@@ -142,5 +153,46 @@ describe.each([
     ]);
     const plain = new Font(new Face(new Blob(out.bytes)));
     expect(kernAt(plain, "AV", 900)).toBe(-40);
+  });
+});
+
+describe.runIf(OUT !== "")("kerning that changes with the weight, for fontTools to read", () => {
+  const regular = master("Regular", 400, {
+    ...GROUPS,
+    pairs: { [L]: { [R]: -40 }, T: { A: -12 } },
+  });
+  const bold = master("Bold", 900, {
+    ...GROUPS,
+    pairs: { [L]: { [R]: -90 }, A: { T: -60 }, B: { W: 0 }, T: { A: -12 } },
+  });
+
+  it("is written out, both flavours, with every pair at each master and between them", () => {
+    mkdirSync(OUT, { recursive: true });
+    writeFileSync(
+      join(OUT, "Kern-VF.otf"),
+      new Uint8Array(exportVariableFont([WEIGHT], [regular, bold], []).bytes),
+    );
+    writeFileSync(
+      join(OUT, "Kern-VF.ttf"),
+      new Uint8Array(exportVariableTrueType([WEIGHT], [regular, bold], []).bytes),
+    );
+
+    // What the masters' own kerning says of every pair of the letters: at each
+    // master, as that master; and between the two, in proportion.
+    const of = (m: VariableMaster, left: string, right: string): number =>
+      kernValue(kernIndex(m.document.kerning), left, right);
+    const places = [400, 525, 650, 900].map((weight) => {
+      const along = (weight - 400) / 500;
+      const pairs: Record<string, number> = {};
+      for (const left of LETTERS) {
+        for (const right of LETTERS) {
+          const light = of(regular, left, right);
+          pairs[`${left} ${right}`] = light + (of(bold, left, right) - light) * along;
+        }
+      }
+      return { at: { wght: weight }, pairs };
+    });
+    writeFileSync(join(OUT, "kerning.json"), JSON.stringify({ places }, null, 2));
+    expect(places).toHaveLength(4);
   });
 });

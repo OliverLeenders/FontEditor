@@ -264,6 +264,18 @@ jobs:
       - name: Check both variable fonts between the masters
         run: python tools/otf-check/check_designspace_vf.py "$RUNNER_TEMP/designspace"
 
+      # Kerning that is not the same in every master: each pair's value at the
+      # default and what it changes by, in a store GDEF holds and GPOS points
+      # into. fontTools pins the font at each master and between them, and the
+      # pairs it then has are compared with the masters' own.
+      - name: Export the varying-kerning proof fonts
+        run: VARYING_KERNING_OUT="$RUNNER_TEMP/kern" pnpm --filter @typewright/font-io exec vitest run varying-kerning
+
+      - name: Pin them with fontTools and read the kerning there
+        run: |
+          python tools/otf-check/check_vf_kerning.py "$RUNNER_TEMP/kern/Kern-VF.otf" "$RUNNER_TEMP/kern/kerning.json"
+          python tools/otf-check/check_vf_kerning.py "$RUNNER_TEMP/kern/Kern-VF.ttf" "$RUNNER_TEMP/kern/kerning.json"
+
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"
 
@@ -271,7 +283,9 @@ jobs:
       # feaLib have to set text identically: every construct the compiler reads
       # is in the proof file, and HarfBuzz sets both fonts string by string.
       # fontTools is also given the Marks file written from the font's anchors,
-      # so its mark attachment has to agree with the one compiled from them.
+      # so its mark attachment has to agree with the one compiled from them:
+      # accents on letters, on accents, and on each part of a ligature, and
+      # letters joined one to the next.
       - name: Export the feature proof font
         run: FEATURES_OUT="$RUNNER_TEMP/fea" pnpm --filter @typewright/font-io exec vitest run proof-features
 
@@ -281,8 +295,8 @@ jobs:
           "$RUNNER_TEMP/fea/Features.otf" "$RUNNER_TEMP/fea/features.fea" "$RUNNER_TEMP/fea/FromFeaLib.otf"
 
       # A second file, of what this editor keeps as source without compiling —
-      # cursive attachment, marks on ligatures, pair adjustments that are not
-      # kerning — beside class kerning, an extension lookup and per-script
+      # cursive attachment, pair adjustments that are not kerning — beside
+      # marks on ligatures, which become anchors, class kerning, an extension lookup and per-script
       # features. With FEATURES_REFERENCE as well, both fontTools fonts are
       # opened here as binaries, exported again, and set against themselves.
       - name: Compile the import proof file with fontTools
