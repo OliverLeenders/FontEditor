@@ -147,6 +147,19 @@ lookup LIFT {
     pos o <0 40 0 0>;
 } LIFT;
 
+lookup TO_ALT {
+    sub a by a.alt1;
+} TO_ALT;
+
+lookup ALT_ON {
+    sub a.alt1 by a.alt2;
+} ALT_ON;
+
+lookup MIXED {
+    sub e by e c;
+    sub n by o;
+} MIXED;
+
 feature ccmp {
     sub ae by a e;
 } ccmp;
@@ -178,6 +191,8 @@ feature calt {
     ignore sub T a';
     sub [n o] a' lookup SMALL;
     sub c b' by b.sc;
+    sub A a' lookup TO_ALT lookup ALT_ON;
+    sub A A [e n]' lookup MIXED;
 } calt;
 
 feature rclt {
@@ -239,6 +254,12 @@ const STRINGS: readonly Setting[] = [
   { text: "á̧" },
   { text: "ná" },
   { text: "f́i" },
+  // Two lookups called at one glyph, and one glyph for one among one for several.
+  { text: "Aa" },
+  { text: "AaTa" },
+  { text: "AAe" },
+  { text: "AAn" },
+  { text: "AAen" },
   // Letters joined: two, three down a stair, and a pair with nothing to meet.
   { text: "ie" },
   { text: "iec" },

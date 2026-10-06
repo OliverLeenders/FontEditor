@@ -216,7 +216,7 @@ describe("reading a rule with a context", () => {
       backtrack: [["a"]],
       input: [["b"]],
       to: null,
-      calls: ["SC"],
+      calls: [["SC"]],
       ignore: false,
     });
   });
@@ -482,12 +482,13 @@ describe("the exported font substitutes in context", () => {
   });
 
   it("keeps several contextual rules in the order they were written", () => {
-    // They are one lookup with a subtable each, tried in order — which is the
-    // whole of what an ignore rule does.
+    // They are one lookup, tried in order — which is the whole of what an
+    // ignore rule does. Two rules about the same glyphs are written together,
+    // by class, in a row; `context-rules.test.ts` asks a shaper what they do.
     const f = reread("feature calt { ignore sub f b'; sub b' by b.sc; } calt;");
     const chain = f.tables.gsub!.lookups.find((l) => l.lookupType === 6);
     expect(chain).toBeDefined();
-    expect(chain!.subtables.length).toBe(2);
+    expect(chain!.subtables.length).toBe(1);
   });
 
   it("points the rule at a lookup that is really in the list", () => {

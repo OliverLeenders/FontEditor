@@ -10,14 +10,14 @@ import {
   type FeaStatement,
   parseFea,
 } from "./fea.js";
+import { chainSubtables } from "./chain-classes.js";
 import { Writer, singlePos } from "./gpos.js";
 import {
   type AlternateSub,
+  type ChainRule,
   type LigatureSub,
   type MultipleSub,
   alternateSubst,
-  chainContextPos,
-  chainContextSubst,
   ligatureSubst,
   ligatureSubtables,
   multipleSubst,
@@ -210,8 +210,14 @@ type Builder = {
   readonly multiples: MultipleSub[];
   readonly alternates: AlternateSub[];
   readonly ligatures: LigatureSub[];
-  /** Everything written one subtable per rule: contexts and single adjustments. */
+  /** What is written one subtable to a rule: single adjustments. */
   readonly subtables: Uint8Array[];
+  /**
+   * The rules in a context, kept as rules until the lookup is written: the
+   * ones that agree about their glyphs are then written together, which is
+   * what lets a font have thousands of them.
+   */
+  readonly chains: ChainRule[];
 };
 
 /**
@@ -557,6 +563,24 @@ class Compilation {
         builder.singles.clear();
         builder.type = 4;
         continue;
+      } else if (
+        builder.table === "sub" &&
+        prepared.table === "sub" &&
+        ((builder.type === 1 && prepared.type === 2) || (builder.type === 2 && prepared.type === 1))
+      ) {
+        // And one glyph for one, among one for several: a sequence of one. A
+        // lookup that puts a mark after some glyphs and swaps another for it
+        // outright is one lookup of sequences in the font, and read in it is
+        // these two kinds of rule.
+        this.rules += prepared.add(builder);
+        for (const [from, to] of builder.singles) {
+          if (!builder.multiples.some((m) => m.from === from)) {
+            builder.multiples.push({ from, to: [to] });
+          }
+        }
+        builder.singles.clear();
+        builder.type = 2;
+        continue;
       } else if (builder.table !== prepared.table || builder.type !== prepared.type) {
         this.problems.push({
           line: statement.rule.line,
@@ -660,6 +684,7 @@ class Compilation {
       alternates: [],
       ligatures: [],
       subtables: [],
+      chains: [],
     };
     this.slots[table].push(builder);
     return builder;
@@ -731,22 +756,24 @@ class Compilation {
     return found.index;
   }
 
-  /** Resolve the named lookups a rule calls at each marked position; `null` if one cannot be. */
+  /**
+   * The named lookups a rule calls, as the table has them: which lookup at
+   * which position of the input, in the order they are run — along the
+   * input, and at one glyph in the order written. `null` if one cannot be
+   * resolved.
+   */
   private callsOf(
-    calls: readonly (string | null)[] | null,
+    calls: readonly (readonly string[])[] | null,
     table: Table,
     line: number,
-  ): (number | null)[] | null {
-    if (calls === null) return [];
-    const out: (number | null)[] = [];
-    for (const name of calls) {
-      if (name === null) {
-        out.push(null);
-        continue;
+  ): { at: number; lookup: number }[] | null {
+    const out: { at: number; lookup: number }[] = [];
+    for (const [at, names] of (calls ?? []).entries()) {
+      for (const name of names) {
+        const lookup = this.called(name, table, line);
+        if (lookup === null) return null;
+        out.push({ at, lookup });
       }
-      const index = this.called(name, table, line);
-      if (index === null) return null;
-      out.push(index);
     }
     return out;
   }
@@ -902,18 +929,16 @@ class Compilation {
           table: "sub",
           type: 6,
           add: (into) => {
-            // Each contextual rule is a subtable of its own, tried in the order
-            // written, and carries a pointer at an ordinary lookup holding the
-            // substitution — the table has no way to write the replacement into
-            // the rule. The lookup it points at goes after the one holding the
-            // rule, which is where fontTools puts it too.
+            // A contextual rule is tried in the order written, and carries a
+            // pointer at an ordinary lookup holding the substitution — the
+            // table has no way to write the replacement into the rule. The
+            // lookup it points at goes after the one holding the rule, which
+            // is where fontTools puts it too.
             const actions: { at: number; lookup: number }[] = [];
             if (replacement !== null)
               actions.push({ at: 0, lookup: this.append("sub", replacement) });
-            calls.forEach((lookup, at) => {
-              if (lookup !== null) actions.push({ at, lookup });
-            });
-            into.subtables.push(chainContextSubst({ ...context, actions }));
+            actions.push(...calls);
+            into.chains.push({ ...context, actions });
             return 1;
           },
         };
@@ -941,10 +966,8 @@ class Compilation {
                 lookup: this.append("pos", under(adjustment, flags)),
               });
             });
-            calls.forEach((lookup, at) => {
-              if (lookup !== null) actions.push({ at, lookup });
-            });
-            into.subtables.push(chainContextPos({ ...context, actions }));
+            actions.push(...calls);
+            into.chains.push({ ...context, actions });
             return 1;
           },
         };
@@ -961,15 +984,17 @@ function gathers(feature: { readonly statements: readonly { readonly kind: strin
 /** A lookup as the table stores it. */
 function written(builder: Builder): Lookup {
   const subtables =
-    builder.table === "pos" || builder.type === 6 || builder.type === 8
-      ? builder.subtables
-      : builder.type === 1
-        ? [singleSubst({ from: [...builder.singles.keys()], to: [...builder.singles.values()] })]
-        : builder.type === 2
-          ? [multipleSubst(builder.multiples)]
-          : builder.type === 3
-            ? [alternateSubst(builder.alternates)]
-            : ligatureSubtables(builder.ligatures);
+    builder.chains.length > 0
+      ? chainSubtables(builder.chains)
+      : builder.table === "pos" || builder.type === 6 || builder.type === 8
+        ? builder.subtables
+        : builder.type === 1
+          ? [singleSubst({ from: [...builder.singles.keys()], to: [...builder.singles.values()] })]
+          : builder.type === 2
+            ? [multipleSubst(builder.multiples)]
+            : builder.type === 3
+              ? [alternateSubst(builder.alternates)]
+              : ligatureSubtables(builder.ligatures);
   return under({ type: builder.type, subtables }, builder.flags);
 }
 

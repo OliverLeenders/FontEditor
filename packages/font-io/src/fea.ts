@@ -74,8 +74,11 @@ export type FeaRule =
        */
       readonly to: readonly string[] | null;
       readonly multiple: boolean;
-      /** The named lookup each marked position calls, if the rule calls any. */
-      readonly calls: readonly (string | null)[] | null;
+      /**
+       * The named lookups each marked position calls, in the order written, if
+       * the rule calls any: none at a position that calls nothing.
+       */
+      readonly calls: readonly (readonly string[])[] | null;
       readonly ignore: boolean;
       readonly line: number;
     }
@@ -106,7 +109,7 @@ export type FeaRule =
       readonly input: readonly (readonly string[])[];
       readonly lookahead: readonly (readonly string[])[];
       readonly values: readonly (ValueRecord | null)[];
-      readonly calls: readonly (string | null)[];
+      readonly calls: readonly (readonly string[])[];
       readonly ignore: boolean;
       readonly line: number;
     }
@@ -1155,7 +1158,7 @@ type PosPosition = {
   readonly list: GlyphList;
   readonly marked: boolean;
   value: ValueRecord | null;
-  call: string | null;
+  calls: string[];
 };
 
 /**
@@ -1217,12 +1220,9 @@ function readPosition(keyword: Token, r: Reader, ignoring: boolean): FeaRule | n
         skipInside(r);
         return null;
       }
-      if (last.call !== null) {
-        r.complain(next.line, "one lookup is called at each marked glyph by this editor");
-        skipInside(r);
-        return null;
-      }
-      last.call = name.text;
+      // One after another at the same glyph: each is run there in turn, on
+      // what the one before it left.
+      last.calls.push(name.text);
       continue;
     }
 
@@ -1236,7 +1236,7 @@ function readPosition(keyword: Token, r: Reader, ignoring: boolean): FeaRule | n
       r.take();
       marked = true;
     }
-    positions.push({ list, marked, value: null, call: null });
+    positions.push({ list, marked, value: null, calls: [] });
   }
 
   if (r.peek()?.text === ";") r.take();
@@ -1254,7 +1254,7 @@ function readPosition(keyword: Token, r: Reader, ignoring: boolean): FeaRule | n
       r.complain(keyword.line, "an ignore rule needs a marked glyph, written with a '");
       return null;
     }
-    if (positions.some((p) => p.call !== null)) {
+    if (positions.some((p) => p.calls.length > 0)) {
       r.complain(keyword.line, "a lookup is called at a marked glyph, written with a '");
       return null;
     }
@@ -1282,21 +1282,21 @@ function readPosition(keyword: Token, r: Reader, ignoring: boolean): FeaRule | n
       return null;
     }
   }
-  if (positions.some((p) => !p.marked && (p.value !== null || p.call !== null))) {
+  if (positions.some((p) => !p.marked && (p.value !== null || p.calls.length > 0))) {
     r.complain(keyword.line, "a value or a lookup in a context belongs to a marked glyph");
     return null;
   }
 
   const input = positions.slice(firstMark, lastMark + 1);
   const values = input.map((p) => p.value);
-  const calls = input.map((p) => p.call);
+  const calls = input.map((p) => p.calls);
 
   if (ignoring) {
-    if (values.some((v) => v !== null) || calls.some((c) => c !== null)) {
+    if (values.some((v) => v !== null) || calls.some((c) => c.length > 0)) {
       r.complain(keyword.line, "an ignore rule adjusts nothing, so it has no value");
       return null;
     }
-  } else if (values.every((v) => v === null) && calls.every((c) => c === null)) {
+  } else if (values.every((v) => v === null) && calls.every((c) => c.length === 0)) {
     r.complain(keyword.line, "a positioning rule needs a value");
     return null;
   }
@@ -1353,7 +1353,7 @@ function readValueRecord(r: Reader): ValueRecord | null {
 type Position = {
   readonly list: GlyphList;
   readonly marked: boolean;
-  readonly call: string | null;
+  readonly calls: readonly string[];
 };
 
 /**
@@ -1374,7 +1374,7 @@ function readReverse(
     r.complain(keyword.line, 'a reverse substitution replaces one glyph, so it needs "by"');
     return null;
   }
-  if (positions.some((p) => p.call !== null)) {
+  if (positions.some((p) => p.calls.length > 0)) {
     r.complain(keyword.line, "a reverse substitution calls no lookup");
     return null;
   }
@@ -1454,12 +1454,7 @@ function readSubstitution(
         skipInside(r);
         return null;
       }
-      if (last.call !== null) {
-        r.complain(next.line, "one lookup is called at each marked glyph by this editor");
-        skipInside(r);
-        return null;
-      }
-      positions[positions.length - 1] = { ...last, call: name.text };
+      positions[positions.length - 1] = { ...last, calls: [...last.calls, name.text] };
       continue;
     }
 
@@ -1474,7 +1469,7 @@ function readSubstitution(
       r.take();
       marked = true;
     }
-    positions.push({ list, marked, call: null });
+    positions.push({ list, marked, calls: [] });
   }
 
   // What follows `by` or `from`: one list, or for `by`, a run of glyphs.
@@ -1531,7 +1526,7 @@ function readSubstitution(
     lookahead: positions.slice(lastMark + 1).map((p) => p.list.glyphs),
     line: keyword.line,
   };
-  const calls = input.some((p) => p.call !== null) ? input.map((p) => p.call) : null;
+  const calls = input.some((p) => p.calls.length > 0) ? input.map((p) => p.calls) : null;
 
   if (ignoring) {
     if (joiner !== null) {
