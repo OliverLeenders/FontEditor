@@ -65,6 +65,14 @@ cleanly, and Ctrl-Z takes it back; while it has a problem, no anchor changes. It
 again from the anchors when you switch files or an anchor moves elsewhere, so comments typed
 there are not kept.
 
+**Letters joined to the next.** In a script written joined up and on a slope, such as
+Nastaliq, a letter sits where the one before it left off. Give a glyph an anchor named
+`entry` where it is joined to and one named `exit` where the next joins it; a letter that
+only begins a word has no entry, and one that only ends it no exit. The exported font sets
+each glyph's entry on the exit of the one before, keeps the last letter of the word on the
+line, and passes over accents in between. The Marks tab shows them as `pos cursive` in a
+`curs` feature, entry first and then exit, `<anchor NULL>` for the one a glyph has not got.
+
 **Accents on a ligature.** A ligature is several letters in one glyph, and an accent typed
 after the second of them belongs over the second. Give the ligature an anchor for each part,
 numbered from one: `top_1` over the first letter, `top_2` over the second, the same for
@@ -485,8 +493,10 @@ takes it away, and it stays where it was put while you work under it.
 **What comes in.** An OTF, TTF or WOFF opened here brings what the font does as well as
 its outlines: kerning into the Spacing workspace, mark attachment as anchors on the glyphs,
 and every substitution and positioning rule as feature source in the Features workspace.
-Marks on ligatures come in as numbered anchors on the ligature. What this editor cannot
-compile yet — cursive attachment — is kept in the source and named in the import report.
+Marks on ligatures come in as numbered anchors on the ligature, and the joins of a script
+written joined up as an `entry` and an `exit` on each glyph. What does not fit the anchors —
+a second set of joins, an accent placed by more lookups than a glyph has anchors for — is
+kept in the source and named in the import report.
 
 **Drawing with a pen.** Any contour can be drawn with a pen instead of being the edge of the
 ink. Select it and open the **Pen** section in the inspector, then choose **Stroke**: the contour

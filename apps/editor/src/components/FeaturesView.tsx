@@ -225,22 +225,37 @@ const counted = (n: number, what: string): string =>
   n === 1 ? `1 ${what}` : `${String(n)} ${what}s`;
 
 /** The glyphs the Marks file names, by the part each plays. */
-function roles(marks: MarksSource): { marks: number; bases: number; stacked: number } {
+function roles(marks: MarksSource): {
+  marks: number;
+  bases: number;
+  stacked: number;
+  joined: number;
+} {
   const attaching = new Set(
     marks.places.filter((p) => p.anchor.startsWith("_")).map((p) => p.glyph),
   );
+  // Where a glyph is joined to its neighbours, which is no place for a mark:
+  // unless a mark attaches by that very name, and then it is one.
+  const joins = (name: string): boolean =>
+    (name === "entry" || name === "exit") && !marks.classes.includes(name);
   const bases = new Set<GlyphName>();
   const stacked = new Set<GlyphName>();
+  const joined = new Set<GlyphName>();
   for (const place of marks.places) {
     if (place.anchor.startsWith("_")) continue;
-    (attaching.has(place.glyph) ? stacked : bases).add(place.glyph);
+    if (joins(place.anchor)) joined.add(place.glyph);
+    else (attaching.has(place.glyph) ? stacked : bases).add(place.glyph);
   }
-  return { marks: attaching.size, bases: bases.size, stacked: stacked.size };
+  return { marks: attaching.size, bases: bases.size, stacked: stacked.size, joined: joined.size };
 }
 
 function MarksSummary({ marks }: { marks: MarksSource }): React.JSX.Element {
-  const { bases, stacked } = roles(marks);
-  const tags = [bases > 0 ? "mark" : null, stacked > 0 ? "mkmk" : null].filter((t) => t !== null);
+  const { bases, stacked, joined } = roles(marks);
+  const tags = [
+    bases > 0 ? "mark" : null,
+    stacked > 0 ? "mkmk" : null,
+    joined > 0 ? "curs" : null,
+  ].filter((t) => t !== null);
   const named = new Set(marks.places.map((p) => p.glyph)).size;
   return tags.length === 0 ? (
     <>no marks yet</>
@@ -260,7 +275,7 @@ function WhatTheMarksAre({
   marks: MarksSource;
   master: string;
 }): React.JSX.Element {
-  const { marks: attaching, bases, stacked } = roles(marks);
+  const { marks: attaching, bases, stacked, joined } = roles(marks);
   return (
     <>
       <h2 className={styles.heading}>From the anchors</h2>
@@ -284,6 +299,12 @@ function WhatTheMarksAre({
           <span className={styles.count}>{stacked}</span>
           {stacked === 1 ? "mark others stack on" : "marks others stack on"}
         </li>
+        {joined > 0 && (
+          <li>
+            <span className={styles.count}>{joined}</span>
+            {joined === 1 ? "glyph joined to the next" : "glyphs joined to the next"}
+          </li>
+        )}
       </ul>
       {/* The file looks like any feature file, and behaves like none: said
           here, because finding out by losing a comment is finding out late. */}
@@ -291,8 +312,8 @@ function WhatTheMarksAre({
         Mark attachment is compiled from the anchors, and this file is them written out. A change
         that reads cleanly moves, adds or removes anchors at once, and undo takes it back; while the
         file has a problem, no anchor changes. Leaving the file or moving an anchor elsewhere writes
-        it again, so comments are not kept. A ligature&apos;s parts, mark filtering sets and rules
-        outside <code>mark</code> and <code>mkmk</code> belong in the feature file.
+        it again, so comments are not kept. Mark filtering sets and rules outside <code>mark</code>,{" "}
+        <code>mkmk</code> and <code>curs</code> belong in the feature file.
       </p>
     </>
   );

@@ -85,7 +85,13 @@ const GLYPHS: readonly (readonly [string, number | null])[] = [
   ["cedillacomb", 0x327],
 ];
 
-/** Anchors, by glyph: two letters, two accents that stack, and a mark below. */
+/**
+ * Anchors, by glyph: two letters, two accents that stack, a mark below, and
+ * two ligatures with a place on their parts — the longer with none on its
+ * middle one, which the file has to say and count. And three letters joined
+ * one to the next: one that only leaves, one that arrives and leaves, one that
+ * only arrives.
+ */
 const ANCHORS: Readonly<Record<string, readonly (readonly [string, number, number])[]>> = {
   a: [
     ["top", 250, 480],
@@ -102,6 +108,22 @@ const ANCHORS: Readonly<Record<string, readonly (readonly [string, number, numbe
     ["top", 10, 720],
   ],
   cedillacomb: [["_bottom", 0, 0]],
+  f_i: [
+    ["top_1", 120, 650],
+    ["top_2", 380, 520],
+    ["bottom_2", 380, 0],
+  ],
+  f_f_i: [
+    ["top_1", 90, 650],
+    ["top_3", 420, 520],
+    ["bottom_3", 420, 0],
+  ],
+  i: [["exit", 460, 80]],
+  e: [
+    ["entry", 30, 0],
+    ["exit", 450, 70],
+  ],
+  c: [["entry", 20, 10]],
 };
 
 const MARKS = new Set(["gravecomb", "acutecomb", "cedillacomb"]);
@@ -217,6 +239,23 @@ const STRINGS: readonly Setting[] = [
   { text: "á̧" },
   { text: "ná" },
   { text: "f́i" },
+  // Letters joined: two, three down a stair, and a pair with nothing to meet.
+  { text: "ie" },
+  { text: "iec" },
+  { text: "ec" },
+  { text: "ci" },
+  { text: "ieiec" },
+  // An accent on each part of a ligature, and where a part has no place for it.
+  { text: "fi\u0301" },
+  { text: "f\u0301i\u0300" },
+  { text: "fi\u0327" },
+  { text: "f\u0327i" },
+  { text: "fi\u0327\u0301" },
+  { text: "f\u0301fi" },
+  { text: "ff\u0301i" },
+  { text: "ffi\u0301" },
+  { text: "ffi\u0327" },
+  { text: "f\u0300f\u0301i\u0301\u0300" },
   { text: "ǽ" },
   { text: "Tò" },
 ];
@@ -278,6 +317,38 @@ describe("the feature proof font", () => {
   it("sets every proof string", () => {
     const font = open(bytes);
     for (const s of STRINGS) expect(setting(font, s).length).toBeGreaterThan(0);
+  });
+
+  it("puts an accent on the part of a ligature it follows", () => {
+    // After the f, at the first part's place; after the i, at the second's. The
+    // pen has passed the ligature, which is 500 wide.
+    const font = open(bytes);
+    expect(setting(font, { text: "f\u0301i" })).toEqual([
+      { name: "f_i", xAdvance: 500, xOffset: 0, yOffset: 0 },
+      { name: "acutecomb", xAdvance: 0, xOffset: 120 - 500, yOffset: 150 },
+    ]);
+    expect(setting(font, { text: "fi\u0301" })[1]).toEqual({
+      name: "acutecomb",
+      xAdvance: 0,
+      xOffset: 380 - 500,
+      yOffset: 20,
+    });
+    // And on the middle of three, where there is no place, it is left alone.
+    expect(setting(font, { text: "ff\u0301i" })[1]).toEqual({
+      name: "acutecomb",
+      xAdvance: 0,
+      xOffset: 0,
+      yOffset: 0,
+    });
+  });
+
+  it("joins each letter to the one before, the last of them on the line", () => {
+    // i leaves at 460,80 and e arrives at 30,0: i ends where it leaves, e is
+    // drawn back to meet it, and i is let down by the eighty between them.
+    expect(setting(open(bytes), { text: "ie" })).toEqual([
+      { name: "i", xAdvance: 460, xOffset: 0, yOffset: -80 },
+      { name: "e", xAdvance: 470, xOffset: -30, yOffset: 0 },
+    ]);
   });
 
   it("attaches the accents by their anchors", () => {

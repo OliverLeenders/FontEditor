@@ -9,6 +9,7 @@ import type {
   Subtable,
   ValueRecord,
 } from "./layout-read.js";
+import { CURSIVE_FLAGS, ENTRY, EXIT } from "./cursive.js";
 import type { SourceKernSide, SourceKerning } from "./readkern.js";
 import type { NameRecord } from "./names.js";
 
@@ -93,6 +94,7 @@ export function recoverLayout(
 
   // ---- anchors -----------------------------------------------------------------
   const anchors = new Map<number, RecoveredAnchor[]>();
+  const joinLookups = gpos === null ? new Set<number>() : joinsFrom(gpos, anchors, warn);
   const markLookups =
     gpos === null ? new Set<number>() : anchorsFrom(gpos, anchors, xHeight, names, warn);
 
@@ -100,7 +102,9 @@ export function recoverLayout(
   const writer = new SourceWriter(nameOf, tables.gdef, warn, tables.names ?? []);
   const gsubText = tables.gsub === null ? "" : writer.table("sub", tables.gsub, new Set());
   const gposText =
-    gpos === null ? "" : writer.table("pos", gpos, new Set([...kernLookups, ...markLookups]));
+    gpos === null
+      ? ""
+      : writer.table("pos", gpos, new Set([...kernLookups, ...joinLookups, ...markLookups]));
   const features = writer.assemble(gsubText, gposText, tables);
 
   if (tables.gsub?.variations === true || gpos?.variations === true) {
@@ -369,6 +373,70 @@ function anchorsFrom(
     }
   }
 
+  return used;
+}
+
+/**
+ * Cursive attachment, as anchors on the glyphs: where each is joined to, its
+ * `entry`, and where the next joins it, its `exit`.
+ *
+ * A lookup of the `curs` feature and of no other, that is nothing but cursive
+ * attachment, and that has the flags the compiler here writes one with: read
+ * from the end of the line, and passing over marks. One written otherwise
+ * joins its glyphs differently, and stays as it was written. So does one that
+ * gives a glyph a second entry or exit somewhere else than the first: a glyph
+ * has one of each. Returns the lookups that became anchors.
+ */
+function joinsFrom(
+  gpos: ReadLayout,
+  anchors: Map<number, RecoveredAnchor[]>,
+  warn: (message: string) => void,
+): Set<number> {
+  const used = new Set<number>();
+  const inCurs = new Set<number>();
+  const elsewhere = new Set<number>();
+  for (const feature of gpos.features) {
+    for (const i of feature.lookups) (feature.tag === "curs" ? inCurs : elsewhere).add(i);
+  }
+
+  for (const index of [...inCurs].sort((a, b) => a - b)) {
+    const lookup = gpos.lookups[index];
+    if (lookup === null || lookup === undefined || lookup.type !== 3) continue;
+    if (elsewhere.has(index)) continue;
+    if (lookup.flags !== CURSIVE_FLAGS || lookup.markFilteringSet !== null) continue;
+
+    const proposal = new Map<number, RecoveredAnchor[]>();
+    let fits = true;
+    let adjusted = false;
+    for (const sub of lookup.subtables) {
+      if (sub.kind !== "cursive") {
+        fits = false;
+        break;
+      }
+      for (const g of sub.glyphs) {
+        for (const [name, a] of [
+          [ENTRY, g.entry],
+          [EXIT, g.exit],
+        ] as const) {
+          if (a === null) continue;
+          // A place given by a point of the outline moves with it, which an
+          // anchor does not.
+          if (a.point !== null) fits = false;
+          if (a.device) adjusted = true;
+          if (!place(proposal, anchors, g.glyph, { name, x: a.x, y: a.y })) fits = false;
+        }
+      }
+    }
+    if (!fits) continue;
+
+    if (adjusted) warn("device and variation adjustments in positioning are not imported");
+    for (const [glyph, list] of proposal) {
+      const existing = anchors.get(glyph) ?? [];
+      for (const a of list) if (!existing.some((e) => e.name === a.name)) existing.push(a);
+      anchors.set(glyph, existing);
+    }
+    used.add(index);
+  }
   return used;
 }
 

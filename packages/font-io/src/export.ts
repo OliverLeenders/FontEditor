@@ -26,12 +26,13 @@ import {
 import { type KerningMasters, DELTA_SETS_EACH, kerningLookups, kerningTables } from "./gpos.js";
 import { itemVariationStore } from "./varstore.js";
 import { withNameLigatures } from "./name-ligatures.js";
-import { layoutTable, mergeFeatures, shiftFeatures } from "./layout.js";
+import { layoutTable, mergeFeatures } from "./layout.js";
 import { opentype } from "./opentype.js";
 import { type FeatureName, compileFeatures } from "./features.js";
 import { withNumberedNames } from "./names.js";
 import { gdefTable } from "./gdef.js";
 import { type SwapVariations, gsubWithSwaps } from "./feature-variations.js";
+import { compileCursive } from "./cursive.js";
 import { compileMarks } from "./marks.js";
 import { readTablesOf, withTable } from "./sfnt.js";
 import type { OtGlyph, OtOS2Init, OtPath, OtPostInit } from "opentype.js";
@@ -719,16 +720,28 @@ export function layoutTables(
   const marks = compileMarks(orderedGlyphs(document), glyphIdOf);
   for (const problem of marks.warnings) warnings.push(problem);
 
-  const markAt = kernLookups.length + features.positioning.lookups.length;
+  // And the joins: where each letter of a script written joined up meets the
+  // next, from the same anchors.
+  const cursive = compileCursive(orderedGlyphs(document), glyphIdOf);
+
+  // The feature file's lookups first, under the numbers it compiled them with.
+  // A rule in a context calls another lookup by its number, written into the
+  // rule; with the kerning numbered ahead of them, as it was, every such rule
+  // in a font that had kerning called a lookup that was not the one it named.
+  const cursiveAt = features.positioning.lookups.length;
+  const kernAt = cursiveAt + cursive.length;
+  const markAt = kernAt + kernLookups.length;
+  const from = (tag: string, at: number, count: number) =>
+    count === 0 ? [] : [{ tag, lookups: Array.from({ length: count }, (_, i) => at + i) }];
   const gpos = layoutTable(
     mergeFeatures(
       mergeFeatures(
-        kernLookups.length === 0 ? [] : [{ tag: "kern", lookups: kernLookups.map((_, i) => i) }],
-        shiftFeatures(features.positioning.entries, kernLookups.length),
+        mergeFeatures(features.positioning.entries, from("curs", cursiveAt, cursive.length)),
+        from("kern", kernAt, kernLookups.length),
       ),
       marks.features.map((tag, i) => ({ tag, lookups: [markAt + i] })),
     ),
-    [...kernLookups, ...features.positioning.lookups, ...marks.lookups],
+    [...features.positioning.lookups, ...cursive, ...kernLookups, ...marks.lookups],
     // Kerning and marks apply in every language system the feature file
     // declares, as they would had they been written in it.
     features.systems,

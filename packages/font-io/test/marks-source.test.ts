@@ -11,7 +11,7 @@ const at = (name: string, x: number, y: number) => anchor(ids.anchor(), name, { 
 function font(): Glyph[] {
   return [
     glyph("a", { anchors: [at("top", 250, 500), at("bottom", 250, 0)] }),
-    glyph("o", { anchors: [at("top", 260, 510), at("exit", 500, 0)] }),
+    glyph("o", { anchors: [at("top", 260, 510), at("origin", 500, 0)] }),
     glyph("acutecomb", { anchors: [at("_top", 0, 500), at("top", 0, 700)] }),
     glyph("cedillacomb", { anchors: [at("_bottom", 0, 0)] }),
   ];
@@ -56,7 +56,7 @@ describe("writing the Marks file", () => {
   });
 
   it("leaves out anchors nothing attaches by", () => {
-    expect(writeMarks(font())).not.toContain("exit");
+    expect(writeMarks(font())).not.toContain("origin");
   });
 
   it("escapes a glyph named like a keyword", () => {
@@ -110,7 +110,7 @@ describe("reading the Marks file back", () => {
     expect(o!.name).toBe("o");
     expect(o!.anchors.map((a) => [a.name, a.pt.x, a.pt.y])).toEqual([
       ["top", 270, 520],
-      ["exit", 500, 0],
+      ["origin", 500, 0],
     ]);
     expect(o!.anchors[0]!.id).toBe(glyphs[1]!.anchors[0]!.id);
   });
@@ -122,7 +122,7 @@ describe("reading the Marks file back", () => {
       .replace("} mark;", "    pos base e <anchor 240 500> mark @MC_top;\n} mark;");
     const changed = placeMarks(glyphs, reading(glyphs, text), ids);
     expect(changed.map((g) => g.name)).toEqual(["o", "e"]);
-    expect(changed[0]!.anchors.map((a) => a.name)).toEqual(["exit"]);
+    expect(changed[0]!.anchors.map((a) => a.name)).toEqual(["origin"]);
     expect(changed[1]!.anchors.map((a) => [a.name, a.pt.x, a.pt.y])).toEqual([["top", 240, 500]]);
   });
 
@@ -208,9 +208,9 @@ describe("what the Marks file refuses", () => {
       "in no mark class",
     ],
     [
-      "cursive attachment",
-      `${MARK}feature mark { pos cursive a <anchor 1 2> <anchor 3 4>; } mark;`,
-      "only pos base, pos ligature and pos mark",
+      "a rule that attaches nothing this file holds",
+      `${MARK}feature mark { pos single a <anchor 1 2> <anchor 3 4>; } mark;`,
+      "only pos base, pos ligature, pos mark and pos cursive",
     ],
     [
       "a lookup flag",

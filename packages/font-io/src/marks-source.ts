@@ -18,6 +18,7 @@ import {
   skipStatementOrBlock,
   tokenize,
 } from "./fea.js";
+import { ENTRY, EXIT, joinsOf } from "./cursive.js";
 import { ligatureParts } from "./marks.js";
 
 /**
@@ -126,13 +127,21 @@ function partsOf(g: Glyph, classes: ReadonlySet<string>): (Anchor | null)[][] | 
  *
  * A mark's own anchor, a place under a class's name, and on a ligature a place
  * on a part. A ligature's place that names no part is not written, as it is
- * not compiled: it is where a component lands.
+ * not compiled: it is where a component lands. And where a glyph is joined to
+ * its neighbours, its entry and its exit.
  */
 function written(g: Glyph, a: Anchor, classes: ReadonlySet<string>): boolean {
   if (isMarkAnchor(a)) return classes.has(a.name.slice(1));
+  if (isJoin(g, a, classes)) return true;
   const parts = partsOf(g, classes);
   if (parts === null) return classes.has(a.name);
   return parts.some((row) => row.includes(a));
+}
+
+/** Whether an anchor is one of the two a glyph is joined to its neighbours by. */
+function isJoin(g: Glyph, a: Anchor, classes: ReadonlySet<string>): boolean {
+  const joins = joinsOf(g, (name) => classes.has(name));
+  return joins !== null && (joins.entry === a || joins.exit === a);
 }
 
 /**
@@ -147,6 +156,7 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
   const bases: string[] = [];
   const ligatures: string[] = [];
   const stacked: string[] = [];
+  const joined: string[] = [];
   const skipped: string[] = [];
   const order = [...classes];
 
@@ -154,6 +164,13 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
     if (leftOut(g)) {
       if (g.anchors.some((a) => written(g, a, classes) || isMarkAnchor(a))) skipped.push(g.name);
       continue;
+    }
+    // Where it is joined to, and where the next joins it; either may be
+    // nowhere, a letter that begins a word having nothing before it.
+    const joins = joinsOf(g, (name) => classes.has(name));
+    if (joins !== null) {
+      const at = (a: Anchor | null): string => (a === null ? "<anchor NULL>" : anchorText(a.pt));
+      joined.push(`    pos cursive ${spelled(g.name)} ${at(joins.entry)} ${at(joins.exit)};`);
     }
     const parts = partsOf(g, classes);
     if (parts !== null) {
@@ -176,7 +193,7 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
     }
     const offers: string[] = [];
     for (const a of g.anchors) {
-      if (!written(g, a, classes)) continue;
+      if (!written(g, a, classes) || a === joins?.entry || a === joins?.exit) continue;
       if (isMarkAnchor(a)) {
         const c = a.name.slice(1);
         markLines
@@ -202,7 +219,8 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
     "#",
     "# A mark class is an anchor's name: @MC_top gathers the glyphs that attach by",
     "# _top, and pos base and pos mark list the glyphs that offer a top. A ligature",
-    "# offers one on each of its parts, which are its anchors top_1, top_2. Change a",
+    "# offers one on each of its parts, which are its anchors top_1, top_2. A glyph",
+    "# joined to its neighbours says where by pos cursive: its entry, then its exit. Change a",
     "# position to move that anchor, or add or remove a line to add or remove one.",
     "# The file is written again from the anchors, so comments here are not kept.",
   ];
@@ -215,6 +233,9 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
     out.push("", "feature mark {", ...bases, ...ligatures, "} mark;");
   }
   if (stacked.length > 0) out.push("", "feature mkmk {", ...stacked, "} mkmk;");
+  if (joined.length > 0) {
+    out.push("", "feature curs {", `    ${JOINED_UNDER}`, ...joined, "} curs;");
+  }
   return `${out.join("\n")}\n`;
 }
 
@@ -234,7 +255,10 @@ export type MarksSource = {
   readonly problems: readonly FeaProblem[];
 };
 
-const SAYS_WHAT_IT_HOLDS = "the Marks file holds mark classes and the mark and mkmk features";
+const SAYS_WHAT_IT_HOLDS = "the Marks file holds mark classes and the mark, mkmk and curs features";
+
+/** The flags every join is compiled under, as the file states them. */
+const JOINED_UNDER = "lookupflag RightToLeft IgnoreMarks;";
 
 const NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
 
@@ -343,12 +367,52 @@ export function readMarks(source: string, hasGlyph: (name: GlyphName) => boolean
     }
   };
 
+  const joins = new Map<GlyphName, { entry: Point | null; exit: Point | null; line: number }>();
+
+  /** `pos cursive glyph <entry> <exit>;`, the keyword already taken. */
+  const readJoin = (pos: { line: number }, feature: string): void => {
+    if (feature !== "curs") {
+      r.complain(pos.line, "pos cursive belongs in feature curs");
+      return skipInside(r);
+    }
+    const list = readGlyphList(pos.line, r);
+    if (list === null) return skipInside(r);
+    const entry = readAnchor(pos.line);
+    if (entry === undefined) return skipInside(r);
+    const exit = readAnchor(pos.line);
+    if (exit === undefined) return skipInside(r);
+    if (r.peek()?.text === ";") r.take();
+    else {
+      r.complain(pos.line, 'expected ";" at the end of the rule');
+      skipInside(r);
+    }
+    if (entry === null && exit === null) {
+      r.complain(
+        pos.line,
+        "a glyph joined to nothing has no line here; one of its two anchors may be NULL, and not both",
+      );
+      return;
+    }
+    for (const glyph of glyphsNamed(list.glyphs, pos.line)) {
+      const earlier = joins.get(glyph);
+      if (earlier !== undefined) {
+        r.complain(
+          pos.line,
+          `${glyph} already has its entry and exit, on line ${String(earlier.line)}`,
+        );
+        continue;
+      }
+      joins.set(glyph, { entry, exit, line: pos.line });
+    }
+  };
+
   const readOffer = (pos: { line: number }, feature: string): void => {
     const kind = r.take();
+    if (kind?.text === "cursive") return readJoin(pos, feature);
     if (kind?.text !== "base" && kind?.text !== "mark" && kind?.text !== "ligature") {
       r.complain(
         pos.line,
-        "only pos base, pos ligature and pos mark are written in the Marks file",
+        "only pos base, pos ligature, pos mark and pos cursive are written in the Marks file",
       );
       return skipInside(r);
     }
@@ -432,7 +496,7 @@ export function readMarks(source: string, hasGlyph: (name: GlyphName) => boolean
 
   const readFeatureBlock = (keyword: { line: number }): void => {
     const tag = r.peek();
-    if (tag === undefined || (tag.text !== "mark" && tag.text !== "mkmk")) {
+    if (tag === undefined || (tag.text !== "mark" && tag.text !== "mkmk" && tag.text !== "curs")) {
       r.complain(
         keyword.line,
         `feature ${tag?.text ?? ""} belongs in the feature file; ${SAYS_WHAT_IT_HOLDS}`,
@@ -456,9 +520,27 @@ export function readMarks(source: string, hasGlyph: (name: GlyphName) => boolean
         readOffer(token, tag.text);
         continue;
       }
+      // The flags joins are compiled under, which the file states and which
+      // are not a thing to change here: said again as they are, or not at all.
+      if (token.text === "lookupflag" && tag.text === "curs") {
+        const flags: string[] = [];
+        while (r.peek() !== undefined && r.peek()!.text !== ";" && r.peek()!.text !== "}") {
+          flags.push(r.take()!.text);
+        }
+        if (r.peek()?.text === ";") r.take();
+        if (flags.sort().join(" ") !== "IgnoreMarks RightToLeft") {
+          r.complain(
+            token.line,
+            "joins are compiled read from the end of the line and passing over marks: lookupflag RightToLeft IgnoreMarks, and no other",
+          );
+        }
+        continue;
+      }
+      const holds =
+        tag.text === "mark" ? "base and pos ligature" : tag.text === "mkmk" ? "mark" : "cursive";
       r.complain(
         token.line,
-        `"${token.text}" belongs in the feature file; feature ${tag.text} here holds only pos ${tag.text === "mark" ? "base and pos ligature" : "mark"} rules`,
+        `"${token.text}" belongs in the feature file; feature ${tag.text} here holds only pos ${holds} rules`,
       );
       skipInside(r);
     }
@@ -512,8 +594,23 @@ export function readMarks(source: string, hasGlyph: (name: GlyphName) => boolean
     }
   }
 
+  for (const [glyph, join] of joins) {
+    for (const name of [ENTRY, EXIT]) {
+      if (classes.has(name)) {
+        r.complain(
+          join.line,
+          `${MARK_CLASS_PREFIX}${name} is a mark class, so ${glyph} cannot be joined by an anchor of that name`,
+        );
+      }
+    }
+  }
+
   const places: MarkPlace[] = [
     ...marks.values(),
+    ...[...joins].flatMap(([glyph, join]) => [
+      ...(join.entry === null ? [] : [{ glyph, anchor: ENTRY, pt: join.entry, line: join.line }]),
+      ...(join.exit === null ? [] : [{ glyph, anchor: EXIT, pt: join.exit, line: join.line }]),
+    ]),
     ...[...offers.values()].map(({ glyph, anchor: name, pt, line }) => ({
       glyph,
       anchor: name,

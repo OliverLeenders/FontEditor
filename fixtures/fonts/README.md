@@ -17,6 +17,7 @@ bring to an editor.
 | `eb-garamond/`      | EB Garamond (variable TTF, weight)      | A variable font; ligatures, small caps, contextual alternates     | SIL OFL 1.1      |
 | `latin-modern/`     | Latin Modern Roman 10 Regular (OTF)     | CFF outlines from another toolchain; the TeX world's text face    | GUST Font Licence |
 | `mutator-sans/`     | MutatorSans (designspace and four UFOs) | Sources rather than a binary: two axes, layers drawn as masters   | MIT              |
+| `noto-nastaliq-urdu/` | Noto Nastaliq Urdu (variable TTF, weight) | Letters joined on a slope: cursive attachment on 707 glyphs, right to left | SIL OFL 1.1 |
 
 Where they came from:
 
@@ -26,5 +27,6 @@ Where they came from:
 - EB Garamond: <https://github.com/google/fonts> (`ofl/ebgaramond/`)
 - Latin Modern: <https://ctan.org/pkg/lm> (`fonts/opentype/public/lm/`)
 - MutatorSans: <https://github.com/LettError/mutatorSans>
+- Noto Nastaliq Urdu: <https://github.com/google/fonts> (`ofl/notonastaliqurdu/`)
 
 None of them is changed. A test that needs a font altered alters a copy in memory.
