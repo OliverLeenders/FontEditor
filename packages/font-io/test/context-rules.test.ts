@@ -235,3 +235,147 @@ describe("many rules, written together", () => {
     expect(names("ac")).toBe("a c");
   });
 });
+
+describe("a rule that begins with part of a class", () => {
+  // The letters a rule begins at are asked two things: whether the subtable
+  // covers them, and their class. So rules may begin with the covered part of
+  // a class that is, whole, what follows in other rules — which is how a font
+  // written by class reads back.
+  const ALT = "lookup ALT { sub [a b c] by [a.alt b.alt c.alt]; } ALT;\n";
+  const part = `${ALT}feature calt {
+    sub [a b]' lookup ALT [a b c]';
+    sub [a b]' lookup ALT d';
+} calt;
+`;
+
+  it("is written with the rules it agrees with, by class", () => {
+    const rule = (input: number[][]): ChainRule => ({
+      backtrack: [],
+      input,
+      lookahead: [],
+      actions: [],
+    });
+    const made_ = chainSubtables([
+      rule([
+        [1, 2],
+        [1, 2, 3],
+      ]),
+      rule([[1, 2], [4]]),
+    ]);
+    expect(made_).toHaveLength(1);
+    expect(made_[0]![1]).toBe(2);
+  });
+
+  it("matches the part and not the class, where it begins; and the class, where it follows", () => {
+    const { out, names } = made(part);
+    expect(out.warnings).toEqual([]);
+    // c is of the class and follows: the rule holds.
+    expect(names("ac")).toBe("a.alt c");
+    expect(names("bb")).toBe("b.alt b");
+    expect(names("bd")).toBe("b.alt d");
+    // c is of the class and does not begin a rule: nothing does.
+    expect(names("ca")).toBe("c a");
+    expect(names("cc")).toBe("c c");
+    expect(names("cd")).toBe("c d");
+  });
+
+  it("is kept apart from a rule beginning with another part of the same class", () => {
+    // [a] and [b] are both of [a b c], and one class can be narrowed one way.
+    const rule = (input: number[][]): ChainRule => ({
+      backtrack: [],
+      input,
+      lookahead: [],
+      actions: [],
+    });
+    expect(chainSubtables([rule([[1], [1, 2, 3]]), rule([[2], [1, 2, 3]])])).toHaveLength(2);
+    const { names } = made(
+      `${ALT}feature calt {\n    sub a' lookup ALT [a b c]';\n    sub b' lookup ALT [a b c]';\n} calt;\n`,
+    );
+    expect(names("ab")).toBe("a.alt b");
+    expect(names("bc")).toBe("b.alt c");
+    expect(names("ca")).toBe("c a");
+  });
+});
+
+describe("rules that can only be written by their lists", () => {
+  // Two places of one rule sharing some glyphs and not all: no sorting into
+  // classes holds both. Each is a subtable of its own, and the lists they name
+  // are written once behind the last of them.
+  const rule = (input: number[][]): ChainRule => ({
+    backtrack: [],
+    input,
+    lookahead: [],
+    actions: [{ at: 0, lookup: 7 }],
+  });
+  const wide = Array.from({ length: 200 }, (_, i) => 100 + i * 2);
+  const wider = [...wide, 999];
+  const rules = [
+    rule([[1], wide, wider]),
+    rule([[2], wide, wider, wide]),
+    rule([[3], wider, wide]),
+  ];
+
+  it("are a subtable each, and the lists of all of them once", () => {
+    const subtables = chainSubtables(rules);
+    expect(subtables).toHaveLength(3);
+    expect(subtables.map((s) => s[1])).toEqual([3, 3, 3]);
+    // The first two are their own few numbers; the last carries the lists.
+    expect(subtables[0]!.length).toBeLessThan(30);
+    expect(subtables[1]!.length).toBeLessThan(30);
+    // Two lists of two hundred glyphs, and three of one: not seven of them.
+    const total = subtables.reduce((sum, s) => sum + s.length, 0);
+    expect(total).toBeLessThan(2 * 200 * 2 + 200);
+  });
+
+  it("point each at its own lists, from where it stands", () => {
+    const u16 = (b: Uint8Array, o: number) => (b[o]! << 8) | b[o + 1]!;
+    const subtables = chainSubtables(rules);
+    const whole = new Uint8Array(subtables.reduce((sum, s) => sum + s.length, 0));
+    const starts: number[] = [];
+    let at = 0;
+    for (const s of subtables) {
+      starts.push(at);
+      whole.set(s, at);
+      at += s.length;
+    }
+    // Read as a shaper reads them: laid end to end, each list found from the
+    // start of the subtable that names it.
+    const lists = starts.map((start) => {
+      const count = u16(whole, start + 4);
+      return Array.from({ length: count }, (_, k) => {
+        const list = start + u16(whole, start + 6 + k * 2);
+        const format = u16(whole, list);
+        const n = u16(whole, list + 2);
+        if (format === 1) return n;
+        let glyphs = 0;
+        for (let r = 0; r < n; r++)
+          glyphs += u16(whole, list + 6 + r * 6) - u16(whole, list + 4 + r * 6) + 1;
+        return glyphs;
+      });
+    });
+    expect(lists).toEqual([
+      [1, 200, 201],
+      [1, 200, 201, 200],
+      [1, 201, 200],
+    ]);
+  });
+
+  it("do what each says, in a font", () => {
+    const ALT = "lookup ALT { sub [a b c] by [a.alt b.alt c.alt]; } ALT;\n";
+    const { out, names } = made(
+      `${ALT}feature calt {
+    sub [a b]' lookup ALT [b c]';
+    sub [a b]' lookup ALT [c d]' [b c]';
+    sub c' lookup ALT [d e]' [e f]';
+} calt;
+`,
+    );
+    expect(out.warnings).toEqual([]);
+    expect(names("ab")).toBe("a.alt b");
+    expect(names("bc")).toBe("b.alt c");
+    expect(names("adc")).toBe("a.alt d c");
+    expect(names("ad")).toBe("a d");
+    expect(names("cde")).toBe("c.alt d e");
+    expect(names("cdd")).toBe("c d d");
+  });
+});
