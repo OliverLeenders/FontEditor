@@ -87,6 +87,26 @@ export function codePointFromName(name: string): number | null {
   return codePoint <= 0x10ffff ? codePoint : null;
 }
 
+/**
+ * The code point somebody typing after a slash meant, or `null`.
+ *
+ * A production name is one way to say it, and the strict one: four digits, or
+ * `u` and up to six. Typed by hand it is also said the way it is printed
+ * everywhere else — `U+03B1` — and with the zeros left off, `uni3B1`, which no
+ * glyph is named but which can only mean one thing. Looser than a name may be
+ * read, and so apart from it: this is asked only once no glyph is called what
+ * was typed.
+ */
+export function codePointFromTyped(typed: string): number | null {
+  const named = codePointFromName(typed);
+  if (named !== null) return named;
+
+  const found = /^(?:u\+|uni)([0-9A-F]{1,6})$/i.exec(typed);
+  if (found === null) return null;
+  const codePoint = Number.parseInt(found[1]!, 16);
+  return codePoint <= 0x10ffff ? codePoint : null;
+}
+
 function character(typed: string, text = typed): TextToken {
   return { kind: "character", text, codePoint: typed.codePointAt(0) ?? 0 };
 }

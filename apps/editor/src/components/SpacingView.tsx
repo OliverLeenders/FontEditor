@@ -360,7 +360,7 @@ export function SpacingView({
           value={text}
           aria-label="Text to space"
           data-own-undo=""
-          title="Letters, or a glyph by name after a slash: /a.001, /uni0301"
+          title="Letters, or a glyph by name after a slash: /a.001, /uni0301, /U+0301"
           spellCheck={false}
           onChange={(event) => store.setSpacingText(event.target.value)}
         />

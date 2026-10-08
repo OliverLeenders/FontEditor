@@ -123,7 +123,7 @@ export {
 } from "./direction.js";
 
 export type { TextToken } from "./text.js";
-export { codePointFromName, textTokens } from "./text.js";
+export { codePointFromName, codePointFromTyped, textTokens } from "./text.js";
 
 export type { MetricKeyReference } from "./metric-key-text.js";
 export { parseMetricKey, renamedMetricKey } from "./metric-key-text.js";

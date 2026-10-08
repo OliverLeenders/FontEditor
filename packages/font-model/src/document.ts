@@ -9,7 +9,7 @@ import {
   renameGlyphInKerning,
 } from "./kerning.js";
 import { renamedMetricKey } from "./metric-key-text.js";
-import { type TextToken, codePointFromName, textTokens } from "./text.js";
+import { type TextToken, codePointFromTyped, textTokens } from "./text.js";
 
 export type GlyphName = string;
 
@@ -456,14 +456,14 @@ export function glyphForCodePoint(document: FontDocument, codePoint: number): Gl
  * A character is found by its code point. A name is found as a name first, and
  * then, where it spells a code point — `uni0301` — by that: the name a glyph
  * would be given is how somebody who does not know what this font called its
- * acute reaches it anyway.
+ * acute reaches it anyway. So is the code point as it is printed, `U+0301`.
  */
 export function glyphForToken(document: FontDocument, token: TextToken): Glyph | null {
   if (token.kind === "character") return glyphForCodePoint(document, token.codePoint);
 
   const named = document.glyphs[token.name];
   if (named !== undefined) return named;
-  const codePoint = codePointFromName(token.name);
+  const codePoint = codePointFromTyped(token.name);
   return codePoint === null ? null : glyphForCodePoint(document, codePoint);
 }
 

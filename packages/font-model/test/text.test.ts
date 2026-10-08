@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { fontDocument, glyphsForString } from "../src/document.js";
 import { glyph } from "../src/glyph.js";
-import { codePointFromName, textTokens } from "../src/text.js";
+import { codePointFromName, codePointFromTyped, textTokens } from "../src/text.js";
 
 /**
  * Typed text with glyph names in it: `/a.001`, `/uni0301`, and the slash that is
@@ -56,6 +56,32 @@ describe("names that spell a code point", () => {
   });
 });
 
+describe("a code point as somebody types it", () => {
+  it("reads what a name spells, as a name is read", () => {
+    expect(codePointFromTyped("uni0301")).toBe(0x301);
+    expect(codePointFromTyped("u1F600")).toBe(0x1f600);
+  });
+
+  it("reads U+ and the digits, in either case and with or without the zeros", () => {
+    expect(codePointFromTyped("U+03B1")).toBe(0x3b1);
+    expect(codePointFromTyped("u+3b1")).toBe(0x3b1);
+    expect(codePointFromTyped("U+1F600")).toBe(0x1f600);
+  });
+
+  it("reads uni with the zeros left off", () => {
+    expect(codePointFromTyped("uni3B1")).toBe(0x3b1);
+    expect(codePointFromTyped("uni41")).toBe(0x41);
+  });
+
+  it("reads nothing out of what is not one, or is past the last of them", () => {
+    expect(codePointFromTyped("acute")).toBeNull();
+    expect(codePointFromTyped("U+")).toBeNull();
+    expect(codePointFromTyped("U+110000")).toBeNull();
+    expect(codePointFromTyped("uni03B1.alt")).toBeNull();
+    expect(codePointFromTyped("union")).toBeNull();
+  });
+});
+
 describe("the glyphs a line of text asks for", () => {
   const font = fontDocument([
     glyph("a", { unicodes: [0x61] }),
@@ -71,6 +97,12 @@ describe("the glyphs a line of text asks for", () => {
 
   it("finds a glyph by the code point its name spells, when none is called that", () => {
     expect(found("/uni0301")).toEqual(["acutecomb"]);
+  });
+
+  it("finds a glyph by its code point written as U+, or with the zeros left off", () => {
+    expect(found("/U+0301")).toEqual(["acutecomb"]);
+    expect(found("/uni301 a")).toEqual(["acutecomb", "a"]);
+    expect(found("a/u+61")).toEqual(["a", "a"]);
   });
 
   it("prefers a glyph with the name to one with the code point", () => {
