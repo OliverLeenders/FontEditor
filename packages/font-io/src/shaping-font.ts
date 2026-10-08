@@ -97,9 +97,14 @@ function compiled(
   const glyphs: OtGlyph[] = glyphNames.map((name, id) => {
     // Code point zero only where the export would write it, or opentype.js
     // refuses the whole font and the preview falls back without a word.
+    //
+    // The private code point goes first, because first is the one opentype.js
+    // looks at to decide whether the character map needs its wide half at all.
+    // After the glyph's own characters, a font in which every glyph had one was
+    // written without it, and no glyph in it could be set by name.
     const unicodes = [
-      ...writableUnicodes(name, document.glyphs[name]?.unicodes ?? []),
       NAMED_GLYPH_BASE + id,
+      ...writableUnicodes(name, document.glyphs[name]?.unicodes ?? []),
     ];
     return new opentype.Glyph({
       name,

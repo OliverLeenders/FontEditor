@@ -337,6 +337,9 @@ export function writableUnicodes(name: string, unicodes: readonly number[]): num
   return name === ".null" ? [...unicodes] : unicodes.filter((codePoint) => codePoint !== 0);
 }
 
+/** A code point outside the Basic Multilingual Plane, which half the character map cannot hold. */
+const isWide = (codePoint: number): boolean => codePoint > 0xffff;
+
 /** The style-map style as the `name` table spells it. */
 const STYLE_NAMES: Readonly<Record<StyleMapStyle, string>> = {
   regular: "Regular",
@@ -551,6 +554,9 @@ export function exportFont(
     );
   }
 
+  // Whether a glyph has gone in with a code point above U+FFFF as its first.
+  let wideFirst = false;
+
   options.progress?.(0, names.length);
   for (const [done, name] of names.entries()) {
     if (done > 0 && done % PROGRESS_EVERY === 0) options.progress?.(done, names.length);
@@ -586,8 +592,15 @@ export function exportFont(
         `${g.name}: U+0000 is left out of the character map, which keeps it for a glyph named .null.`,
       );
     }
-    const first = unicodes[0];
+    // Which of them is called the first matters once: opentype.js writes the
+    // wide half of the character map only where some glyph's first code point
+    // is above U+FFFF, so a font whose wide code points all came second lost
+    // every one of them. One glyph is given its wide code point as its first,
+    // and only one, because the first is also what the OS/2 ranges are read
+    // from and there is no reason to move more of those than it takes.
+    const first = wideFirst ? unicodes[0] : (unicodes.find(isWide) ?? unicodes[0]);
     if (first !== undefined) {
+      wideFirst ||= isWide(first);
       init.unicode = first;
       init.unicodes = unicodes;
     }

@@ -39,6 +39,24 @@ describe("the shaping font", () => {
     expect(parsed.charToGlyph("f").index).toBe(1);
   });
 
+  it("keeps the private code points where every glyph has a character of its own", () => {
+    // opentype.js writes the wide half of the character map only when some
+    // glyph's first code point needs it, so a font of nothing but letters lost
+    // every private code point and `/alpha` set nothing.
+    const { bytes, glyphNames } = exportShapingFont(
+      fontDocument([
+        glyph("A", { unicodes: [0x41], advance: 600 }),
+        glyph("alpha", { unicodes: [0x3b1], advance: 500 }),
+      ]),
+    );
+    const parsed = opentype.parse(bytes);
+
+    glyphNames.forEach((_, id) => {
+      expect(parsed.charToGlyph(String.fromCodePoint(NAMED_GLYPH_BASE + id)).index).toBe(id);
+    });
+    expect(parsed.charToGlyph("α").index).toBe(2);
+  });
+
   it("carries the substitutions and the kerning, compiled as the export compiles them", () => {
     const tags = tagsOf(exportShapingFont(document()).bytes);
     expect(tags).toContain("GSUB");
