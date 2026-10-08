@@ -14,6 +14,7 @@ import {
   drawableGlyph,
   resolvedMetrics,
   sidebearings,
+  textWithoutGlyphs,
 } from "@typewright/font-model";
 import {
   type ViewTransform,
@@ -68,6 +69,19 @@ export function runView(
     tx: (drawn < viewport.width - RUN_INSET * 2 ? (viewport.width - drawn) / 2 : RUN_INSET) + panX,
     ty: viewport.height * 0.72,
   };
+}
+
+/** How many pieces with no glyph are named before the rest are counted. */
+const MISSING_NAMED = 4;
+
+/**
+ * What the line leaves out, said: the pieces typed that the font has no glyph
+ * for, the first few by what was typed and the rest by how many.
+ */
+export function missingText(missing: readonly string[]): string {
+  const named = missing.slice(0, MISSING_NAMED).join(" ");
+  const more = missing.length - MISSING_NAMED;
+  return more > 0 ? `No glyph for ${named} and ${String(more)} more` : `No glyph for ${named}`;
 }
 
 /**
@@ -129,6 +143,10 @@ export function SpacingView({
     () => layoutRun(document, text, shape, position, engine),
     [document, text, shape, position, engine],
   );
+
+  // What was typed and is not in the line. The line passes over it, which is
+  // right for a line being spaced and no help to whoever mistyped a name.
+  const missing = useMemo(() => textWithoutGlyphs(document, text), [document, text]);
 
   const selectedName = selected === null ? null : (run.glyphs[selected]?.name ?? null);
   const bands = useMemo(
@@ -608,6 +626,11 @@ export function SpacingView({
               </span>
             )}
           </>
+        )}
+        {missing.length === 0 ? null : (
+          <span className={styles.missing} role="status">
+            {missingText(missing)}
+          </span>
         )}
       </div>
     </div>

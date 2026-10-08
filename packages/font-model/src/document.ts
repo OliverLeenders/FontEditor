@@ -483,6 +483,30 @@ export function glyphsForString(
   return tokens.map((token) => glyphForToken(document, token));
 }
 
+/**
+ * What was typed that the font has nothing for, as it was typed: each once, in
+ * the order it first comes.
+ *
+ * A line leaves these out without a word, which is right for the line — an
+ * invented box between two letters is a width nobody drew — and wrong for
+ * whoever typed `/uni3B1x` and is looking at nothing. So a view can say it
+ * beside the line. A space is named, since it cannot be shown.
+ */
+export function textWithoutGlyphs(
+  document: FontDocument,
+  text: string | readonly TextToken[],
+): string[] {
+  const tokens = typeof text === "string" ? textTokens(text) : text;
+  const missing = new Set<string>();
+  for (const token of tokens) {
+    if (glyphForToken(document, token) !== null) continue;
+    // A newline ends a line of a paragraph and is not asked of the font.
+    if (token.kind === "character" && /[\n\r]/.test(token.text)) continue;
+    missing.add(token.text.trim() === "" ? "space" : token.text.trim());
+  }
+  return [...missing];
+}
+
 /** Replace the font's feature source, leaving everything else alone. */
 export function setFeatures(document: FontDocument, features: string): FontDocument {
   return document.features === features ? document : { ...document, features };

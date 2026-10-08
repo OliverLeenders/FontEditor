@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fontDocument, glyphsForString } from "../src/document.js";
+import { fontDocument, glyphsForString, textWithoutGlyphs } from "../src/document.js";
 import { glyph } from "../src/glyph.js";
 import { codePointFromName, codePointFromTyped, textTokens } from "../src/text.js";
 
@@ -107,6 +107,15 @@ describe("the glyphs a line of text asks for", () => {
 
   it("prefers a glyph with the name to one with the code point", () => {
     expect(found("/uni0302")).toEqual(["uni0302"]);
+  });
+
+  it("says what was typed that it has nothing for, once each and as typed", () => {
+    expect(textWithoutGlyphs(font, "a/a.001/uni0301")).toEqual([]);
+    expect(textWithoutGlyphs(font, "ab/nothing b/uni0303")).toEqual(["b", "/nothing", "/uni0303"]);
+  });
+
+  it("names a space the font has not got, and passes over the end of a line", () => {
+    expect(textWithoutGlyphs(font, "a a\na")).toEqual(["space"]);
   });
 
   it("leaves a gap for a name the font has not got", () => {

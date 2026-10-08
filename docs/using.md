@@ -98,6 +98,13 @@ between with none is written `<anchor NULL>`. An anchor on the ligature with no 
 plain `top`, is still where a component lands in the drawing and is left out of the font's
 rules.
 
+**A glyph with no key.** In the Spacing line, the Proof and the strip under the drawing, a
+slash starts a glyph name: `/a.001`, `/f_i`. The name ends at a space, which is not set, or
+at the next slash; `//` is a slash. Where no glyph has the name, a code point is read from
+it — `/uni03B1`, `/u1F600`, `/U+03B1`, with or without the leading zeros — and the glyph
+that carries it is set. The Spacing line leaves out what the font has no glyph for, and
+says what it left out at the right of the bar below the line.
+
 **Which way the text runs.** The Spacing bar and the Proof bar each end with three pickers:
 direction, script and language. All three start at Auto, which reads them from the text —
 type Arabic and it is set right to left, with any Latin or numbers inside it in their own

@@ -186,6 +186,7 @@ export {
   glyphForToken,
   glyphNamed,
   glyphsForString,
+  textWithoutGlyphs,
   orderedGlyphs,
   putGlyph,
   removeGlyph,

@@ -180,6 +180,13 @@
   color: var(--ink-3, var(--ink-2));
 }
 
+/* What was typed and has no glyph. At the far end, away from the selected
+   letter's numbers, so it neither moves them nor is taken for one of them. */
+.missing {
+  margin-left: auto;
+  color: var(--warn);
+}
+
 /* Two exclusive modes, so they read as one control rather than two buttons. */
 .modes {
   box-sizing: border-box;
