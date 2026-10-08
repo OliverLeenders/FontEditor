@@ -26,6 +26,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { KernGroups } from "./KernGroups.js";
+import { missingText } from "../missing.js";
 import { palette } from "../scene.js";
 import { SPACING_SPECIMENS, specimenNamed } from "../specimens.js";
 import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingEngine } from "../shaping.js";
@@ -69,19 +70,6 @@ export function runView(
     tx: (drawn < viewport.width - RUN_INSET * 2 ? (viewport.width - drawn) / 2 : RUN_INSET) + panX,
     ty: viewport.height * 0.72,
   };
-}
-
-/** How many pieces with no glyph are named before the rest are counted. */
-const MISSING_NAMED = 4;
-
-/**
- * What the line leaves out, said: the pieces typed that the font has no glyph
- * for, the first few by what was typed and the rest by how many.
- */
-export function missingText(missing: readonly string[]): string {
-  const named = missing.slice(0, MISSING_NAMED).join(" ");
-  const more = missing.length - MISSING_NAMED;
-  return more > 0 ? `No glyph for ${named} and ${String(more)} more` : `No glyph for ${named}`;
 }
 
 /**

@@ -51,6 +51,23 @@
   color: var(--ink-2);
 }
 
+/* What was typed and has no glyph: at the far end with the count, and the one
+   to give way where the bar is short of room. */
+.missing {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  font-size: var(--text-s);
+  color: var(--warn);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.missing + .count {
+  flex: none;
+  margin-left: 0;
+}
+
 /* Everything left over, because the page is the point. */
 .stage {
   position: relative;

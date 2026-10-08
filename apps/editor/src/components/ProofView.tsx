@@ -1,8 +1,9 @@
 import { CanvasSurface, type ProofScene, drawProof } from "@typewright/render";
-import { drawableGlyph } from "@typewright/font-model";
+import { drawableGlyph, textWithoutGlyphs } from "@typewright/font-model";
 import { layoutParagraph, wheelIntent } from "@typewright/view";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { missingText } from "../missing.js";
 import { palette } from "../scene.js";
 import { PROOF_SPECIMENS, specimenNamed } from "../specimens.js";
 import { hasSomethingToShape, positionerFrom, shaperFrom, useShapingModule } from "../shaping.js";
@@ -97,6 +98,10 @@ export function ProofView(): React.JSX.Element {
   const applyFeatures = useStoreValue((s) => s.applyFeatures);
   const settings = useStoreValue((s) => s.proofTextSettings);
   const hasFeatures = useMemo(() => hasSomethingToShape(document), [document]);
+  // What was typed and is not on the page, which passes over it as the
+  // spacing line does: said in the bar, so a name spelled wrong is not taken
+  // for a glyph that will not set.
+  const missing = useMemo(() => textWithoutGlyphs(document, text), [document, text]);
   // HarfBuzz once it has loaded, which then sets the page on its own. The module
   // rather than an engine, because a block sets with its own features and there
   // is no telling how many blocks there are — see `useShapingModule`.
@@ -426,6 +431,11 @@ export function ProofView(): React.JSX.Element {
           onApplyFeaturesChange={() => store.toggleApplyFeatures()}
         />
 
+        {missing.length === 0 ? null : (
+          <span className={styles.missing} role="status" title={missing.join(" ")}>
+            {missingText(missing)}
+          </span>
+        )}
         <span className={styles.count}>
           {lineCount === 1 ? "1 line" : `${String(lineCount)} lines`}
         </span>

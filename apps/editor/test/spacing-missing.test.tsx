@@ -7,7 +7,8 @@ import { freshStore, installDomStubs, render } from "./render.js";
 
 installBrowserGlobals();
 
-const { SpacingView, missingText } = await import("../src/components/SpacingView.js");
+const { SpacingView } = await import("../src/components/SpacingView.js");
+const { missingText } = await import("../src/missing.js");
 
 /**
  * The spacing line saying what it has left out.

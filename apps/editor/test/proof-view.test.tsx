@@ -79,6 +79,29 @@ describe("setting the proof", () => {
   });
 });
 
+describe("text the font has not all of", () => {
+  const said = (): string | null => screen.queryByText(/^No glyph for /)?.textContent ?? null;
+
+  // The starter font has h, e, l, o, c, i, n and space.
+  it("is said beside the count, each piece once and as it was typed", () => {
+    const { store } = render(<ProofView />);
+
+    act(() => store.setProofText("hello/uni03B1 hexxo"));
+
+    expect(said()).toBe("No glyph for /uni03B1 x");
+  });
+
+  it("is not said of the end of a line, nor once the text is mended", () => {
+    const { store } = render(<ProofView />);
+
+    act(() => store.setProofText("hello\nhello/nothing"));
+    expect(said()).toBe("No glyph for /nothing");
+
+    act(() => store.setProofText("hello\nhello/U+006F"));
+    expect(said()).toBeNull();
+  });
+});
+
 describe("specimens", () => {
   it("replace the text with the one chosen", () => {
     const { store } = render(<ProofView />);
