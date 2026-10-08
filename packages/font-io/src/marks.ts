@@ -338,6 +338,13 @@ export type MarkCompilation = {
    * of it, so it is written where those meet. See `gdef.ts`.
    */
   readonly classes: ReadonlyMap<number, number>;
+  /**
+   * The sets of marks the mark-to-mark lookups look at, each passing over
+   * every other mark: glyph ids, in the order the lookups' `markFilteringSet`
+   * counts them from nought. They go into GDEF after whatever sets the feature
+   * file names, and the lookups' numbers are moved along by as many.
+   */
+  readonly markSets: readonly (readonly number[])[];
   readonly warnings: readonly string[];
 };
 
@@ -345,6 +352,7 @@ const NOTHING: MarkCompilation = {
   lookups: [],
   features: [],
   classes: new Map(),
+  markSets: [],
   warnings: [],
 };
 
@@ -410,6 +418,39 @@ export function markRounds(glyphs: readonly Glyph[]): Map<string, number> {
 }
 
 /**
+ * The marks that have to do with each class of marks that stack: the ones that
+ * attach by its anchor, and the ones that offer a place for it. By class, in
+ * the order the glyphs are given; a class nothing stacks in is not there.
+ *
+ * An accent stacks on the accent before it. But "before it" is among the
+ * marks of its own kind: with a dot below typed between two accents above,
+ * the second accent still belongs on the first. So a class's lookup is told
+ * to look at these marks and pass over every other, which is a mark filtering
+ * set — what the fonts made from such anchors by other tools carry too.
+ */
+export function stackingSets(glyphs: readonly Glyph[]): Map<string, GlyphName[]> {
+  const marks = glyphs.filter((g) => g.anchors.some(isMarkAnchor));
+  const classes = new Set(
+    marks.flatMap((g) => g.anchors.filter(isMarkAnchor).map((a) => a.name.slice(1))),
+  );
+  const sets = new Map<string, GlyphName[]>();
+  for (const name of classes) {
+    const offering = marks.filter((g) => g.anchors.some((a) => a.name === name));
+    if (offering.length === 0) continue;
+    sets.set(
+      name,
+      marks
+        .filter((g) => g.anchors.some((a) => a.name === name || a.name === `_${name}`))
+        .map((g) => g.name),
+    );
+  }
+  return sets;
+}
+
+/** `UseMarkFilteringSet`: the lookup looks only at the marks of the set it names. */
+const FILTERING = 0x0010;
+
+/**
  * Compile every glyph's anchors into mark attachment.
  *
  * The classes are the names the marks use: an accent carrying `_top` makes a
@@ -443,6 +484,8 @@ export function compileMarks(
 
   const attaching: Lookup[] = [];
   const stacking: Lookup[] = [];
+  const markSets: number[][] = [];
+  const sets = stackingSets(glyphs);
   const count = Math.max(...rounds.values()) + 1;
   for (let round = 0; round < count; round++) {
     // This round's classes, numbered as its lookups number them.
@@ -502,8 +545,26 @@ export function compileMarks(
         subtables: ligatureSubtables(marks, ligatures, classIndex.size),
       });
     }
-    if (stacked.length > 0) {
-      stacking.push({ type: 6, subtables: attachmentSubtables(marks, stacked, classIndex.size) });
+    // Marks on marks, a class at a time: each a lookup of its own, that
+    // looks only at the marks of its class and passes over the others.
+    for (const [name, at] of classIndex) {
+      const onto = stacked.flatMap((s) => {
+        const anchor = s.anchors[at] ?? null;
+        return anchor === null ? [] : [{ id: s.id, anchors: [anchor] }];
+      });
+      if (onto.length === 0) continue;
+      const stacks = marks.filter((m) => m.class === at).map((m) => ({ ...m, class: 0 }));
+      const set = (sets.get(name) ?? []).flatMap((glyph) => {
+        const id = glyphIdOf(glyph);
+        return id === undefined ? [] : [id];
+      });
+      stacking.push({
+        type: 6,
+        flags: FILTERING,
+        markFilteringSet: markSets.length,
+        subtables: attachmentSubtables(stacks, onto, 1),
+      });
+      markSets.push(set.sort((a, b) => a - b));
     }
   }
   if (attaching.length + stacking.length === 0) return NOTHING;
@@ -515,6 +576,7 @@ export function compileMarks(
     lookups: [...attaching, ...stacking],
     features: [...attaching.map(() => "mark"), ...stacking.map(() => "mkmk")],
     classes: glyphClasses(glyphs, markNames, ligatureNames, glyphIdOf),
+    markSets,
     warnings: [],
   };
 }

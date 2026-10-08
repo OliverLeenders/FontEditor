@@ -224,6 +224,7 @@ describe("a mark in two classes, in the Marks file", () => {
         "} mark;",
         "",
         "feature mkmk {",
+        "    lookupflag UseMarkFilteringSet [dotaccentcomb ringcomb];",
         "    pos mark dotaccentcomb <anchor 30 90> mark @MC_top;",
         "} mkmk;",
       ].join("\n"),

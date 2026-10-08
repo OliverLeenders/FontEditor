@@ -19,7 +19,7 @@ import {
   tokenize,
 } from "./fea.js";
 import { ENTRY, EXIT, joinsOf } from "./cursive.js";
-import { ligatureParts, markRounds } from "./marks.js";
+import { ligatureParts, markRounds, stackingSets } from "./marks.js";
 
 /**
  * The Marks file: mark attachment written as feature source, from the anchors.
@@ -166,7 +166,11 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
   const perRound = (): string[][] => Array.from({ length: roundCount }, () => []);
   const bases = perRound();
   const ligatures = perRound();
-  const stacked = perRound();
+  // Marks on marks are a class at a time, each under the set of marks its
+  // lookup looks at: in the order the compiler writes them, round by round.
+  const stacked = new Map<string, string[]>(
+    [...rounds.entries()].sort((a, b) => a[1] - b[1]).map(([name]) => [name, []]),
+  );
 
   for (const g of glyphs) {
     if (leftOut(g)) {
@@ -221,16 +225,28 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
       }
     }
 
-    const kind = g.anchors.some(isMarkAnchor) ? "mark" : "base";
+    if (g.anchors.some(isMarkAnchor)) {
+      // A mark others stack on: a rule for each class it has a place for.
+      for (const a of g.anchors) {
+        if (isMarkAnchor(a) || !written(g, a, classes) || a === joins?.entry || a === joins?.exit) {
+          continue;
+        }
+        stacked
+          .get(a.name)
+          ?.push(
+            `    pos mark ${spelled(g.name)} ${anchorText(a.pt)} mark ${MARK_CLASS_PREFIX}${a.name};`,
+          );
+      }
+      continue;
+    }
     for (const [round, offered] of offers.entries()) {
       if (offered.length === 0) continue;
       const rule =
         offered.length === 1
-          ? `    pos ${kind} ${spelled(g.name)} ${offered[0]!};`
-          : [`    pos ${kind} ${spelled(g.name)}`, ...offered.map((o) => `        ${o}`)].join(
-              "\n",
-            ) + ";";
-      (kind === "mark" ? stacked : bases)[round]!.push(rule);
+          ? `    pos base ${spelled(g.name)} ${offered[0]!};`
+          : [`    pos base ${spelled(g.name)}`, ...offered.map((o) => `        ${o}`)].join("\n") +
+            ";";
+      bases[round]!.push(rule);
     }
   }
 
@@ -238,17 +254,17 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
   // is several, each lot in a lookup of its own, in order. A lot is one kind
   // of rule — a named lookup holds one kind, so a round's letters and its
   // ligatures are two.
+  const deeper = (rule: string): string =>
+    rule
+      .split("\n")
+      .map((line) => `    ${line}`)
+      .join("\n");
   const feature = (tag: string, lots: readonly string[][]): string[] => {
     const filled = lots.filter((rules) => rules.length > 0);
     if (filled.length === 0) return [];
     if (roundCount === 1 || filled.length === 1) {
       return ["", `feature ${tag} {`, ...filled.flat(), `} ${tag};`];
     }
-    const deeper = (rule: string): string =>
-      rule
-        .split("\n")
-        .map((line) => `    ${line}`)
-        .join("\n");
     return [
       "",
       `feature ${tag} {`,
@@ -289,7 +305,32 @@ export function writeMarks(glyphs: readonly Glyph[], master: string | null = nul
       bases.flatMap((rules, round) => [rules, ligatures[round]!]),
     ),
   );
-  out.push(...feature("mkmk", stacked));
+  // The marks on marks, each class under the marks its lookup looks at: the
+  // ones that attach by its anchor and the ones that offer a place for it.
+  const sets = stackingSets(glyphs.filter((g) => !leftOut(g)));
+  const stacks = [...stacked]
+    .filter(([, rules]) => rules.length > 0)
+    .map(([name, rules]) => ({
+      name,
+      rules: [
+        `    lookupflag UseMarkFilteringSet [${(sets.get(name) ?? []).map(spelled).join(" ")}];`,
+        ...rules,
+      ],
+    }));
+  if (stacks.length === 1) {
+    out.push("", "feature mkmk {", ...stacks[0]!.rules, "} mkmk;");
+  } else if (stacks.length > 1) {
+    out.push(
+      "",
+      "feature mkmk {",
+      ...stacks.flatMap(({ name, rules }) => [
+        `    lookup mkmk_${name} {`,
+        ...rules.map(deeper),
+        `    } mkmk_${name};`,
+      ]),
+      "} mkmk;",
+    );
+  }
   if (joined.length > 0) {
     out.push("", "feature curs {", `    ${JOINED_UNDER}`, ...joined, "} curs;");
   }
@@ -597,6 +638,23 @@ export function readMarks(source: string, hasGlyph: (name: GlyphName) => boolean
       }
       // The flags joins are compiled under, which the file states and which
       // are not a thing to change here: said again as they are, or not at all.
+      // And the marks a lookup of marks on marks looks at, which are the
+      // marks of its class: stated, and worked out again from the anchors.
+      if (token.text === "lookupflag" && tag.text === "mkmk") {
+        const flag = r.take();
+        const list = flag?.text === "UseMarkFilteringSet" ? readGlyphList(token.line, r) : null;
+        if (list === null || r.peek()?.text !== ";") {
+          r.complain(
+            token.line,
+            "marks on marks look at the marks of their class and pass over the others: lookupflag UseMarkFilteringSet and those marks, and no other",
+          );
+          skipInside(r);
+          continue;
+        }
+        r.take();
+        glyphsNamed(list.glyphs, token.line);
+        continue;
+      }
       if (token.text === "lookupflag" && tag.text === "curs") {
         const flags: string[] = [];
         while (r.peek() !== undefined && r.peek()!.text !== ";" && r.peek()!.text !== "}") {

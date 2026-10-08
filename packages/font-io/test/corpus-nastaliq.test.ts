@@ -26,7 +26,7 @@ import { type Placed, fontBytes, set, setDifferently } from "./real-fonts.js";
  * HarfBuzz sets Urdu with both; the substitutions are then the font's own, and
  * every letter has to be where it was. And the font taken round whole — read
  * in, written out, and set beside the font it came from: the same glyphs, each
- * letter and each dot where it was. But for one thing, which is named below.
+ * letter and each dot where it was.
  */
 
 const PATH = "noto-nastaliq-urdu/NotoNastaliqUrdu[wght].ttf";
@@ -38,16 +38,18 @@ const WORDS =
   );
 
 /** With the marks a reader of the Quran or a learner writes: short vowels, doubling, and a stack of two. */
-const VOWELLED = ["بِسْمِ", "اللّٰہ", "مُحَمَّد", "کِتَابٌ", "قُرْآن", "اَلْحَمْدُ", "عَلَیْہِ"];
-
-/**
- * Known not to come through yet: a vowel below a letter that has a dot below
- * and a doubling sign above. The font as released stacks the vowel on the dot
- * by a lookup that passes over every mark but those below — a mark filtering
- * set — and this editor writes its marks on marks without one, so the sign
- * between the two is in the way and the vowel is set on the letter instead.
- */
-const NOT_YET = ["رَبِّ"];
+const VOWELLED = [
+  "بِسْمِ",
+  "اللّٰہ",
+  "مُحَمَّد",
+  "کِتَابٌ",
+  "قُرْآن",
+  "اَلْحَمْدُ",
+  "عَلَیْہِ",
+  // A vowel below a letter that has a dot below and a doubling sign above: the
+  // vowel stacks on the dot, past the sign typed between them.
+  "رَبِّ",
+];
 
 /** What the font is read with: the one thing known not to come through. */
 const READ_WITH = ["device and variation adjustments in positioning are not imported"];
@@ -160,8 +162,6 @@ describe("Noto Nastaliq Urdu, and its letters joined", () => {
     const after = new Font(new Face(new Blob(written.bytes)));
     const texts = [...WORDS, ...VOWELLED];
     expect(setDifferently(before, after, texts).slice(0, 3)).toEqual([]);
-    // And what is known not to: said here, so that mending it is noticed.
-    expect(setDifferently(before, after, NOT_YET)).toHaveLength(NOT_YET.length);
 
     // Asked of something: there are dots in these words, off the line, and
     // more than one on a letter.

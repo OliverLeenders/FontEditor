@@ -754,7 +754,20 @@ export function layoutTables(
       ),
       marks.features.map((tag, i) => ({ tag, lookups: [markAt + i] })),
     ),
-    [...features.positioning.lookups, ...cursive, ...kernLookups, ...marks.lookups],
+    [
+      ...features.positioning.lookups,
+      ...cursive,
+      ...kernLookups,
+      // The sets its lookups name come after the feature file's in GDEF.
+      ...marks.lookups.map((lookup) =>
+        lookup.markFilteringSet === undefined
+          ? lookup
+          : {
+              ...lookup,
+              markFilteringSet: lookup.markFilteringSet + features.gdef.markSets.length,
+            },
+      ),
+    ],
     // Kerning and marks apply in every language system the feature file
     // declares, as they would had they been written in it.
     features.systems,
@@ -777,7 +790,7 @@ export function layoutTables(
   const gdef = gdefTable({
     classes: new Map([...marks.classes, ...features.gdef.classes]),
     attach: features.gdef.attach,
-    markSets: features.gdef.markSets,
+    markSets: [...features.gdef.markSets, ...marks.markSets],
     carets: features.gdef.carets,
     ...(options.kerning === undefined || kern.deltaSets.length === 0
       ? {}

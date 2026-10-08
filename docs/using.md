@@ -65,6 +65,13 @@ cleanly, and Ctrl-Z takes it back; while it has a problem, no anchor changes. It
 again from the anchors when you switch files or an anchor moves elsewhere, so comments typed
 there are not kept.
 
+**An accent on an accent.** A mark that carries a place of its own — an acute with a `top`
+above it — is one others stack on. An accent stacks on the accent before it among the marks
+of its own kind: with a dot below typed between two accents above, the second still sits on
+the first. The Marks tab shows this as the `mkmk` feature, each kind under a
+`lookupflag UseMarkFilteringSet` line that lists the marks it looks at; the list is worked
+out from the anchors and is not a thing to edit there.
+
 **An accent that attaches two ways.** A dot may sit at one height on round letters and at
 another on tall ones. Give the mark an attaching anchor for each — `_top` and, say,
 `_high` — and give each letter the place it offers, `top` or `high`. The exported font sets
