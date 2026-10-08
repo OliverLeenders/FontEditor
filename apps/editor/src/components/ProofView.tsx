@@ -431,13 +431,17 @@ export function ProofView(): React.JSX.Element {
           onApplyFeaturesChange={() => store.toggleApplyFeatures()}
         />
 
-        {missing.length === 0 ? null : (
-          <span className={styles.missing} role="status" title={missing.join(" ")}>
-            {missingText(missing)}
+        {/* One thing to the bar, so that the two go to the next row together
+            when there is no room for them, and to its far end. */}
+        <span className={styles.tail}>
+          {missing.length === 0 ? null : (
+            <span className={styles.missing} role="status" title={missing.join(" ")}>
+              {missingText(missing)}
+            </span>
+          )}
+          <span className={styles.count}>
+            {lineCount === 1 ? "1 line" : `${String(lineCount)} lines`}
           </span>
-        )}
-        <span className={styles.count}>
-          {lineCount === 1 ? "1 line" : `${String(lineCount)} lines`}
         </span>
       </div>
 
