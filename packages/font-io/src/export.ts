@@ -101,13 +101,16 @@ function tracePath(path: OtPath, c: Contour): void {
  *
  * `fallback` is where a glyph a component names is looked for when this
  * document has not got it: the default master, for a master that draws only
- * some of the glyphs.
+ * some of the glyphs. `inkFor` is a stroke's ink where somebody has worked it
+ * out already — to the same points in every master, for a variable font — and
+ * says nothing of a stroke it has no ink for.
  */
 export function flatten(
   g: Glyph,
   document: FontDocument,
   ids: IdFactory,
   fallback: FontDocument = document,
+  inkFor?: (stroke: Contour) => readonly Contour[] | undefined,
 ): readonly Contour[] {
   // A stroke's skeleton is the path a pen was drawn along; what goes in the font is
   // the ink it leaves. Worked out before anything else, so the union below sees
@@ -123,7 +126,7 @@ export function flatten(
   const split = (glyph: Glyph, kind: "outline" | "ink"): readonly Contour[] =>
     glyph.contours
       .filter((c) => (c.nib === undefined) === (kind === "outline"))
-      .flatMap((c) => inkOf(c, ids));
+      .flatMap((c) => (c.nib === undefined ? undefined : inkFor?.(c)) ?? inkOf(c, ids));
 
   const gathered = (kind: "outline" | "ink"): readonly Contour[] => {
     const own = split(g, kind);

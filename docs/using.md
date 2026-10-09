@@ -562,6 +562,15 @@ UFO folder saved and opened again comes back with its strokes. If another applic
 a stroke's outline in the meantime, the changed outline is kept as an outline and the file's
 import report says so, rather than the old pen being put back over the edit.
 
+In a variable font a stroke varies as the pen and the path do, from one master to the next. Its
+ink goes in differently there: as one line round it that crosses itself where the ink turns a
+corner or folds inside a tight bend, which a variable font may hold and fills as the ink — the
+joined outline a single font gets has different points in every master, and a variable font
+needs the same ones. Two things have no such line and are written as the default master draws
+them at every weight, with a warning that says which glyphs: a broad edge whose angle or width
+changes along the stroke, and a pen that is a broad edge in one master and an oval in another.
+So is a stroke whose masters have not the same points, or one with a **Step** in its blend.
+
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it
 undoes that. **Hold** beside it makes it stay: a held point is put back where the curvatures

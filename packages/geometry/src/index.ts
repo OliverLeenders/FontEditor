@@ -136,6 +136,8 @@ export {
 } from "./nib.js";
 
 export type { PenBlend, PenProfile, PenShape, SegmentBlend, StrokeParts } from "./pen.js";
+export type { PlannedPiece, StrokeMaster } from "./convolution.js";
+export { plannedStrokes } from "./convolution.js";
 export {
   blendPen,
   isBroad,

@@ -1,12 +1,13 @@
 import type {
   Axis,
+  Contour,
   FontDocument,
   Glyph,
   Location,
   Rule,
   RulesProcessing,
 } from "@typewright/font-model";
-import { counterIds, glyph, isDiscrete, sameLocation } from "@typewright/font-model";
+import { counterIds, glyph, isDiscrete, plannedInk, sameLocation } from "@typewright/font-model";
 
 import { cff2Table, sameShape } from "./cff2.js";
 import {
@@ -237,7 +238,7 @@ export function exportVariableFont(
   // put a delta between them.
   // As the font compiled above numbers them: `.notdef` first, given or not.
   const order = writtenOrder(first.document);
-  const drawn = prepared.masters.map((m) => flattened(m.document, order, first.document));
+  const drawn = flattenedMasters(prepared.masters, order);
 
   // Which masters take part in each glyph: all of them, a sparse one only where
   // it draws the glyph, and none but the default where they disagree.
@@ -355,9 +356,10 @@ export function withVariationTables(
  * What is said of the glyphs written from the default master alone.
  *
  * Two reasons, said apart because they are mended differently. Masters that
- * disagree are a drawing to go and put right. A glyph drawn with a pen is not:
- * its ink is worked out in each master, and comes to different points in each
- * however alike the skeletons are, so there is nothing to put a delta between.
+ * disagree are a drawing to go and put right. A glyph drawn with a pen whose ink
+ * could not be drawn to one plan in every master is not: its ink is then worked
+ * out in each master for itself, and comes to different points in each however
+ * alike the skeletons are, so there is nothing to put a delta between.
  */
 export function notVaryingWarning(
   notVarying: readonly string[],
@@ -410,20 +412,92 @@ export function drawnWithPen(
  *
  * A stroke is written as the ink its pen leaves, as it is in any other font.
  * It used to go in as its skeleton, the path the pen was drawn along closed up
- * and filled, which is no letter anybody drew.
+ * and filled, which is no letter anybody drew. `inkFor` is that ink where it
+ * has been drawn to the same points in every master; see {@link flattenedMasters}.
  */
 export function flattened(
   document: FontDocument,
   order: readonly string[],
   fallback: FontDocument = document,
+  inkFor?: (stroke: Contour) => readonly Contour[] | undefined,
 ): Glyph[] {
   const ids = counterIds("v");
 
   return order.map((name) => {
     const found = document.glyphs[name];
     if (found === undefined) return glyph(name);
-    return { ...found, components: [], contours: [...flatten(found, document, ids, fallback)] };
+    return {
+      ...found,
+      components: [],
+      contours: [...flatten(found, document, ids, fallback, inkFor)],
+    };
   });
+}
+
+/**
+ * Every master's glyphs, prepared together: the first is the default, which the
+ * others fall back on.
+ *
+ * Together because of the strokes. A stroke's ink joined into one outline has
+ * different points in every master, and a glyph whose masters have different
+ * points cannot vary. So each stroke is drawn in all the masters that have it
+ * at once, to one plan (see `plannedInk`): a line round the ink that crosses
+ * itself where the ink folds, which a variable font may hold and fills as the
+ * ink. A stroke there is no one plan for is inked in each master for itself,
+ * and its glyph is then written as the default master draws it and said to be.
+ */
+export function flattenedMasters(
+  masters: readonly VariableMaster[],
+  order: readonly string[],
+): Glyph[][] {
+  const first = masters[0]!.document;
+  const ids = counterIds("p");
+  const inks = masters.map(() => new Map<Contour, readonly Contour[]>());
+
+  // Every glyph the default master has, and not only the ones written under
+  // their own names: a stroke may be reached only through a component.
+  for (const name of Object.keys(first.glyphs)) {
+    const having = masters.flatMap((m, at) => {
+      const found = m.document.glyphs[name];
+      return found === undefined ? [] : [{ at, contours: found.contours }];
+    });
+    const base = having[0]?.contours ?? [];
+    for (const [k, stroke] of base.entries()) {
+      if (stroke.nib === undefined) continue;
+      const same = having.map((h) => h.contours[k]);
+      if (same.some((c) => c === undefined)) continue;
+      const planned = plannedInk(same as Contour[], ids);
+      if (planned === null) continue;
+      for (const [h, ink] of planned.entries()) {
+        inks[having[h]!.at]!.set(same[h]!, ink.map(onWholeUnits));
+      }
+    }
+  }
+
+  // A master that has not got a glyph a component names draws the default's,
+  // and so the default's ink for it.
+  return masters.map((m, at) =>
+    flattened(m.document, order, first, (stroke) => inks[at]!.get(stroke) ?? inks[0]!.get(stroke)),
+  );
+}
+
+/**
+ * A contour with every point and handle on a whole unit.
+ *
+ * Ink is worked out, and comes to whatever fraction it comes to. A font's
+ * coordinates are whole numbers by long habit, and here for two reasons more:
+ * a fraction costs five bytes in a charstring where a whole number costs one or
+ * two, in every master; and a charstring says each point as a step from the one
+ * before, so whatever makes an instance of the font and rounds as it goes is a
+ * little further out with every point of a long line.
+ */
+function onWholeUnits(c: Contour): Contour {
+  const whole = <P extends { readonly x: number; readonly y: number } | null>(p: P): P =>
+    (p === null ? null : { x: Math.round(p.x), y: Math.round(p.y) }) as P;
+  return {
+    ...c,
+    nodes: c.nodes.map((n) => ({ ...n, pt: whole(n.pt), in: whole(n.in), out: whole(n.out) })),
+  };
 }
 
 /** The `name` table as it stands, for adding to. */

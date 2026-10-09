@@ -1,5 +1,6 @@
 import {
   type FontDocument,
+  type Glyph,
   DEFAULT_FONT_INFO,
   WEIGHT,
   component,
@@ -11,11 +12,14 @@ import {
   node,
   withNib,
 } from "@typewright/font-model";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { writtenOrder } from "../src/export.js";
+import { exportFont, writtenOrder } from "../src/export.js";
 import { opentype } from "../src/opentype.js";
-import { drawnWithPen, exportVariableFont, flattened } from "../src/variable.js";
+import { drawnWithPen, exportVariableFont, flattened, flattenedMasters } from "../src/variable.js";
+import { sameShape } from "../src/cff2.js";
 import { exportVariableTrueType } from "../src/variable-truetype.js";
 
 /**
@@ -23,16 +27,18 @@ import { exportVariableTrueType } from "../src/variable-truetype.js";
  *
  * A stroke is a path and a pen, and what goes in a font is the ink. The static
  * export has always written it; the variable one wrote the path itself, closed
- * up and filled. It is the ink now — the default master's, at every weight,
- * and said to be, until the ink is worked out to the same points in every
- * master.
+ * up and filled. It is the ink now, and drawn to the same points in every
+ * master so that it varies as any other glyph does: a line round the ink that
+ * crosses itself where the ink folds, which a variable font may hold. Where
+ * the masters' pens are too unlike for one plan, it is the default master's
+ * ink at every weight, and said to be.
  */
 
 const ids = counterIds("vs");
 const at = (x: number, y: number) => ({ x, y });
 
 /** An S drawn with a pen of a given width, and a letter that is the S again. */
-const master = (pen: number): FontDocument => {
+const master = (pen: number, thickness = pen / 4): FontDocument => {
   const skeleton = withNib(
     contour(
       ids.contour(),
@@ -47,7 +53,7 @@ const master = (pen: number): FontDocument => {
       ],
       false,
     ),
-    { angle: 30, width: pen, thickness: pen / 4 },
+    { angle: 30, width: pen, thickness },
   );
   return fontDocument(
     [
@@ -112,8 +118,64 @@ describe("a stroke in a variable font", () => {
     expect(drawnWithPen(document, "n")).toBe(false);
   });
 
-  it("is written as the default master draws it, and said not to vary", () => {
-    const { warnings, notVarying } = exportVariableFont(axes, family());
+  it("is drawn to the same points in every master, and varies", () => {
+    const masters = family();
+    const order = writtenOrder(masters[0]!.document);
+    const drawn = flattenedMasters(masters, order);
+    const regular = drawn[0]![order.indexOf("s")]!;
+    const black = drawn[1]![order.indexOf("s")]!;
+
+    expect(sameShape(regular, black)).toBe(true);
+    // One line round the ink of an open path, and the bold's reaching further.
+    expect(regular.contours).toHaveLength(1);
+    const reach = (g: Glyph): number => contourBounds(g.contours[0]!)!.maxX;
+    expect(reach(black)).toBeGreaterThan(reach(regular) + 20);
+
+    const { warnings, notVarying } = exportVariableFont(axes, masters);
+    expect(notVarying).toEqual([]);
+    expect(warnings.some((w) => w.includes("do not vary"))).toBe(false);
+  });
+
+  it("varies in a glyph that only names it, and in the font with quadratic outlines", () => {
+    const { bytes, warnings, notVarying } = exportVariableTrueType(axes, family());
+    const box = opentype.parse(bytes).charToGlyph("s").path.getBoundingBox();
+
+    expect(box.x1).toBeLessThan(90);
+    expect(box.x2).toBeGreaterThan(510);
+    expect(notVarying).toEqual([]);
+    expect(warnings.some((w) => w.includes("do not vary"))).toBe(false);
+  });
+
+  it("writes itself out when asked to, with each weight as a font of its own", () => {
+    // For `tools/otf-check/check_vf_strokes.py`: whether the font pinned to a
+    // weight fills as the stroke drawn at that weight does is a question about
+    // the deltas, and fontTools is who can be asked.
+    const out = process.env["STROKES_OUT"] ?? "";
+    if (out === "") return;
+    mkdirSync(out, { recursive: true });
+    const write = (name: string, bytes: ArrayBuffer): void =>
+      writeFileSync(join(out, name), new Uint8Array(bytes));
+
+    write("Penned.otf", exportVariableFont(axes, family()).bytes);
+    write("Penned.ttf", exportVariableTrueType(axes, family()).bytes);
+    // The pen half way between the two is the stroke half way along the axis,
+    // the path being the same in both.
+    for (const [weight, pen] of [
+      [400, 60],
+      [650, 100],
+      [900, 140],
+    ] as const) {
+      write(`static-${String(weight)}.otf`, exportFont(master(pen)).bytes);
+    }
+  });
+
+  it("is the default master's ink, and said not to vary, where the pens are too unlike", () => {
+    // An oval in one master and a broad edge in the other: no one plan.
+    const unlike = [
+      { name: "Regular", location: { wght: 400 }, document: master(60) },
+      { name: "Black", location: { wght: 900 }, document: master(140, 0) },
+    ];
+    const { warnings, notVarying } = exportVariableFont(axes, unlike);
 
     expect(notVarying).toEqual(expect.arrayContaining(["s", "dollar"]));
     expect(notVarying).not.toContain("n");
@@ -121,15 +183,5 @@ describe("a stroke in a variable font", () => {
       expect.stringMatching(/drawn with a pen do not vary.*s, dollar/),
     );
     expect(warnings.some((w) => w.includes("masters disagree"))).toBe(false);
-  });
-
-  it("is the ink in the font with quadratic outlines as well", () => {
-    const { bytes, warnings } = exportVariableTrueType(axes, family());
-    const s = opentype.parse(bytes).charToGlyph("s");
-    const box = s.path.getBoundingBox();
-
-    expect(box.x1).toBeLessThan(90);
-    expect(box.x2).toBeGreaterThan(510);
-    expect(warnings).toContainEqual(expect.stringMatching(/drawn with a pen do not vary/));
   });
 });

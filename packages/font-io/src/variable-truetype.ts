@@ -13,7 +13,7 @@ import {
   type VariableOptions,
   type VariableResult,
   advanceRows,
-  flattened,
+  flattenedMasters,
   notVaryingWarning,
   prepareVariable,
   withVariationTables,
@@ -55,7 +55,7 @@ export function exportVariableTrueType(
 
   // As the font compiled above numbers them: `.notdef` first, given or not.
   const order = writtenOrder(first.document);
-  const drawn = prepared.masters.map((m) => flattened(m.document, order, first.document));
+  const drawn = flattenedMasters(prepared.masters, order);
 
   // Every glyph converted across the masters that take part in it at once.
   // This is what `glyf` is written from as well, so the two tables cannot

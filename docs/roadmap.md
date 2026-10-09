@@ -1415,11 +1415,35 @@ look at twenty-four pixels, or helped draw one to the sizes icons are drawn to. 
   code point, name, anchors and mark; a file named for any other glyph is still left out,
   so `a.svg` never draws over the letter.
 
+#### After phase 38 — Strokes in a variable font — done
+
+A stroke went into a variable font as its skeleton: the path the pen was drawn along, closed
+up and filled. The ink a single font gets could not simply take its place, because it is
+fitted, cut at its folds and joined by a union, and comes to different points for a pen a
+little wider — and a variable font says a glyph once and then how each point moves.
+
+So the ink is drawn a second way for a variable font, to one plan for all the masters. It is
+one line round the ink: the pen's furthest reach to the right of the path, out along it and
+back, with the pen's own edge followed round each end and round each corner by as much as the
+path turned. That line is not the edge of the ink — it runs back over itself inside a tight
+bend and crosses itself inside a corner — but it goes round every point the pen covered and
+round nothing the wrong way, so the non-zero rule fills it as the ink exactly, and nothing has
+to find a fold or cut one out. The plan is how many curves each stretch is drawn with, which
+is as many as the master that needs most. A broad edge is exact: its side is the path moved
+over by half the nib, crossing along the nib where the path runs along it.
+
+fontTools is asked, as it is of every other delta: it draws both flavours at each weight and
+the fill is held against the same stroke exported on its own at that weight
+(`tools/otf-check/check_vf_strokes.py`). What has no one plan — a broad edge that changes
+along the stroke, a broad edge in one master and an oval in another, a blend that steps — is
+written as the default master draws it and named in a warning.
+
 #### Open
 
 What is next in the same direction:
 
-- **Strokes in a variable font**, whose masters are still written as their skeletons.
+- **A broad edge that turns or widens along a stroke, in a variable font**, which is still
+  written as the default master draws it.
 - **Fitting to the fixed width in every layer**, where it now fits the main drawing.
 
 #### Parked

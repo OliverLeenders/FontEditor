@@ -5,6 +5,7 @@ import {
   evaluate,
   loopArea,
   penPathStrokeParts,
+  plannedStrokes,
   reverseLoop,
 } from "@typewright/geometry";
 
@@ -75,6 +76,33 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   markInk(answer);
   joinedInk.set(c, answer);
   return answer;
+}
+
+/**
+ * One stroke's ink in each of several masters, drawn to the same points in all
+ * of them — or `null` where it cannot be.
+ *
+ * `strokes` is the same stroke as each master has it. What comes back is, for
+ * each, the ink as a line round it that crosses itself where the ink folds or
+ * turns a corner, and fills as the ink does by the non-zero rule: not an
+ * outline to edit or to put in a font that wants its overlaps gone, but one
+ * that has the same points in every master, which the joined outline of
+ * {@link inkOf} has not. See `plannedStrokes` for how, and for when not.
+ */
+export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour[][] | null {
+  if (strokes.some((c) => c.nib === undefined || c.nodes.length < 2)) return null;
+  const planned = plannedStrokes(
+    strokes.map((c) => {
+      const curves: Cubic[] = [];
+      for (let i = 0; i < segmentCount(c); i++) {
+        const segment = segmentAt(c, i);
+        if (segment !== null) curves.push(segmentCubic(segment));
+      }
+      return { curves, pens: pensOf(c), closed: c.closed, blends: c.nodes.map((n) => n.blend) };
+    }),
+  );
+  if (planned === null) return null;
+  return planned.map((loops) => markInk(loops.map((loop) => contourOfCurves(loop, ids))));
 }
 
 /** Below this average thickness, in units, a region of ink is a sliver. */

@@ -120,6 +120,23 @@ python check_vf_kerning.py /tmp/kern/Kern-VF.otf /tmp/kern/kerning.json
 python check_vf_kerning.py /tmp/kern/Kern-VF.ttf /tmp/kern/kerning.json
 ```
 
+## Strokes that vary
+
+`check_vf_strokes.py` is for a glyph drawn with a pen. Its ink goes into a variable font as
+one line round it, crossing itself where the ink folds or turns a corner, drawn to the same
+points in every master. Two things about that cannot be asked here: whether the points move
+to the right places between the masters, and whether a line that crosses itself fills as the
+ink does. So fontTools draws both flavours at each weight — at the masters and half way
+between — and a grid of points is asked of the glyph there and of the same stroke exported
+as a static font at that weight, where its ink is one joined outline. The font is drawn at
+the weight, not made into an instance first: an instance's coordinates are rounded one step
+after another, which along a line of two hundred points is a couple of units of rounding.
+
+```sh
+STROKES_OUT=/tmp/strokes pnpm --filter @typewright/font-io exec vitest run variable-strokes
+python check_vf_strokes.py /tmp/strokes
+```
+
 ## The TrueType flavour
 
 `check_ttf.py` asks the one question the conversion raises. A cubic cannot be

@@ -303,6 +303,7 @@ export { offsetContour } from "./offset.js";
 export {
   DEFAULT_NIB,
   inkOf,
+  plannedInk,
   isInk,
   markInk,
   inkRegions,

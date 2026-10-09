@@ -276,6 +276,17 @@ jobs:
           python tools/otf-check/check_vf_kerning.py "$RUNNER_TEMP/kern/Kern-VF.otf" "$RUNNER_TEMP/kern/kerning.json"
           python tools/otf-check/check_vf_kerning.py "$RUNNER_TEMP/kern/Kern-VF.ttf" "$RUNNER_TEMP/kern/kerning.json"
 
+      # A stroke goes into a variable font as a line round its ink that crosses
+      # itself, drawn to the same points in every master. Whether the points
+      # move to the right places, and whether such a line fills as the ink, is
+      # asked of fontTools: it draws both flavours at each weight, and the fill
+      # is held against the same stroke exported on its own at that weight.
+      - name: Export the stroke proof fonts
+        run: STROKES_OUT="$RUNNER_TEMP/strokes" pnpm --filter @typewright/font-io exec vitest run variable-strokes
+
+      - name: Draw them at each weight with fontTools and compare the fill
+        run: python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes"
+
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"
 
