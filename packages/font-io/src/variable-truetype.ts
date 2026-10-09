@@ -136,7 +136,11 @@ export function exportVariableTrueType(
 
   return {
     bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    warnings: [...base.warnings, ...prepared.warnings, ...notVaryingWarning(notVarying)],
+    warnings: [
+      ...base.warnings,
+      ...prepared.warnings,
+      ...notVaryingWarning(notVarying, first.document),
+    ],
     notVarying,
   };
 }

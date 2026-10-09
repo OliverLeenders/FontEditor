@@ -98,8 +98,17 @@ function tracePath(path: OtPath, c: Contour): void {
  * outlines. Nothing is lost in the shape — a flattened composite draws exactly
  * what it drew — but the fact that it *was* composed does not survive, which is
  * one of the two reasons the UFO export exists alongside this one.
+ *
+ * `fallback` is where a glyph a component names is looked for when this
+ * document has not got it: the default master, for a master that draws only
+ * some of the glyphs.
  */
-function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Contour[] {
+export function flatten(
+  g: Glyph,
+  document: FontDocument,
+  ids: IdFactory,
+  fallback: FontDocument = document,
+): readonly Contour[] {
   // A stroke's skeleton is the path a pen was drawn along; what goes in the font is
   // the ink it leaves. Worked out before anything else, so the union below sees
   // only outlines.
@@ -123,7 +132,7 @@ function flatten(g: Glyph, document: FontDocument, ids: IdFactory): readonly Con
     // down, so a stroke inside a component is still ink when it arrives here.
     const source: ComponentSource = {
       glyphOf: (name) => {
-        const found = document.glyphs[name];
+        const found = document.glyphs[name] ?? fallback.glyphs[name];
         return found === undefined ? null : { ...found, contours: split(found, kind) };
       },
     };

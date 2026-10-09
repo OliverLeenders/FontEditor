@@ -1,23 +1,21 @@
 import type {
   Axis,
-  ComponentSource,
   FontDocument,
   Glyph,
   Location,
   Rule,
   RulesProcessing,
 } from "@typewright/font-model";
-import {
-  correctDirections,
-  counterIds,
-  glyph,
-  isDiscrete,
-  resolveGlyphComponents,
-  sameLocation,
-} from "@typewright/font-model";
+import { counterIds, glyph, isDiscrete, sameLocation } from "@typewright/font-model";
 
 import { cff2Table, sameShape } from "./cff2.js";
-import { type ExportOptions, type ExportResult, exportFont, writtenOrder } from "./export.js";
+import {
+  type ExportOptions,
+  type ExportResult,
+  exportFont,
+  flatten,
+  writtenOrder,
+} from "./export.js";
 import { swapVariationsFor, type SwapVariations } from "./feature-variations.js";
 import { type NamedInstance, avarTable, fvarTable, statTable } from "./fvar.js";
 import { withNameLigatures } from "./name-ligatures.js";
@@ -279,7 +277,11 @@ export function exportVariableFont(
 
   return {
     bytes: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
-    warnings: [...base.warnings, ...prepared.warnings, ...notVaryingWarning(notVarying)],
+    warnings: [
+      ...base.warnings,
+      ...prepared.warnings,
+      ...notVaryingWarning(notVarying, first.document),
+    ],
     notVarying,
   };
 }
@@ -349,13 +351,50 @@ export function withVariationTables(
   return bytes;
 }
 
-export function notVaryingWarning(notVarying: readonly string[]): string[] {
-  return notVarying.length === 0
-    ? []
-    : [
-        `${String(notVarying.length)} glyphs do not vary because their masters disagree: ` +
-          `${notVarying.slice(0, 8).join(", ")}${notVarying.length > 8 ? "…" : ""}`,
-      ];
+/**
+ * What is said of the glyphs written from the default master alone.
+ *
+ * Two reasons, said apart because they are mended differently. Masters that
+ * disagree are a drawing to go and put right. A glyph drawn with a pen is not:
+ * its ink is worked out in each master, and comes to different points in each
+ * however alike the skeletons are, so there is nothing to put a delta between.
+ */
+export function notVaryingWarning(
+  notVarying: readonly string[],
+  document?: FontDocument,
+): string[] {
+  const listed = (names: readonly string[]): string =>
+    `${names.slice(0, 8).join(", ")}${names.length > 8 ? "…" : ""}`;
+  const penned =
+    document === undefined ? [] : notVarying.filter((name) => drawnWithPen(document, name));
+  const others = notVarying.filter((name) => !penned.includes(name));
+  return [
+    ...(others.length === 0
+      ? []
+      : [
+          `${String(others.length)} glyphs do not vary because their masters disagree: ` +
+            listed(others),
+        ]),
+    ...(penned.length === 0
+      ? []
+      : [
+          `${String(penned.length)} glyphs drawn with a pen do not vary, and are written as the ` +
+            `default master draws them: ${listed(penned)}`,
+        ]),
+  ];
+}
+
+/** Whether a glyph has a stroke in it, its own or one a component brings. */
+export function drawnWithPen(
+  document: FontDocument,
+  name: string,
+  seen: ReadonlySet<string> = new Set(),
+): boolean {
+  const found = document.glyphs[name];
+  if (found === undefined || seen.has(name)) return false;
+  if (found.contours.some((c) => c.nib !== undefined)) return true;
+  const within = new Set([...seen, name]);
+  return found.components.some((c) => drawnWithPen(document, c.base, within));
 }
 
 /**
@@ -368,6 +407,10 @@ export function notVaryingWarning(notVarying: readonly string[]): string[] {
  *
  * A component naming a glyph this master does not draw — which in a sparse
  * master is most of them — is resolved from `fallback`, the default master.
+ *
+ * A stroke is written as the ink its pen leaves, as it is in any other font.
+ * It used to go in as its skeleton, the path the pen was drawn along closed up
+ * and filled, which is no letter anybody drew.
  */
 export function flattened(
   document: FontDocument,
@@ -375,19 +418,11 @@ export function flattened(
   fallback: FontDocument = document,
 ): Glyph[] {
   const ids = counterIds("v");
-  const source: ComponentSource = {
-    glyphOf: (name) => document.glyphs[name] ?? fallback.glyphs[name] ?? null,
-  };
 
   return order.map((name) => {
     const found = document.glyphs[name];
     if (found === undefined) return glyph(name);
-
-    const resolved = [
-      ...found.contours,
-      ...resolveGlyphComponents(source, found.name, found.components, ids),
-    ];
-    return { ...found, components: [], contours: correctDirections(resolved) };
+    return { ...found, components: [], contours: [...flatten(found, document, ids, fallback)] };
   });
 }
 
