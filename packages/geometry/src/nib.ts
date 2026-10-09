@@ -285,6 +285,21 @@ export function ovalWedge(before: Cubic, after: Cubic, pen: PenShape): Cubic[] |
 }
 
 /**
+ * Whether the join between two curves is a corner to an oval pen standing at it:
+ * one that gets a wedge. Asked where the pen is a circle, as the wedge is, so the
+ * two never disagree about a join.
+ */
+export function ovalCorner(before: Cubic, after: Cubic, pen: PenShape): boolean {
+  const { inward } = squashFor(pen, OFFSET_TOLERANCE);
+  const arriving = endTangent(mapCubic(before, inward), 1);
+  const leaving = endTangent(mapCubic(after, inward), 0);
+  if (arriving === null || leaving === null) return false;
+  const turn = arriving.x * leaving.y - arriving.y * leaving.x;
+  const dot = arriving.x * leaving.x + arriving.y * leaving.y;
+  return Math.abs(Math.atan2(turn, dot)) >= CORNER;
+}
+
+/**
  * The round end an oval pen leaves where a path ends: at the far end of `curve`
  * when `atEnd`, at its start otherwise.
  */

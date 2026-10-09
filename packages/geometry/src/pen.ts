@@ -6,10 +6,11 @@ import {
   derivative,
   endTangent,
   evaluate,
+  split,
   tangent,
 } from "./cubic.js";
 import { fitCubics } from "./fit.js";
-import { halfNib, nibStroke, ovalBands, ovalCap, ovalFolds, ovalWedge } from "./nib.js";
+import { halfNib, nibStroke, ovalBands, ovalCap, ovalCorner, ovalFolds, ovalWedge } from "./nib.js";
 import { OFFSET_TOLERANCE, leftNormal } from "./offset.js";
 import type { Vec2 } from "./vec2.js";
 
@@ -301,15 +302,16 @@ export type StrokeParts = {
 };
 
 export function penPathStrokeParts(
-  curves: readonly Cubic[],
+  drawn: readonly Cubic[],
   pens: readonly PenShape[],
   closed: boolean,
   tolerance: number = OFFSET_TOLERANCE,
   blends?: readonly (SegmentBlend | undefined)[],
 ): StrokeParts {
-  const count = curves.length;
+  const count = drawn.length;
   const sweeps: Cubic[][][] = [];
   if (count === 0 || pens.length < (closed ? count : count + 1)) return { loops: [], sweeps };
+  const curves = straightenedJoins(drawn, pens, closed);
   const bandsOf = (curve: Cubic, penOn: (t: number) => PenShape): Cubic[][] => {
     const found = varyingBands(curve, penOn, tolerance);
     sweeps.push(...found.sweeps);
@@ -373,6 +375,59 @@ export function penPathStrokeParts(
   return { loops, sweeps };
 }
 
+/**
+ * The path with every join that is all but smooth made smooth: the two handles
+ * either side of it turned, each by half of what they differ by, onto one line.
+ *
+ * A join is a corner or it is not. A corner gets a wedge on its outside; a join
+ * too slight for one gets nothing, and is taken to be smooth — the band before
+ * it ending along the same line across the ink as the band after it starts on.
+ * But handles that have been rounded, or come from another program, are a
+ * thousandth of a degree off a line, and then the two lines across are too: a
+ * crack between the bands from the edge of the ink to the path, a hair wide,
+ * which the union followed in and out again and wrote down as a spike.
+ *
+ * Only where the pen is an oval. A broad nib's bands are closed by the nib
+ * itself, standing at the join, which is the same nib whichever curve is asked.
+ */
+function straightenedJoins(
+  curves: readonly Cubic[],
+  pens: readonly PenShape[],
+  closed: boolean,
+): readonly Cubic[] {
+  const count = curves.length;
+  const out = [...curves];
+  const joins = closed ? count : count - 1;
+  for (let i = 0; i < joins; i++) {
+    const j = (i + 1) % count;
+    const pen = pens[closed ? j : i + 1]!;
+    if (isBroad(pen) || !(pen.width > 0)) continue;
+    const before = out[i]!;
+    const after = out[j]!;
+    if (ovalCorner(before, after, pen)) continue;
+    const arriving = endTangent(before, 1);
+    const leaving = endTangent(after, 0);
+    if (arriving === null || leaving === null) continue;
+    const turn = Math.atan2(
+      arriving.x * leaving.y - arriving.y * leaving.x,
+      arriving.x * leaving.x + arriving.y * leaving.y,
+    );
+    if (turn === 0) continue;
+    const turned = (p: Vec2, about: Vec2, by: number): Vec2 => {
+      const cos = Math.cos(by);
+      const sin = Math.sin(by);
+      const x = p.x - about.x;
+      const y = p.y - about.y;
+      return { x: about.x + x * cos - y * sin, y: about.y + x * sin + y * cos };
+    };
+    out[i] = cubic(before.a, before.c1, turned(before.c2, before.b, turn / 2), before.b);
+    // The curve after may be the curve before, where a closed path is one curve.
+    const next = out[j]!;
+    out[j] = cubic(next.a, turned(next.c1, next.a, -turn / 2), next.c2, next.b);
+  }
+  return out;
+}
+
 /** How many points a varying curve's sides are sampled at, before fitting. */
 const SAMPLES = 48;
 
@@ -418,6 +473,13 @@ function sampleParams(): number[] {
  * where the side came back past itself — an oval pen leaving a sharp corner, a
  * handle pulled onto its point — that straight line ran through ink and left a
  * notch.
+ *
+ * Only the side that folds is lost, though. The other, on the outside of the
+ * bend, is the edge of the ink there as it is anywhere, and is fitted as it is
+ * anywhere: a band from it to the path (see {@link halfBand}), with the steps kept
+ * inside it. Left to the steps, that edge was their straight sides — a smooth
+ * curve drawn as a row of flats, meeting the fitted side either end of the fold
+ * at a corner.
  */
 function varyingBands(
   curve: Cubic,
@@ -502,10 +564,15 @@ function varyingBands(
     broken = true;
     for (const stretch of stretchesOf(run, folding)) {
       if (stretch.folds) {
+        const outside = unfoldedSide(stretch.samples, curve, penOn);
+        const kept =
+          outside === 0 ? null : halfBand(curve, penOn, stretch.samples, outside, tolerance);
+        if (kept !== null) pieces.push(kept);
         const chain = sweptSteps(
           curve,
           penOn,
           stretch.samples.map((s) => s.t),
+          kept === null ? 0 : outside,
         );
         if (chain.length > 0) sweeps.push(chain);
       } else {
@@ -583,6 +650,110 @@ function fittedSides(
 }
 
 /**
+ * The side of a folding stretch that does not fold: `1` for the left, `-1` for
+ * the right, and `0` where both do, or the pen is a broad edge somewhere along
+ * it — whose two sides are its two ends, and swap — or pivots.
+ */
+function unfoldedSide(
+  samples: readonly SideSample[],
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+): 1 | -1 | 0 {
+  let left = false;
+  let right = false;
+  for (let k = 0; k < samples.length; k++) {
+    const here = samples[k]!;
+    if (isBroad(penOn(here.t)) || pivoting(curve, penOn, here.t)) return 0;
+    const next = samples[k + 1];
+    if (next === undefined) continue;
+    left ||= runsBack(here.left, next.left, next.along);
+    right ||= runsBack(here.right, next.right, next.along);
+  }
+  return left === right ? 0 : left ? -1 : 1;
+}
+
+/** Whether going from one point of a side to the next goes backwards against the path. */
+function runsBack(from: Vec2, to: Vec2, along: Vec2): boolean {
+  return (to.x - from.x) * along.x + (to.y - from.y) * along.y < 0;
+}
+
+/**
+ * The ink between the path and one side of it, along a stretch: the side fitted,
+ * the path itself, and a straight line across at each end.
+ *
+ * All of it is ink, since the pen is convex and holds both its own middle and
+ * the furthest it reaches. `null` where the side will not fit, or the stretch
+ * has no length.
+ *
+ * And `null` where the side swings round faster than it was sampled. A handle
+ * pulled onto its point turns the path through most of its direction in a hair,
+ * and the side goes round the end of the pen in that hair: a few samples of it
+ * are a corner to whatever fits them, where the pen stood there is round. Such a
+ * stretch is left to the steps, which stand the pen itself there.
+ *
+ * So is a stretch whose side is next to no length — the same handle makes one,
+ * a fold a hair long at the very end of a curve. A band that short is a sliver
+ * between the cap and the band after it, and the union made a corner of it.
+ */
+function halfBand(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  samples: readonly SideSample[],
+  side: 1 | -1,
+  tolerance: number,
+): Cubic[] | null {
+  const first = samples[0]!.t;
+  const last = samples[samples.length - 1]!.t;
+  if (!(last > first)) return null;
+  const points = samples.map((s) => (side === 1 ? s.left : s.right));
+  if (!turnsGently(points)) return null;
+  let length = 0;
+  for (let k = 0; k + 1 < points.length; k++) {
+    length += Math.hypot(points[k + 1]!.x - points[k]!.x, points[k + 1]!.y - points[k]!.y);
+  }
+  if (length < SHORTEST_SIDE) return null;
+  const edge = fitCubics(
+    points,
+    tolerance,
+    edgeDirection(curve, penOn, first, side, 1),
+    edgeDirection(curve, penOn, last, side, -1),
+  );
+  if (edge.length === 0) return null;
+  const upTo = last >= 1 ? curve : split(curve, last)[0];
+  const spine = first <= 0 ? upTo : split(upTo, first / last)[1];
+  return [
+    ...edge,
+    line(edge[edge.length - 1]!.b, spine.b),
+    reversed(spine),
+    line(spine.a, edge[0]!.a),
+  ];
+}
+
+/** How long a side has to be, in units, to be worth a band of its own. */
+const SHORTEST_SIDE = 2;
+
+/** How far a side may turn from one sample to the next and still be fitted, in radians. */
+const GENTLE = (20 * Math.PI) / 180;
+
+/** Whether a row of points turns by little enough at each to have been sampled finely. */
+function turnsGently(points: readonly Vec2[]): boolean {
+  let before: Vec2 | null = null;
+  for (let k = 0; k + 1 < points.length; k++) {
+    const step = { x: points[k + 1]!.x - points[k]!.x, y: points[k + 1]!.y - points[k]!.y };
+    if (Math.hypot(step.x, step.y) < 1e-9) continue;
+    if (before !== null) {
+      const turn = Math.atan2(
+        before.x * step.y - before.y * step.x,
+        before.x * step.x + before.y * step.y,
+      );
+      if (Math.abs(turn) > GENTLE) return false;
+    }
+    before = step;
+  }
+  return true;
+}
+
+/**
  * Which steps between samples fold: where either side runs backwards against
  * the path.
  *
@@ -598,8 +769,7 @@ function foldingSteps(
   curve: Cubic,
   penOn: (t: number) => PenShape,
 ): boolean[] {
-  const back = (from: Vec2, to: Vec2, along: Vec2): boolean =>
-    (to.x - from.x) * along.x + (to.y - from.y) * along.y < 0;
+  const back = runsBack;
   const pivots = samples.map((s) => pivoting(curve, penOn, s.t));
   const out: boolean[] = [];
   for (let k = 0; k + 1 < samples.length; k++) {
@@ -719,11 +889,16 @@ const OUTLINE_SIDES = 32;
  * it is used only where the fast way — two sides and a band between them — has no
  * sides to give. The pieces overlap their neighbours and are all turned the same
  * way, so the non-zero rule fills them as their union.
+ *
+ * `outside` names a side of the path whose edge is drawn by something else — a
+ * band fitted to it — and on that side the pen is drawn a little small, so the
+ * steps stay within that edge and it is the fitted curve that shows.
  */
 function sweptSteps(
   curve: Cubic,
   penOn: (t: number) => PenShape,
   ts: readonly number[],
+  outside: 1 | -1 | 0 = 0,
 ): Cubic[][] {
   // Placed by how far the pen has gone and turned since the last position, walked
   // along a fine grid of the curve, rather than one or more per sample: the samples
@@ -756,7 +931,14 @@ function sweptSteps(
   }
   poses.push(to);
 
-  const outlines = poses.map((t) => penOutline(penOn(t), evaluate(curve, t)));
+  const outlines = poses.map((t) => {
+    const normal = outside === 0 ? null : leftNormal(curve, t);
+    return penOutline(
+      penOn(t),
+      evaluate(curve, t),
+      normal === null ? null : { x: normal.x * outside, y: normal.y * outside },
+    );
+  });
   const out: Cubic[][] = [];
   for (let i = 0; i + 1 < outlines.length; i++) {
     const a = outlines[i]!;
@@ -803,8 +985,16 @@ function nibBetween(first: readonly Vec2[], second: readonly Vec2[]): Vec2[][] {
  * The pen's outline at a place, as a polygon drawn round it rather than inside it,
  * so the polygon never leaves out a sliver of what the pen covers. A broad edge is
  * its two ends.
+ *
+ * `within` is a direction the polygon is to stay inside the pen in: its corners
+ * on that side are drawn a hair short of the pen's edge rather than beyond it,
+ * for a side whose edge is drawn exactly by something else. Round the other side
+ * it grows by degrees to the polygon it would have been, and is that only where
+ * the pen faces straight away: a polygon short on one half and long on the other
+ * has a step where the halves meet, at the front and the back of the pen, and at
+ * the end of a path the back of the pen is the edge of the ink.
  */
-function penOutline(pen: PenShape, at: Vec2): Vec2[] {
+function penOutline(pen: PenShape, at: Vec2, within: Vec2 | null = null): Vec2[] {
   if (isBroad(pen)) {
     const a = (pen.angle * Math.PI) / 180;
     const half = { x: (Math.cos(a) * pen.width) / 2, y: (Math.sin(a) * pen.width) / 2 };
@@ -817,11 +1007,20 @@ function penOutline(pen: PenShape, at: Vec2): Vec2[] {
   const grow = 1 / Math.cos(Math.PI / OUTLINE_SIDES);
   for (let k = 0; k < OUTLINE_SIDES; k++) {
     const u = (k / OUTLINE_SIDES) * Math.PI * 2;
-    const reach = penSupport(pen, { x: Math.cos(u), y: Math.sin(u) });
-    out.push({ x: at.x + reach.x * grow, y: at.y + reach.y * grow });
+    const facing = { x: Math.cos(u), y: Math.sin(u) };
+    const reach = penSupport(pen, facing);
+    const away = within === null ? 1 : Math.max(0, -(facing.x * within.x + facing.y * within.y));
+    const by = within === null ? grow : WITHIN + (grow - WITHIN) * away;
+    out.push({ x: at.x + reach.x * by, y: at.y + reach.y * by });
   }
   return out;
 }
+
+/**
+ * How much of the pen's reach a corner kept inside it is drawn at: short by a
+ * thousandth, so it never lies on the edge it is kept inside of.
+ */
+const WITHIN = 0.999;
 
 /** The convex hull of some points, anticlockwise, by Andrew's monotone chain. */
 function convexHull(points: readonly Vec2[]): Vec2[] {

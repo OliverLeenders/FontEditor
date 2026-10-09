@@ -21,6 +21,7 @@ import { counterIds } from "../src/ids.js";
 import { node } from "../src/node.js";
 import { offsetContour } from "../src/offset.js";
 import { removeOverlap } from "../src/overlap.js";
+import { simplifyContour } from "../src/simplify.js";
 import { rectContour } from "../src/shapes.js";
 import { contourOfCurves } from "../src/curves.js";
 import { unionByPolygons } from "../src/polygon-union.js";
@@ -1049,6 +1050,66 @@ describe("a stroke turned into outlines", () => {
       at([883, 63], [[850, 50], null], thin),
     ]),
     nib: { angle: 30, width: 90 },
+  });
+
+  it("keeps the outside of a bend one curve where the inside of it folds", () => {
+    // A drawn S, its first bend tighter than the long side of the pen. The
+    // inside of that bend folds and is swept; the outside was swept with it,
+    // its curve drawn as the steps' straight sides, and where those met the
+    // fitted side again the outline had a dent — a corner and a point four
+    // units after it — that tidying up made a sharp corner of.
+    const xy = (x: number, y: number) => ({ x, y });
+    const drawn: [number, number, number, number, number, number][] = [
+      [63.727, 390.277, 63.727, 390.277, 81.755, 433.603],
+      [159.813, 453.111, 121.682, 453.111, 191.784, 453.111],
+      [214.95, 405.983, 214.95, 442.989, 214.95, 313.704],
+      [108.202, 85.382, 108.202, 219.909, 108.202, 41.607],
+      [169.547, 7.358, 123.819, 7.358, 191.072, 7.358],
+      [255.646, 32.701, 219.267, 14.946, 367.91, 87.49],
+      [401.88, 254.553, 401.88, 169.777, 401.88, 329.198],
+      [353.131, 467.206, 375.545, 405.772, 353.131, 467.206],
+    ];
+    const last = drawn.length - 1;
+    const skeleton = withNib(
+      contour(
+        ids.contour(),
+        drawn.map(([x, y, ix, iy, ox, oy], i) =>
+          node(ids.node(), xy(x, y), {
+            type: i === 0 || i === last ? "corner" : "smooth",
+            in: i === 0 ? null : xy(ix, iy),
+            out: i === last ? null : xy(ox, oy),
+          }),
+        ),
+        false,
+      ),
+      { angle: 30, width: 80, thickness: 20 },
+    );
+
+    const ink = inkOf(skeleton, ids);
+    expect(ink).toHaveLength(1);
+    const outline = ink[0]!;
+
+    // The one corner there is, on the inside of the bend where the fold ends.
+    const corners = outline.nodes.filter((n) => n.type === "corner");
+    expect(corners).toHaveLength(1);
+    expect(corners[0]!.pt.x).toBeCloseTo(112, 0);
+    expect(corners[0]!.pt.y).toBeCloseTo(429.5, 0);
+
+    // And the outside of it is a curve or two, where the steps made it a row
+    // of short ones: the whole outline came to forty points and more.
+    expect(outline.nodes.length).toBeLessThanOrEqual(34);
+
+    // The sixth point of the path is smooth to a thousandth of a degree, not
+    // exactly, its handles having been rounded. The bands either side of it then
+    // ended on lines across the ink a hair apart, and the outline ran down the
+    // crack between them to the path and back: no point of it is on the path.
+    const onPath = outline.nodes.filter((n) => Math.hypot(n.pt.x - 255.646, n.pt.y - 32.701) < 1);
+    expect(onPath).toEqual([]);
+
+    // Simplified as the button does it, to a thousandth of the em, it still has
+    // the one corner: the dent was what that made a second, sharp one of.
+    const simpler = simplifyContour(outline, 1) ?? outline;
+    expect(simpler.nodes.filter((n) => n.type === "corner")).toHaveLength(1);
   });
 
   it("joins the pieces of its ink rather than handing them back as they are", () => {

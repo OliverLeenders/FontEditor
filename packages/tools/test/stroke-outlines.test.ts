@@ -69,7 +69,10 @@ describe("an oval-pen stroke with a sharp V, turned into outlines", () => {
   const stroke = () => parseClipboard(PASTED, ids)![0]!;
 
   it("is drawn in a handful of pieces, not hundreds", () => {
-    expect(inkRegions(stroke()).length).toBeLessThan(20);
+    // A few more than the bands, wedges and caps since a fold keeps the side of
+    // it that does not fold, a band of its own to each: tens, where there were
+    // hundreds.
+    expect(inkRegions(stroke()).length).toBeLessThan(30);
   });
 
   it("becomes one outline, in good time", () => {

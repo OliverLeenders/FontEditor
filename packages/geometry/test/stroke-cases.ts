@@ -208,4 +208,20 @@ export const STROKE_CASES: readonly StrokeCase[] = [
     pens: pens(2, oval),
     closed: false,
   },
+  {
+    // A drawn S whose first bend is tighter than the long side of its pen: the
+    // inside of the bend folds, and the outside of it does not.
+    name: "a thin oval round a bend that folds on the inside",
+    curves: [
+      cubic(p(63.727, 390.277), p(81.755, 433.603), p(121.682, 453.111), p(159.813, 453.111)),
+      cubic(p(159.813, 453.111), p(191.784, 453.111), p(214.95, 442.989), p(214.95, 405.983)),
+      cubic(p(214.95, 405.983), p(214.95, 313.704), p(108.202, 219.909), p(108.202, 85.382)),
+      cubic(p(108.202, 85.382), p(108.202, 41.607), p(123.819, 7.358), p(169.547, 7.358)),
+      cubic(p(169.547, 7.358), p(191.072, 7.358), p(219.267, 14.946), p(255.646, 32.701)),
+      cubic(p(255.646, 32.701), p(367.91, 87.49), p(401.88, 169.777), p(401.88, 254.553)),
+      cubic(p(401.88, 254.553), p(401.88, 329.198), p(375.545, 405.772), p(353.131, 467.206)),
+    ],
+    pens: pens(8, { angle: 30, width: 80, thickness: 20 }),
+    closed: false,
+  },
 ];

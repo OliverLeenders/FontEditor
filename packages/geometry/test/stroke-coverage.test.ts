@@ -30,6 +30,7 @@ describe("a stroke's ink, against the pen swept along it", () => {
       "a broad nib turning along a curve",
       "an oval pen round a sharp V",
       "a round pen round a hairpin",
+      "a thin oval round a bend that folds on the inside",
     ].map(named),
   )("fills as the pen does: $name", { timeout: 120_000 }, (c) => {
     const d = disagreement(filled(c), sweep(c.curves, c.pens, c.closed, c.blends), 45);
