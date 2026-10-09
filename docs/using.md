@@ -552,6 +552,25 @@ carries on through a point instead of turning a corner there, and never goes pas
 the way; **Ease**, slowly away from the point and slowly into the next; and **Step**, the point's
 pen held until the next point. A point put into a segment takes its blend with it.
 
+**How a stroke ends.** A pen held at an angle ends a stroke at that angle: the foot of a stem
+drawn with a pen at thirty degrees slants at thirty degrees and hangs below the point it ends
+at. Turning the pen level at the last point flattens the foot and widens the stem, and the
+width then has to be taken off again. So the end can be cut instead, and the pen left alone.
+Select the first or last point of an open stroke and the Pen section shows an **End** row:
+**Pen**, as the pen leaves it; **Square**, cut straight across the path; **Level**, a foot
+standing on a line; **Upright**, the end of a bar. A cut that is not square shows its angle in
+**Cut at**, in degrees anticlockwise from level as the pen's is, to be typed over. The stroke
+is carried on past its last point as far as the pen reaches and cut off by a line through that
+point — so the point is exactly where the ink ends, and the stroke is its own weight all the
+way to it. Put the point on the baseline and choose Level, and the stem stands on the
+baseline. Choose Pen and the end is the pen's again.
+
+Only the segment that ends there is cut: the bowl of a u hangs below the tops of its stems and
+is not touched by cutting them. A cut within fifteen degrees of the way the path is going is
+not made, since the pen would never get past it, and the end is left as the pen leaves it. A
+stroke with a cut end does not yet vary in a variable font: it is written as the default
+master draws it and named in the export's warnings.
+
 The **Stroke** tool (`N`) draws exactly as the pen tool does and makes strokes instead of
 outlines, with the last pen set in the Pen section — so a run of strokes in one hand is the pen
 set once. Until a pen has been set it draws with thirty degrees and eighty units. The pen interpolates between
@@ -569,7 +588,8 @@ joined outline a single font gets has different points in every master, and a va
 needs the same ones. Two things have no such line and are written as the default master draws
 them at every weight, with a warning that says which glyphs: a broad edge whose angle or width
 changes along the stroke, and a pen that is a broad edge in one master and an oval in another.
-So is a stroke whose masters have not the same points, or one with a **Step** in its blend.
+So is a stroke whose masters have not the same points, one with a **Step** in its blend, or
+one with an end cut straight.
 
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it

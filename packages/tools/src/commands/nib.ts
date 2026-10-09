@@ -3,6 +3,7 @@ import {
   type ContourId,
   type IdFactory,
   type Nib,
+  type StrokeEnd,
   contour,
   inkOf,
   samePen as sameNib,
@@ -318,6 +319,72 @@ export function setPenBlend(
     return nodes.some((n, i) => n !== c.nodes[i]) ? { ...c, nodes } : c;
   });
   return done(state, after, channel === "angle" ? "Pen angle blend" : "Pen shape blend");
+}
+
+/**
+ * How an end of a stroke ends: as the pen leaves it, or cut straight — square to
+ * the path, or at an angle in degrees anticlockwise from level.
+ */
+export type EndChoice = "pen" | "square" | number;
+
+/** The selected points that are an end of an open stroke, by contour. */
+function endPoints(state: EditorState): { contour: Contour; index: number }[] {
+  const glyph = currentGlyph(state);
+  if (glyph === null) return [];
+  const out: { contour: Contour; index: number }[] = [];
+  for (const item of state.selection) {
+    if (item.part !== "point") continue;
+    const c = glyph.contours.find((each) => each.id === item.contourId);
+    if (c === undefined || c.nib === undefined || c.closed) continue;
+    const index = c.nodes.findIndex((n) => n.id === item.nodeId);
+    if (index !== 0 && index !== c.nodes.length - 1) continue;
+    out.push({ contour: c, index });
+  }
+  return out;
+}
+
+const choiceOf = (end: StrokeEnd | undefined): EndChoice => (end === undefined ? "pen" : end.cut);
+
+/**
+ * How the selected ends of strokes end: the way they share, `"mixed"` where they
+ * differ, `null` where no selected point is an end of an open stroke.
+ */
+export function selectedStrokeEnd(state: EditorState): EndChoice | "mixed" | null {
+  let found: EndChoice | null = null;
+  for (const { contour: c, index } of endPoints(state)) {
+    const choice = choiceOf(c.nodes[index]!.end);
+    if (found === null) found = choice;
+    else if (found !== choice) return "mixed";
+  }
+  return found;
+}
+
+/**
+ * Set how the selected ends of strokes end. An end left as the pen leaves it
+ * stores nothing, as one never cut does.
+ */
+export function setStrokeEnd(state: EditorState, choice: EndChoice): ToolResult {
+  const chosen = new Map<string, Set<number>>();
+  for (const { contour: c, index } of endPoints(state)) {
+    const set = chosen.get(c.id) ?? new Set<number>();
+    set.add(index);
+    chosen.set(c.id, set);
+  }
+
+  const after = edit(state, selected(state), (c) => {
+    const indices = chosen.get(c.id);
+    if (indices === undefined) return c;
+    const nodes = c.nodes.map((n, i) => {
+      if (!indices.has(i) || choiceOf(n.end) === choice) return n;
+      if (choice === "pen") {
+        const { end: _dropped, ...rest } = n;
+        return rest;
+      }
+      return { ...n, end: { cut: choice } };
+    });
+    return nodes.some((n, i) => n !== c.nodes[i]) ? { ...c, nodes } : c;
+  });
+  return done(state, after, "Stroke end");
 }
 
 /** The whole contours the selection claims, in the order the glyph has them. */

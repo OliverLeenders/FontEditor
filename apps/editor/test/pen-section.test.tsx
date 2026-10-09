@@ -219,3 +219,52 @@ describe("the pen's blends", () => {
     expect(shape.getByRole("button", { name: "Smooth" }).getAttribute("aria-pressed")).toBe("true");
   });
 });
+
+describe("how a stroke ends", () => {
+  /** The same path as a stroke, with its last point selected: the foot of a stem. */
+  function atItsEnd(): Store {
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    return store;
+  }
+
+  it("is offered at an end of an open stroke, as the pen leaves it until set", () => {
+    opened(withPath());
+    // An outline has no ends to cut.
+    expect(screen.queryByRole("group", { name: "End" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+
+    const end = within(screen.getByRole("group", { name: "End" }));
+    expect(end.getByRole("button", { name: "Pen" }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByLabelText("Cut angle")).toBeNull();
+  });
+
+  it("cuts the end level, shows the angle, and takes another typed over it", () => {
+    const store = atItsEnd();
+    const end = within(screen.getByRole("group", { name: "End" }));
+
+    fireEvent.click(end.getByRole("button", { name: "Level" }));
+    expect(path(store).nodes[0]!.end).toEqual({ cut: 0 });
+    expect(end.getByRole("button", { name: "Level" }).getAttribute("aria-pressed")).toBe("true");
+
+    const angle = screen.getByLabelText("Cut angle");
+    fireEvent.change(angle, { target: { value: "12" } });
+    fireEvent.blur(angle);
+    expect(path(store).nodes[0]!.end).toEqual({ cut: 12 });
+    // Neither level nor upright now, and not the pen's either.
+    expect(end.getByRole("button", { name: "Level" }).getAttribute("aria-pressed")).toBe("false");
+    expect(end.getByRole("button", { name: "Pen" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("is switched off again by Pen, and the angle goes with it", () => {
+    const store = atItsEnd();
+    const end = within(screen.getByRole("group", { name: "End" }));
+
+    fireEvent.click(end.getByRole("button", { name: "Square" }));
+    expect(path(store).nodes[0]!.end).toEqual({ cut: "square" });
+    expect(screen.queryByLabelText("Cut angle")).toBeNull();
+
+    fireEvent.click(end.getByRole("button", { name: "Pen" }));
+    expect(path(store).nodes[0]!.end).toBeUndefined();
+  });
+});

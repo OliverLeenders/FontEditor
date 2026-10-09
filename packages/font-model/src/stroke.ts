@@ -1,8 +1,13 @@
 import {
   type Cubic,
   type PenShape,
+  type SegmentBlend,
+  type Vec2,
   blendPen,
+  clipLoop,
+  endTangent,
   evaluate,
+  lineAsCubic,
   loopArea,
   penPathStrokeParts,
   plannedStrokes,
@@ -91,6 +96,11 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
  */
 export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour[][] | null {
   if (strokes.some((c) => c.nib === undefined || c.nodes.length < 2)) return null;
+  // An end cut straight is the ink cut by a line, which is a different number
+  // of points wherever the line falls: not yet a thing every master shares.
+  if (strokes.some((c) => strokeCut(c, "start") !== null || strokeCut(c, "end") !== null)) {
+    return null;
+  }
   const planned = plannedStrokes(
     strokes.map((c) => {
       const curves: Cubic[] = [];
@@ -223,58 +233,277 @@ function strokeParts(c: Contour): {
 } {
   const known = partsOf.get(c);
   if (known !== undefined) return known;
-  const nib = c.nib;
-  if (nib === undefined || !(nib.width > 0) || c.nodes.length < 2) {
-    const none = { pieces: [], folds: [] };
-    partsOf.set(c, none);
-    return none;
-  }
 
+  const pieces: Contour[] = [];
+  const folds: Contour[][] = [];
+  for (const stretch of stretchesOf(c)) {
+    const parts = stretchParts(stretch);
+    // Nearly every stroke is one stretch with nothing cut, and is drawn again
+    // at every move of a drag: its parts go straight through.
+    if (stretch.cuts.length === 0) {
+      for (const loop of parts.loops) pieces.push(regionOf(loop));
+      for (const chain of parts.sweeps) folds.push(chain.map(regionOf));
+      continue;
+    }
+    for (const loop of parts.loops) {
+      const kept = cutBy(loop, stretch.cuts);
+      if (kept.length > 0) pieces.push(regionOf(kept));
+    }
+    for (const chain of parts.sweeps) {
+      const steps = chain
+        .map((step) => cutBy(step, stretch.cuts))
+        .filter((kept) => kept.length > 0);
+      if (steps.length > 0) folds.push(steps.map(regionOf));
+    }
+  }
+  const found = { pieces, folds };
+  partsOf.set(c, found);
+  return found;
+}
+
+/**
+ * A loop as a region of ink, turned the way ink is.
+ *
+ * Every piece the same way round — anticlockwise, which is how an outline's
+ * outer contour is turned for the fill — or two that overlap with opposite
+ * turns cancel where they cross and leave a hole in the stroke.
+ */
+function regionOf(loop: readonly Cubic[]): Contour {
+  return asContour(loopArea(loop) < 0 ? reverseLoop(loop) : loop);
+}
+
+/** A loop as a contour, turned as it is. */
+function asContour(loop: readonly Cubic[]): Contour {
+  return contourOfCurves(
+    loop.map((curve) => ({ curve, line: straight(curve) })),
+    regionIds,
+  );
+}
+
+/** A contour's curves, in order. */
+function curvesOf(c: Contour): Cubic[] {
   const curves: Cubic[] = [];
   for (let i = 0; i < segmentCount(c); i++) {
     const segment = segmentAt(c, i);
     if (segment !== null) curves.push(segmentCubic(segment));
   }
+  return curves;
+}
 
-  // The pen at every point, which is the point's own where it has one and the
-  // contour's where it does not; along each segment it blends from one to the
-  // next. Where a segment's two pens are the same, its ink is worked out as it
-  // always was — exactly, for a broad edge.
-  const parts = penPathStrokeParts(
-    curves,
-    pensOf(c),
-    c.closed,
-    undefined,
-    c.nodes.map((n) => n.blend),
-  );
+/** A loop with everything past each of some cuts taken off. */
+function cutBy(loop: readonly Cubic[], cuts: readonly StrokeCut[]): readonly Cubic[] {
+  let kept = loop;
+  for (const cut of cuts) {
+    if (kept.length === 0) break;
+    kept = clipLoop(kept, cut.through, cut.normal);
+  }
+  return kept;
+}
 
-  // Every piece the same way round — anticlockwise, which is how an outline's
-  // outer contour is turned for the fill — or two that overlap with opposite
-  // turns cancel where they cross and leave a hole in the stroke.
-  const region = (loop: readonly Cubic[]): Contour =>
-    contourOfCurves(
-      (loopArea(loop) < 0 ? reverseLoop(loop) : loop).map((curve) => ({
-        curve,
-        line: straight(curve),
-      })),
-      regionIds,
-    );
-  const found = {
-    pieces: parts.loops.map(region),
-    folds: parts.sweeps.map((chain) => chain.map(region)),
+/**
+ * A straight line a stroke's end is cut off by: the point it goes through, the
+ * way it faces — away from the ink that is kept — and the way the path was
+ * going when it got there.
+ */
+export type StrokeCut = {
+  readonly through: Vec2;
+  readonly normal: Vec2;
+  readonly onward: Vec2;
+};
+
+/**
+ * How nearly along the path a cut may lie: the sine of fifteen degrees.
+ *
+ * A stroke is carried on until the whole pen is past the cut, and a cut that
+ * runs nearly the way the path does is never got past. Flatter than this the
+ * end is left as the pen leaves it.
+ */
+const SHALLOWEST_CUT = Math.sin((15 * Math.PI) / 180);
+
+/**
+ * The cut at one end of a stroke, or `null` where that end is left as the pen
+ * leaves it: no cut set there, a closed path, which has no ends, or a cut too
+ * nearly along the path to make.
+ */
+export function strokeCut(c: Contour, which: "start" | "end"): StrokeCut | null {
+  if (c.nib === undefined || c.closed || c.nodes.length < 2) return null;
+  const node = which === "start" ? c.nodes[0]! : c.nodes[c.nodes.length - 1]!;
+  if (node.end === undefined) return null;
+  const segment = segmentAt(c, which === "start" ? 0 : segmentCount(c) - 1);
+  if (segment === null) return null;
+  const along = endTangent(segmentCubic(segment), which === "start" ? 0 : 1);
+  if (along === null) return null;
+  // The way the stroke would go on: forwards past its last point, backwards
+  // past its first.
+  const onward = which === "start" ? { x: -along.x, y: -along.y } : along;
+
+  let normal = onward;
+  if (node.end.cut !== "square") {
+    const angle = (node.end.cut * Math.PI) / 180;
+    const across = { x: -Math.sin(angle), y: Math.cos(angle) };
+    const facing = across.x * onward.x + across.y * onward.y;
+    normal = facing < 0 ? { x: -across.x, y: -across.y } : across;
+  }
+  if (normal.x * onward.x + normal.y * onward.y < SHALLOWEST_CUT) return null;
+  return { through: node.pt, normal, onward };
+}
+
+/**
+ * A stretch of a stroke worked out on its own: its path, the pen at each of its
+ * points, and the cuts its ink is cut by.
+ */
+type Stretch = {
+  readonly curves: readonly Cubic[];
+  readonly pens: readonly PenShape[];
+  readonly blends: readonly (SegmentBlend | undefined)[];
+  readonly closed: boolean;
+  readonly cuts: readonly StrokeCut[];
+};
+
+/**
+ * A stroke as the stretches its ink is worked out in: one, the whole of it,
+ * unless an end is cut.
+ *
+ * A cut end is the stroke carried on straight past its last point, with the pen
+ * it had there, far enough for the whole pen to be past the cut — and then cut.
+ * The cut is a line across the whole page, and a stroke comes back across lines:
+ * the bowl of a u hangs below the feet of its stems. So only the last segment is
+ * carried on and cut, as a stretch of its own, and the rest of the stroke is
+ * left whole. Each stretch has the pen standing at both its ends, so they
+ * overlap where they meet, as the segments of a stroke always have.
+ */
+function stretchesOf(c: Contour): Stretch[] {
+  const nib = c.nib;
+  if (nib === undefined || !(nib.width > 0) || c.nodes.length < 2) return [];
+  const curves = curvesOf(c);
+  const count = curves.length;
+  if (count === 0) return [];
+  const pens = pensOf(c);
+  const blends = c.nodes.map((n) => n.blend);
+
+  const start = strokeCut(c, "start");
+  const end = strokeCut(c, "end");
+  if (start === null && end === null) return [{ curves, pens, blends, closed: c.closed, cuts: [] }];
+
+  // How far on the stroke is carried: until the pen's furthest reach is past the cut.
+  const carried = (cut: StrokeCut, pen: PenShape): Vec2 => {
+    const reach = Math.max(pen.width, pen.thickness) / 2 + 2;
+    const by = reach / (cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y);
+    return { x: cut.through.x + cut.onward.x * by, y: cut.through.y + cut.onward.y * by };
   };
-  partsOf.set(c, found);
-  return found;
+  const before = start === null ? null : lineAsCubic(carried(start, pens[0]!), start.through);
+  const after = end === null ? null : lineAsCubic(end.through, carried(end, pens[count]!));
+
+  if (count === 1) {
+    return [
+      {
+        curves: [
+          ...(before === null ? [] : [before]),
+          curves[0]!,
+          ...(after === null ? [] : [after]),
+        ],
+        pens: [
+          ...(before === null ? [] : [pens[0]!]),
+          pens[0]!,
+          pens[1]!,
+          ...(after === null ? [] : [pens[1]!]),
+        ],
+        blends: [
+          ...(before === null ? [] : [undefined]),
+          blends[0],
+          ...(after === null ? [] : [undefined]),
+        ],
+        closed: false,
+        cuts: [...(start === null ? [] : [start]), ...(end === null ? [] : [end])],
+      },
+    ];
+  }
+
+  const out: Stretch[] = [];
+  if (start !== null && before !== null) {
+    out.push({
+      curves: [before, curves[0]!],
+      pens: [pens[0]!, pens[0]!, pens[1]!],
+      blends: [undefined, blends[0]],
+      closed: false,
+      cuts: [start],
+    });
+  }
+  const from = start === null ? 0 : 1;
+  const to = end === null ? count : count - 1;
+  if (to > from) {
+    out.push({
+      curves: curves.slice(from, to),
+      pens: pens.slice(from, to + 1),
+      blends: blends.slice(from, to),
+      closed: false,
+      cuts: [],
+    });
+  }
+  if (end !== null && after !== null) {
+    out.push({
+      curves: [curves[count - 1]!, after],
+      pens: [pens[count - 1]!, pens[count]!, pens[count]!],
+      blends: [blends[count - 1], undefined],
+      closed: false,
+      cuts: [end],
+    });
+  }
+  return out;
+}
+
+/**
+ * The ink of one stretch in its parts, as the geometry gives them.
+ *
+ * The pen at every point, which is the point's own where it has one and the
+ * contour's where it does not; along each segment it blends from one to the
+ * next. Where a segment's two pens are the same, its ink is worked out as it
+ * always was — exactly, for a broad edge.
+ */
+function stretchParts(stretch: Stretch): { loops: Cubic[][]; sweeps: Cubic[][][] } {
+  return penPathStrokeParts([...stretch.curves], [...stretch.pens], stretch.closed, undefined, [
+    ...stretch.blends,
+  ]);
 }
 
 /** Each part of a stroke's ink, with every fold's chain of steps joined into one region. */
 function joinedParts(c: Contour, ids: IdFactory): readonly Contour[] {
-  const parts = strokeParts(c);
-  // Where the join fails the steps are kept as they are: they fill the same.
-  return [
-    ...parts.pieces,
-    ...parts.folds.flatMap((steps) => unionByPolygons(steps, ids, false) ?? steps),
-  ];
+  const stretches = stretchesOf(c);
+  if (stretches.every((s) => s.cuts.length === 0)) {
+    const parts = strokeParts(c);
+    // Where the join fails the steps are kept as they are: they fill the same.
+    return [
+      ...parts.pieces,
+      ...parts.folds.flatMap((steps) => unionByPolygons(steps, ids, false) ?? steps),
+    ];
+  }
+
+  // A stretch that is cut is joined into one outline first and cut after. Cut
+  // first, every part of it would have an edge along the same line, lying on
+  // its neighbours' — and edges lying along each other are what the union is
+  // worst at.
+  return stretches.flatMap((stretch) => {
+    const parts = stretchParts(stretch);
+    const regions = [
+      ...parts.loops.map(regionOf),
+      ...parts.sweeps.flatMap((chain) => {
+        const steps = chain.map(regionOf);
+        return unionByPolygons(steps, ids, false) ?? steps;
+      }),
+    ];
+    if (stretch.cuts.length === 0) return regions;
+    const whole =
+      regions.length < 2
+        ? regions
+        : (removeOverlap(glyph("", { contours: regions }), ids)?.glyph.contours ??
+          unionByPolygons(regions, ids) ??
+          regions);
+    // Turned as the union left them: a hole in it stays a hole.
+    return whole.flatMap((region) => {
+      const kept = cutBy(curvesOf(region), stretch.cuts);
+      return kept.length === 0 ? [] : [asContour(kept)];
+    });
+  });
 }
 
 /**

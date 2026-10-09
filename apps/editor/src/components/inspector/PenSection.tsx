@@ -1,13 +1,16 @@
 import type { PenBlend } from "@typewright/geometry";
 import {
   type BlendChannel,
+  type EndChoice,
   changePen,
   drawWithPen,
   selectedPenBlend,
   selectedPenValue,
   selectedPointPen,
+  selectedStrokeEnd,
   selectionNib,
   setPenBlend,
+  setStrokeEnd,
 } from "@typewright/tools";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
@@ -44,6 +47,8 @@ export function PenSection(): React.JSX.Element {
   // How the pen changes along the segments leaving those points, part by part.
   const angleBlend = useStoreValue((s) => selectedPenBlend(s.session.editor, "angle"));
   const shapeBlend = useStoreValue((s) => selectedPenBlend(s.session.editor, "shape"));
+  // How the stroke ends at the selected points, where one of them is an end.
+  const end = useStoreValue((s) => selectedStrokeEnd(s.session.editor));
 
   const selected = stroke !== null;
   const drawing = stroke !== null && stroke !== "none";
@@ -142,7 +147,64 @@ export function PenSection(): React.JSX.Element {
           segment after it to say anything about. */}
       {angleBlend !== null && <BlendField label="Angle blend" channel="angle" value={angleBlend} />}
       {shapeBlend !== null && <BlendField label="Shape blend" channel="shape" value={shapeBlend} />}
+
+      {/* How the stroke ends, where an end of an open one is selected. Beside the
+          pen and not in it: a cut is what saves turning the pen to get a flat
+          end, and widening the stroke by turning it. */}
+      {end !== null && <EndField value={end} />}
     </Section>
+  );
+}
+
+const ENDS: readonly {
+  readonly value: EndChoice;
+  readonly label: string;
+  readonly title: string;
+}[] = [
+  { value: "pen", label: "Pen", title: "As the pen leaves it" },
+  { value: "square", label: "Square", title: "Cut straight across the path, at this point" },
+  { value: 0, label: "Level", title: "Cut level, at this point: a foot standing on a line" },
+  { value: 90, label: "Upright", title: "Cut upright, at this point: the end of a bar" },
+];
+
+/**
+ * How a stroke ends at the selected ends: as the pen leaves it, or cut straight
+ * through the point. A cut at an angle shows the angle, to be typed over; level
+ * and upright are that angle at nought and ninety.
+ */
+function EndField({ value }: { readonly value: EndChoice | "mixed" }): React.JSX.Element {
+  const store = useEditorStore();
+  const set = (choice: EndChoice): void => store.applyTool(setStrokeEnd(store.editor, choice));
+  return (
+    <>
+      <Field label="End" group>
+        <div className={styles.segmented}>
+          {ENDS.map((e) => (
+            <button
+              key={e.label}
+              type="button"
+              aria-pressed={value === e.value}
+              title={e.title}
+              onClick={() => set(e.value)}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
+      </Field>
+      {typeof value === "number" && (
+        <Field label="Cut at">
+          <NumberField
+            className={styles.input}
+            label="Cut angle"
+            title="Degrees anticlockwise from level"
+            value={value}
+            bigStep={15}
+            onCommit={(angle) => set(angle)}
+          />
+        </Field>
+      )}
+    </>
   );
 }
 

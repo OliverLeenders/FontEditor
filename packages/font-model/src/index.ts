@@ -35,7 +35,7 @@ export {
 export type { AnchorId, ComponentId, ContourId, GuideId, IdFactory, NodeId } from "./ids.js";
 export { counterIds, randomIds } from "./ids.js";
 
-export type { ContinuousCorner, HandleLock, Node, NodeInit, NodeType } from "./node.js";
+export type { ContinuousCorner, HandleLock, Node, NodeInit, NodeType, StrokeEnd } from "./node.js";
 export {
   BOTH_LOCKED,
   NO_LOCK,
@@ -81,6 +81,7 @@ export {
   isHalfHandled,
   insertNodeOnSegment,
   readSegmentBlend,
+  readStrokeEnd,
   insertNodesOnSegment,
   makeSegmentCurve,
   makeSegmentLine,
@@ -292,6 +293,7 @@ export type { KnifeCut } from "./knife.js";
 export { cutGlyph } from "./knife.js";
 
 export type { StrokeCrossing } from "./crossings.js";
+export type { StrokeCut } from "./stroke.js";
 export { byContour, samePoint, strokeCrossings } from "./crossings.js";
 
 export type { Measurement, PlacedGlyph, Section, SectionSpan } from "./measure.js";
@@ -304,6 +306,7 @@ export {
   DEFAULT_NIB,
   inkOf,
   plannedInk,
+  strokeCut,
   isInk,
   markInk,
   inkRegions,

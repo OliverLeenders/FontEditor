@@ -191,6 +191,47 @@ describe("serialization", () => {
     }
   });
 
+  it("keeps how a stroke's ends are cut", () => {
+    const ids = counterIds("e");
+    const stem = {
+      ...contour(ids.contour(), [
+        node(ids.node(), vec(0, 300), { end: { cut: "square" } }),
+        node(ids.node(), vec(0, 150)),
+        node(ids.node(), vec(0, 0), { end: { cut: 12.5 } }),
+      ]),
+      nib: { angle: 30, width: 80 },
+    };
+    const encoded = encodeGlyph(addContour(glyph("l"), stem));
+    // A point that is not cut stores nothing.
+    expect("end" in encoded.contours[0]!.nodes[1]!).toBe(false);
+    const decoded = decodeGlyph(JSON.parse(JSON.stringify(encoded)) as unknown);
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) {
+      expect(decoded.value.contours[0]!.nodes.map((n) => n.end)).toEqual([
+        { cut: "square" },
+        undefined,
+        { cut: 12.5 },
+      ]);
+    }
+  });
+
+  it("reads a cut it does not know as no cut at all", () => {
+    const ids = counterIds("f");
+    const stem = {
+      ...contour(ids.contour(), [node(ids.node(), vec(0, 300)), node(ids.node(), vec(0, 0))]),
+      nib: { angle: 30, width: 80 },
+    };
+    const encoded = JSON.parse(JSON.stringify(encodeGlyph(addContour(glyph("l"), stem)))) as {
+      contours: { nodes: Record<string, unknown>[] }[];
+    };
+    encoded.contours[0]!.nodes[1]!["end"] = { cut: "wavy" };
+    const decoded = decodeGlyph(encoded);
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) expect(decoded.value.contours[0]!.nodes[1]!.end).toBeUndefined();
+  });
+
   it("keeps a continuous corner", () => {
     const ids = counterIds("k");
     const box = contour(

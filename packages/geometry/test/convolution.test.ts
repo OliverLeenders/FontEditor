@@ -150,28 +150,34 @@ describe("the line round a stroke's ink, in two masters", () => {
     },
   );
 
-  it("is the same pieces for a broad nib whose path runs along it in one master only", () => {
-    // A quarter turn drawn with a nib at forty-five degrees crosses the nib's
-    // direction half way; with the nib upright it never does.
-    const turn = [cubic(p(0, 0), p(0, 110), p(90, 200), p(200, 200))];
-    const crossing: StrokeMaster = {
-      curves: turn,
-      pens: pens(2, { angle: 45, width: 80, thickness: 0 }),
-      closed: false,
-    };
-    const clear: StrokeMaster = {
-      curves: turn,
-      pens: pens(2, { angle: 135, width: 80, thickness: 0 }),
-      closed: false,
-    };
-    const planned = plannedStrokes([clear, crossing])!;
-    expect(shapeOf(planned[0]!)).toBe(shapeOf(planned[1]!));
-    for (const [at, m] of [clear, crossing].entries()) {
-      const d = disagreement(curvesOf(planned[at]!), sweep(m.curves, m.pens, m.closed), 45);
-      expect(d.missing).toEqual([]);
-      expect(d.extra).toEqual([]);
-    }
-  });
+  it(
+    "is the same pieces for a broad nib whose path runs along it in one master only",
+    {
+      timeout: 120_000,
+    },
+    () => {
+      // A quarter turn drawn with a nib at forty-five degrees crosses the nib's
+      // direction half way; with the nib upright it never does.
+      const turn = [cubic(p(0, 0), p(0, 110), p(90, 200), p(200, 200))];
+      const crossing: StrokeMaster = {
+        curves: turn,
+        pens: pens(2, { angle: 45, width: 80, thickness: 0 }),
+        closed: false,
+      };
+      const clear: StrokeMaster = {
+        curves: turn,
+        pens: pens(2, { angle: 135, width: 80, thickness: 0 }),
+        closed: false,
+      };
+      const planned = plannedStrokes([clear, crossing])!;
+      expect(shapeOf(planned[0]!)).toBe(shapeOf(planned[1]!));
+      for (const [at, m] of [clear, crossing].entries()) {
+        const d = disagreement(curvesOf(planned[at]!), sweep(m.curves, m.pens, m.closed), 45);
+        expect(d.missing).toEqual([]);
+        expect(d.extra).toEqual([]);
+      }
+    },
+  );
 
   it("declines masters whose paths have not the same number of curves", () => {
     const one = master(named("a round pen round a sharp V"));

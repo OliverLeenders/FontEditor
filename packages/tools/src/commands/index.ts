@@ -140,14 +140,17 @@ export type { OffsetRequest, ReshapeReport } from "./reshape.js";
 export { offsetAt, simplifyAt } from "./reshape.js";
 export {
   type BlendChannel,
+  type EndChoice,
   changePen,
   convertStrokesToOutlines,
   drawWithPen,
   selectedPenBlend,
   selectedPenValue,
+  selectedStrokeEnd,
   selectedPointPen,
   selectionNib,
   setPenBlend,
+  setStrokeEnd,
   strokesToOutline,
 } from "./nib.js";
 export type { CombineReport } from "./combine.js";

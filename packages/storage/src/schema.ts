@@ -18,6 +18,7 @@ import {
   type PlainValue,
   type Node,
   type NodeType,
+  type StrokeEnd,
   BOTH_LOCKED,
   DEFAULT_FONT_INFO,
   DEFAULT_GRID,
@@ -38,6 +39,7 @@ import {
   node,
   readContinuous,
   readSegmentBlend,
+  readStrokeEnd,
 } from "@typewright/font-model";
 import type { SegmentBlend, Vec2 } from "@typewright/geometry";
 
@@ -88,6 +90,8 @@ export type StoredNode = {
   readonly blend?: { readonly angle: string; readonly shape: string };
   /** A continuous corner: how much of each side it spends, and how smoothly. */
   readonly continuous?: { readonly size: number; readonly smoothness: number };
+  /** How a stroke ends at this point, where it is cut straight: square, or at an angle. */
+  readonly end?: { readonly cut: "square" | number };
 };
 
 export type StoredContour = {
@@ -312,7 +316,8 @@ function encodeNode(n: Node): StoredNode {
   const blended = n.blend === undefined ? pennedOnly : { ...pennedOnly, blend: { ...n.blend } };
   const penned =
     n.continuous === undefined ? blended : { ...blended, continuous: { ...n.continuous } };
-  const held = n.harmonised ? { ...penned, harmonised: true as const } : penned;
+  const ended = n.end === undefined ? penned : { ...penned, end: { ...n.end } };
+  const held = n.harmonised ? { ...ended, harmonised: true as const } : ended;
   if (n.hvLock.in && n.hvLock.out) return { ...held, hvLock: true };
   if (n.hvLock.in) return { ...held, hvLock: "in" };
   if (n.hvLock.out) return { ...held, hvLock: "out" };
@@ -606,6 +611,7 @@ function decodeNode(raw: unknown): Decoded<Node> {
       ...penField(decodeNib(raw["pen"])),
       ...blendField(readSegmentBlend(raw["blend"])),
       ...continuousField(readContinuous(raw["continuous"])),
+      ...endField(readStrokeEnd(raw["end"])),
     }),
   );
 }
@@ -638,6 +644,11 @@ function decodeContour(raw: unknown): Decoded<Contour> {
   const plain = contour(raw["id"], nodes, raw["closed"] === true);
   const nib = decodeNib(raw["nib"]);
   return ok(nib === null ? plain : { ...plain, nib });
+}
+
+/** A stroke's end as the optional field a node is built with. */
+function endField(end: StrokeEnd | undefined): { readonly end?: StrokeEnd } {
+  return end === undefined ? {} : { end };
 }
 
 /** A continuous corner as the optional field a node is built with. */

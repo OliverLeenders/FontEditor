@@ -258,6 +258,23 @@ function mixNode(
             ),
           },
         }),
+    // How a stroke ends at a point is the base's to say; where it is cut at an
+    // angle the angle interpolates, a master that does not cut there or cuts
+    // square counting as the base's.
+    ...(base.end === undefined
+      ? {}
+      : {
+          end:
+            typeof base.end.cut === "number"
+              ? {
+                  cut: mix(
+                    others.map((n) => (typeof n?.end?.cut === "number" ? n.end.cut : null)),
+                    weights,
+                    base.end.cut,
+                  ),
+                }
+              : base.end,
+        }),
     // A point's own pen interpolates with it, the way the contour's does. A master
     // whose point has no pen of its own counts as the base's here, as a missing
     // value always does.

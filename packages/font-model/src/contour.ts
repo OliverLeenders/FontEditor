@@ -41,6 +41,7 @@ import {
   snapToAxis,
   translateNode,
   withHandleRaw,
+  type StrokeEnd,
 } from "./node.js";
 
 /**
@@ -174,6 +175,18 @@ export function readSegmentBlend(raw: unknown): SegmentBlend | undefined {
   const word = (value: unknown): PenBlend => BLENDS.find((b) => b === value) ?? "linear";
   const blend = { angle: word(r["angle"]), shape: word(r["shape"]) };
   return blend.angle === "linear" && blend.shape === "linear" ? undefined : blend;
+}
+
+/**
+ * A stored stroke end, read back: a cut square to the path or at an angle, or
+ * nothing. What this version does not know is read as no cut at all, so a file
+ * from a later one opens with its strokes ending as the pen leaves them.
+ */
+export function readStrokeEnd(raw: unknown): StrokeEnd | undefined {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const cut = (raw as Record<string, unknown>)["cut"];
+  if (cut === "square") return { cut };
+  return typeof cut === "number" && Number.isFinite(cut) ? { cut } : undefined;
 }
 
 export function segments(c: Contour): Segment[] {

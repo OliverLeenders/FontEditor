@@ -10,6 +10,8 @@ import {
   node,
   readContinuous,
   readSegmentBlend,
+  readStrokeEnd,
+  type StrokeEnd,
   removeContour,
 } from "@typewright/font-model";
 
@@ -52,6 +54,7 @@ type StoredNode = {
   readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
   readonly blend?: { readonly angle: string; readonly shape: string };
   readonly continuous?: { readonly size: number; readonly smoothness: number };
+  readonly end?: { readonly cut: "square" | number };
 };
 
 type Payload = {
@@ -107,6 +110,7 @@ export function clipboardText(state: EditorState): string | null {
         ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
         ...(n.blend === undefined ? {} : { blend: { ...n.blend } }),
         ...(n.continuous === undefined ? {} : { continuous: { ...n.continuous } }),
+        ...(n.end === undefined ? {} : { end: { ...n.end } }),
       })),
       ...(c.nib === undefined ? {} : { nib: { ...c.nib } }),
     })),
@@ -233,6 +237,10 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
           ...((): { continuous?: ContinuousCorner } => {
             const continuous = readContinuous(rawNode["continuous"]);
             return continuous === undefined ? {} : { continuous };
+          })(),
+          ...((): { end?: StrokeEnd } => {
+            const end = readStrokeEnd(rawNode["end"]);
+            return end === undefined ? {} : { end };
           })(),
         }),
       );

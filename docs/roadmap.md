@@ -1438,10 +1438,31 @@ the fill is held against the same stroke exported on its own at that weight
 along the stroke, a broad edge in one master and an oval in another, a blend that steps — is
 written as the default master draws it and named in a warning.
 
+#### After phase 38 — How a stroke ends — done
+
+A pen held at an angle ends a stroke at that angle, and the way to a flat foot was to turn the
+pen level at the last point — which widens the stroke there, so that the width has to be taken
+back off, point by point and master by master. An end can now be cut instead: square to the
+path, level, upright or at any angle, set on the first or last point of an open stroke in the
+Pen section's **End** row, and switched off there again.
+
+The pen is not touched. The stroke is carried on straight past its last point, with the pen it
+had there, until the whole pen is past the cut, and then cut by a line through that point: the
+point is where the ink ends. Only the last segment is carried on and cut, as a stretch of its
+own, because the line goes on across the whole glyph and a stroke comes back across it — the
+bowl of a u below the tops of its stems. The stretch is joined into one outline first and cut
+after, so that no two of its parts are left with edges lying along the same line.
+
 #### Open
 
 What is next in the same direction:
 
+- **A cut end in a variable font**, which is the line round the ink going straight along the
+  cut where it now goes round the pen: such a stroke is still written as the default master
+  draws it.
+- **A pen with corners**: one more number, from an oval to a rectangle, so that a pen can be
+  a rounded box or a square one. With cut ends it is what a slab serif drawn as a stroke
+  needs.
 - **A broad edge that turns or widens along a stroke, in a variable font**, which is still
   written as the default master draws it.
 - **Fitting to the fixed width in every layer**, where it now fits the main drawing.

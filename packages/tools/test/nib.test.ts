@@ -16,8 +16,10 @@ import {
   changePen,
   drawWithPen,
   selectedPenBlend,
+  selectedStrokeEnd,
   selectionNib,
   setPenBlend,
+  setStrokeEnd,
 } from "../src/commands/nib.js";
 import { type EditorState, editorState } from "../src/state.js";
 
@@ -346,5 +348,77 @@ describe("blending the pen along a segment", () => {
     const outline = selecting(withContours(stroke(0)), 0);
     expect(selectedPenBlend(outline, "angle")).toBeNull();
     expect(setPenBlend(outline, "angle", "smooth").state).toBe(outline);
+  });
+});
+
+describe("cutting a stroke's end", () => {
+  const penned = () => withContours(withNib(stroke(0), { angle: 30, width: 80 }));
+  const selectingNode = (state: EditorState, index: number): EditorState => {
+    const c = state.document.glyphs["l"]!.contours[0]!;
+    return {
+      ...state,
+      selection: [{ contourId: c.id, nodeId: c.nodes[index]!.id, part: "point" as const }],
+    };
+  };
+  const endOf = (state: EditorState, index: number) =>
+    state.document.glyphs["l"]!.contours[0]!.nodes[index]!.end;
+
+  it("is as the pen leaves it until it is set", () => {
+    expect(selectedStrokeEnd(selectingNode(penned(), 0))).toBe("pen");
+  });
+
+  it("cuts the end selected and leaves the other", () => {
+    const cut = setStrokeEnd(selectingNode(penned(), 1), 0).state;
+    expect(endOf(cut, 1)).toEqual({ cut: 0 });
+    expect(endOf(cut, 0)).toBeUndefined();
+    expect(selectedStrokeEnd(cut)).toBe(0);
+  });
+
+  it("is switched off again, and then stores nothing", () => {
+    const cut = setStrokeEnd(selectingNode(penned(), 1), "square").state;
+    expect(endOf(cut, 1)).toEqual({ cut: "square" });
+    const back = setStrokeEnd(cut, "pen").state;
+    expect("end" in back.document.glyphs["l"]!.contours[0]!.nodes[1]!).toBe(false);
+  });
+
+  it("is one step in the history, and none where nothing changed", () => {
+    const state = selectingNode(penned(), 1);
+    expect(setStrokeEnd(state, "pen").state).toBe(state);
+    expect(setStrokeEnd(state, 90).state).not.toBe(state);
+  });
+
+  it("says mixed of two ends that end differently", () => {
+    const cut = setStrokeEnd(selectingNode(penned(), 1), 0).state;
+    const c = cut.document.glyphs["l"]!.contours[0]!;
+    const both = {
+      ...cut,
+      selection: c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+    };
+    expect(selectedStrokeEnd(both)).toBe("mixed");
+    expect(selectedStrokeEnd(setStrokeEnd(both, "square").state)).toBe("square");
+  });
+
+  it("says nothing of a point that is not an end, of a closed stroke, or of an outline", () => {
+    const three = withContours(
+      withNib(
+        contour(ids.contour(), [
+          node(ids.node(), { x: 0, y: 0 }),
+          node(ids.node(), { x: 0, y: 150 }),
+          node(ids.node(), { x: 0, y: 300 }),
+        ]),
+        { angle: 30, width: 80 },
+      ),
+    );
+    expect(selectedStrokeEnd(selectingNode(three, 1))).toBeNull();
+    expect(setStrokeEnd(selectingNode(three, 1), 0).state.document).toBe(three.document);
+
+    const outline = selectingNode(withContours(stroke(0)), 0);
+    expect(selectedStrokeEnd(outline)).toBeNull();
+  });
+
+  it("goes with a stroke copied and pasted", () => {
+    const cut = setStrokeEnd(selectingNode(penned(), 1), 30).state;
+    const pasted = parseClipboard(clipboardText(cut)!, ids)!;
+    expect(pasted[0]!.nodes[1]!.end).toEqual({ cut: 30 });
   });
 });

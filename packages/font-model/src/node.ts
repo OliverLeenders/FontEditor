@@ -110,7 +110,31 @@ export type Node = {
    * Only on a corner or a tangent node; see `corneredContour`.
    */
   readonly continuous?: ContinuousCorner;
+  /**
+   * How a stroke ends here, for the first or last point of an open stroke's
+   * skeleton: cut off straight instead of left as the pen leaves it. Absent, the
+   * end is the pen's own. On any other point it means nothing — and is kept, so
+   * that a point which becomes an end again, by the knife, ends as it did.
+   */
+  readonly end?: StrokeEnd;
 };
+
+/**
+ * A stroke's end, cut straight.
+ *
+ * A pen held at an angle leaves the end of a stroke at that angle: the foot of
+ * a stem drawn with a pen at thirty degrees slants at thirty degrees. Turning
+ * the pen level at the last point makes the foot level and the stem wider, and
+ * the width then has to be taken back off, at every weight. A cut leaves the
+ * pen alone: the stroke is carried on past its last point as far as the pen
+ * reaches, and cut off by a straight line through that point. So the point is
+ * where the ink ends, and the stroke is its own weight all the way to it.
+ *
+ * `cut` is the line: `"square"`, across the path where it ends, or an angle in
+ * degrees anticlockwise from level, as a pen's is — nought for a foot standing
+ * on the baseline, ninety for the end of a bar.
+ */
+export type StrokeEnd = { readonly cut: "square" | number };
 
 /** How a continuous corner is drawn. */
 export type ContinuousCorner = { readonly size: number; readonly smoothness: number };
@@ -125,6 +149,7 @@ export type NodeInit = {
   readonly pen?: Nib;
   readonly blend?: SegmentBlend;
   readonly continuous?: ContinuousCorner;
+  readonly end?: StrokeEnd;
 };
 
 /** Read an init's lock, accepting the boolean the field used to be. */
@@ -146,6 +171,7 @@ export function node(id: NodeId, pt: Vec2, init: NodeInit = {}): Node {
     ...(init.pen === undefined ? {} : { pen: init.pen }),
     ...(init.blend === undefined ? {} : { blend: init.blend }),
     ...(init.continuous === undefined ? {} : { continuous: init.continuous }),
+    ...(init.end === undefined ? {} : { end: init.end }),
   };
 }
 

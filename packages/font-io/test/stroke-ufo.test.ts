@@ -114,6 +114,25 @@ describe("a stroke through a .glif", () => {
     expect(back.contours[0]!.nodes[0]!.blend).toEqual({ angle: "smooth", shape: "step" });
   });
 
+  it("keeps how its ends are cut, and writes the ink cut so", () => {
+    const drawn = curl();
+    const last = drawn.nodes.length - 1;
+    const cut = {
+      ...drawn,
+      nodes: drawn.nodes.map((n, i) =>
+        i === last ? { ...n, end: { cut: "square" } as const } : n,
+      ),
+    };
+    const { glyph: back, warnings } = throughGlif(glyph("s", { contours: [cut] }));
+
+    // No word of the outline having been changed: what was written is the ink
+    // of the stroke as it comes back, cut and all.
+    expect(warnings).toEqual([]);
+    expect(back.contours[0]!.nib).toBeDefined();
+    expect(back.contours[0]!.nodes[last]!.end).toEqual({ cut: "square" });
+    expect(back.contours[0]!.nodes[0]!.end).toBeUndefined();
+  });
+
   it("writes a continuous corner drawn, and brings it back continuous", () => {
     const box = contour(
       ids.contour(),

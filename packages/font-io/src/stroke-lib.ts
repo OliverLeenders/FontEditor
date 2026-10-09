@@ -4,10 +4,12 @@ import {
   type IdFactory,
   type Nib,
   type NodeType,
+  type StrokeEnd,
   contour,
   node,
   readContinuous,
   readSegmentBlend,
+  readStrokeEnd,
 } from "@typewright/font-model";
 import type { SegmentBlend } from "@typewright/geometry";
 
@@ -60,6 +62,7 @@ type StoredNode = {
   readonly pen?: Nib;
   readonly blend?: SegmentBlend;
   readonly continuous?: ContinuousCorner;
+  readonly end?: StrokeEnd;
 };
 
 /** What was read out of a glyph's lib: the strokes, and what their ink should be. */
@@ -158,6 +161,7 @@ function storedNode(n: Contour["nodes"][number]): StoredNode {
     ...(n.pen === undefined ? {} : { pen: { ...n.pen } }),
     ...(n.blend === undefined ? {} : { blend: { ...n.blend } }),
     ...(n.continuous === undefined ? {} : { continuous: { ...n.continuous } }),
+    ...(n.end === undefined ? {} : { end: { ...n.end } }),
   };
 }
 
@@ -279,6 +283,10 @@ function readNode(raw: unknown): StoredNode | null {
       const continuous = readContinuous(r["continuous"]);
       return continuous === undefined ? {} : { continuous };
     })(),
+    ...((): { readonly end?: StrokeEnd } => {
+      const end = readStrokeEnd(r["end"]);
+      return end === undefined ? {} : { end };
+    })(),
   };
 }
 
@@ -346,6 +354,7 @@ export function restoreStrokes(
               ...(n.pen === undefined ? {} : { pen: n.pen }),
               ...(n.blend === undefined ? {} : { blend: n.blend }),
               ...(n.continuous === undefined ? {} : { continuous: n.continuous }),
+              ...(n.end === undefined ? {} : { end: n.end }),
             },
           ),
         ),
