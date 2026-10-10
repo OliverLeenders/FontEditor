@@ -12,8 +12,11 @@ import {
   loopArea,
   penExponent,
   penPathStrokeParts,
+  penProfiles,
   plannedStrokes,
   reverseLoop,
+  subcurve,
+  unitRoots,
 } from "@typewright/geometry";
 
 import {
@@ -409,6 +412,13 @@ function halfPen(cut: StrokeCut, from: number, to: number, depth: number): Cubic
   const half = (to - from) / 2;
   const power = 2 / penExponent(cut.pen);
   const raised = (v: number): number => Math.sign(v) * Math.pow(Math.abs(v), power);
+  // Out from the edge the way the stroke was going, not square to the cut: on
+  // a cut that slants across the stroke the half outline leans with it, and
+  // leaves each side of the stroke the way that side was going. Square to the
+  // cut it met one side at a corner and the other in a notch. As far out from
+  // the line either way, so the tip is still on the line through the point.
+  const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
+  const lean = { x: cut.onward.x / facing, y: cut.onward.y / facing };
   const STEPS = 48;
   const points: Vec2[] = [];
   for (let k = 0; k <= STEPS; k++) {
@@ -417,8 +427,8 @@ function halfPen(cut: StrokeCut, from: number, to: number, depth: number): Cubic
     const a = middle + half * raised(Math.cos(u));
     const out = k === 0 || k === STEPS ? 0 : depth * raised(Math.sin(u));
     points.push({
-      x: cut.through.x + along.x * a + cut.normal.x * out,
-      y: cut.through.y + along.y * a + cut.normal.y * out,
+      x: cut.through.x + along.x * a + lean.x * out,
+      y: cut.through.y + along.y * a + lean.y * out,
     });
   }
   const arc = fitCubics(points, 0.02);
@@ -590,23 +600,54 @@ type Stretch = {
  * A cut end is the stroke carried on straight past its last point, with the pen
  * it had there, far enough for the whole pen to be past the cut — and then cut.
  * The cut is a line across the whole page, and a stroke comes back across lines:
- * the bowl of a u hangs below the feet of its stems. So only the last segment is
- * carried on and cut, as a stretch of its own, and the rest of the stroke is
- * left whole. Each stretch has the pen standing at both its ends, so they
+ * the bowl of a u hangs below the feet of its stems. So only the last of the
+ * stroke is carried on and cut, as a stretch of its own — its last segment, from
+ * where that last turns to come towards the cut — and the rest is left whole. Each stretch has the pen standing at both its ends, so they
  * overlap where they meet, as the segments of a stroke always have.
  */
 function stretchesOf(c: Contour): Stretch[] {
   const nib = c.nib;
   if (nib === undefined || !(nib.width > 0) || c.nodes.length < 2) return [];
-  const curves = curvesOf(c);
-  const count = curves.length;
-  if (count === 0) return [];
-  const pens = pensOf(c);
-  const blends = c.nodes.map((n) => n.blend);
+  const drawn = curvesOf(c);
+  if (drawn.length === 0) return [];
+  const drawnPens = pensOf(c);
+  const drawnBlends = c.nodes.map((n) => n.blend);
 
   const start = strokeCut(c, "start");
   const end = strokeCut(c, "end");
-  if (start === null && end === null) return [{ curves, pens, blends, closed: c.closed, cuts: [] }];
+  if (start === null && end === null) {
+    return [{ curves: drawn, pens: drawnPens, blends: drawnBlends, closed: c.closed, cuts: [] }];
+  }
+
+  // The segment an end is on, cut in two where it stops coming towards the
+  // cut: only what comes after that is carried on and cut. See `lastApproach`.
+  const curves = [...drawn];
+  const pens = [...drawnPens];
+  const blends = [...drawnBlends];
+  const profiles = penProfiles(drawn, drawnPens, false, drawnBlends);
+  const splitAt = (index: number, t: number, pen: PenShape): void => {
+    const whole = curves[index]!;
+    curves.splice(index, 1, subcurve(whole, 0, t), subcurve(whole, t, 1));
+    pens.splice(index + 1, 0, pen);
+    // Both halves blend the way the whole one did.
+    blends.splice(index + 1, 0, blends[index]);
+  };
+  const last = drawn.length - 1;
+  const fromEnd = end === null ? null : lastApproach(drawn[last]!, end.normal, "end");
+  const fromStart = start === null ? null : lastApproach(drawn[0]!, start.normal, "start");
+  // On a stroke of one segment the two are cuts of the same curve, and are
+  // both made only where the start's comes before the end's.
+  const both = drawn.length === 1 && fromStart !== null && fromEnd !== null;
+  if (!both || fromStart < fromEnd) {
+    if (fromEnd !== null) splitAt(last, fromEnd, profiles[last]!.at(fromEnd));
+    if (fromStart !== null) {
+      // The first segment is the part before the end's cut, where there was one
+      // segment and that cut was made: the same place along it is further along.
+      const along = drawn.length === 1 && fromEnd !== null ? fromStart / fromEnd : fromStart;
+      splitAt(0, along, profiles[0]!.at(fromStart));
+    }
+  }
+  const count = curves.length;
 
   // How far on the stroke is carried: until the pen's furthest reach is past the cut.
   const carried = (cut: StrokeCut, pen: PenShape): Vec2 => {
@@ -673,6 +714,35 @@ function stretchesOf(c: Contour): Stretch[] {
     });
   }
   return out;
+}
+
+/**
+ * Where along the segment an end is on the path last turns to come towards the
+ * cut at that end: the parameter, or `null` where it comes towards it all the
+ * way, or turns so near an end of the segment as makes no difference.
+ *
+ * A cut is a line, and a line goes on across the whole glyph. A segment that
+ * rises over a hump before coming down to its end has been on the far side of
+ * that line's direction once already, and cut whole it lost a bite out of its
+ * near end to a cut made at its far one. What the cut is for is the last of the
+ * segment, where the path is coming to the line and does not leave it again:
+ * from where its distance from the line last stops growing. How fast that
+ * distance changes is the path's speed across the line, a quadratic in the
+ * parameter, so where it stops is one of two roots.
+ */
+function lastApproach(curve: Cubic, normal: Vec2, which: "start" | "end"): number | null {
+  const d0 = { x: curve.c1.x - curve.a.x, y: curve.c1.y - curve.a.y };
+  const d1 = { x: curve.c2.x - curve.c1.x, y: curve.c2.y - curve.c1.y };
+  const d2 = { x: curve.b.x - curve.c2.x, y: curve.b.y - curve.c2.y };
+  const across = (v: Vec2): number => v.x * normal.x + v.y * normal.y;
+  const roots = unitRoots(
+    0,
+    across({ x: d0.x - 2 * d1.x + d2.x, y: d0.y - 2 * d1.y + d2.y }),
+    2 * across({ x: d1.x - d0.x, y: d1.y - d0.y }),
+    across(d0),
+  ).filter((t) => t > 1e-3 && t < 1 - 1e-3);
+  if (roots.length === 0) return null;
+  return which === "end" ? Math.max(...roots) : Math.min(...roots);
 }
 
 /**

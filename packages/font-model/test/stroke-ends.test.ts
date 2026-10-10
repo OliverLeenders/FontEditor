@@ -1,6 +1,15 @@
+import { evaluate, tangent } from "@typewright/geometry";
 import { describe, expect, it } from "vitest";
 
-import { type Contour, type Nib, contour, contourBounds, readStrokeEnd } from "../src/contour.js";
+import {
+  type Contour,
+  type Nib,
+  contour,
+  contourBounds,
+  readStrokeEnd,
+  segmentAt,
+  segmentCubic,
+} from "../src/contour.js";
 import { counterIds } from "../src/ids.js";
 import { interpolateGlyph } from "../src/interpolate.js";
 import { glyph } from "../src/glyph.js";
@@ -269,5 +278,105 @@ describe("a cut end closed with the pen's own shape", () => {
     const bold = glyph("i", { contours: [stem(BROAD, { cut: 20, shape: "nib" })] });
     const between = interpolateGlyph([light, bold], [0.5, 0.5])!;
     expect(between.contours[0]!.nodes[1]!.end).toEqual({ cut: 10, shape: "nib" });
+  });
+});
+
+describe("a cut at the end of a segment that turns on its way there", () => {
+  // A drawn stroke whose last segment rises over a hump before it comes down
+  // to its end, cut there on a slant. The cut's line, going on across the
+  // glyph, passes through the near end of the same segment.
+  const drawn = (end?: StrokeEnd): Contour =>
+    withNib(
+      contour(
+        ids.contour(),
+        [
+          node(ids.node(), at(30.637, 464.017)),
+          node(ids.node(), at(230.293, 538.027), {
+            type: "smooth",
+            in: at(94.32, 567.287),
+            out: at(366.265, 508.767),
+          }),
+          node(ids.node(), at(318.072, 224.774)),
+          node(ids.node(), at(507.892, 131.686), {
+            type: "smooth",
+            in: at(330.611, -23.219),
+            out: at(685.172, 286.592),
+          }),
+          node(ids.node(), at(675.99, 16.888), end === undefined ? {} : { end }),
+        ],
+        false,
+      ),
+      { angle: 30, width: 80, thickness: 30 },
+    );
+
+  it.each([
+    ["closed straight", { cut: 149 }],
+    ["closed with the nib", { cut: 149, shape: "nib" }],
+  ])("cuts the end and not the near end of the same segment: %s", (_, end) => {
+    const ink = inkOf(drawn(end), ids);
+    // It came to two outlines, a bite taken out of the hump's near side.
+    expect(ink).toHaveLength(1);
+
+    // Beside the path where the last segment starts, either side of it: ink,
+    // as it is without the cut.
+    const plain = inkOf(drawn(), ids);
+    const hump = segmentCubic(segmentAt(drawn(), 3)!);
+    // Across the whole width of the stroke there, wherever the uncut one is ink.
+    let asked = 0;
+    for (const t of [0.02, 0.06, 0.12, 0.2, 0.35]) {
+      const on = evaluate(hump, t);
+      const along = tangent(hump, t)!;
+      for (let side = -36; side <= 36; side += 4) {
+        const x = on.x - along.y * side;
+        const y = on.y + along.x * side;
+        if (!inked(plain, x, y)) continue;
+        asked++;
+        expect(inked(ink, x, y)).toBe(true);
+      }
+    }
+    expect(asked).toBeGreaterThan(40);
+    // And the end is cut: nothing of it past the line through the last point.
+    const cut = strokeCut(drawn(end), "end")!;
+    for (const c of ink) {
+      for (const n of c.nodes) {
+        if (Math.hypot(n.pt.x - 675.99, n.pt.y - 16.888) > 90) continue;
+        const past = (n.pt.x - 675.99) * cut.normal.x + (n.pt.y - 16.888) * cut.normal.y;
+        expect(past).toBeLessThan(0.5);
+      }
+    }
+  });
+
+  it("cuts both ends of one arch, each where it comes down, and leaves the top", () => {
+    // One segment up over an arch and down again, both feet cut level.
+    const arch = (cut?: StrokeEnd): Contour =>
+      withNib(
+        contour(
+          ids.contour(),
+          [
+            node(ids.node(), at(0, 0), {
+              out: at(0, 400),
+              ...(cut === undefined ? {} : { end: cut }),
+            }),
+            node(ids.node(), at(300, 0), {
+              in: at(300, 400),
+              ...(cut === undefined ? {} : { end: cut }),
+            }),
+          ],
+          false,
+        ),
+        OVAL,
+      );
+    const plain = boxOf(inkOf(arch(), ids));
+    const ink = inkOf(arch({ cut: 0 }), ids);
+    const box = boxOf(ink);
+
+    expect(ink).toHaveLength(1);
+    expect(box.minY).toBeCloseTo(0, 3);
+    expect(box.maxY).toBeCloseTo(plain.maxY, 3);
+    // Each foot the stroke's whole width, down to the line.
+    for (const x of [0, 300]) {
+      expect(inked(ink, x - 25, 2)).toBe(true);
+      expect(inked(ink, x + 25, 2)).toBe(true);
+    }
   });
 });
