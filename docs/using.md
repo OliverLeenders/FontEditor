@@ -596,6 +596,14 @@ that comes to a point. **Cup** is how far the middle of its foot is hollowed, in
 **Round tips**, in per cent, how much of each tip is rounded off. A slab is a reach and a
 height; a bracketed serif the same with a bracket; a wedge one with a slope.
 
+While the end is selected the serif has three handles on the canvas, diamonds where the knob
+that turns the cut is round: one at each tip, on the line the serif stands on, and one on the
+middle of the stroke as high up it as the serif goes. Drag a tip along the line and that side's
+reach follows, no nearer than the stroke's own edge; drag the third up the stroke and the
+height follows, never to nothing. In whole units, one step to undo, and on an end with a style
+the number dragged is the end's own, as one typed is. The knob stands clear of the tips, a
+little past the longer reach.
+
 A serif has a **Serif style**, or numbers of its own. A style is a serif with a name that the
 font keeps — **Font info** has them under **Serifs**, where one is added from a slab, a
 bracketed serif, a wedge or a hairline, renamed, changed and removed — and an end that has a

@@ -46,6 +46,7 @@ import {
   startMarquee,
   startSelectionDrag,
   startCornerSizeDrag,
+  startSerifDrag,
   startStrokeCutDrag,
   startTunniDrag,
   translateSelection,
@@ -252,6 +253,15 @@ export function pointerDown(
       return startCornerSizeDrag(base, input, target.contourId, target.nodeId, target.side);
     case "strokeCut":
       return startStrokeCutDrag(base, input, target.contourId, target.nodeId, target.end);
+    case "serifHandle":
+      return startSerifDrag(
+        base,
+        input,
+        target.contourId,
+        target.nodeId,
+        target.end,
+        target.handle,
+      );
     case "segment":
       return selectSegmentEnds(base, input, target);
     case "originLine":

@@ -1542,13 +1542,18 @@ the style, in every glyph and layer, leaving the numbers that were set on an end
 styles are in the project file and in the `.ufo`'s lib under `org.typewright.serifs`, each
 end's serif with its stroke. Moving the font to another em scales the lengths.
 
-Set in the inspector's Pen section and in Font info. Handles on the canvas are next.
+Set in the inspector's Pen section and in Font info, and by three handles on the canvas while
+the end is selected: a diamond at each tip, dragged along the cut's line for that side's reach,
+and one on the middle of the stroke at the serif's height. Where they are is read off the ink
+as the serif's seat is, and remembered by the stroke; the knob that turns the cut is moved out
+past the longer reach so that the two are not on top of each other.
 
 #### Open
 
 What is next in the same direction:
 
-- **A serif's handles on the canvas**: its tips and its height dragged, as the cut's knob is.
+- **Handles for the rest of a serif**: its bracket, slope, cup and the round of its tips are
+  typed, where its reach and height are also dragged.
 - **Serif styles kept in step between masters**: each master has its own, which is how a serif
   varies, and nothing yet adds a style to every master at once or says where one is missing.
 - **A serif on a short last segment**, shorter than the serif is high: it is laid over the end

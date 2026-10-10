@@ -321,7 +321,7 @@ export type { KnifeCut } from "./knife.js";
 export { cutGlyph } from "./knife.js";
 
 export type { StrokeCrossing } from "./crossings.js";
-export type { StrokeCut, StrokeCutHandle } from "./stroke.js";
+export type { SerifHandle, SerifHandles, StrokeCut, StrokeCutHandle } from "./stroke.js";
 export { byContour, samePoint, strokeCrossings } from "./crossings.js";
 
 export type { Measurement, PlacedGlyph, Section, SectionSpan } from "./measure.js";
@@ -335,6 +335,8 @@ export {
   inkOf,
   plannedInk,
   strokeCut,
+  serifDragged,
+  serifHandles,
   strokeCutHandle,
   strokeCutTowards,
   isInk,

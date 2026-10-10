@@ -29,7 +29,16 @@ import {
   segmentCubic,
 } from "./contour.js";
 import type { StrokeEnd } from "./node.js";
-import { type Serif, type SerifPiece, serifInset, serifOutline, serifRise } from "./serif.js";
+import {
+  type EndSerif,
+  type Serif,
+  type SerifPiece,
+  serifInset,
+  serifOutline,
+  serifRise,
+  soundSerif,
+  withSerifNumber,
+} from "./serif.js";
 import { type Glyph, glyph } from "./glyph.js";
 import { type IdFactory, counterIds } from "./ids.js";
 import { corneredContour, hasContinuousCorners } from "./corner.js";
@@ -753,9 +762,121 @@ export function strokeCutHandle(c: Contour, which: "start" | "end"): StrokeCutHa
     along = { x: Math.cos(angle), y: Math.sin(angle) };
   }
   const pen = penAt(c, index) ?? c.nib;
-  const half = Math.max(pen.width, pen.thickness ?? 0) / 2 + CUT_HANDLE_PAST;
+  // Past a serif's tips too, which have handles of their own on the same line.
+  const reach =
+    node.end.serif === undefined ? 0 : Math.max(node.end.serif.left, node.end.serif.right);
+  const half = Math.max(pen.width, pen.thickness ?? 0) / 2 + reach + CUT_HANDLE_PAST;
   const at = (by: number): Vec2 => ({ x: node.pt.x + along.x * by, y: node.pt.y + along.y * by });
   return { through: node.pt, from: at(-half), to: at(half), knob: at(half) };
+}
+
+/**
+ * Where a serif is taken hold of: its two tips, on the line it stands on, and
+ * its height, on the middle of the stroke as high up it as the serif goes.
+ */
+export type SerifHandles = {
+  readonly left: Vec2;
+  readonly right: Vec2;
+  readonly height: Vec2;
+};
+
+/** A part of a serif that is dragged on the canvas. */
+export type SerifHandle = keyof SerifHandles;
+
+/**
+ * Where a serif stands, as dragging it wants to know: the line's point, which
+ * way along it is rightwards on the page and which way is up the stroke, and
+ * where the stroke's two edges are along it.
+ */
+type SerifFrame = {
+  readonly through: Vec2;
+  readonly rightwards: Vec2;
+  readonly up: Vec2;
+  readonly footLeft: number;
+  readonly footRight: number;
+};
+
+const serifFrames = new WeakMap<Contour, Partial<Record<"start" | "end", SerifFrame | null>>>();
+
+/**
+ * The frame of the serif at an end, or `null` where that end has none or it
+ * cannot stand there. Remembered by the stroke: it is asked at every move of
+ * the pointer over a glyph with a serif selected, and depends on the stroke's
+ * path and pen but not on the serif's numbers — not that it could tell.
+ */
+function serifFrame(c: Contour, which: "start" | "end"): SerifFrame | null {
+  const known = serifFrames.get(c)?.[which];
+  if (known !== undefined) return known;
+  const found = ((): SerifFrame | null => {
+    if (strokeCut(c, which)?.serif === undefined) return null;
+    const stretches = stretchesOf(c);
+    const stretch = which === "start" ? stretches[0] : stretches[stretches.length - 1];
+    const cut = which === "start" ? stretch?.cuts[0] : stretch?.cuts[stretch.cuts.length - 1];
+    if (stretch === undefined || cut?.serif === undefined) return null;
+    const parts = stretchParts(stretch);
+    const foot = crossing([...parts.loops, ...parts.sweeps.flat()], cut);
+    if (foot === null) return null;
+    const along = { x: -cut.normal.y, y: cut.normal.x };
+    // As `serifOutline` has left and right: by the page.
+    const flipped = along.x < -1e-9 || (Math.abs(along.x) <= 1e-9 && along.y < 0);
+    return {
+      through: cut.through,
+      rightwards: flipped ? { x: -along.x, y: -along.y } : along,
+      up: { x: -cut.normal.x, y: -cut.normal.y },
+      footLeft: flipped ? -foot.to : foot.from,
+      footRight: flipped ? -foot.from : foot.to,
+    };
+  })();
+  serifFrames.set(c, { ...serifFrames.get(c), [which]: found });
+  return found;
+}
+
+/** The handles of the serif at an end of a stroke, or `null` where there is none. */
+export function serifHandles(c: Contour, which: "start" | "end"): SerifHandles | null {
+  const frame = serifFrame(c, which);
+  const node = which === "start" ? c.nodes[0] : c.nodes[c.nodes.length - 1];
+  if (frame === null || node?.end?.serif === undefined) return null;
+  const serif = soundSerif(node.end.serif);
+  const at = (a: number, h: number): Vec2 => ({
+    x: frame.through.x + frame.rightwards.x * a + frame.up.x * h,
+    y: frame.through.y + frame.rightwards.y * a + frame.up.y * h,
+  });
+  return {
+    left: at(frame.footLeft - serif.left, 0),
+    right: at(frame.footRight + serif.right, 0),
+    height: at((frame.footLeft + frame.footRight) / 2, serif.height),
+  };
+}
+
+/**
+ * The serif an end has when one of its handles is dragged to `towards`, or
+ * `null` where that changes nothing.
+ *
+ * A tip goes along the line the serif stands on and no nearer than the
+ * stroke's own edge; the height goes up the stroke and no lower than one unit,
+ * a serif of no height being no serif and having no handle to bring it back
+ * by. In whole units, as it is typed.
+ */
+export function serifDragged(
+  c: Contour,
+  which: "start" | "end",
+  handle: SerifHandle,
+  towards: Vec2,
+): EndSerif | null {
+  const frame = serifFrame(c, which);
+  const node = which === "start" ? c.nodes[0] : c.nodes[c.nodes.length - 1];
+  const serif = node?.end?.serif;
+  if (frame === null || serif === undefined) return null;
+  const dx = towards.x - frame.through.x;
+  const dy = towards.y - frame.through.y;
+  const along = dx * frame.rightwards.x + dy * frame.rightwards.y;
+  const value =
+    handle === "left"
+      ? Math.max(0, Math.round(frame.footLeft - along))
+      : handle === "right"
+        ? Math.max(0, Math.round(along - frame.footRight))
+        : Math.max(1, Math.round(dx * frame.up.x + dy * frame.up.y));
+  return value === serif[handle] ? null : withSerifNumber(serif, handle, value);
 }
 
 /** How near a round angle a cut being turned is drawn to it, in degrees. */

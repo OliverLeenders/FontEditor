@@ -92,7 +92,7 @@ describe("buildHitIndex", () => {
     const index = buildHitIndex(addContour(glyph("o"), c), [{ contourId: c.id, segmentIndex: 0 }]);
     const target = index.targets.find((t) => t.kind === "tunniPoint" && t.segmentIndex === 0);
     expect(target).toBeDefined();
-    expect(target!.kind === "tunniPoint" && target!.point).toEqual(segmentTunniPoint(c, 0));
+    expect(target!.kind === "tunniPoint" && target.point).toEqual(segmentTunniPoint(c, 0));
   });
 
   it("offers no Tunni controls on straight segments", () => {

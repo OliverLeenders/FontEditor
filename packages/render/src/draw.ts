@@ -6,6 +6,7 @@ import {
   type Node,
   type Segment,
   continuousCuts,
+  serifHandles,
   strokeCutHandle,
   corneredContour,
   filledContours,
@@ -606,6 +607,25 @@ export function drawStrokeCuts(ctx: Canvas2D, s: Scene): void {
       ctx.strokeStyle = s.palette.nodeSelected;
       ctx.lineWidth = 1.5;
       ctx.stroke();
+
+      // A serif standing on the cut: a diamond at each tip and one at its
+      // height, which are dragged. Diamonds, the knob that turns being round.
+      const serif = serifHandles(c, end);
+      if (serif === null) continue;
+      for (const part of [serif.left, serif.right, serif.height]) {
+        const p = toScreen(s.view, part);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - r * 1.2);
+        ctx.lineTo(p.x + r * 1.2, p.y);
+        ctx.lineTo(p.x, p.y + r * 1.2);
+        ctx.lineTo(p.x - r * 1.2, p.y);
+        ctx.closePath();
+        ctx.fillStyle = s.palette.halo;
+        ctx.fill();
+        ctx.strokeStyle = s.palette.nodeSelected;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
     }
   }
 }

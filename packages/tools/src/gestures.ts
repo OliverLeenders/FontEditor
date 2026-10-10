@@ -11,6 +11,8 @@ import {
   type Glyph,
   type NodeId,
   continuousSizeAt,
+  type SerifHandle,
+  serifDragged,
   strokeCutTowards,
   contourById,
   metricLines,
@@ -384,6 +386,33 @@ export function startStrokeCutDrag(
       },
     },
     [begin("Stroke end")],
+  );
+}
+
+/** Begin dragging a handle of the serif on an end of a stroke. */
+export function startSerifDrag(
+  state: EditorState,
+  input: PointerInput,
+  contourId: ContourId,
+  nodeId: NodeId,
+  end: "start" | "end",
+  handle: SerifHandle,
+): ToolResult {
+  return result(
+    {
+      ...state,
+      gesture: {
+        kind: "dragSerif",
+        origin: input.point,
+        contourId,
+        nodeId,
+        end,
+        handle,
+        before: state.document,
+        moved: false,
+      },
+    },
+    [begin("Serif")],
   );
 }
 
@@ -1120,6 +1149,27 @@ const CONTINUE: Continuations = {
         const turned = strokeCutTowards(c, gesture.end, input.point);
         if (turned === null || turned.cut === node.end.cut) return null;
         const end = { ...node.end, cut: turned.cut };
+        return { ...c, nodes: c.nodes.map((n, i) => (i === index ? { ...n, end } : n)) };
+      }),
+    );
+    return {
+      ...state,
+      document: next ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+    };
+  },
+
+  dragSerif: (state, gesture, input, delta) => {
+    // Read against the stroke as it was when the drag began: where the pointer
+    // is says what the number is, not how far it has moved since.
+    const next = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
+      updateContour(g, gesture.contourId, (c) => {
+        const index = c.nodes.findIndex((n) => n.id === gesture.nodeId);
+        const node = c.nodes[index];
+        if (node?.end === undefined) return null;
+        const serif = serifDragged(c, gesture.end, gesture.handle, input.point);
+        if (serif === null) return null;
+        const end = { ...node.end, serif };
         return { ...c, nodes: c.nodes.map((n, i) => (i === index ? { ...n, end } : n)) };
       }),
     );

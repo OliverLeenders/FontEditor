@@ -10,6 +10,7 @@ import {
   type Measurement,
   type Nib,
   type NodeId,
+  type SerifHandle,
   DEFAULT_NIB,
   glyphNamed,
   measurableGlyph,
@@ -92,6 +93,17 @@ export type Gesture =
       readonly contourId: ContourId;
       readonly nodeId: NodeId;
       readonly end: "start" | "end";
+      readonly before: FontDocument;
+      readonly moved: boolean;
+    }
+  | {
+      /** Dragging a handle of the serif on a stroke's end: a tip, or its height. */
+      readonly kind: "dragSerif";
+      readonly origin: Vec2;
+      readonly contourId: ContourId;
+      readonly nodeId: NodeId;
+      readonly end: "start" | "end";
+      readonly handle: SerifHandle;
       readonly before: FontDocument;
       readonly moved: boolean;
     }

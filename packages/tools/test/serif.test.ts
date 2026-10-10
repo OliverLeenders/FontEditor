@@ -7,6 +7,7 @@ import {
   fontDocument,
   glyph,
   node,
+  serifHandles,
   strokeCutHandle,
   withNib,
 } from "@typewright/font-model";
@@ -126,6 +127,65 @@ describe("closing a cut end with a serif", () => {
     const state = serifed(twoStems());
     const pasted = parseClipboard(clipboardText(state)!, ids)!;
     expect(pasted[0]!.nodes[1]!.end).toEqual({ cut: 0, serif: DEFAULT_SERIF });
+  });
+});
+
+describe("a serif's handles on the canvas", () => {
+  const stemOf = (state: EditorState) => state.document.glyphs["l"]!.contours[0]!;
+  const drag = (
+    state: EditorState,
+    handle: "left" | "right" | "height",
+    by: { x: number; y: number },
+  ): EditorState => {
+    const from = serifHandles(stemOf(state), "end")![handle];
+    const held = pointerDown(state, pointerInput(from), { ids }).state;
+    const to = { x: from.x + by.x, y: from.y + by.y };
+    return pointerUp(pointerMove(held, pointerInput(to), { ids }).state).state;
+  };
+
+  it("are its two tips on the line it stands on, and its height up the stroke", () => {
+    const handles = serifHandles(stemOf(serifed(twoStems())), "end")!;
+    expect(handles.left.y).toBeCloseTo(0, 9);
+    expect(handles.right.y).toBeCloseTo(0, 9);
+    // Sixty past each edge of a stem about the point at 200.
+    expect(handles.right.x - handles.left.x).toBeGreaterThan(120);
+    expect((handles.left.x + handles.right.x) / 2).toBeCloseTo(200, 0);
+    expect(handles.height.y).toBeCloseTo(30, 9);
+    // And none on an end without a serif.
+    expect(serifHandles(stemOf(twoStems()), "end")).toBeNull();
+  });
+
+  it("leave the knob that turns the cut clear of the tips", () => {
+    const state = serifed(twoStems());
+    const knob = strokeCutHandle(stemOf(state), "end")!.knob;
+    expect(knob.x).toBeGreaterThan(serifHandles(stemOf(state), "end")!.right.x + 10);
+  });
+
+  it("set a reach by a tip dragged along the line, whatever else the drag does", () => {
+    const state = drag(serifed(twoStems()), "left", { x: -25, y: 40 });
+    expect(footOf(state)!.serif).toMatchObject({ left: 85, right: 60, height: 30 });
+    expect(footOf(drag(state, "right", { x: 12, y: 0 }))!.serif!.right).toBe(72);
+  });
+
+  it("take a reach no further in than the stroke's own edge", () => {
+    const state = drag(serifed(twoStems()), "right", { x: -300, y: 0 });
+    expect(footOf(state)!.serif!.right).toBe(0);
+  });
+
+  it("set the height by its handle dragged up the stroke, and never to nothing", () => {
+    const state = drag(serifed(twoStems()), "height", { x: 9, y: 17 });
+    expect(footOf(state)!.serif!.height).toBe(47);
+    expect(footOf(drag(state, "height", { x: 0, y: -400 }))!.serif!.height).toBe(1);
+  });
+
+  it("make the number the end's own, on an end that has a style", () => {
+    const state = drag(serifed(addSerifStyle(twoStems(), FOOT).state), "left", { x: -10, y: 0 });
+    expect(footOf(state)!.serif).toMatchObject({ left: 60, style: "Foot", own: ["left"] });
+  });
+
+  it("change nothing where the handle is put back where it was", () => {
+    const state = serifed(twoStems());
+    expect(drag(state, "left", { x: 0.2, y: 0 }).document).toBe(state.document);
   });
 });
 

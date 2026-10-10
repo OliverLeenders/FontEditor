@@ -21,6 +21,8 @@ import {
   segmentCubic,
   segmentTunniStatus,
   segments,
+  type SerifHandle,
+  serifHandles,
   strokeCutHandle,
   segmentTunniPoint,
 } from "@typewright/font-model";
@@ -38,6 +40,7 @@ export type HitKind =
   | "tunniLine"
   | "cornerSize"
   | "strokeCut"
+  | "serifHandle"
   | "segment"
   | "originLine"
   | "advanceLine";
@@ -105,6 +108,18 @@ export type HitTarget =
       readonly end: "start" | "end";
       readonly point: Vec2;
     }
+  /**
+   * A handle of the serif on an end of a stroke: a tip, dragged along the line
+   * the serif stands on, or its height, dragged up the stroke.
+   */
+  | {
+      readonly kind: "serifHandle";
+      readonly contourId: ContourId;
+      readonly nodeId: NodeId;
+      readonly end: "start" | "end";
+      readonly handle: SerifHandle;
+      readonly point: Vec2;
+    }
   /** The vertical lines bounding the advance width. Full height, so only x matters. */
   | { readonly kind: "originLine" | "advanceLine"; readonly x: number };
 
@@ -124,6 +139,8 @@ export const PICK_PRIORITY: Readonly<Record<HitKind, number>> = {
   cornerSize: 0,
   // And like those two: a knob in open space beside the ink, aimed at.
   strokeCut: 0,
+  // And a serif's handles, which stand on the ink's own edge.
+  serifHandle: 0,
   node: 1,
   // Level with a node rather than above it, so distance decides between the
   // two. An anchor usually floats clear of the outline, but a `bottom` sitting
@@ -294,6 +311,19 @@ export function buildHitIndex(
       const n = end === "start" ? c.nodes[0]! : c.nodes[c.nodes.length - 1]!;
       if (!chosen.has(`${c.id}${String.fromCharCode(0)}${n.id}`)) continue;
       targets.push({ kind: "strokeCut", contourId: c.id, nodeId: n.id, end, point: handle.knob });
+      // And the handles of the serif standing on that cut, where there is one.
+      const serif = serifHandles(c, end);
+      if (serif === null) continue;
+      for (const part of ["left", "right", "height"] as const) {
+        targets.push({
+          kind: "serifHandle",
+          contourId: c.id,
+          nodeId: n.id,
+          end,
+          handle: part,
+          point: serif[part],
+        });
+      }
     }
   }
 
@@ -431,6 +461,7 @@ export function distanceToTarget(
     case "tunniPoint":
     case "cornerSize":
     case "strokeCut":
+    case "serifHandle":
       return distance(p, target.point);
     case "component":
       return distanceToOutlines(target.outlines, p);
