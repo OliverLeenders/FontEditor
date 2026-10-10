@@ -309,10 +309,11 @@ describe("a cut at the end of a segment that turns on its way there", () => {
       { angle: 30, width: 80, thickness: 30 },
     );
 
-  it.each([
+  const ends: readonly (readonly [string, StrokeEnd])[] = [
     ["closed straight", { cut: 149 }],
     ["closed with the nib", { cut: 149, shape: "nib" }],
-  ])("cuts the end and not the near end of the same segment: %s", (_, end) => {
+  ];
+  it.each(ends)("cuts the end and not the near end of the same segment: %s", (_, end) => {
     const ink = inkOf(drawn(end), ids);
     // It came to two outlines, a bite taken out of the hump's near side.
     expect(ink).toHaveLength(1);
