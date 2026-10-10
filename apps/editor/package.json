@@ -1,6 +1,6 @@
 {
   "name": "@typewright/editor",
-  "version": "0.1.95",
+  "version": "0.1.96",
   "private": true,
   "type": "module",
   "description": "The font editor itself.",
