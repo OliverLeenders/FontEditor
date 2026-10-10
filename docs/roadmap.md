@@ -1488,12 +1488,22 @@ pen's edge at that end. A side that is cut short keeps its pieces, the ones past
 no length, so every master has the same. fontTools draws the proof font's cut stem at each
 weight beside its S.
 
+A pen with corners varies too, also against an oval in another master. Its sides cannot be
+given by how fast they are going, as an oval's are: where the pen's reach passes one of its
+corners the side turns, sharply for a square pen, and where a flat of the pen is laid along
+the path the reach crosses the whole flat in next to no path at all. So each side is read
+closely — a gap too long halved until it is not — and cut where the reach passes a corner of
+the pen and where the side turns back on itself; between the cuts it is fitted in pieces of
+about a length, each run with as many as the master that needs most. The pen's edge at a join
+and round an end is read and cut at its corners the same way, and an end closed with the
+pen's shape is four pieces, a corner's worth to each. Where any master has corners every
+master is drawn so, an oval among them: the same ink in other pieces. fontTools draws a hook
+that is an oval in the light and a rectangle in the black.
+
 #### Open
 
 What is next in the same direction:
 
-- **A pen with corners in a variable font**: its own outline followed round a join where
-  the oval's is. Such a stroke is still written as the default master draws it.
 - **A rectangle that is one**, exact as the broad edge is: its sides the path moved over by a
   corner, with a straight line across where the path runs along one of its edges.
 - **A broad edge that turns or widens along a stroke, in a variable font**, which is still

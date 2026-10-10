@@ -48,6 +48,52 @@ export function fitCubics(
   return out;
 }
 
+/**
+ * One cubic through the first and last of `points`, leaving along `start` and
+ * arriving along `end`, as near the points between as one cubic gets — and how
+ * far the worst of them is from it.
+ *
+ * {@link fitCubics} without the splitting: for whoever has to say beforehand
+ * how many curves a run is drawn with, and wants to know how well that many do.
+ * Points all in one place are a curve of no length there.
+ */
+export function fitOne(
+  points: readonly Vec2[],
+  start: Vec2,
+  end: Vec2,
+): { readonly curve: Cubic; readonly strays: number } {
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (first === undefined || last === undefined) {
+    const nowhere = { x: 0, y: 0 };
+    return { curve: cubic(nowhere, nowhere, nowhere, nowhere), strays: 0 };
+  }
+  const pts = [first, ...dedupe(points.slice(1, -1)), last];
+  if (dist(first, last) < 1e-9 && pts.every((p) => dist(p, first) < 1e-9)) {
+    return { curve: cubic(first, first, first, last), strays: 0 };
+  }
+  const leaving = start;
+  const arriving = neg(end);
+  if (pts.length === 2) {
+    const d = dist(first, last) / 3;
+    return {
+      curve: cubic(first, add(first, scale(leaving, d)), add(last, scale(arriving, d)), last),
+      strays: 0,
+    };
+  }
+  const params = chordParameters(pts, 0, pts.length - 1);
+  let curve = handlesFor(pts, 0, pts.length - 1, params, leaving, arriving);
+  let worst = worstPoint(pts, 0, pts.length - 1, curve, params);
+  let best = { curve, squared: worst.squared };
+  for (let round = 0; round < REPARAMETERISE; round++) {
+    reparameterise(pts, 0, params, curve);
+    curve = handlesFor(pts, 0, pts.length - 1, params, leaving, arriving);
+    worst = worstPoint(pts, 0, pts.length - 1, curve, params);
+    if (worst.squared < best.squared) best = { curve, squared: worst.squared };
+  }
+  return { curve: best.curve, strays: Math.sqrt(best.squared) };
+}
+
 /** The longest a fitted handle may be, in chords. */
 const HANDLE_MOST = 3;
 

@@ -607,8 +607,10 @@ needs the same ones. Two things have no such line and are written as the default
 them at every weight, with a warning that says which glyphs: a broad edge whose angle or width
 changes along the stroke, and a pen that is a broad edge in one master and an oval in another.
 So is a stroke whose masters have not the same points, one with a **Step** in its blend, or
-a pen with any squareness, or an end that is cut in one master and not in another, or closed
-differently. An end cut the same way in every master varies with the rest of the stroke.
+an end that is cut in one master and not in another, or closed differently. An end cut the same
+way in every master varies with the rest of the stroke, and so does a pen's squareness: an oval
+in the light and a box in the bold is a pen whose corners fill out along the axis. A stroke
+drawn with corners in any master comes to more points than an oval's.
 
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it

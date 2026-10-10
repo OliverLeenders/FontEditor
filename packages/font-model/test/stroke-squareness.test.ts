@@ -74,10 +74,11 @@ describe("a stroke drawn with a pen that has corners", () => {
     expect(inked(half, 200 + 38.5, -18.5)).toBe(false);
   });
 
-  it("is not yet drawn to one plan for a variable font", () => {
+  it("is drawn to one plan for a variable font, with an oval in another master", () => {
+    // What the plan comes to is held against the ink in `stroke-planned-ends`.
     const squared = stem({ ...oval, squareness: 0.5 });
-    expect(plannedInk([squared, squared], ids)).toBeNull();
-    expect(plannedInk([stem(oval), stem(oval)], ids)).not.toBeNull();
+    expect(plannedInk([squared, squared], ids)).not.toBeNull();
+    expect(plannedInk([stem(oval), squared], ids)).not.toBeNull();
   });
 });
 

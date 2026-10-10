@@ -138,6 +138,26 @@ describe("a cut end, drawn to one plan", () => {
     ],
     ["a broad edge's foot cut level", BROAD, { cut: 0 }, undefined],
     ["a broad edge cut at both ends", BROAD, { cut: 0 }, { cut: 0 }],
+    [
+      "a pen with corners, its ends left to the pen",
+      { ...OVAL, squareness: 0.6 },
+      undefined,
+      undefined,
+    ],
+    ["a square pen, its ends left to the pen", { ...OVAL, squareness: 1 }, undefined, undefined],
+    ["a pen with corners cut level", { ...OVAL, squareness: 0.6 }, { cut: 0 }, undefined],
+    [
+      "a pen with corners cut level and closed with the nib",
+      { ...OVAL, squareness: 0.6 },
+      { cut: 0, shape: "nib" },
+      undefined,
+    ],
+    [
+      "a square pen cut on a slant and closed with the nib",
+      { ...OVAL, squareness: 1 },
+      { cut: 20, shape: "nib" },
+      { cut: "square", shape: "nib" },
+    ],
   ];
 
   it.each(cases)("fills as the stroke carried on and cut does: %s", (_, nib, foot, head) => {
@@ -162,6 +182,23 @@ describe("a cut end, drawn to one plan", () => {
       for (const [k, stroke] of [light, bold].entries()) {
         expect(disagreement(planned[k]!, inkOf(stroke, ids)).wrong).toEqual([]);
       }
+    }
+  });
+
+  it("is the same pieces in an oval master and one with corners, cut and closed with the nib", () => {
+    const foot = { cut: 0, shape: "nib" } as const;
+    const light = stem({ angle: 30, width: 40, thickness: 14 }, foot);
+    const bold = stem(
+      { angle: 20, width: 140, thickness: 50, squareness: 0.8 },
+      foot,
+      undefined,
+      30,
+    );
+    const planned = plannedInk([light, bold], ids)!;
+    expect(planned).not.toBeNull();
+    expect(shapeOf(planned[1]!)).toBe(shapeOf(planned[0]!));
+    for (const [k, stroke] of [light, bold].entries()) {
+      expect(disagreement(planned[k]!, inkOf(stroke, ids)).wrong).toEqual([]);
     }
   });
 

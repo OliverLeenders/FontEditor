@@ -69,9 +69,13 @@ for variable in ("Penned.otf", "Penned.ttf"):
         ring = [(-margin, 0), (margin, 0), (0, -margin), (0, margin)]
 
         checked = missing = extra = 0
-        y = y0 - step
+        # Off the whole numbers a font is drawn on. A row of the grid that runs
+        # along a level edge - the foot of a stem cut on the baseline - is on
+        # the outline from end to end, and says whatever the pen asking
+        # happens to make of that.
+        y = y0 - step + 0.37
         while y <= y1 + step:
-            x = x0 - step
+            x = x0 - step + 0.29
             while x <= x1 + step:
                 here = inside(theirs, x, y)
                 if all(inside(theirs, x + dx, y + dy) == here for dx, dy in ring):

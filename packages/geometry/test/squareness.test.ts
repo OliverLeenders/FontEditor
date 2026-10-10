@@ -13,7 +13,7 @@ import {
   samePenShape,
 } from "../src/pen.js";
 import { STROKE_CASES, type StrokeCase } from "./stroke-cases.js";
-import { disagreement, sweep } from "./sweep.js";
+import { disagreement, sweep, winding } from "./sweep.js";
 
 /**
  * A pen with corners: one more number, from the oval to a rectangle.
@@ -129,9 +129,71 @@ describe("the ink of a pen with corners, against the pen swept along the path", 
     expect(d.missing).toEqual([]);
     expect(d.extra).toEqual([]);
   });
+});
 
-  it("is not yet drawn to one plan for a variable font", () => {
-    const c = squaredCase("an oval pen round a sharp V", 0.5);
-    expect(plannedStrokes([{ curves: c.curves, pens: c.pens, closed: c.closed }])).toBeNull();
+describe("the line round the ink of a pen with corners, drawn to one plan", () => {
+  const squaredCase = (name: string, squareness: number): StrokeCase => {
+    const c = named(name);
+    return {
+      ...c,
+      name: `${c.name}, squareness ${String(squareness)}`,
+      pens: c.pens.map((p) => ({ ...p, squareness })),
+    };
+  };
+  const planned = (c: StrokeCase) =>
+    plannedStrokes([{ curves: c.curves, pens: c.pens, closed: c.closed }]);
+  const curvesOf = (loops: readonly (readonly { curve: Cubic }[])[]): Cubic[][] =>
+    loops.map((loop) => loop.map((piece) => piece.curve));
+  const shapeOf = (loops: readonly (readonly { line: boolean }[])[]): string =>
+    loops.map((loop) => loop.map((piece) => (piece.line ? "l" : "c")).join("")).join(" ");
+
+  it.each([
+    squaredCase("an oval pen round a sharp V", 0.5),
+    squaredCase("an oval pen round a sharp V", 1),
+    squaredCase("an oval pen along an S", 0.6),
+    squaredCase("an oval pen along an S", 1),
+    squaredCase("an oval pen round a closed square", 1),
+    squaredCase("an oval pen round a bend tighter than itself", 0.8),
+  ])("fills as the pen does: $name", { timeout: 240_000 }, (c) => {
+    const loops = planned(c);
+    expect(loops).not.toBeNull();
+    const swept = sweep(c.curves, c.pens, c.closed, c.blends);
+    const d = disagreement(curvesOf(loops![0]!), swept, 45);
+    expect(d.checked).toBeGreaterThan(500);
+    expect(d.missing).toEqual([]);
+    expect(d.extra).toEqual([]);
+  });
+
+  it("goes round nothing the wrong way", { timeout: 120_000 }, () => {
+    for (const c of [
+      squaredCase("an oval pen round a sharp V", 1),
+      squaredCase("an oval pen along an S", 0.6),
+    ]) {
+      const loops = curvesOf(planned(c)![0]!);
+      const { minX, minY, maxX, maxY } = sweep(c.curves, c.pens, c.closed, c.blends).bounds;
+      const step = Math.max(maxX - minX, maxY - minY) / 40;
+      let least = Infinity;
+      for (let y = minY - step; y <= maxY + step; y += step) {
+        for (let x = minX - step; x <= maxX + step; x += step) {
+          least = Math.min(least, winding(loops, { x: x + 0.013, y: y + 0.007 }));
+        }
+      }
+      expect(least).toBe(0);
+    }
+  });
+
+  it("is the same pieces in an oval master and a square one", () => {
+    const c = named("an oval pen along an S");
+    const with_ = (squareness: number, width: number) => ({
+      curves: c.curves,
+      pens: c.pens.map((p) => ({ ...p, width, squareness })),
+      closed: c.closed,
+    });
+    const masters = [with_(0, 60), with_(0.5, 90), with_(1, 130)];
+    const loops = plannedStrokes(masters);
+    expect(loops).not.toBeNull();
+    expect(shapeOf(loops![1]!)).toBe(shapeOf(loops![0]!));
+    expect(shapeOf(loops![2]!)).toBe(shapeOf(loops![0]!));
+    expect(loops![0]![0]!.length).toBeLessThan(200);
   });
 });

@@ -9,6 +9,7 @@ import {
   tangent,
   unitRoots,
 } from "./cubic.js";
+import { fitOne } from "./fit.js";
 import { halfNib, nibTangencies } from "./nib.js";
 import {
   type PenProfile,
@@ -16,6 +17,7 @@ import {
   type SegmentBlend,
   isBroad,
   isSquared,
+  penExponent,
   penProfiles,
   penSupport,
   samePenShape,
@@ -115,9 +117,13 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
     }
   }
 
-  // A pen with corners has no circle to be made into, which is how the pen's
-  // edge is followed round a join here: not yet drawn to one plan.
-  if (masters.some((m) => m.pens.some(isSquared))) return null;
+  // A pen with corners in any master, and every master is drawn the way such a
+  // pen is: its sides fitted between the places the path runs along one of the
+  // pen's own sides, and the pen's edge at a join walked and fitted, where an
+  // oval's sides are given by their speed and its edge is made from a circle.
+  // An oval drawn that way comes to the same ink in other pieces, and the
+  // pieces are what the masters have to share.
+  const cornered = masters.some((m) => m.pens.some(isSquared));
 
   // An end is cut in every master or in none, and closed the same way in all:
   // what closes it is pieces of the line, and the masters share their pieces.
@@ -150,7 +156,11 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
   const back: Leg[] = [...there].reverse().map((leg) => ({ ...leg, forward: false }));
   const cycles = first.closed ? [there, back] : [[...there, ...back]];
 
-  const sides = broad ? broadSides(masters) : ovalSides(masters, profiles);
+  const sides = broad
+    ? broadSides(masters)
+    : cornered
+      ? corneredSides(masters, profiles)
+      : ovalSides(masters, profiles);
   if (sides === null) return null;
 
   // The ends that are cut: the side arriving at each and the side leaving it
@@ -166,7 +176,13 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
       const arriving: Leg = { index, forward: end === "end" };
       const leaving: Leg = { index, forward: end !== "end" };
       const pen = profiles[at]![index]!.at(end === "end" ? 1 : 0);
-      const made = cutTurn(sides[at]!.get(key(arriving))!, sides[at]!.get(key(leaving))!, cut, pen);
+      const made = cutTurn(
+        sides[at]!.get(key(arriving))!,
+        sides[at]!.get(key(leaving))!,
+        cut,
+        pen,
+        cornered,
+      );
       if (made === null) return null;
       sides[at]!.set(key(arriving), made.arriving);
       sides[at]!.set(key(leaving), made.leaving);
@@ -179,9 +195,15 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
     const loops: PlannedPiece[][] = masters.map(() => []);
     for (const [k, leg] of cycle.entries()) {
       const next = cycle[(k + 1) % cycle.length]!;
-      const joins = masters.map((m, at) =>
-        joinOf(m, profiles[at]!, leg, next, sides[at]!.get(key(leg))!, sides[at]!.get(key(next))!),
-      );
+      const each = masters.map((m, at) => ({
+        master: m,
+        profiles: profiles[at]!,
+        before: sides[at]!.get(key(leg))!,
+        after: sides[at]!.get(key(next))!,
+      }));
+      const joins = cornered
+        ? corneredJoins(each, leg, next)
+        : each.map((j) => joinOf(j.master, j.profiles, leg, next, j.before, j.after));
       // The pen's edge at a join goes into every master or into none.
       const turns = joins.some((j) => j.turns);
       for (const [at, loop] of loops.entries()) {
@@ -267,6 +289,474 @@ function ovalSides(
     }
   }
   return out;
+}
+
+/**
+ * The four directions a pen faces at its corners: where its outline turns
+ * tightest, half way between its length and its breadth as the outline itself
+ * goes. For an oval they are four places like any other; the squarer the pen,
+ * the more of a corner each is.
+ */
+function cornerFacings(pen: PenShape): Vec2[] {
+  const a = pen.width / 2;
+  const b = pen.thickness / 2;
+  const size = Math.hypot(a, b);
+  if (!(size > 0)) return [];
+  const angle = (pen.angle * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  // In the pen's own frame the outline faces (b, a) where it crosses the
+  // diagonal of its box, whatever its exponent.
+  return [
+    [b, a],
+    [-b, a],
+    [-b, -a],
+    [b, -a],
+  ].map(([x, y]) => ({
+    x: (cos * x! - sin * y!) / size,
+    y: (sin * x! + cos * y!) / size,
+  }));
+}
+
+/**
+ * Where along a leg the pen's reach passes one of the pen's corners: where the
+ * side, which has been running along one flat of the pen, turns to run along
+ * the next.
+ */
+function pastCorners(curve: Cubic, profile: PenProfile, leg: Leg): number[] {
+  const STEPS = 256;
+  const facing = (s: number): Vec2 | null => {
+    const along = heading(curve, leg, s);
+    return along === null ? null : rightOf(along);
+  };
+  const found: number[] = [];
+  for (let corner = 0; corner < 4; corner++) {
+    const value = (s: number): number | null => {
+      const f = facing(s);
+      const c = cornerFacings(profile.at(leg.forward ? s : 1 - s))[corner];
+      if (f === null || c === undefined) return null;
+      // Nothing while the pen is facing the other way altogether.
+      if (f.x * c.x + f.y * c.y <= 0) return null;
+      return f.x * c.y - f.y * c.x;
+    };
+    let before = value(0);
+    for (let k = 1; k <= STEPS; k++) {
+      const here = value(k / STEPS);
+      if (before !== null && here !== null && before * here < 0) {
+        let lo = (k - 1) / STEPS;
+        let hi = k / STEPS;
+        const sign = Math.sign(before);
+        for (let i = 0; i < 40; i++) {
+          const mid = (lo + hi) / 2;
+          const v = value(mid);
+          if (v !== null && Math.sign(v) === sign) lo = mid;
+          else hi = mid;
+        }
+        found.push((lo + hi) / 2);
+      }
+      before = here;
+    }
+  }
+  return found.filter((t) => t > 1e-3 && t < 1 - 1e-3).sort((a, b) => a - b);
+}
+
+/** A unit vector from one point towards another, or `null` where they are one point. */
+function towards(from: Vec2, to: Vec2): Vec2 | null {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  return length < 1e-12 ? null : { x: dx / length, y: dy / length };
+}
+
+/** A place along a leg, and where the pen reaches there. */
+type Reached = { readonly s: number; readonly p: Vec2 };
+
+/** How far apart, in units, the places a cornered side is read at are let be. */
+const READ_APART = 3;
+
+/**
+ * One side of a stretch, read closely: where the pen reaches at places along
+ * the leg near enough together that the side is all but straight between them.
+ *
+ * Not evenly by the path's parameter. Where a flat of the pen is laid along
+ * the path the reach crosses the whole flat in next to no distance of path,
+ * and places evenly spaced step over all of it in one go; so a gap too long is
+ * halved until it is not, or is too short a piece of path to halve.
+ */
+function readSide(curve: Cubic, profile: PenProfile, leg: Leg): Reached[] | null {
+  const at = (s: number): Reached | null => {
+    const p = reach(curve, profile, leg, s);
+    return p === null ? null : { s, p };
+  };
+  const START = 64;
+  const out: Reached[] = [];
+  for (let k = 0; k <= START; k++) {
+    const here = at(k / START);
+    if (here === null) return null;
+    out.push(here);
+  }
+  for (let i = 0; i + 1 < out.length && out.length < 6000;) {
+    const a = out[i]!;
+    const b = out[i + 1]!;
+    if (Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y) > READ_APART && b.s - a.s > 1e-7) {
+      const middle = at((a.s + b.s) / 2);
+      if (middle === null) return null;
+      out.splice(i + 1, 0, middle);
+    } else {
+      i++;
+    }
+  }
+  return out;
+}
+
+/**
+ * Where along a leg a side turns back: where it stops going the way the path is
+ * going and goes the other way, or stops going the other way.
+ *
+ * The inside of a bend tighter than the pen, where the pen's reach runs back
+ * over ink already laid. A side is a smooth thing to follow either side of
+ * such a place and not through it, so it is one of the places a side is cut.
+ */
+function turnsBack(curve: Cubic, leg: Leg, side: readonly Reached[]): number[] {
+  const out: number[] = [];
+  let before = 0;
+  for (let i = 0; i + 1 < side.length; i++) {
+    const a = side[i]!;
+    const b = side[i + 1]!;
+    const along = heading(curve, leg, (a.s + b.s) / 2);
+    if (along === null) continue;
+    const forward = (b.p.x - a.p.x) * along.x + (b.p.y - a.p.y) * along.y;
+    if (Math.abs(forward) < 1e-9) continue;
+    const way = Math.sign(forward);
+    if (before !== 0 && way !== before) out.push(a.s);
+    before = way;
+  }
+  return out.filter((t) => t > 1e-3 && t < 1 - 1e-3);
+}
+
+/**
+ * A run of a side between two of its cuts, in `pieces` curves of about a
+ * length each, and how far the worst of them strays.
+ *
+ * Cut by how far along the side each place is, and each piece fitted to the
+ * places in it, leaving and arriving the way the side is going there: at an
+ * end of the run the way it sets off or comes in, since the run before it may
+ * have come from the other direction.
+ */
+function fittedRun(run: readonly Reached[], pieces: number): { curves: Cubic[]; strays: number } {
+  const first = run[0]!.p;
+  const last = run[run.length - 1]!.p;
+  const along: number[] = [0];
+  for (let i = 1; i < run.length; i++) {
+    const a = run[i - 1]!.p;
+    const b = run[i]!.p;
+    along.push(along[i - 1]! + Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  const whole = along[along.length - 1]!;
+  if (run.length < 2 || whole < 1e-9) {
+    return {
+      curves: Array.from({ length: pieces }, () => cubic(first, first, last, last)),
+      strays: 0,
+    };
+  }
+  const going = (i: number): Vec2 => {
+    for (let reach_ = 1; reach_ < run.length; reach_++) {
+      const a = run[Math.max(0, i - reach_)]!.p;
+      const b = run[Math.min(run.length - 1, i + reach_)]!.p;
+      const d = towards(a, b);
+      if (d !== null) return d;
+    }
+    return { x: 1, y: 0 };
+  };
+
+  const curves: Cubic[] = [];
+  let strays = 0;
+  let start = 0;
+  for (let j = 1; j <= pieces; j++) {
+    let end = run.length - 1;
+    if (j < pieces) {
+      end = start;
+      while (end < run.length - 1 && along[end]! < (whole * j) / pieces) end++;
+    }
+    const fitted = fitOne(
+      run.slice(start, end + 1).map((r) => r.p),
+      going(start),
+      going(end),
+    );
+    strays = Math.max(strays, fitted.strays);
+    curves.push(fitted.curve);
+    start = end;
+  }
+  return { curves, strays };
+}
+
+/** The part of a closely read side between two places along the leg, both ends on them exactly. */
+function between(
+  side: readonly Reached[],
+  ends: (s: number) => Reached | null,
+  from: number,
+  to: number,
+): Reached[] {
+  const inside = side.filter((r) => r.s > from + 1e-9 && r.s < to - 1e-9);
+  const first = ends(from);
+  const last = ends(to);
+  return [...(first === null ? [] : [first]), ...inside, ...(last === null ? [] : [last])];
+}
+
+/**
+ * Both sides of every stretch for a pen with corners in some master.
+ *
+ * Each side is read closely and cut in two kinds of place. Where the pen's
+ * reach passes one of the pen's corners, and the side that was running along
+ * one flat of the pen turns to run along the next: the squarer the pen, the
+ * sharper the turn. And where the side turns back on itself, inside a bend
+ * tighter than the pen. A master whose side is
+ * not cut where another's is, is cut at the same places. Between the cuts every
+ * master has the same number of pieces, as many as the one that needs most,
+ * each about as long as the next.
+ */
+function corneredSides(
+  masters: readonly StrokeMaster[],
+  profiles: readonly (readonly PenProfile[])[],
+): Map<string, PlannedPiece[]>[] | null {
+  const out = masters.map(() => new Map<string, PlannedPiece[]>());
+  const count = masters[0]!.curves.length;
+
+  for (let index = 0; index < count; index++) {
+    for (const forward of [true, false]) {
+      const leg: Leg = { index, forward };
+      const read: Reached[][] = [];
+      const found: number[][] = [];
+      for (const [at, m] of masters.entries()) {
+        const curve = m.curves[index]!;
+        const profile = profiles[at]![index]!;
+        const side = readSide(curve, profile, leg);
+        if (side === null) return null;
+        read.push(side);
+        const cuts = [...pastCorners(curve, profile, leg), ...turnsBack(curve, leg, side)].sort(
+          (a, b) => a - b,
+        );
+        found.push(cuts.filter((t, i) => i === 0 || t - cuts[i - 1]! > 1e-4));
+      }
+      const most = found.reduce((best, f) => (f.length > best.length ? f : best), found[0]!);
+      const bounds = found.map((own) => [0, ...cutsLike(most, own), 1]);
+
+      const ends = masters.map((m, at) => (s: number): Reached | null => {
+        const p = reach(m.curves[index]!, profiles[at]![index]!, leg, s);
+        return p === null ? null : { s, p };
+      });
+      const chosen: PlannedPiece[][] = masters.map(() => []);
+      // Run by run: each has as many pieces as the master that needs most of
+      // them for that run, and no more because another run needed more.
+      for (let span = 0; span + 1 < bounds[0]!.length; span++) {
+        const runs = masters.map((_, at) =>
+          between(read[at]!, ends[at]!, bounds[at]![span]!, bounds[at]![span + 1]!),
+        );
+        let fitted: Cubic[][] = [];
+        for (const pieces of SIDE_COUNTS) {
+          let worst = 0;
+          fitted = runs.map((run) => {
+            const made = fittedRun(run, pieces);
+            worst = Math.max(worst, made.strays);
+            return made.curves;
+          });
+          if (worst <= SIDE_TOLERANCE) break;
+          if (pieces === SIDE_COUNTS[SIDE_COUNTS.length - 1] && worst > SIDE_LIMIT) return null;
+        }
+        for (const [at, curves] of fitted.entries()) {
+          for (const curve of curves) chosen[at]!.push({ curve, line: false });
+        }
+      }
+      for (const side of chosen) {
+        // Each piece starts exactly where the one before it ended.
+        for (let k = 1; k < side.length; k++) {
+          const c = side[k]!.curve;
+          side[k] = { curve: cubic(side[k - 1]!.curve.b, c.c1, c.c2, c.b), line: false };
+        }
+      }
+      for (const [at, side] of chosen.entries()) out[at]!.set(key(leg), side);
+    }
+  }
+  return out;
+}
+
+/** The numbers of curves each run of the pen's edge at a join is tried with, fewest first. */
+const EDGE_COUNTS = [1, 2, 3, 4, 6];
+
+/**
+ * The pen's own edge, standing at a point, from where it reaches furthest in
+ * one direction round by `sweep` to where it reaches furthest in another, in
+ * `pieces` curves of about a length — and how far the worst strays.
+ *
+ * Walked by the direction the edge faces, which puts the places it is read at
+ * close together round a corner and few along a flat, and cut into pieces by
+ * how far along the edge they are. The way the edge is going where it faces a
+ * direction is that direction turned a quarter turn, whatever the pen.
+ */
+function edgeArc(
+  pen: PenShape,
+  centre: Vec2,
+  from: Vec2,
+  sweep: number,
+  pieces: number,
+): { curves: Cubic[]; strays: number } {
+  const facing = (f: number): Vec2 => {
+    const by = sweep * f;
+    const cos = Math.cos(by);
+    const sin = Math.sin(by);
+    return { x: from.x * cos - from.y * sin, y: from.x * sin + from.y * cos };
+  };
+  const at = (f: number): { f: number; p: Vec2 } => {
+    const by = penSupport(pen, facing(f));
+    return { f, p: { x: centre.x + by.x, y: centre.y + by.y } };
+  };
+  // Read by the direction the edge faces, and then closer wherever that left
+  // a gap: along a flat of a square pen the whole flat is one direction.
+  const START = 96;
+  const read = Array.from({ length: START + 1 }, (_, k) => at(k / START));
+  for (let i = 0; i + 1 < read.length && read.length < 4000;) {
+    const a = read[i]!;
+    const b = read[i + 1]!;
+    if (Math.hypot(b.p.x - a.p.x, b.p.y - a.p.y) > READ_APART && b.f - a.f > 1e-9) {
+      read.splice(i + 1, 0, at((a.f + b.f) / 2));
+    } else {
+      i++;
+    }
+  }
+  const points = read.map((r) => r.p);
+  const along: number[] = [0];
+  for (let k = 1; k < points.length; k++) {
+    const a = points[k - 1]!;
+    const b = points[k]!;
+    along.push(along[k - 1]! + Math.hypot(b.x - a.x, b.y - a.y));
+  }
+  const end = points.length - 1;
+  const way = sweep < 0 ? -1 : 1;
+  // The way the edge is going where it faces a direction is that direction
+  // turned a quarter turn — but along a flat it faces one way from end to end,
+  // and at a sharp corner every way within a hair: so the way it is going is
+  // read off the places either side, as a side's is.
+  const going = (k: number): Vec2 => {
+    for (let wide = 1; wide <= end; wide++) {
+      const d = towards(points[Math.max(0, k - wide)]!, points[Math.min(end, k + wide)]!);
+      if (d !== null) return d;
+    }
+    const f = facing(read[k]!.f);
+    return { x: -f.y * way, y: f.x * way };
+  };
+
+  // Cut where the edge passes a corner of the pen, which half a turn of it
+  // does twice and less than half a turn twice at most: so into three runs
+  // always, the ones a master has no corner for being runs of no length at
+  // the end.
+  const corners = cornerFacings(pen);
+  const marks: number[] = [];
+  for (let k = 1; k < end && marks.length < 2; k++) {
+    const a = facing(read[k - 1]!.f);
+    const b = facing(read[k]!.f);
+    if (
+      corners.some(
+        (c) => a.x * c.x + a.y * c.y > 0 && (a.x * c.y - a.y * c.x) * (b.x * c.y - b.y * c.x) < 0,
+      )
+    ) {
+      marks.push(k);
+    }
+  }
+  while (marks.length < 2) marks.push(end);
+  const bounds = [0, ...marks, end];
+
+  const curves: Cubic[] = [];
+  let strays = 0;
+  for (let run = 0; run + 1 < bounds.length; run++) {
+    const first = bounds[run]!;
+    const last = bounds[run + 1]!;
+    const length = along[last]! - along[first]!;
+    let start = first;
+    for (let j = 1; j <= pieces; j++) {
+      let stop = last;
+      if (j < pieces) {
+        stop = start;
+        while (stop < last && along[stop]! - along[first]! < (length * j) / pieces) stop++;
+      }
+      const fitted = fitOne(points.slice(start, stop + 1), going(start), going(stop));
+      strays = Math.max(strays, fitted.strays);
+      curves.push(fitted.curve);
+      start = stop;
+    }
+  }
+  return { curves, strays };
+}
+
+/**
+ * What goes between the end of one leg and the start of the next in every
+ * master, for a pen with corners in some: {@link joinOf}, with the pen's edge
+ * walked and fitted and every master given as many curves as the one that
+ * needs most.
+ */
+function corneredJoins(
+  each: readonly {
+    readonly master: StrokeMaster;
+    readonly profiles: readonly PenProfile[];
+    readonly before: readonly PlannedPiece[];
+    readonly after: readonly PlannedPiece[];
+  }[],
+  leg: Leg,
+  next: Leg,
+): { pieces: PlannedPiece[]; turns: boolean }[] {
+  const turned = each.map(({ master, profiles, before, after }) => {
+    const from = before[before.length - 1]!.curve.b;
+    const to = after[0]!.curve.a;
+    const uTurn = leg.index === next.index && leg.forward !== next.forward && !master.closed;
+    const arriving = heading(master.curves[leg.index]!, leg, 1);
+    const leaving = heading(master.curves[next.index]!, next, 0);
+    const curve = master.curves[leg.index]!;
+    const centre = leg.forward ? curve.b : curve.a;
+    const pen = profiles[leg.index]!.at(leg.forward ? 1 : 0);
+    let sweep = 0;
+    if (arriving !== null && leaving !== null) {
+      sweep = Math.atan2(
+        arriving.x * leaving.y - arriving.y * leaving.x,
+        arriving.x * leaving.x + arriving.y * leaving.y,
+      );
+    }
+    if (uTurn) sweep = Math.PI;
+    return {
+      from,
+      to,
+      centre,
+      pen,
+      sweep,
+      uTurn,
+      facing: arriving === null ? null : rightOf(arriving),
+    };
+  });
+  const turns = turned.some((t) => t.uTurn || Math.abs(t.sweep) > TURN);
+
+  let chosen: Cubic[][] = [];
+  for (const pieces of EDGE_COUNTS) {
+    let worst = 0;
+    chosen = turned.map((t) => {
+      if (t.facing === null) return Array.from({ length: pieces }, () => lineAsCubic(t.from, t.to));
+      const arc = edgeArc(t.pen, t.centre, t.facing, t.sweep, pieces);
+      worst = Math.max(worst, arc.strays);
+      return arc.curves;
+    });
+    if (worst <= SIDE_TOLERANCE) break;
+  }
+  return turned.map((t, at) => {
+    const curves = chosen[at]!;
+    // Ending exactly where the sides either side of it do.
+    const first = curves[0]!;
+    const last = curves[curves.length - 1]!;
+    curves[0] = cubic(t.from, first.c1, first.c2, first.b);
+    curves[curves.length - 1] = cubic(
+      curves.length === 1 ? t.from : last.a,
+      last.c1,
+      last.c2,
+      t.to,
+    );
+    return { pieces: curves.map((curve) => ({ curve, line: false })), turns };
+  });
 }
 
 /** One side of a stretch in `pieces` curves, and how far the worst of them strays. */
@@ -498,6 +988,7 @@ function cutTurn(
   leaving: readonly PlannedPiece[],
   cut: PlannedCut,
   pen: PenShape,
+  cornered: boolean,
 ): { arriving: PlannedPiece[]; leaving: PlannedPiece[]; closure: PlannedPiece[] } | null {
   const from = stoppedAt(arriving, cut);
   const to = startedAt(leaving, cut);
@@ -526,6 +1017,13 @@ function cutTurn(
   const half = { x: a.at.x - middle.x, y: a.at.y - middle.y };
   const tip = { x: middle.x + out.x, y: middle.y + out.y };
   const by = (p: Vec2, v: Vec2, k: number): Vec2 => ({ x: p.x + v.x * k, y: p.y + v.y * k });
+  if (cornered) {
+    return {
+      arriving: a.pieces,
+      leaving: b.pieces,
+      closure: halfOutline(pen, a.at, b.at, middle, half, out),
+    };
+  }
   return {
     arriving: a.pieces,
     leaving: b.pieces,
@@ -534,6 +1032,65 @@ function cutTurn(
       { curve: cubic(tip, by(tip, half, -QUARTER), by(b.at, out, QUARTER), b.at), line: false },
     ],
   };
+}
+
+/**
+ * Half the outline of a pen with corners, standing on the edge of a cut: from
+ * one end of the edge out to its tip and back to the other, in four curves, a
+ * corner's worth to each.
+ *
+ * The outline said by its own equation, as the single font's is: a point round
+ * half a circle with each coordinate raised to two over the pen's exponent.
+ * Cut at the tip and half way to it either side, where a square pen's corners
+ * are, so that each piece is a flat and the turn at the end of it.
+ */
+function halfOutline(
+  pen: PenShape,
+  from: Vec2,
+  to: Vec2,
+  middle: Vec2,
+  half: Vec2,
+  out: Vec2,
+): PlannedPiece[] {
+  const power = 2 / penExponent(pen);
+  const raised = (v: number): number => Math.sign(v) * Math.pow(Math.abs(v), power);
+  const at = (u: number): Vec2 => {
+    const along = raised(Math.cos(u));
+    const outward = raised(Math.sin(u));
+    return {
+      x: middle.x + half.x * along + out.x * outward,
+      y: middle.y + half.y * along + out.y * outward,
+    };
+  };
+  const unit = (v: Vec2): Vec2 => {
+    const length = Math.hypot(v.x, v.y);
+    return length === 0 ? { x: 1, y: 0 } : { x: v.x / length, y: v.y / length };
+  };
+  const quarter = Math.PI / 4;
+  // Which way the outline is going at each cut: out from the edge, towards the
+  // tip along it, back in — and between those, as it is going there.
+  const going = (k: number): Vec2 => {
+    if (k === 0) return unit(out);
+    if (k === 2) return unit({ x: -half.x, y: -half.y });
+    if (k === 4) return unit({ x: -out.x, y: -out.y });
+    const a = at(k * quarter - 1e-4);
+    const b = at(k * quarter + 1e-4);
+    return unit({ x: b.x - a.x, y: b.y - a.y });
+  };
+  const pieces: PlannedPiece[] = [];
+  const STEPS = 16;
+  for (let k = 0; k < 4; k++) {
+    const points: Vec2[] = [];
+    for (let i = 0; i <= STEPS; i++) points.push(at((k + i / STEPS) * quarter));
+    if (k === 0) points[0] = from;
+    if (k === 3) points[STEPS] = to;
+    pieces.push({ curve: fitOne(points, going(k), going(k + 1)).curve, line: false });
+  }
+  for (let k = 1; k < pieces.length; k++) {
+    const c = pieces[k]!.curve;
+    pieces[k] = { curve: cubic(pieces[k - 1]!.curve.b, c.c1, c.c2, c.b), line: false };
+  }
+  return pieces;
 }
 
 /**

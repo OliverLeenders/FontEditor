@@ -68,10 +68,29 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
     ),
     { angle: 30, width: pen, thickness },
   );
+  // A hook drawn with a pen that has corners, the squarer the heavier: an oval
+  // in the lightest and a rectangle in the heaviest, its foot closed with the
+  // pen's shape. A broad edge has no corners, so none where there is no thickness.
+  const squareness = Math.min(1, Math.max(0, (pen - 60) / 80));
+  const boxed = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(420, 620), { out: at(250, 620) }),
+        node(ids.node(), at(240, 420), { type: "smooth", in: at(240, 540), out: at(240, 300) }),
+        node(ids.node(), at(300, 0), { in: at(300, 160), end: { cut: 0, shape: "nib" } }),
+      ],
+      false,
+    ),
+    thickness > 0 && squareness > 0
+      ? { angle: 30, width: pen, thickness, squareness }
+      : { angle: 30, width: pen, thickness },
+  );
   return fontDocument(
     [
       glyph(".notdef", { advance: 500 }),
       glyph("l", { advance: 600, unicodes: [0x6c], contours: [stem] }),
+      glyph("t", { advance: 600, unicodes: [0x74], contours: [boxed] }),
       glyph("s", { advance: 600, unicodes: [0x73], contours: [skeleton] }),
       glyph("dollar", {
         advance: 600,
