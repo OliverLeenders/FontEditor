@@ -22,6 +22,7 @@ import {
   segmentTunniStatus,
   segments,
   type SerifHandle,
+  SERIF_HANDLES,
   serifHandles,
   strokeCutHandle,
   segmentTunniPoint,
@@ -109,8 +110,8 @@ export type HitTarget =
       readonly point: Vec2;
     }
   /**
-   * A handle of the serif on an end of a stroke: a tip, dragged along the line
-   * the serif stands on, or its height, dragged up the stroke.
+   * A handle of the serif on an end of a stroke, dragged to set the number it
+   * is the handle of: see `serifHandles`.
    */
   | {
       readonly kind: "serifHandle";
@@ -314,14 +315,16 @@ export function buildHitIndex(
       // And the handles of the serif standing on that cut, where there is one.
       const serif = serifHandles(c, end);
       if (serif === null) continue;
-      for (const part of ["left", "right", "height"] as const) {
+      for (const part of SERIF_HANDLES) {
+        const point = serif[part];
+        if (point === undefined) continue;
         targets.push({
           kind: "serifHandle",
           contourId: c.id,
           nodeId: n.id,
           end,
           handle: part,
-          point: serif[part],
+          point,
         });
       }
     }

@@ -771,22 +771,54 @@ export function strokeCutHandle(c: Contour, which: "start" | "end"): StrokeCutHa
 }
 
 /**
- * Where a serif is taken hold of: its two tips, on the line it stands on, and
- * its height, on the middle of the stroke as high up it as the serif goes.
+ * Where a serif is taken hold of, a handle to a number.
+ *
+ * Its two tips, on the line it stands on, and its height, on the middle of the
+ * stroke as high up it as the serif goes: those three always. The rest are on
+ * the side that reaches further, and are there where they have something to
+ * say. `slope` is the middle of the serif's top, which comes down as the tip
+ * thins. `bracket` is where the bracket leaves the stroke's edge, which goes
+ * up the stroke as the bracket grows. `round` is where the round of the tip
+ * leaves the serif's top, which comes in from the tip's corner. `cup` hangs a
+ * little under the foot and goes up with the hollow — a quarter of the way
+ * across the stroke, not under its middle, where the stroke's own last point
+ * is and the handle would go up through it.
  */
 export type SerifHandles = {
   readonly left: Vec2;
   readonly right: Vec2;
   readonly height: Vec2;
+  readonly cup: Vec2;
+  readonly slope?: Vec2;
+  readonly bracket?: Vec2;
+  readonly round?: Vec2;
 };
 
-/** A part of a serif that is dragged on the canvas. */
+/** A part of a serif that is dragged on the canvas: the number it sets. */
 export type SerifHandle = keyof SerifHandles;
+
+/** Every handle a serif may have, the three it always has first. */
+export const SERIF_HANDLES: readonly SerifHandle[] = [
+  "left",
+  "right",
+  "height",
+  "cup",
+  "slope",
+  "bracket",
+  "round",
+];
+
+/** How far under the foot the cup's handle hangs, in units. */
+const CUP_HANDLE_BELOW = 16;
+
+/** The most of a serif's height its foot is hollowed by, as `serifOutline` has it. */
+const CUP_HANDLE_MOST = 0.75;
 
 /**
  * Where a serif stands, as dragging it wants to know: the line's point, which
- * way along it is rightwards on the page and which way is up the stroke, and
- * where the stroke's two edges are along it.
+ * way along it is rightwards on the page and which way is up the stroke, where
+ * the stroke's two edges are along it, and how far rightwards those edges go
+ * for each unit up the stroke.
  */
 type SerifFrame = {
   readonly through: Vec2;
@@ -794,6 +826,7 @@ type SerifFrame = {
   readonly up: Vec2;
   readonly footLeft: number;
   readonly footRight: number;
+  readonly lean: number;
 };
 
 const serifFrames = new WeakMap<Contour, Partial<Record<"start" | "end", SerifFrame | null>>>();
@@ -819,16 +852,35 @@ function serifFrame(c: Contour, which: "start" | "end"): SerifFrame | null {
     const along = { x: -cut.normal.y, y: cut.normal.x };
     // As `serifOutline` has left and right: by the page.
     const flipped = along.x < -1e-9 || (Math.abs(along.x) <= 1e-9 && along.y < 0);
+    const rightwards = flipped ? { x: -along.x, y: -along.y } : along;
+    const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
     return {
       through: cut.through,
-      rightwards: flipped ? { x: -along.x, y: -along.y } : along,
+      rightwards,
       up: { x: -cut.normal.x, y: -cut.normal.y },
       footLeft: flipped ? -foot.to : foot.from,
       footRight: flipped ? -foot.from : foot.to,
+      // Back up the stroke the way it came.
+      lean: -(cut.onward.x * rightwards.x + cut.onward.y * rightwards.y) / facing,
     };
   })();
   serifFrames.set(c, { ...serifFrames.get(c), [which]: found });
   return found;
+}
+
+/**
+ * The side of a serif its other handles are on: the one that reaches further,
+ * the right where they reach alike. `null` for a serif that reaches neither
+ * way, which has no tip to slope or round and no corner to bracket.
+ */
+function handledSide(
+  serif: Serif,
+  frame: SerifFrame,
+): { readonly out: 1 | -1; readonly edge: number; readonly reach: number } | null {
+  if (!(Math.max(serif.left, serif.right) > 0)) return null;
+  return serif.right >= serif.left
+    ? { out: 1, edge: frame.footRight, reach: serif.right }
+    : { out: -1, edge: frame.footLeft, reach: serif.left };
 }
 
 /** The handles of the serif at an end of a stroke, or `null` where there is none. */
@@ -841,10 +893,28 @@ export function serifHandles(c: Contour, which: "start" | "end"): SerifHandles |
     x: frame.through.x + frame.rightwards.x * a + frame.up.x * h,
     y: frame.through.y + frame.rightwards.y * a + frame.up.y * h,
   });
-  return {
+  const middle = (frame.footLeft + frame.footRight) / 2;
+  const always = {
     left: at(frame.footLeft - serif.left, 0),
     right: at(frame.footRight + serif.right, 0),
-    height: at((frame.footLeft + frame.footRight) / 2, serif.height),
+    height: at(middle, serif.height),
+    cup: at(
+      frame.footLeft + (frame.footRight - frame.footLeft) / 4,
+      Math.min(serif.cup, serif.height * CUP_HANDLE_MOST) - CUP_HANDLE_BELOW,
+    ),
+  };
+  const side = handledSide(serif, frame);
+  if (side === null) return always;
+
+  const tip = serif.height * (1 - serif.slope);
+  const rounded = Math.min((serif.round * tip) / 2, side.reach);
+  const run = serif.bracket * Math.max(0, side.reach - rounded);
+  return {
+    ...always,
+    slope: at(side.edge + (side.out * side.reach) / 2, (tip + serif.height) / 2),
+    bracket: at(side.edge + frame.lean * (serif.height + run), serif.height + run),
+    // A tip that comes to a point has no corner to round.
+    ...(tip > 1e-6 ? { round: at(side.edge + side.out * (side.reach - rounded), tip) } : {}),
   };
 }
 
@@ -855,7 +925,9 @@ export function serifHandles(c: Contour, which: "start" | "end"): SerifHandles |
  * A tip goes along the line the serif stands on and no nearer than the
  * stroke's own edge; the height goes up the stroke and no lower than one unit,
  * a serif of no height being no serif and having no handle to bring it back
- * by. In whole units, as it is typed.
+ * by. Those and the cup in whole units, as they are typed, and the shares in
+ * whole per cent. Each handle is read where the pointer is along the one way
+ * it goes, whatever else the drag does.
  */
 export function serifDragged(
   c: Contour,
@@ -870,12 +942,51 @@ export function serifDragged(
   const dx = towards.x - frame.through.x;
   const dy = towards.y - frame.through.y;
   const along = dx * frame.rightwards.x + dy * frame.rightwards.y;
-  const value =
-    handle === "left"
-      ? Math.max(0, Math.round(frame.footLeft - along))
-      : handle === "right"
-        ? Math.max(0, Math.round(along - frame.footRight))
-        : Math.max(1, Math.round(dx * frame.up.x + dy * frame.up.y));
+  const up = dx * frame.up.x + dy * frame.up.y;
+  const share = (v: number): number => Math.round(Math.min(1, Math.max(0, v)) * 100) / 100;
+  const sound = soundSerif(serif);
+  const side = handledSide(sound, frame);
+  const tip = sound.height * (1 - sound.slope);
+
+  let value: number;
+  switch (handle) {
+    case "left":
+      value = Math.max(0, Math.round(frame.footLeft - along));
+      break;
+    case "right":
+      value = Math.max(0, Math.round(along - frame.footRight));
+      break;
+    case "height":
+      value = Math.max(1, Math.round(up));
+      break;
+    case "cup":
+      value = Math.min(
+        Math.floor(sound.height * CUP_HANDLE_MOST),
+        Math.max(0, Math.round(up + CUP_HANDLE_BELOW)),
+      );
+      break;
+    case "slope":
+      // The middle of the top is half way between the tip's top and the height.
+      if (!(sound.height > 0)) return null;
+      value = share(1 - (2 * up - sound.height) / sound.height);
+      break;
+    case "bracket": {
+      if (side === null) return null;
+      const rounded = Math.min((sound.round * tip) / 2, side.reach);
+      const room = side.reach - rounded;
+      if (!(room > 1e-9)) return null;
+      value = share((up - sound.height) / room);
+      break;
+    }
+    case "round": {
+      if (side === null || !(tip > 1e-6)) return null;
+      const most = Math.min(tip / 2, side.reach);
+      if (!(most > 1e-9)) return null;
+      const inward = side.out * (side.edge + side.out * side.reach - along);
+      value = share((Math.min(most, Math.max(0, inward)) * 2) / tip);
+      break;
+    }
+  }
   return value === serif[handle] ? null : withSerifNumber(serif, handle, value);
 }
 

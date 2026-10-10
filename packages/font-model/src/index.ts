@@ -337,6 +337,7 @@ export {
   inkOf,
   plannedInk,
   strokeCut,
+  SERIF_HANDLES,
   serifDragged,
   serifHandles,
   strokeCutHandle,

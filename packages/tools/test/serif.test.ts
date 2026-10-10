@@ -1,5 +1,6 @@
 import {
   type Contour,
+  type SerifHandle,
   type SerifStyle,
   DEFAULT_SERIF,
   contour,
@@ -134,10 +135,10 @@ describe("a serif's handles on the canvas", () => {
   const stemOf = (state: EditorState) => state.document.glyphs["l"]!.contours[0]!;
   const drag = (
     state: EditorState,
-    handle: "left" | "right" | "height",
+    handle: SerifHandle,
     by: { x: number; y: number },
   ): EditorState => {
-    const from = serifHandles(stemOf(state), "end")![handle];
+    const from = serifHandles(stemOf(state), "end")![handle]!;
     const held = pointerDown(state, pointerInput(from), { ids }).state;
     const to = { x: from.x + by.x, y: from.y + by.y };
     return pointerUp(pointerMove(held, pointerInput(to), { ids }).state).state;
@@ -181,6 +182,56 @@ describe("a serif's handles on the canvas", () => {
   it("make the number the end's own, on an end that has a style", () => {
     const state = drag(serifed(addSerifStyle(twoStems(), FOOT).state), "left", { x: -10, y: 0 });
     expect(footOf(state)!.serif).toMatchObject({ left: 60, style: "Foot", own: ["left"] });
+  });
+
+  it("hollow the foot by the handle hanging under it, and no deeper than the serif allows", () => {
+    const state = serifed(twoStems());
+    const handles = serifHandles(stemOf(state), "end")!;
+    // Under the line, clear of the stroke's own last point.
+    expect(handles.cup.y).toBeCloseTo(-16, 9);
+    expect(footOf(drag(state, "cup", { x: 3, y: 10 }))!.serif!.cup).toBe(10);
+    expect(footOf(drag(state, "cup", { x: 0, y: 300 }))!.serif!.cup).toBe(22);
+  });
+
+  it("thin the tip by the middle of the serif's top brought down", () => {
+    const state = serifed(twoStems());
+    expect(serifHandles(stemOf(state), "end")!.slope!.y).toBeCloseTo(30, 9);
+    expect(footOf(drag(state, "slope", { x: 5, y: -7.5 }))!.serif!.slope).toBe(0.5);
+    const pointed = drag(state, "slope", { x: 0, y: -40 });
+    expect(footOf(pointed)!.serif!.slope).toBe(1);
+    // A tip that comes to a point has no corner to round, and no handle for it.
+    expect(serifHandles(stemOf(pointed), "end")!.round).toBeUndefined();
+  });
+
+  it("grow the bracket by its handle taken up the stroke's edge", () => {
+    const state = serifed(twoStems());
+    const half = drag(state, "bracket", { x: -4, y: 30 });
+    expect(footOf(half)!.serif!.bracket).toBe(0.5);
+    expect(footOf(drag(half, "bracket", { x: 0, y: 500 }))!.serif!.bracket).toBe(1);
+    expect(footOf(drag(half, "bracket", { x: 0, y: -500 }))!.serif!.bracket).toBe(0);
+  });
+
+  it("round the tip by its corner brought in along the top", () => {
+    const state = serifed(twoStems());
+    expect(footOf(drag(state, "round", { x: -7.5, y: 6 }))!.serif!.round).toBe(0.5);
+    expect(footOf(drag(state, "round", { x: -200, y: 0 }))!.serif!.round).toBe(1);
+  });
+
+  it("are on the side that reaches further, and only the plain four where neither does", () => {
+    const state = serifed(twoStems());
+    const right = serifHandles(stemOf(state), "end")!;
+    const lefter = setEndSerifNumber(state, "left", 90).state;
+    const left = serifHandles(stemOf(lefter), "end")!;
+    expect(right.slope!.x).toBeGreaterThan(200);
+    expect(left.slope!.x).toBeLessThan(200);
+
+    const none = setEndSerifNumber(setEndSerifNumber(state, "left", 0).state, "right", 0).state;
+    expect(Object.keys(serifHandles(stemOf(none), "end")!).sort()).toEqual([
+      "cup",
+      "height",
+      "left",
+      "right",
+    ]);
   });
 
   it("change nothing where the handle is put back where it was", () => {

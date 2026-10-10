@@ -600,13 +600,20 @@ that comes to a point. **Cup** is how far the middle of its foot is hollowed, in
 **Round tips**, in per cent, how much of each tip is rounded off. A slab is a reach and a
 height; a bracketed serif the same with a bracket; a wedge one with a slope.
 
-While the end is selected the serif has three handles on the canvas, diamonds where the knob
-that turns the cut is round: one at each tip, on the line the serif stands on, and one on the
-middle of the stroke as high up it as the serif goes. Drag a tip along the line and that side's
-reach follows, no nearer than the stroke's own edge; drag the third up the stroke and the
-height follows, never to nothing. In whole units, one step to undo, and on an end with a style
-the number dragged is the end's own, as one typed is. The knob stands clear of the tips, a
-little past the longer reach.
+While the end is selected the serif has handles on the canvas, diamonds where the knob that
+turns the cut is round. Three larger ones: one at each tip, on the line the serif stands on,
+and one on the middle of the stroke as high up it as the serif goes. Drag a tip along the line
+and that side's reach follows, no nearer than the stroke's own edge; drag the third up the
+stroke and the height follows, never to nothing. Four smaller ones are the rest of its numbers,
+on the side that reaches further. The one at the corner between serif and stroke is the
+**bracket**: take it up the stroke's edge and the bracket grows. The one in the middle of the
+serif's top is the **slope**: bring it down and the tip thins, to a point at half the height.
+The one at the tip's upper corner is the **round**: bring it in along the top and the tip is
+rounded off. And the one hanging just under the foot is the **cup**: lift it and the foot is
+hollowed. Each goes one way and reads the pointer along that way only. Lengths in whole units
+and shares in whole per cent, one step to undo, and on an end with a style the number dragged
+is the end's own, as one typed is. The knob stands clear of the tips, a little past the longer
+reach.
 
 A serif has a **Serif style**, or numbers of its own. A style is a serif with a name that the
 font keeps — **Font info** has them under **Serifs**, where one is added from a slab, a
