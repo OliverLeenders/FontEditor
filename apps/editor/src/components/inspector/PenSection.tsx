@@ -168,6 +168,16 @@ const ENDS: readonly {
 ];
 
 /**
+ * Whether an end is the one a button names. A line at an angle is the same line
+ * half a turn on, and the knob on the canvas turns it all the way round: level
+ * is level at a hundred and eighty as at nought.
+ */
+function sameEnd(value: EndChoice | "mixed", named: EndChoice): boolean {
+  if (typeof value !== "number" || typeof named !== "number") return value === named;
+  return (((value - named) % 180) + 180) % 180 === 0;
+}
+
+/**
  * How a stroke ends at the selected ends: as the pen leaves it, or cut straight
  * through the point. A cut at an angle shows the angle, to be typed over; level
  * and upright are that angle at nought and ninety.
@@ -183,7 +193,7 @@ function EndField({ value }: { readonly value: EndChoice | "mixed" }): React.JSX
             <button
               key={e.label}
               type="button"
-              aria-pressed={value === e.value}
+              aria-pressed={sameEnd(value, e.value)}
               title={e.title}
               onClick={() => set(e.value)}
             >

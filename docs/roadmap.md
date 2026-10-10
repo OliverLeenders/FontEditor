@@ -1453,6 +1453,10 @@ own, because the line goes on across the whole glyph and a stroke comes back acr
 bowl of a u below the tops of its stems. The stretch is joined into one outline first and cut
 after, so that no two of its parts are left with edges lying along the same line.
 
+A selected cut end shows its line on the canvas with a knob at one end, as a continuous corner
+shows where its round ends: dragged round the point it turns the cut, settling on level,
+upright and square.
+
 #### Open
 
 What is next in the same direction:

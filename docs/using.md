@@ -565,6 +565,11 @@ point — so the point is exactly where the ink ends, and the stroke is its own 
 way to it. Put the point on the baseline and choose Level, and the stem stands on the
 baseline. Choose Pen and the end is the pen's again.
 
+While a cut end is selected its line is drawn through it, dashed, a little longer than the pen
+is wide, with a round knob at one end. Drag the knob round the point and the cut turns with
+it, in whole degrees; within four degrees of level, upright or square to the path it settles
+on that. The point does not move, and the drag is one step to undo.
+
 Only the segment that ends there is cut: the bowl of a u hangs below the tops of its stems and
 is not touched by cutting them. A cut within fifteen degrees of the way the path is going is
 not made, since the pen would never get past it, and the end is left as the pen leaves it. A

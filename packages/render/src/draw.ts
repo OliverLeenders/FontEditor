@@ -6,6 +6,7 @@ import {
   type Node,
   type Segment,
   continuousCuts,
+  strokeCutHandle,
   corneredContour,
   filledContours,
   hasContinuousCorners,
@@ -87,6 +88,7 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
     drawCornerSizes(ctx, s);
+    drawStrokeCuts(ctx, s);
     // Under the nodes: the ring is round the first one and must not cover it.
     drawContourStarts(ctx, s);
     drawNodes(ctx, s);
@@ -565,6 +567,45 @@ export function drawCornerSizes(ctx: Canvas2D, s: Scene): void {
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
+    }
+  }
+}
+
+/**
+ * The line each selected end of a stroke is cut along, where it is cut: dashed,
+ * through the end and a little past the ink either side, with a round knob at
+ * one end that is dragged to turn it.
+ */
+export function drawStrokeCuts(ctx: Canvas2D, s: Scene): void {
+  const chosen = selectedKeys(s.selection);
+  const r = s.metrics.nodeRadius * 0.9;
+  for (const c of s.glyph.contours) {
+    for (const end of ["start", "end"] as const) {
+      const handle = strokeCutHandle(c, end);
+      if (handle === null) continue;
+      const n = end === "start" ? c.nodes[0]! : c.nodes[c.nodes.length - 1]!;
+      if (!chosen.has(selectionKey({ contourId: c.id, nodeId: n.id, part: "point" }))) continue;
+
+      const from = toScreen(s.view, handle.from);
+      const to = toScreen(s.view, handle.to);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = s.palette.nodeSelected;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
+
+      const knob = toScreen(s.view, handle.knob);
+      ctx.beginPath();
+      ctx.arc(knob.x, knob.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = s.palette.halo;
+      ctx.fill();
+      ctx.strokeStyle = s.palette.nodeSelected;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
   }
 }

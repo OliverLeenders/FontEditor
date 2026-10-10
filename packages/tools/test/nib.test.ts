@@ -5,12 +5,13 @@ import {
   fontDocument,
   glyph,
   node,
+  strokeCutHandle,
   withNib,
 } from "@typewright/font-model";
 import { describe, expect, it } from "vitest";
 
 import { parseClipboard, clipboardText } from "../src/clipboard.js";
-import { keyDown, pointerDown, pointerUp } from "../src/dispatch.js";
+import { keyDown, pointerDown, pointerMove, pointerUp } from "../src/dispatch.js";
 import { keyInput, pointerInput } from "../src/input.js";
 import {
   changePen,
@@ -420,5 +421,86 @@ describe("cutting a stroke's end", () => {
     const cut = setStrokeEnd(selectingNode(penned(), 1), 30).state;
     const pasted = parseClipboard(clipboardText(cut)!, ids)!;
     expect(pasted[0]!.nodes[1]!.end).toEqual({ cut: 30 });
+  });
+});
+
+describe("turning a cut by its knob", () => {
+  // A stem from the baseline up to 300, its top cut level and selected: the
+  // line of the cut runs level through the top, and its knob is at the right
+  // end of it, a little past the pen.
+  const cutTop = (): EditorState => {
+    const state = withContours(withNib(stroke(0), { angle: 30, width: 80 }));
+    const c = state.document.glyphs["l"]!.contours[0]!;
+    const top = {
+      ...state,
+      selection: [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" as const }],
+    };
+    return setStrokeEnd(top, 0).state;
+  };
+  const stemOf = (state: EditorState) => state.document.glyphs["l"]!.contours[0]!;
+  const endOf = (state: EditorState) => stemOf(state).nodes[1]!.end;
+  const dragKnobTo = (state: EditorState, x: number, y: number): EditorState => {
+    const knob = strokeCutHandle(stemOf(state), "end")!.knob;
+    const held = pointerDown(state, pointerInput(knob), { ids }).state;
+    return pointerUp(pointerMove(held, pointerInput({ x, y }), { ids }).state).state;
+  };
+
+  it("has a knob beside the ink, on the line of the cut", () => {
+    const handle = strokeCutHandle(stemOf(cutTop()), "end")!;
+    expect(handle.through).toEqual({ x: 0, y: 300 });
+    expect(handle.knob.y).toBeCloseTo(300, 9);
+    // Half the pen and a little more.
+    expect(handle.knob.x).toBeCloseTo(64, 9);
+    // And none where the end is as the pen leaves it.
+    expect(strokeCutHandle(stemOf(cutTop()), "start")).toBeNull();
+  });
+
+  it("turns the cut to where the knob is dragged, in whole degrees", () => {
+    const turned = dragKnobTo(cutTop(), 60, 340);
+    expect(endOf(turned)).toEqual({ cut: 34 });
+    // The point itself has not moved, and is still what is selected.
+    expect(stemOf(turned).nodes[1]!.pt).toEqual({ x: 0, y: 300 });
+    expect(selectedStrokeEnd(turned)).toBe(34);
+  });
+
+  it("settles on level and upright when it is within a few degrees of them", () => {
+    expect(endOf(dragKnobTo(dragKnobTo(cutTop(), 60, 340), 100, 303))).toEqual({ cut: 0 });
+    expect(endOf(dragKnobTo(cutTop(), 3, 400))).toEqual({ cut: 90 });
+  });
+
+  it("settles on square where the path leans", () => {
+    // Up and to the right at forty-five degrees: square is a hundred and thirty-five.
+    const leaning = withContours(
+      withNib(
+        contour(ids.contour(), [
+          node(ids.node(), { x: 0, y: 0 }),
+          node(ids.node(), { x: 300, y: 300 }, { end: { cut: 0 } }),
+        ]),
+        { angle: 30, width: 80 },
+      ),
+    );
+    const c = stemOf(leaning);
+    const chosen = {
+      ...leaning,
+      selection: [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" as const }],
+    };
+    expect(endOf(dragKnobTo(chosen, 300 - 50, 300 + 52))).toEqual({ cut: "square" });
+  });
+
+  it("is one step in the history", () => {
+    const before = cutTop();
+    const held = pointerDown(before, pointerInput(strokeCutHandle(stemOf(before), "end")!.knob), {
+      ids,
+    });
+    expect(held.state.gesture?.kind).toBe("dragStrokeCut");
+  });
+
+  it("has no knob to take hold of while the end is not selected", () => {
+    const state = cutTop();
+    const knob = strokeCutHandle(stemOf(state), "end")!.knob;
+    const unselected = { ...state, selection: [] };
+    expect(pointerDown(unselected, pointerInput(knob), { ids }).state.gesture?.kind).not.toBe(
+      "dragStrokeCut",
+    );
   });
 });

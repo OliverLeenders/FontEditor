@@ -86,6 +86,16 @@ export type Gesture =
       readonly moved: boolean;
     }
   | {
+      /** Dragging the knob on a stroke's cut end round the end, which turns the cut. */
+      readonly kind: "dragStrokeCut";
+      readonly origin: Vec2;
+      readonly contourId: ContourId;
+      readonly nodeId: NodeId;
+      readonly end: "start" | "end";
+      readonly before: FontDocument;
+      readonly moved: boolean;
+    }
+  | {
       /** Dragging one end of a continuous corner's round along its side. */
       readonly kind: "dragCornerSize";
       readonly origin: Vec2;

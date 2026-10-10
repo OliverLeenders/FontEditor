@@ -21,6 +21,7 @@ import {
   segmentCubic,
   segmentTunniStatus,
   segments,
+  strokeCutHandle,
   segmentTunniPoint,
 } from "@typewright/font-model";
 
@@ -36,6 +37,7 @@ export type HitKind =
   | "tunniPoint"
   | "tunniLine"
   | "cornerSize"
+  | "strokeCut"
   | "segment"
   | "originLine"
   | "advanceLine";
@@ -92,6 +94,17 @@ export type HitTarget =
       readonly side: "in" | "out";
       readonly point: Vec2;
     }
+  /**
+   * The knob on the line an end of a stroke is cut along: dragged round the
+   * end, it turns the cut.
+   */
+  | {
+      readonly kind: "strokeCut";
+      readonly contourId: ContourId;
+      readonly nodeId: NodeId;
+      readonly end: "start" | "end";
+      readonly point: Vec2;
+    }
   /** The vertical lines bounding the advance width. Full height, so only x matters. */
   | { readonly kind: "originLine" | "advanceLine"; readonly x: number };
 
@@ -109,6 +122,8 @@ export const PICK_PRIORITY: Readonly<Record<HitKind, number>> = {
   // Small and deliberate like the Tunni point, and sitting on the outline where a
   // segment would otherwise win it.
   cornerSize: 0,
+  // And like those two: a knob in open space beside the ink, aimed at.
+  strokeCut: 0,
   node: 1,
   // Level with a node rather than above it, so distance decides between the
   // two. An anchor usually floats clear of the outline, but a `bottom` sitting
@@ -270,6 +285,18 @@ export function buildHitIndex(
     }
   }
 
+  // The knob that turns a cut end, for the ends selected: as with the corners,
+  // only those draw one.
+  for (const c of g.contours) {
+    for (const end of ["start", "end"] as const) {
+      const handle = strokeCutHandle(c, end);
+      if (handle === null) continue;
+      const n = end === "start" ? c.nodes[0]! : c.nodes[c.nodes.length - 1]!;
+      if (!chosen.has(`${c.id}${String.fromCharCode(0)}${n.id}`)) continue;
+      targets.push({ kind: "strokeCut", contourId: c.id, nodeId: n.id, end, point: handle.knob });
+    }
+  }
+
   for (const c of g.contours) {
     for (const [nodeIndex, n] of c.nodes.entries()) {
       targets.push({ kind: "node", contourId: c.id, nodeId: n.id, point: n.pt });
@@ -403,6 +430,7 @@ export function distanceToTarget(
     case "anchor":
     case "tunniPoint":
     case "cornerSize":
+    case "strokeCut":
       return distance(p, target.point);
     case "component":
       return distanceToOutlines(target.outlines, p);

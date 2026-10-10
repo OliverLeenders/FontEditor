@@ -15,6 +15,7 @@ import {
 } from "@typewright/geometry";
 
 import { type Contour, type Nib, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import type { StrokeEnd } from "./node.js";
 import { type Glyph, glyph } from "./glyph.js";
 import { type IdFactory, counterIds } from "./ids.js";
 import { corneredContour, hasContinuousCorners } from "./corner.js";
@@ -346,6 +347,99 @@ export function strokeCut(c: Contour, which: "start" | "end"): StrokeCut | null 
   }
   if (normal.x * onward.x + normal.y * onward.y < SHALLOWEST_CUT) return null;
   return { through: node.pt, normal, onward };
+}
+
+/**
+ * The line an end of a stroke is cut along, as something to show and to take
+ * hold of: through the end, a little longer than the pen is wide, with a knob at
+ * one end of it that turns it.
+ *
+ * Wherever a cut is set — also one too nearly along the path to be made, which
+ * is exactly the one somebody wants to take hold of and turn back. `null` where
+ * the end is left as the pen leaves it.
+ */
+export type StrokeCutHandle = {
+  readonly through: Vec2;
+  readonly from: Vec2;
+  readonly to: Vec2;
+  /** Where the line is taken hold of: its far end. */
+  readonly knob: Vec2;
+};
+
+/** How far past the pen's reach the line of a cut is drawn, in units. */
+const CUT_HANDLE_PAST = 24;
+
+export function strokeCutHandle(c: Contour, which: "start" | "end"): StrokeCutHandle | null {
+  if (c.nib === undefined || c.closed || c.nodes.length < 2) return null;
+  const index = which === "start" ? 0 : c.nodes.length - 1;
+  const node = c.nodes[index]!;
+  if (node.end === undefined) return null;
+
+  let along: Vec2;
+  if (node.end.cut === "square") {
+    const segment = segmentAt(c, which === "start" ? 0 : segmentCount(c) - 1);
+    const going =
+      segment === null ? null : endTangent(segmentCubic(segment), which === "start" ? 0 : 1);
+    if (going === null) return null;
+    along = { x: -going.y, y: going.x };
+  } else {
+    const angle = (node.end.cut * Math.PI) / 180;
+    along = { x: Math.cos(angle), y: Math.sin(angle) };
+  }
+  const pen = penAt(c, index) ?? c.nib;
+  const half = Math.max(pen.width, pen.thickness ?? 0) / 2 + CUT_HANDLE_PAST;
+  const at = (by: number): Vec2 => ({ x: node.pt.x + along.x * by, y: node.pt.y + along.y * by });
+  return { through: node.pt, from: at(-half), to: at(half), knob: at(half) };
+}
+
+/** How near a round angle a cut being turned is drawn to it, in degrees. */
+const CUT_SNAP = 4;
+
+/**
+ * The cut an end takes when its line is turned to point at `towards`.
+ *
+ * In whole degrees, anticlockwise from level, as it is typed. Near level,
+ * upright or square to the path it is that exactly: those are what a cut is
+ * nearly always wanted at, and a degree off one of them is a mistake nobody
+ * can see until the font is set.
+ */
+export function strokeCutTowards(
+  c: Contour,
+  which: "start" | "end",
+  towards: Vec2,
+): StrokeEnd | null {
+  if (c.nib === undefined || c.closed || c.nodes.length < 2) return null;
+  const node = which === "start" ? c.nodes[0]! : c.nodes[c.nodes.length - 1]!;
+  const dx = towards.x - node.pt.x;
+  const dy = towards.y - node.pt.y;
+  if (Math.hypot(dx, dy) < 1e-6) return null;
+  const turned = ((Math.atan2(dy, dx) * 180) / Math.PI + 360) % 360;
+
+  // How far two lines are apart, which is never more than a quarter turn.
+  const apart = (a: number, b: number): number => {
+    const d = Math.abs(a - b) % 180;
+    return Math.min(d, 180 - d);
+  };
+  const segment = segmentAt(c, which === "start" ? 0 : segmentCount(c) - 1);
+  const going =
+    segment === null ? null : endTangent(segmentCubic(segment), which === "start" ? 0 : 1);
+  if (going !== null) {
+    const square = ((Math.atan2(going.x, -going.y) * 180) / Math.PI + 360) % 360;
+    // Level and upright first: a stem's foot is both level and square, and
+    // level is what it is called.
+    if (
+      apart(turned, 0) > CUT_SNAP &&
+      apart(turned, 90) > CUT_SNAP &&
+      apart(turned, square) <= CUT_SNAP
+    ) {
+      return { cut: "square" };
+    }
+  }
+  for (const round of [0, 90, 180, 270]) {
+    const d = Math.abs(turned - round);
+    if (Math.min(d, 360 - d) <= CUT_SNAP) return { cut: round };
+  }
+  return { cut: Math.round(turned) % 360 };
 }
 
 /**

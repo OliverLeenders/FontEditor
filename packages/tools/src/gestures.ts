@@ -11,6 +11,7 @@ import {
   type Glyph,
   type NodeId,
   continuousSizeAt,
+  strokeCutTowards,
   contourById,
   metricLines,
   movedComponent,
@@ -358,6 +359,31 @@ export function startGuideDrag(
       },
     },
     [begin("Move guide")],
+  );
+}
+
+/** Begin turning the cut at an end of a stroke, by the knob on its line. */
+export function startStrokeCutDrag(
+  state: EditorState,
+  input: PointerInput,
+  contourId: ContourId,
+  nodeId: NodeId,
+  end: "start" | "end",
+): ToolResult {
+  return result(
+    {
+      ...state,
+      gesture: {
+        kind: "dragStrokeCut",
+        origin: input.point,
+        contourId,
+        nodeId,
+        end,
+        before: state.document,
+        moved: false,
+      },
+    },
+    [begin("Stroke end")],
   );
 }
 
@@ -1081,6 +1107,27 @@ const CONTINUE: Continuations = {
 
   dragTunniLine: (state, gesture, input, delta) =>
     continueTunni(state, gesture, input, delta, moveSegmentTunniLine),
+
+  dragStrokeCut: (state, gesture, input, delta) => {
+    // The cut is the line from the end to where the pointer is, read against
+    // the stroke as it was when the drag began — which is the same stroke, a
+    // cut moving nothing but the ink.
+    const next = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
+      updateContour(g, gesture.contourId, (c) => {
+        const index = c.nodes.findIndex((n) => n.id === gesture.nodeId);
+        const node = c.nodes[index];
+        if (node?.end === undefined) return null;
+        const turned = strokeCutTowards(c, gesture.end, input.point);
+        if (turned === null || turned.cut === node.end.cut) return null;
+        return { ...c, nodes: c.nodes.map((n, i) => (i === index ? { ...n, end: turned } : n)) };
+      }),
+    );
+    return {
+      ...state,
+      document: next ?? gesture.before,
+      gesture: { ...gesture, moved: gesture.moved || budged(delta) },
+    };
+  },
 
   dragCornerSize: (state, gesture, input, delta) => {
     // The size is the distance along the side from the corner to where the
