@@ -285,7 +285,11 @@ made in the other masters when you leave the one you made it in: on going to ano
 saving to the folder, exporting, or closing the window. It is the change as it stands then, so
 one that was undone is not made at all. A glyph added arrives in the others as a copy of the
 drawing it was made with, compatible from the start; a glyph renamed keeps each master's own
-drawing under the new name. Masters that differ already — a family drawn elsewhere, or from
+drawing under the new name. Serif styles are shared by name and not by number: a style added
+in one master is added to the others with the numbers it was given, to be made each master's
+own there; one renamed is renamed in all of them, on the ends that have it too; one removed is
+removed, the letters keeping their serifs. A style's numbers changed in one master change in
+no other, which is how a serif is slight in the light and heavy in the bold. Masters that differ already — a family drawn elsewhere, or from
 before this — are not made to agree, since nothing says which is right: **Check** in the
 Masters panel lists what two masters differ in, a part at a time, with a button to copy that
 part across.
@@ -645,9 +649,10 @@ So is a stroke whose masters have not the same points, one with a **Step** in it
 an end that is cut in one master and not in another, or closed differently. An end cut the same
 way in every master varies with the rest of the stroke, and so does a pen's squareness: an oval
 in the light and a box in the bold is a pen whose corners fill out along the axis. A serif
-varies too, number by number, where the end has one in every master: each master is a font
-with serif styles of its own, so a style called Foot that is slight in the light and heavy in
-the bold is a foot that grows along the axis. A stroke
+varies too, number by number, where the end has one in every master: a style called Foot has
+numbers of its own in each master, so one that is slight in the light and heavy in the bold is
+a foot that grows along the axis. The style's name is the family's, and follows from master to
+master as a glyph's does. A stroke
 drawn with corners in any master comes to more points than an oval's — unless it is a rectangle
 in every master, the same one all along the stroke, which is exact and comes to fewer.
 

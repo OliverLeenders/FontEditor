@@ -1548,14 +1548,24 @@ and one on the middle of the stroke at the serif's height. Where they are is rea
 as the serif's seat is, and remembered by the stroke; the knob that turns the cut is moved out
 past the longer reach so that the two are not on top of each other.
 
+Serif styles are the family's by name and each master's by number. A style added, renamed or
+removed in one master is carried to the others when that master is left, as a glyph is: an
+added one as a copy with the numbers it was given, a renamed one keeping each master's own
+numbers and renamed on the ends that have it, a removed one leaving the letters their serifs.
+A change of numbers is not carried, being how a serif varies. Told apart from a style removed
+and another added by its numbers or its place in the list, a rename leaving both as they were.
+A master that is a layer of another has no list and follows in its ends. Where masters have
+come apart the Masters panel's check names the styles only one of them has, to be added one
+way or the other.
+
 #### Open
 
 What is next in the same direction:
 
 - **Handles for the rest of a serif**: its bracket, slope, cup and the round of its tips are
   typed, where its reach and height are also dragged.
-- **Serif styles kept in step between masters**: each master has its own, which is how a serif
-  varies, and nothing yet adds a style to every master at once or says where one is missing.
+- **A serif put on an end in every master at once**: the styles are the family's now, but
+  giving an end a serif is still done master by master, as drawing is.
 - **A serif on a short last segment**, shorter than the serif is high: it is laid over the end
   and its sides run as the path was going, where a longer segment is measured.
 

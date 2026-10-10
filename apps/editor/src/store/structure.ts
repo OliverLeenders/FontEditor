@@ -97,7 +97,7 @@ export async function shareStructure(host: Host): Promise<number> {
 export async function copyStructureTo(
   host: Host,
   id: MasterId,
-  part: Exclude<StructurePart, "onlyThere">,
+  part: Exclude<StructurePart, "onlyThere" | "serifsOnlyThere">,
 ): Promise<void> {
   const state = host.state();
   const master = state.project.masters.find((m) => m.id === id);

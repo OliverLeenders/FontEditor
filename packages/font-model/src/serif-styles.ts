@@ -81,6 +81,38 @@ export function removedSerifStyle(document: FontDocument, name: string): FontDoc
   };
 }
 
+/**
+ * A master with a serif style renamed as another master renamed it: the style
+ * in its list, with the numbers it has here, and every end that has it. A
+ * master that has no such style in its list still has its ends renamed — a
+ * master that is a layer of another has no list of its own. Left as it is
+ * where the new name is already a style here.
+ */
+export function carriedSerifRename(document: FontDocument, from: string, to: string): FontDocument {
+  if (from === to || serifStyleNamed(document, to) !== null) return document;
+  const next = withEndSerifs(document, (serif) =>
+    serif.style === from ? { ...serif, style: to } : serif,
+  );
+  if (serifStyleNamed(document, from) === null) return next;
+  return {
+    ...next,
+    serifs: document.serifs.map((style) => (style.name === from ? { ...style, name: to } : style)),
+  };
+}
+
+/**
+ * A master with a serif style taken out as another master took it out: out of
+ * its list, and off the ends that have it, which keep their serifs as numbers
+ * of their own — in a master with no list of its own too.
+ */
+export function carriedSerifRemoval(document: FontDocument, name: string): FontDocument {
+  const next = withEndSerifs(document, (serif) =>
+    serif.style === name ? serifNumbers(serif) : serif,
+  );
+  if (serifStyleNamed(document, name) === null) return next;
+  return { ...next, serifs: document.serifs.filter((style) => style.name !== name) };
+}
+
 /** How many ends of strokes, in every glyph and layer, have a style. */
 export function serifStyleUses(document: FontDocument, name: string): number {
   let uses = 0;

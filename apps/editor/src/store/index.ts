@@ -798,10 +798,11 @@ export class EditorStore {
    * The other master is made to agree with the open one, save for the glyphs
    * only the other has: those are added to the open master, as an edit of it —
    * a step of its history, to be undone like any other — and reach the rest of
-   * the family as any glyph added here does.
+   * the family as any glyph added here does. So with the serif styles only the
+   * other has a name for.
    */
   async copyStructure(id: string, part: StructurePart): Promise<void> {
-    if (part !== "onlyThere") {
+    if (part !== "onlyThere" && part !== "serifsOnlyThere") {
       await copyStructureTo(this.host, id, part);
       return;
     }
@@ -809,11 +810,16 @@ export class EditorStore {
     const there = await documentOfMaster(this.host, id);
     if (there === null) return;
     const here = this.editor.document;
-    const next = applyStructure(here, { ...structureCopy(there, here, "onlyHere"), order: null });
+    const next =
+      part === "onlyThere"
+        ? applyStructure(here, { ...structureCopy(there, here, "onlyHere"), order: null })
+        : applyStructure(here, structureCopy(there, here, "serifsOnlyHere"));
     if (next === here) return;
-    this.applyTool(
-      result({ ...this.editor, document: next }, [begin("Add glyphs from another master"), commit]),
-    );
+    const label =
+      part === "onlyThere"
+        ? "Add glyphs from another master"
+        : "Add serif styles from another master";
+    this.applyTool(result({ ...this.editor, document: next }, [begin(label), commit]));
   }
 
   /** Read in the master the open one is a layer of, where it is one. */

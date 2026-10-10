@@ -13,6 +13,8 @@ import type { Glyph } from "./glyph.js";
 import type { Grid } from "./grid.js";
 import { type Kerning, groupNameOf, isGroupKey, renameKernGroup } from "./kerning.js";
 import { scaledFont } from "./scale.js";
+import { type SerifStyle, sameSerif } from "./serif.js";
+import { addedSerifStyle, carriedSerifRemoval, carriedSerifRename } from "./serif-styles.js";
 
 /**
  * What the masters of one typeface have to have in common, and carrying a
@@ -35,6 +37,12 @@ import { scaledFont } from "./scale.js";
  *
  * What stays a master's own is its drawing: outlines, advances, where an anchor
  * sits, how much a pair is kerned by, its style name and weight, its guides.
+ *
+ * Serif styles are both. That there is a style called Foot is the family's: an
+ * end that has it in one master has it in the others, or the serif does not
+ * vary. What Foot's numbers are is each master's own, and is how it varies —
+ * slight in the light, heavy in the bold. So a style added, renamed or removed
+ * is carried, and a style changed is not.
  */
 
 /** The parts of a font's information that are the master's own, and are never carried across. */
@@ -75,6 +83,16 @@ export type StructuralChange = {
   readonly grid: Grid | null;
   readonly fixedWidth: { readonly to: number | null } | null;
   readonly nameLigatures: boolean | null;
+  /**
+   * The serif styles that came, went, or are called something else. One that
+   * came is whole, with the numbers it has in the master it came from: another
+   * master begins with a copy, as it does of a glyph, and makes it its own.
+   */
+  readonly serifs: {
+    readonly renamed: readonly (readonly [string, string])[];
+    readonly removed: readonly string[];
+    readonly added: readonly SerifStyle[];
+  } | null;
 };
 
 /**
@@ -162,8 +180,36 @@ export function structuralChange(base: FontDocument, now: FontDocument): Structu
     grid: base.grid === now.grid || sameJson(base.grid, now.grid) ? null : now.grid,
     fixedWidth: base.fixedWidth === now.fixedWidth ? null : { to: now.fixedWidth },
     nameLigatures: base.nameLigatures === now.nameLigatures ? null : now.nameLigatures,
+    serifs: serifsChanged(base.serifs, now.serifs),
   };
   return isNothing(change) ? null : change;
+}
+
+/**
+ * The serif styles that came, went or were renamed between two moments of a
+ * master's list. A style gone and one come in its place in the list, or with
+ * its numbers, is the one renamed: a rename leaves both as they were.
+ */
+function serifsChanged(
+  base: readonly SerifStyle[],
+  now: readonly SerifStyle[],
+): StructuralChange["serifs"] {
+  if (base === now) return null;
+  const gone = base.filter((style) => !now.some((other) => other.name === style.name));
+  const fresh = now.filter((style) => !base.some((other) => other.name === style.name));
+  const renamed: [string, string][] = [];
+  for (const to of fresh) {
+    const at = gone.findIndex(
+      (from) => base.indexOf(from) === now.indexOf(to) || sameSerif(from, to),
+    );
+    if (at === -1) continue;
+    renamed.push([gone[at]!.name, to.name]);
+    gone.splice(at, 1);
+  }
+  const arrived = new Set(renamed.map(([, to]) => to));
+  const added = fresh.filter((style) => !arrived.has(style.name));
+  if (renamed.length === 0 && gone.length === 0 && added.length === 0) return null;
+  return { renamed, removed: gone.map((style) => style.name), added };
 }
 
 function isNothing(change: StructuralChange): boolean {
@@ -179,7 +225,8 @@ function isNothing(change: StructuralChange): boolean {
     change.unitsPerEm === null &&
     change.grid === null &&
     change.fixedWidth === null &&
-    change.nameLigatures === null
+    change.nameLigatures === null &&
+    change.serifs === null
   );
 }
 
@@ -272,8 +319,13 @@ export function applyStructure(
     if (g !== undefined && !sameList(g.unicodes, unicodes))
       next = putGlyph(next, { ...g, unicodes });
   }
+  // A serif style's name is on the ends that have it, in whatever master
+  // draws them: a master that is a layer of another follows that much.
+  for (const [from, to] of change.serifs?.renamed ?? []) next = carriedSerifRename(next, from, to);
+  for (const name of change.serifs?.removed ?? []) next = carriedSerifRemoval(next, name);
   if (sparse) return next;
 
+  for (const style of change.serifs?.added ?? []) next = addedSerifStyle(next, style) ?? next;
   for (const g of change.added) {
     if (!(g.name in next.glyphs)) next = putGlyph(next, g);
   }
@@ -357,6 +409,10 @@ export type StructureDifferences = {
   /** The family's information that differs, by field. */
   readonly info: readonly (keyof FontInfo)[];
   readonly unitsPerEm: boolean;
+  /** Serif styles this master has a name for and the other has not. */
+  readonly serifsOnlyHere: readonly string[];
+  /** Serif styles the other has a name for and this one has not. */
+  readonly serifsOnlyThere: readonly string[];
 };
 
 /** The parts of {@link StructureDifferences}, as what can be copied across. */
@@ -390,6 +446,12 @@ export function structuralDifferences(
       (key) => !OWN_INFO.has(key) && !sameJson(here.info[key], there.info[key]),
     ),
     unitsPerEm: here.info.unitsPerEm !== there.info.unitsPerEm,
+    serifsOnlyHere: here.serifs
+      .filter((style) => !there.serifs.some((other) => other.name === style.name))
+      .map((style) => style.name),
+    serifsOnlyThere: there.serifs
+      .filter((style) => !here.serifs.some((other) => other.name === style.name))
+      .map((style) => style.name),
   };
 }
 
@@ -403,7 +465,9 @@ export function sameStructure(differences: StructureDifferences): boolean {
     !differences.features &&
     !differences.groups &&
     differences.info.length === 0 &&
-    !differences.unitsPerEm
+    !differences.unitsPerEm &&
+    differences.serifsOnlyHere.length === 0 &&
+    differences.serifsOnlyThere.length === 0
   );
 }
 
@@ -412,14 +476,15 @@ export function sameStructure(differences: StructureDifferences): boolean {
  * with `from` in it.
  *
  * A change, so that it is made by the same hand that carries any other across:
- * {@link applyStructure}. For `onlyThere` the masters are the other way round —
- * it is the open master that gains the glyphs — which is the caller's to
- * arrange; this only ever copies from the first to the second.
+ * {@link applyStructure}. For `onlyThere` and `serifsOnlyThere` the masters
+ * are the other way round — it is the open master that gains the glyphs or the
+ * styles — which is the caller's to arrange; this only ever copies from the
+ * first to the second.
  */
 export function structureCopy(
   from: FontDocument,
   to: FontDocument,
-  part: Exclude<StructurePart, "onlyThere">,
+  part: Exclude<StructurePart, "onlyThere" | "serifsOnlyThere">,
 ): StructuralChange {
   const nothing: StructuralChange = {
     renamed: [],
@@ -434,6 +499,7 @@ export function structureCopy(
     grid: null,
     fixedWidth: null,
     nameLigatures: null,
+    serifs: null,
   };
   const differences = structuralDifferences(from, to);
 
@@ -466,6 +532,15 @@ export function structureCopy(
       for (const key of differences.info) Object.assign(info, { [key]: from.info[key] });
       return { ...nothing, info };
     }
+    case "serifsOnlyHere":
+      return {
+        ...nothing,
+        serifs: {
+          renamed: [],
+          removed: [],
+          added: from.serifs.filter((style) => differences.serifsOnlyHere.includes(style.name)),
+        },
+      };
     case "unitsPerEm":
       // Scaled: a master whose em is made another's has to keep its shapes the
       // size they were on the page.

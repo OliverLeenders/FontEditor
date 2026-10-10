@@ -640,6 +640,25 @@ function Shared({
     });
   }
 
+  const styleCount = (n: number): string =>
+    n === 1 ? "1 serif style is" : `${String(n)} serif styles are`;
+  if (differences.serifsOnlyHere.length > 0) {
+    lines.push({
+      part: "serifsOnlyHere",
+      says: `${styleCount(differences.serifsOnlyHere.length)} only in this master: ${some(differences.serifsOnlyHere)}`,
+      does: `Add to ${name}`,
+      title: `Add them to ${name} with this master's numbers, to be made ${name}'s own there`,
+    });
+  }
+  if (differences.serifsOnlyThere.length > 0) {
+    lines.push({
+      part: "serifsOnlyThere",
+      says: `${styleCount(differences.serifsOnlyThere.length)} only in ${name}: ${some(differences.serifsOnlyThere)}`,
+      does: "Add here",
+      title: `Add them to this master with ${name}'s numbers, to be made this master's own`,
+    });
+  }
+
   return (
     <div className={styles.report}>
       <p className={styles.reportHead}>This master and {name} differ in what every master shares</p>

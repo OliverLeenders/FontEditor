@@ -283,6 +283,8 @@ export {
 
 export {
   addedSerifStyle,
+  carriedSerifRemoval,
+  carriedSerifRename,
   changedSerifStyle,
   freeSerifStyleName,
   removedSerifStyle,
