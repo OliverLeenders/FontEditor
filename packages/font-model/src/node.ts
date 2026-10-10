@@ -1,3 +1,4 @@
+import type { EndSerif } from "./serif.js";
 import { type Vec2, add, addScaled, distance, length, sub } from "@typewright/geometry";
 
 import type { SegmentBlend } from "@typewright/geometry";
@@ -140,8 +141,15 @@ export type Node = {
  * there — the end the pen would leave if it were turned to the cut and were the
  * stroke's width, which is the turning and the taking back of width done for
  * you. A broad edge has no outline but a line, and its end is the same either way.
+ *
+ * `serif` is a serif standing on the cut, which then closes the end whatever
+ * `shape` says: see `serif.ts`.
  */
-export type StrokeEnd = { readonly cut: "square" | number; readonly shape?: "nib" };
+export type StrokeEnd = {
+  readonly cut: "square" | number;
+  readonly shape?: "nib";
+  readonly serif?: EndSerif;
+};
 
 /** How a continuous corner is drawn. */
 export type ContinuousCorner = { readonly size: number; readonly smoothness: number };

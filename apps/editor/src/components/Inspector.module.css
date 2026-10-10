@@ -332,6 +332,29 @@
   cursor: default;
 }
 
+/* A choice among the font's own things, where the rows around it are numbers. */
+select.input {
+  height: var(--control);
+  padding: 0 1.5rem 0 0.4rem;
+  font-family: inherit;
+}
+/* The chevron is the picker icon here, with a place of its own; see controls.css. */
+@supports (appearance: base-select) {
+  select.input {
+    padding-right: 0.4rem;
+  }
+}
+
+/* What can be done about the rows above, as small buttons side by side. */
+.rowButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.rowButton {
+  composes: small from "./Button.module.css";
+}
+
 /* Two numbers sharing one row and one label. */
 .pair {
   display: grid;

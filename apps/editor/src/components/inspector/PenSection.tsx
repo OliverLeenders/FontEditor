@@ -1,19 +1,25 @@
+import { type EndSerif, type SerifNumber, serifNumbers } from "@typewright/font-model";
 import type { PenBlend } from "@typewright/geometry";
 import {
   type BlendChannel,
   type EndChoice,
   type EndShape,
+  addSerifStyle,
   begin,
   changePen,
   commit,
   drawWithPen,
   result,
+  selectedEndSerif,
+  selectedEndSerifsDiffer,
   selectedPenBlend,
   selectedPenValue,
   selectedPointPen,
   selectedStrokeEnd,
   selectedStrokeEndShape,
   selectionNib,
+  setEndSerifNumber,
+  setEndSerifStyle,
   setPenBlend,
   setStrokeEnd,
   setStrokeEndShape,
@@ -290,9 +296,18 @@ function EndField({
             >
               Nib
             </button>
+            <button
+              type="button"
+              aria-pressed={shape === "serif"}
+              title="A serif standing on the cut, measured from the stroke's own edges"
+              onClick={() => close("serif")}
+            >
+              Serif
+            </button>
           </div>
         </Field>
       )}
+      {shape === "serif" && <SerifFields />}
       {typeof value === "number" && (
         <Field label="Cut at">
           <NumberField
@@ -305,6 +320,173 @@ function EndField({
           />
         </Field>
       )}
+    </>
+  );
+}
+
+const SERIF_FIELDS: readonly {
+  readonly key: SerifNumber;
+  readonly label: string;
+  readonly name: string;
+  readonly title: string;
+  /** Shown as a percentage, where the number is a share of something. */
+  readonly percent?: boolean;
+}[] = [
+  {
+    key: "left",
+    label: "Reach left",
+    name: "Serif reach left",
+    title: "How far the serif goes past the stroke's left edge, in units. 0 for none on that side.",
+  },
+  {
+    key: "right",
+    label: "Reach right",
+    name: "Serif reach right",
+    title:
+      "How far the serif goes past the stroke's right edge, in units. 0 for none on that side.",
+  },
+  {
+    key: "height",
+    label: "Height",
+    name: "Serif height",
+    title: "How far up the stroke the serif goes where it meets it, in units",
+  },
+  {
+    key: "bracket",
+    label: "Bracket",
+    name: "Serif bracket",
+    title: "How much of the corner between serif and stroke is a curve: 0 none, 100 out to the tip",
+    percent: true,
+  },
+  {
+    key: "slope",
+    label: "Slope",
+    name: "Serif slope",
+    title: "How much thinner the serif is at its tip: 0 a slab, 100 a wedge that comes to a point",
+    percent: true,
+  },
+  {
+    key: "cup",
+    label: "Cup",
+    name: "Serif cup",
+    title: "How far the middle of the serif's foot is hollowed, in units",
+  },
+  {
+    key: "round",
+    label: "Round tips",
+    name: "Serif round tips",
+    title: "How much of each tip is rounded off: 0 square, 100 half a circle",
+    percent: true,
+  },
+];
+
+/**
+ * The serif on the selected ends: which of the font's styles it is, and its
+ * numbers.
+ *
+ * A number typed here is this end's own from then on and stays when the style
+ * is changed in Font info; the style picked again takes them back. A serif
+ * with no style is all its own numbers, and can be made a style of the font
+ * from here, which is how a style is usually come by: drawn on a letter first.
+ */
+function SerifFields(): React.JSX.Element | null {
+  const store = useEditorStore();
+  // The serif as the end has it, the same object until it changes; a new one
+  // made here at every look would be a change at every look.
+  const found = useStoreValue((s) => selectedEndSerif(s.session.editor));
+  const mixed = useStoreValue((s) => selectedEndSerifsDiffer(s.session.editor));
+  const fontStyles = useStoreValue((s) => s.session.editor.document.serifs);
+  if (found === null) return null;
+  const serif: EndSerif = found;
+  const own = serif.own ?? [];
+
+  const saveAsStyle = (): void => {
+    store.applyTool(result(store.editor, [begin("New serif style")]));
+    const before = new Set(store.editor.document.serifs.map((style) => style.name));
+    store.applyTool(
+      result(addSerifStyle(store.editor, { name: "Serif", ...serifNumbers(serif) }).state),
+    );
+    const made = store.editor.document.serifs.find((style) => !before.has(style.name));
+    if (made !== undefined) {
+      store.applyTool(result(setEndSerifStyle(store.editor, made.name).state));
+    }
+    store.applyTool(result(store.editor, [commit]));
+  };
+
+  return (
+    <>
+      <Field label="Serif style">
+        <select
+          className={styles.input}
+          aria-label="Serif style"
+          title="One of the font's serif styles, which are changed in Font info, or numbers of this end's own"
+          value={mixed ? "\u0000mixed" : (serif.style ?? "")}
+          onChange={(event) =>
+            store.applyTool(
+              setEndSerifStyle(store.editor, event.target.value === "" ? null : event.target.value),
+            )
+          }
+        >
+          {mixed && <option value={"\u0000mixed"}>—</option>}
+          <option value="">Own numbers</option>
+          {fontStyles.map((style) => (
+            <option key={style.name} value={style.name}>
+              {style.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {SERIF_FIELDS.map((field) => (
+        <Field key={field.key} label={own.includes(field.key) ? `${field.label} •` : field.label}>
+          <NumberField
+            className={styles.input}
+            label={field.name}
+            title={
+              own.includes(field.key)
+                ? `${field.title}. Set on this end: the style's is not followed.`
+                : field.title
+            }
+            value={
+              field.percent === true
+                ? Math.round(serif[field.key] * 100)
+                : Math.round(serif[field.key] * 100) / 100
+            }
+            bigStep={10}
+            bounds={field.percent === true ? { min: 0, max: 100 } : { min: 0 }}
+            onCommit={(value) =>
+              store.applyTool(
+                setEndSerifNumber(
+                  store.editor,
+                  field.key,
+                  field.percent === true ? value / 100 : value,
+                ),
+              )
+            }
+          />
+        </Field>
+      ))}
+      <div className={styles.rowButtons}>
+        {serif.style !== undefined && own.length > 0 && (
+          <button
+            type="button"
+            className={styles.rowButton}
+            title="Take back the numbers set on this end, and follow the style again"
+            onClick={() => store.applyTool(setEndSerifStyle(store.editor, serif.style ?? null))}
+          >
+            Follow style
+          </button>
+        )}
+        {serif.style === undefined && (
+          <button
+            type="button"
+            className={styles.rowButton}
+            title="Make these numbers a serif style of the font, and give it to this end"
+            onClick={saveAsStyle}
+          >
+            Save as style
+          </button>
+        )}
+      </div>
     </>
   );
 }

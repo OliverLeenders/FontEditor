@@ -1,14 +1,20 @@
 import {
   type Contour,
   type ContourId,
+  type EndSerif,
   type IdFactory,
   type Nib,
+  type SerifNumber,
   type StrokeEnd,
+  DEFAULT_SERIF,
   contour,
   inkOf,
   samePen as sameNib,
+  serifNumbers,
+  serifStyleNamed,
   updateContour,
   withNib,
+  withSerifNumber,
 } from "@typewright/font-model";
 import type { PenBlend } from "@typewright/geometry";
 
@@ -398,8 +404,14 @@ export function setStrokeEnd(state: EditorState, choice: EndChoice): ToolResult 
   return done(state, after, "Stroke end");
 }
 
-/** What a cut end is closed with: the cut itself, or half the pen's outline. */
-export type EndShape = "straight" | "nib";
+/**
+ * What a cut end is closed with: the cut itself, half the pen's outline, or a
+ * serif standing on the cut.
+ */
+export type EndShape = "straight" | "nib" | "serif";
+
+const shapeOf = (end: StrokeEnd): EndShape =>
+  end.serif !== undefined ? "serif" : end.shape === "nib" ? "nib" : "straight";
 
 /**
  * What the selected cut ends are closed with: what they share, `"mixed"` where
@@ -410,15 +422,23 @@ export function selectedStrokeEndShape(state: EditorState): EndShape | "mixed" |
   for (const { contour: c, index } of endPoints(state)) {
     const end = c.nodes[index]!.end;
     if (end === undefined) continue;
-    const shape: EndShape = end.shape === "nib" ? "nib" : "straight";
+    const shape = shapeOf(end);
     if (found === null) found = shape;
     else if (found !== shape) return "mixed";
   }
   return found;
 }
 
-/** Set what the selected cut ends are closed with. An end that is not cut is left alone. */
+/**
+ * Set what the selected cut ends are closed with. An end that is not cut is left alone.
+ *
+ * A serif starts as the font's first style, where it has one, and as a plain
+ * slab where it has none.
+ */
 export function setStrokeEndShape(state: EditorState, shape: EndShape): ToolResult {
+  const first = state.document.serifs[0];
+  const serif: EndSerif =
+    first === undefined ? DEFAULT_SERIF : { ...serifNumbers(first), style: first.name };
   const chosen = new Map<string, Set<number>>();
   for (const { contour: c, index } of endPoints(state)) {
     const set = chosen.get(c.id) ?? new Set<number>();
@@ -431,12 +451,97 @@ export function setStrokeEndShape(state: EditorState, shape: EndShape): ToolResu
     if (indices === undefined) return c;
     const nodes = c.nodes.map((n, i) => {
       if (!indices.has(i) || n.end === undefined) return n;
-      if ((n.end.shape === "nib") === (shape === "nib")) return n;
+      if (shapeOf(n.end) === shape) return n;
+      if (shape === "serif") return { ...n, end: { cut: n.end.cut, serif } };
       return { ...n, end: shape === "nib" ? { cut: n.end.cut, shape } : { cut: n.end.cut } };
     });
     return nodes.some((n, i) => n !== c.nodes[i]) ? { ...c, nodes } : c;
   });
   return done(state, after, "Stroke end shape");
+}
+
+/**
+ * The serif on the selected ends, as a panel shows it: the first one's, the
+ * very object the end has, so it is the same until that serif changes. `null`
+ * where no selected end has a serif.
+ */
+export function selectedEndSerif(state: EditorState): EndSerif | null {
+  for (const { contour: c, index } of endPoints(state)) {
+    const serif = c.nodes[index]!.end?.serif;
+    if (serif !== undefined) return serif;
+  }
+  return null;
+}
+
+/** Whether the selected ends that have serifs have different ones. */
+export function selectedEndSerifsDiffer(state: EditorState): boolean {
+  let found: string | null = null;
+  for (const { contour: c, index } of endPoints(state)) {
+    const serif = c.nodes[index]!.end?.serif;
+    if (serif === undefined) continue;
+    const said = JSON.stringify(serif);
+    if (found === null) found = said;
+    else if (found !== said) return true;
+  }
+  return false;
+}
+
+/** The selected ends that have a serif, each put through `change`. */
+function editEndSerifs(
+  state: EditorState,
+  label: string,
+  change: (serif: EndSerif) => EndSerif,
+): ToolResult {
+  const chosen = new Map<string, Set<number>>();
+  for (const { contour: c, index } of endPoints(state)) {
+    const set = chosen.get(c.id) ?? new Set<number>();
+    set.add(index);
+    chosen.set(c.id, set);
+  }
+  const after = edit(state, selected(state), (c) => {
+    const indices = chosen.get(c.id);
+    if (indices === undefined) return c;
+    const nodes = c.nodes.map((n, i) => {
+      if (!indices.has(i) || n.end?.serif === undefined) return n;
+      const next = change(n.end.serif);
+      return next === n.end.serif ? n : { ...n, end: { ...n.end, serif: next } };
+    });
+    return nodes.some((n, i) => n !== c.nodes[i]) ? { ...c, nodes } : c;
+  });
+  return done(state, after, label);
+}
+
+/**
+ * Set one number of the serif on the selected ends. On an end that has a style
+ * the number is the end's own from then on, and stays when the style changes.
+ */
+export function setEndSerifNumber(state: EditorState, key: SerifNumber, value: number): ToolResult {
+  if (!Number.isFinite(value)) return result(state);
+  return editEndSerifs(state, "Serif", (serif) => {
+    const next = withSerifNumber(serif, key, value);
+    return next[key] === serif[key] ? serif : next;
+  });
+}
+
+/**
+ * Give the serif on the selected ends one of the font's styles, with all of
+ * that style's numbers, or with `null` take the style off and leave the
+ * numbers as the end's own. Giving an end the style it has takes back the
+ * numbers that were set on it.
+ */
+export function setEndSerifStyle(state: EditorState, name: string | null): ToolResult {
+  if (name === null) {
+    return editEndSerifs(state, "Serif style", (serif) =>
+      serif.style === undefined ? serif : serifNumbers(serif),
+    );
+  }
+  const style = serifStyleNamed(state.document, name);
+  if (style === null) return result(state);
+  return editEndSerifs(state, "Serif style", (serif) =>
+    serif.style === name && (serif.own ?? []).length === 0
+      ? serif
+      : { ...serifNumbers(style), style: name },
+  );
 }
 
 /** The whole contours the selection claims, in the order the glyph has them. */

@@ -104,12 +104,53 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
       ? { angle: pen / 7, width: pen, thickness, squareness: 1 }
       : { angle: pen / 7, width: pen, thickness },
   );
+  // A leaning stem with a serif at each end, heavier with the pen: a flag at
+  // its head, to one side and sloped to a point, and at its foot a bracketed
+  // serif with a hollow under it. Outlines of their own laid over the ends.
+  const footed = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(340, 640), {
+          end: {
+            cut: 0,
+            serif: {
+              left: pen * 0.8,
+              right: 0,
+              height: pen * 0.5,
+              bracket: 0.3,
+              slope: 1,
+              cup: 0,
+              round: 0,
+            },
+          },
+        }),
+        node(ids.node(), at(300, 0), {
+          end: {
+            cut: 0,
+            serif: {
+              left: pen * 0.6,
+              right: pen * 0.7,
+              height: pen * 0.3,
+              bracket: 0.6,
+              slope: 0.2,
+              cup: pen * 0.05,
+              round: 0.5,
+            },
+          },
+        }),
+      ],
+      false,
+    ),
+    { angle: 30, width: pen, thickness },
+  );
   return fontDocument(
     [
       glyph(".notdef", { advance: 500 }),
       glyph("l", { advance: 600, unicodes: [0x6c], contours: [stem] }),
       glyph("t", { advance: 600, unicodes: [0x74], contours: [boxed] }),
       glyph("z", { advance: 600, unicodes: [0x7a], contours: [slab] }),
+      glyph("f", { advance: 600, unicodes: [0x66], contours: [footed] }),
       glyph("s", { advance: 600, unicodes: [0x73], contours: [skeleton] }),
       glyph("dollar", {
         advance: 600,

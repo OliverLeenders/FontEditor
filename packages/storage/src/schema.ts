@@ -18,6 +18,7 @@ import {
   type PlainValue,
   type Node,
   type NodeType,
+  type SerifStyle,
   type StrokeEnd,
   BOTH_LOCKED,
   DEFAULT_FONT_INFO,
@@ -42,6 +43,7 @@ import {
   readSquareness,
   nibOfShape,
   penShapeOf,
+  readSerifStyles,
   readStrokeEnd,
 } from "@typewright/font-model";
 import type { SegmentBlend, Vec2 } from "@typewright/geometry";
@@ -233,6 +235,8 @@ export type StoredFontInfo = {
   readonly grid?: { readonly step: number; readonly major: number };
   /** The width of a fixed-width font. Omitted when none has been chosen. */
   readonly fixedWidth?: number;
+  /** The serifs the font has names for. Omitted when it has none. */
+  readonly serifs?: readonly SerifStyle[];
   /** Whether icons' names are compiled as ligatures. Omitted when they are not. */
   readonly nameLigatures?: boolean;
 };
@@ -344,6 +348,7 @@ export function encodeFontInfo(document: FontDocument): StoredFontInfo {
     ...(isDefaultGrid(document.grid) ? {} : { grid: document.grid }),
     ...(document.fixedWidth === null ? {} : { fixedWidth: document.fixedWidth }),
     ...(document.nameLigatures ? { nameLigatures: true } : {}),
+    ...(document.serifs.length === 0 ? {} : { serifs: document.serifs }),
   };
   return document.features === "" ? base : { ...base, features: document.features };
 }
@@ -410,6 +415,7 @@ export function decodeFontInfo(raw: unknown): {
   grid: Grid;
   fixedWidth: number | null;
   nameLigatures: boolean;
+  serifs: readonly SerifStyle[];
 } {
   if (!isRecord(raw)) {
     return {
@@ -422,6 +428,7 @@ export function decodeFontInfo(raw: unknown): {
       grid: DEFAULT_GRID,
       fixedWidth: null,
       nameLigatures: false,
+      serifs: [],
     };
   }
 
@@ -440,6 +447,7 @@ export function decodeFontInfo(raw: unknown): {
         ? Math.round(raw["fixedWidth"])
         : null,
     nameLigatures: raw["nameLigatures"] === true,
+    serifs: readSerifStyles(raw["serifs"]),
   };
 }
 

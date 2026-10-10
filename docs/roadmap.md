@@ -1515,9 +1515,44 @@ font where it is so in every master; a rectangle that turns or changes size alon
 or is an oval in another master, is fitted as before. fontTools draws a zigzag whose pen is a
 rectangle turned differently in each master.
 
+#### After phase 38 — Serifs on the ends of strokes — done
+
+What cut ends and a pen with corners were for. A cut end can be closed with a serif: a shape
+standing on the cut's line, as far out past each edge of the stroke as its reach says, so high
+along the stroke, joined to the stroke's edges square or round a bracket, thinner at its tips
+by its slope, hollowed under by its cup and its tips rounded or not. Seven numbers, the same
+fourteen pieces of outline whatever they are — a piece a number makes nothing of is there with
+no length — which is what lets it vary.
+
+It is measured from the ink. Where the cut's line crosses the stroke is how wide the stroke is
+there, whatever the pen and the way the path was going make of it, and where a line at the top
+of the serif crosses it is where the stroke's edges have got to by then; between the two the
+edges are taken to be straight. So the serif needs no compensating for the pen's angle or the
+stem's weight, and leans with a stem that leans. In a single font the stroke is stopped at the
+top of the serif and the serif stands on the edge that leaves, sharing it, as an end shaped by
+the pen does, and the two are one outline. In a variable font the serif is an outline of its
+own laid over the stroke's end, the stroke stopped inside it: the same points in every master,
+its numbers interpolating. fontTools draws a leaning stem with a flag at its head and a
+bracketed, cupped foot at each weight.
+
+A serif's numbers are on the end that has it, so a stroke's ink still depends on nothing but
+the stroke and is remembered by it. The font has serif styles, serifs with names, and an end
+may have one: changing a style is one step that changes the font's list and every end that has
+the style, in every glyph and layer, leaving the numbers that were set on an end itself. The
+styles are in the project file and in the `.ufo`'s lib under `org.typewright.serifs`, each
+end's serif with its stroke. Moving the font to another em scales the lengths.
+
+Set in the inspector's Pen section and in Font info. Handles on the canvas are next.
+
 #### Open
 
 What is next in the same direction:
+
+- **A serif's handles on the canvas**: its tips and its height dragged, as the cut's knob is.
+- **Serif styles kept in step between masters**: each master has its own, which is how a serif
+  varies, and nothing yet adds a style to every master at once or says where one is missing.
+- **A serif on a short last segment**, shorter than the serif is high: it is laid over the end
+  and its sides run as the path was going, where a longer segment is measured.
 
 - **A rectangle that turns or changes size along a stroke**, exact as the constant one is:
   it is fitted now, a hundredth short at its corners.

@@ -2,8 +2,11 @@ import {
   type FontDocument,
   type FontInfo,
   type Grid,
+  type SerifNumber,
+  type SerifStyle,
   type VerticalMetrics,
   DEFAULT_GRID,
+  SERIF_PRESETS,
   FEATURES_NOT_SCALED,
   STYLE_MAP_STYLES,
   USE_TYPO_METRICS_BIT,
@@ -14,11 +17,15 @@ import {
   iconGrid,
   isWholeStep,
   offWidthGlyphs,
+  serifStyleUses,
 } from "@typewright/font-model";
 import { nameLigatureCount } from "@typewright/font-io";
 import {
+  addSerifStyle,
+  changeSerifStyle,
   fitToWidth,
   infoProblem,
+  removeSerifStyle,
   scaleFontTo,
   setFixedWidth,
   setGrid,
@@ -399,6 +406,7 @@ export function FontInfoPanel(): React.JSX.Element {
           {/* Beside the em, which its step is counted in and which it may ask to change. */}
           {section.title === "Metrics" ? <GridSection document={document} store={store} /> : null}
           {section.title === "Metrics" ? <IconsSection document={document} store={store} /> : null}
+          {section.title === "Metrics" ? <SerifsSection document={document} store={store} /> : null}
         </Fragment>
       ))}
       <p className={styles.note}>
@@ -938,6 +946,165 @@ function IconsSection({
         </p>
       ) : null}
     </section>
+  );
+}
+
+const SERIF_STYLE_FIELDS: readonly {
+  readonly key: SerifNumber;
+  readonly label: string;
+  readonly hint: string;
+  readonly percent?: boolean;
+}[] = [
+  { key: "left", label: "Reach left", hint: "Units past the stroke's left edge. 0 for none." },
+  { key: "right", label: "Reach right", hint: "Units past the stroke's right edge. 0 for none." },
+  { key: "height", label: "Height", hint: "Units up the stroke, where the serif meets it" },
+  {
+    key: "bracket",
+    label: "Bracket %",
+    hint: "How much of the corner between serif and stroke is a curve: 0 none, 100 out to the tip",
+    percent: true,
+  },
+  {
+    key: "slope",
+    label: "Slope %",
+    hint: "How much thinner the serif is at its tip: 0 a slab, 100 a wedge that comes to a point",
+    percent: true,
+  },
+  { key: "cup", label: "Cup", hint: "Units the middle of the serif's foot is hollowed by" },
+  {
+    key: "round",
+    label: "Round tips %",
+    hint: "How much of each tip is rounded off: 0 square, 100 half a circle",
+    percent: true,
+  },
+];
+
+/**
+ * The serifs the font has names for.
+ *
+ * A stroke's end that is cut can be closed with a serif, in the inspector's
+ * Pen section, and a serif there can have one of these styles. Changing a
+ * style here changes every end that has it, in every glyph, as one step —
+ * but for a number that was set on an end itself, which is that end's own.
+ */
+function SerifsSection({
+  document,
+  store,
+}: {
+  readonly document: FontDocument;
+  readonly store: ReturnType<typeof useEditorStore>;
+}): React.JSX.Element {
+  return (
+    <section className={styles.section}>
+      <h3 className={styles.heading}>Serifs</h3>
+      {document.serifs.length === 0 ? (
+        <p className={styles.caveat}>
+          No serif styles yet. A style is a serif with a name, for the ends of strokes: change it
+          here and every end that has it follows.
+        </p>
+      ) : null}
+      {document.serifs.map((style) => (
+        <SerifStyleFields key={style.name} style={style} document={document} store={store} />
+      ))}
+      <label className={styles.field}>
+        <span className={styles.label}>Add a style</span>
+        <select
+          className={styles.input}
+          value=""
+          aria-label="Add a serif style"
+          title="A new serif style, starting from one of these"
+          onChange={(event) => {
+            const preset = SERIF_PRESETS.find((p) => p.name === event.target.value);
+            if (preset !== undefined) store.applyTool(addSerifStyle(store.editor, preset));
+          }}
+        >
+          <option value="">Choose…</option>
+          {SERIF_PRESETS.map((preset) => (
+            <option key={preset.name} value={preset.name}>
+              {preset.name}
+            </option>
+          ))}
+        </select>
+      </label>
+    </section>
+  );
+}
+
+/** One serif style: its name, its numbers, how many ends have it, and its removal. */
+function SerifStyleFields({
+  style,
+  document,
+  store,
+}: {
+  readonly style: SerifStyle;
+  readonly document: FontDocument;
+  readonly store: ReturnType<typeof useEditorStore>;
+}): React.JSX.Element {
+  const uses = useMemo(() => serifStyleUses(document, style.name), [document, style.name]);
+  const [name, setName] = useState(style.name);
+  useEffect(() => setName(style.name), [style.name]);
+  const taken =
+    name.trim() !== style.name && document.serifs.some((other) => other.name === name.trim());
+  const rename = (): void => {
+    const wanted = name.trim();
+    if (wanted === "" || wanted === style.name || taken) {
+      setName(style.name);
+      return;
+    }
+    store.applyTool(changeSerifStyle(store.editor, style.name, { ...style, name: wanted }));
+  };
+
+  return (
+    <>
+      <label className={styles.field}>
+        <span className={styles.label}>Style</span>
+        <input
+          className={styles.input}
+          type="text"
+          autoComplete="off"
+          spellCheck={false}
+          value={name}
+          data-wrong={taken}
+          aria-label={`Serif style name, ${style.name}`}
+          title="What the style is called, in the inspector's Pen section"
+          onChange={(event) => setName(event.target.value)}
+          onBlur={rename}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur();
+          }}
+        />
+        {taken ? <span className={styles.problem}>Another style has that name.</span> : null}
+      </label>
+      {SERIF_STYLE_FIELDS.map((field) => (
+        <UnitsField
+          key={field.key}
+          label={field.label}
+          hint={field.hint}
+          value={field.percent === true ? Math.round(style[field.key] * 100) : style[field.key]}
+          onCommit={(next) =>
+            store.applyTool(
+              changeSerifStyle(store.editor, style.name, {
+                ...style,
+                [field.key]: field.percent === true ? next / 100 : next,
+              }),
+            )
+          }
+        />
+      ))}
+      <p className={styles.caveat}>
+        {uses === 0
+          ? "No end of a stroke has this style yet."
+          : `${uses === 1 ? "One end has" : `${String(uses)} ends have`} this style.`}{" "}
+        <button
+          type="button"
+          className={styles.button}
+          title="Take the style out of the font. The ends that have it keep their serifs."
+          onClick={() => store.applyTool(removeSerifStyle(store.editor, style.name))}
+        >
+          Remove {style.name}
+        </button>
+      </p>
+    </>
   );
 }
 

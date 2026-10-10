@@ -228,6 +228,7 @@ export function documentOf(snapshot: StoredSnapshot): {
     grid: read.grid,
     fixedWidth: read.fixedWidth,
     nameLigatures: read.nameLigatures,
+    serifs: read.serifs,
   };
   if (read.glyphOrder.length > 0) document = setGlyphOrder(document, read.glyphOrder);
   document = setKerning(document, decodeKerning(snapshot.kerning));

@@ -265,6 +265,31 @@ export { UNIT_GRID, roundFont, roundGlyph, unroundedGlyphs } from "./round.js";
 export type { FillAsWound } from "./tidy.js";
 export { fillAsWound, tidyContour, tidyFont, tidyGlyph, untidyGlyphs } from "./tidy.js";
 
+export type { EndSerif, Serif, SerifNumber, SerifStyle } from "./serif.js";
+export {
+  DEFAULT_SERIF,
+  SERIF_NUMBERS,
+  SERIF_PRESETS,
+  SERIF_SHARES,
+  readEndSerif,
+  readSerif,
+  readSerifStyles,
+  restyled,
+  sameSerif,
+  serifNumbers,
+  soundSerif,
+  withSerifNumber,
+} from "./serif.js";
+
+export {
+  addedSerifStyle,
+  changedSerifStyle,
+  freeSerifStyleName,
+  removedSerifStyle,
+  serifStyleNamed,
+  serifStyleUses,
+} from "./serif-styles.js";
+
 export type { Grid } from "./grid.js";
 export {
   DEFAULT_GRID,

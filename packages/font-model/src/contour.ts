@@ -1,3 +1,4 @@
+import { readEndSerif } from "./serif.js";
 import {
   type Cubic,
   type PenBlend,
@@ -224,8 +225,10 @@ export function readStrokeEnd(raw: unknown): StrokeEnd | undefined {
   // A shape this version does not know is the plain cut.
   const shape =
     (raw as Record<string, unknown>)["shape"] === "nib" ? { shape: "nib" as const } : {};
-  if (cut === "square") return { cut, ...shape };
-  return typeof cut === "number" && Number.isFinite(cut) ? { cut, ...shape } : undefined;
+  const read = readEndSerif((raw as Record<string, unknown>)["serif"]);
+  const serif = read === undefined ? {} : { serif: read };
+  if (cut === "square") return { cut, ...shape, ...serif };
+  return typeof cut === "number" && Number.isFinite(cut) ? { cut, ...shape, ...serif } : undefined;
 }
 
 export function segments(c: Contour): Segment[] {

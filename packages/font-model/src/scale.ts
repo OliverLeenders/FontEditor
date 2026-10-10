@@ -1,3 +1,4 @@
+import type { Serif } from "./serif.js";
 import type { Vec2 } from "@typewright/geometry";
 
 import type { Anchor } from "./anchor.js";
@@ -55,6 +56,7 @@ export function scaledFont(document: FontDocument, unitsPerEm: number): FontDocu
     // by 0.96, is the 40 it was meant to come out as rather than a hair over.
     grid: { ...document.grid, step: Math.round(document.grid.step * k * 1e6) / 1e6 },
     fixedWidth: document.fixedWidth === null ? null : n(document.fixedWidth),
+    serifs: document.serifs.map((style) => scaledSerif(style, k)),
   };
 }
 
@@ -177,6 +179,17 @@ function scaledNib(nib: Nib, k: number): Nib {
   };
 }
 
+/** A serif's lengths scaled; what it has as a share of something is left. */
+function scaledSerif<T extends Serif>(serif: T, k: number): T {
+  return {
+    ...serif,
+    left: Math.round(serif.left * k),
+    right: Math.round(serif.right * k),
+    height: Math.round(serif.height * k),
+    cup: Math.round(serif.cup * k),
+  };
+}
+
 function scaledNode(node: Node, k: number): Node {
   return {
     ...node,
@@ -184,6 +197,9 @@ function scaledNode(node: Node, k: number): Node {
     in: node.in === null ? null : point(node.in, k),
     out: node.out === null ? null : point(node.out, k),
     ...(node.pen === undefined ? {} : { pen: scaledNib(node.pen, k) }),
+    ...(node.end?.serif === undefined
+      ? {}
+      : { end: { ...node.end, serif: scaledSerif(node.end.serif, k) } }),
     ...(node.continuous === undefined
       ? {}
       : { continuous: { ...node.continuous, size: Math.round(node.continuous.size * k) } }),

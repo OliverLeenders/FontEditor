@@ -1,7 +1,12 @@
 import {
   type FontInfo,
   type Grid,
+  type SerifStyle,
+  addedSerifStyle,
+  changedSerifStyle,
   fitToFixedWidth,
+  freeSerifStyleName,
+  removedSerifStyle,
   fixedWidthOf,
   grid as soundGrid,
   scaledFont,
@@ -141,6 +146,34 @@ export function setGrid(state: EditorState, step: number, major: number): ToolRe
   const now = state.document.grid;
   if (now.step === next.step && now.major === next.major) return result(state);
   return done(state, { ...state, document: { ...state.document, grid: next } }, "Grid");
+}
+
+/**
+ * A new serif style for the font, under the name asked for or, where that is
+ * taken, the name with a number after it.
+ */
+export function addSerifStyle(state: EditorState, style: SerifStyle): ToolResult {
+  const name = freeSerifStyleName(state.document, style.name);
+  const document = addedSerifStyle(state.document, { ...style, name });
+  if (document === null) return result(state);
+  return done(state, { ...state, document }, "Add serif style");
+}
+
+/**
+ * Change a serif style, and with it every end of a stroke that has it, in every
+ * glyph: one undo step. Refused for a name that is nothing or another style's.
+ */
+export function changeSerifStyle(state: EditorState, name: string, next: SerifStyle): ToolResult {
+  const document = changedSerifStyle(state.document, name, next);
+  if (document === null || document === state.document) return result(state);
+  return done(state, { ...state, document }, "Serif style");
+}
+
+/** Take a serif style out of the font. The ends that had it keep their serifs. */
+export function removeSerifStyle(state: EditorState, name: string): ToolResult {
+  const document = removedSerifStyle(state.document, name);
+  if (document === state.document) return result(state);
+  return done(state, { ...state, document }, "Remove serif style");
 }
 
 /**

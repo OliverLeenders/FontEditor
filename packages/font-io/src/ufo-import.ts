@@ -14,7 +14,9 @@ import {
   EMPTY_KERNING,
   drawingOf,
   fontDocument,
+  type SerifStyle,
   grid,
+  readSerifStyles,
   hasMetricKeys,
   groupKey,
   guide,
@@ -174,6 +176,7 @@ export function readUfo(files: readonly ZipFile[], ids: IdFactory): UfoImport | 
           GRID_KEY,
           FIXED_WIDTH_KEY,
           NAME_LIGATURES_KEY,
+          SERIFS_KEY,
         ]);
   const drawnOn = drawingSettings(libSource);
 
@@ -610,10 +613,14 @@ const FIXED_WIDTH_KEY = "org.typewright.fixedWidth";
 /** Whether icons' names are compiled as ligatures; see `name-ligatures.ts`. */
 const NAME_LIGATURES_KEY = "org.typewright.nameLigatures";
 
+/** The serifs the font has names for; see `serif.ts` in the model. */
+const SERIFS_KEY = "org.typewright.serifs";
+
 type DrawingSettings = {
   readonly grid: Grid;
   readonly fixedWidth: number | null;
   readonly nameLigatures: boolean;
+  readonly serifs: readonly SerifStyle[];
 };
 
 /**
@@ -622,7 +629,9 @@ type DrawingSettings = {
  * is a setting for drawing, and a font is still a font without it.
  */
 function drawingSettings(lib: string | null): DrawingSettings {
-  if (lib === null) return { grid: DEFAULT_GRID, fixedWidth: null, nameLigatures: false };
+  if (lib === null) {
+    return { grid: DEFAULT_GRID, fixedWidth: null, nameLigatures: false, serifs: [] };
+  }
   const dict = parsePlistDict(lib);
   const said = dict[GRID_KEY];
   const step = isDict(said) ? plistNumber(said, "step") : null;
@@ -632,6 +641,7 @@ function drawingSettings(lib: string | null): DrawingSettings {
     grid: (step === null ? null : grid(step, major)) ?? DEFAULT_GRID,
     fixedWidth: width !== null && width > 0 ? Math.round(width) : null,
     nameLigatures: dict[NAME_LIGATURES_KEY] === true,
+    serifs: readSerifStyles(dict[SERIFS_KEY]),
   };
 }
 
@@ -641,6 +651,7 @@ function withDrawingSettings(document: FontDocument, settings: DrawingSettings):
     grid: settings.grid,
     fixedWidth: settings.fixedWidth,
     nameLigatures: settings.nameLigatures,
+    serifs: settings.serifs,
   };
 }
 

@@ -1,5 +1,6 @@
 import type { Glyph } from "./glyph.js";
 import { type Grid, DEFAULT_GRID } from "./grid.js";
+import type { SerifStyle } from "./serif.js";
 import type { Guide } from "./guide.js";
 import type { LayerInfo } from "./layers.js";
 import {
@@ -286,6 +287,13 @@ export type FontDocument = {
    * `name-ligatures.ts` in font-io.
    */
   readonly nameLigatures: boolean;
+  /**
+   * The serifs the font has names for, in the order they were made. An end of a
+   * stroke that has one carries its numbers, so what a stroke draws is still
+   * the stroke's own to say; changing a style here is changing them there. See
+   * `serif.ts`, and `withSerifStyle` for the changing.
+   */
+  readonly serifs: readonly SerifStyle[];
 };
 
 export function fontDocument(
@@ -310,6 +318,7 @@ export function fontDocument(
     grid: DEFAULT_GRID,
     fixedWidth: null,
     nameLigatures: false,
+    serifs: [],
   };
 }
 

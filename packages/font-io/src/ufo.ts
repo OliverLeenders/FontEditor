@@ -9,6 +9,7 @@ import {
   glyphFileName,
   groupNameOf,
   hasMetricKeys,
+  SERIF_NUMBERS,
   isDefaultGrid,
   inLayer,
   counterIds,
@@ -500,6 +501,8 @@ const METRIC_KEYS = "org.typewright.metricKeys";
 const GRID_KEY = "org.typewright.grid";
 const FIXED_WIDTH_KEY = "org.typewright.fixedWidth";
 const NAME_LIGATURES_KEY = "org.typewright.nameLigatures";
+/** The serifs the font has names for; see `serif.ts` in the model. */
+const SERIFS_KEY = "org.typewright.serifs";
 
 export function ufoFiles(
   document: FontDocument,
@@ -643,6 +646,19 @@ export function ufoFiles(
   }
   if (document.fixedWidth !== null) lib.push([FIXED_WIDTH_KEY, int(document.fixedWidth)]);
   if (document.nameLigatures) lib.push([NAME_LIGATURES_KEY, "<true/>"]);
+  if (document.serifs.length > 0) {
+    lib.push([
+      SERIFS_KEY,
+      array(
+        document.serifs.map((style) =>
+          dict([
+            ["name", str(style.name)],
+            ...SERIF_NUMBERS.map((key) => [key, real(style[key])] as const),
+          ]),
+        ),
+      ),
+    ]);
+  }
 
   // Everything else somebody put in the lib, back where they put it. A lib is
   // where every tool keeps what the format has no field for, so it is the one
@@ -653,7 +669,8 @@ export function ufoFiles(
       key === METRIC_KEYS ||
       key === GRID_KEY ||
       key === FIXED_WIDTH_KEY ||
-      key === NAME_LIGATURES_KEY
+      key === NAME_LIGATURES_KEY ||
+      key === SERIFS_KEY
     ) {
       continue;
     }

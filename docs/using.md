@@ -572,7 +572,7 @@ point — so the point is exactly where the ink ends, and the stroke is its own 
 way to it. Put the point on the baseline and choose Level, and the stem stands on the
 baseline. Choose Pen and the end is the pen's again.
 
-A cut end is **Closed with** one of two things. **Straight** is the cut itself: a straight
+A cut end is **Closed with** one of three things. **Straight** is the cut itself: a straight
 edge and a sharp corner where it meets each side of the stroke. **Nib** is half the pen's own
 outline laid along the cut, as wide as the stroke is there and as deep in proportion as the
 pen is thick to its width — the end the pen would leave if it were turned to the cut and were
@@ -580,7 +580,32 @@ the stroke's width, which is the turning and the taking back of width done for y
 is on the same line through the point, so the stem still stands on the baseline; an oval
 gives a rounded foot, a round pen half a circle, a pen with squareness a box with two
 rounded corners, and at a hundred the straight cut again. A broad edge has no shape but a
-line, and its end is the same either way.
+line, and its end is the same either way. **Serif** is a serif standing on the cut.
+
+**Serifs.** A serif stands on the line its end is cut along, so the stem still stands on the
+baseline, and it is measured from the stroke's own edges where that line crosses them: make
+the stem heavier, or turn the pen, and the serif goes out with it, and nothing is taken off or
+put back by hand. It leans as the stroke leans, its foot staying on the line. Seven numbers
+say what it is. **Reach left** and **Reach right** are how far it goes past the stroke's edge
+on each side, in units, left and right as they are on the page — nothing on one side is a
+serif on the other only, the flag at the head of an n. **Height** is how far up the stroke it
+goes where it meets it. **Bracket**, in per cent, is how much of the corner between serif and
+stroke is a curve: none, or all the way out to the tip. **Slope**, in per cent, is how much
+thinner the serif is at its tip than at the stroke: nought is a slab and a hundred a wedge
+that comes to a point. **Cup** is how far the middle of its foot is hollowed, in units, and
+**Round tips**, in per cent, how much of each tip is rounded off. A slab is a reach and a
+height; a bracketed serif the same with a bracket; a wedge one with a slope.
+
+A serif has a **Serif style**, or numbers of its own. A style is a serif with a name that the
+font keeps — **Font info** has them under **Serifs**, where one is added from a slab, a
+bracketed serif, a wedge or a hairline, renamed, changed and removed — and an end that has a
+style has its numbers: change the style in Font info and every end that has it, in every
+glyph, follows in one step. A number typed on an end itself is that end's own from then on,
+marked with a dot beside its name, and stays when the style changes; **Follow style** takes
+those back. **Save as style** makes a serif with numbers of its own a style of the font, which
+is how a style is usually come by: drawn on one letter until it is right, then named. The
+first serif put on an end is the font's first style, where it has one. Removing a style leaves
+the serifs on the letters, as numbers of their own.
 
 While a cut end is selected its line is drawn through it, dashed, a little longer than the pen
 is wide, with a round knob at one end. Drag the knob round the point and the cut turns with
@@ -611,7 +636,10 @@ changes along the stroke, and a pen that is a broad edge in one master and an ov
 So is a stroke whose masters have not the same points, one with a **Step** in its blend, or
 an end that is cut in one master and not in another, or closed differently. An end cut the same
 way in every master varies with the rest of the stroke, and so does a pen's squareness: an oval
-in the light and a box in the bold is a pen whose corners fill out along the axis. A stroke
+in the light and a box in the bold is a pen whose corners fill out along the axis. A serif
+varies too, number by number, where the end has one in every master: each master is a font
+with serif styles of its own, so a style called Foot that is slight in the light and heavy in
+the bold is a foot that grows along the axis. A stroke
 drawn with corners in any master comes to more points than an oval's — unless it is a rectangle
 in every master, the same one all along the stroke, which is exact and comes to fewer.
 

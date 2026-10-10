@@ -29,6 +29,7 @@ import {
   segmentCubic,
 } from "./contour.js";
 import type { StrokeEnd } from "./node.js";
+import { type Serif, type SerifPiece, serifInset, serifOutline, serifRise } from "./serif.js";
 import { type Glyph, glyph } from "./glyph.js";
 import { type IdFactory, counterIds } from "./ids.js";
 import { corneredContour, hasContinuousCorners } from "./corner.js";
@@ -125,8 +126,16 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
  */
 export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour[][] | null {
   if (strokes.some((c) => c.nib === undefined || c.nodes.length < 2)) return null;
+  // The serifs, which are outlines of their own laid over the ends: each end
+  // has one in every master or in none.
+  const serifs = (["start", "end"] as const).map((which) => {
+    const each = strokes.map((c) => laidSerif(c, which));
+    return each.every((s) => s !== null) ? each : each.every((s) => s === null) ? null : false;
+  });
+  if (serifs.includes(false)) return null;
+  const [startSerifs, endSerifs] = serifs as (LaidSerif[] | null)[];
   const planned = plannedStrokes(
-    strokes.map((c) => {
+    strokes.map((c, at) => {
       const curves: Cubic[] = [];
       for (let i = 0; i < segmentCount(c); i++) {
         const segment = segmentAt(c, i);
@@ -135,8 +144,8 @@ export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour
       // The ends that are cut, as the plan wants them. An end whose cut is too
       // nearly along the path to make is left as the pen leaves it, here as in
       // a single font.
-      const start = strokeCut(c, "start");
-      const end = strokeCut(c, "end");
+      const start = startSerifs?.[at]?.cut ?? strokeCut(c, "start");
+      const end = endSerifs?.[at]?.cut ?? strokeCut(c, "end");
       const cuts = {
         ...(start === null ? {} : { start }),
         ...(end === null ? {} : { end }),
@@ -151,7 +160,51 @@ export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour
     }),
   );
   if (planned === null) return null;
-  return planned.map((loops) => markInk(loops.map((loop) => contourOfCurves(loop, ids))));
+  const laid = [startSerifs, endSerifs].flatMap((each) => {
+    if (each == null) return [];
+    // A piece is a line where it is one in every master, so they all have the
+    // same points.
+    const lines = each[0]!.pieces.map((_, i) =>
+      each.every((s) => s.pieces[i]!.line || flat(s.pieces[i]!.curve)),
+    );
+    return [each.map((s) => s.pieces.map((piece, i) => ({ curve: piece.curve, line: lines[i]! })))];
+  });
+  return planned.map((loops, at) =>
+    markInk([
+      ...loops.map((loop) => contourOfCurves(loop, ids)),
+      ...laid.map((each) => contourOfCurves(each[at]!, ids)),
+    ]),
+  );
+}
+
+/** Whether a curve is a straight line, or nothing at all. */
+function flat(s: Cubic): boolean {
+  return Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) < 1e-9
+    ? Math.hypot(s.c1.x - s.a.x, s.c1.y - s.a.y) < 1e-9 &&
+        Math.hypot(s.c2.x - s.a.x, s.c2.y - s.a.y) < 1e-9
+    : straight(s);
+}
+
+/** A serif laid over an end of a stroke: the cut the stroke is stopped at, and the outline. */
+type LaidSerif = { readonly cut: StrokeCut; readonly pieces: SerifPiece[] };
+
+/**
+ * The serif at one end of a stroke as an outline of its own laid over the end,
+ * or `null` where that end has none or it cannot stand there.
+ *
+ * Where it stands is read off the stroke's own ink, as the stroke is drawn in
+ * a single font: how wide the stroke is on the cut, and where its edges are a
+ * serif's height further up.
+ */
+function laidSerif(c: Contour, which: "start" | "end"): LaidSerif | null {
+  if (strokeCut(c, which)?.serif === undefined) return null;
+  const stretches = stretchesOf(c);
+  const stretch = which === "start" ? stretches[0] : stretches[stretches.length - 1];
+  const cut = which === "start" ? stretch?.cuts[0] : stretch?.cuts[stretch.cuts.length - 1];
+  if (stretch === undefined || cut?.serif === undefined) return null;
+  const parts = stretchParts(stretch);
+  const stood = serifEnd([...parts.loops, ...parts.sweeps.flat()], cut, false);
+  return stood === null ? null : { cut: stood.cut, pieces: stood.pieces };
 }
 
 /** Below this average thickness, in units, a region of ink is a sliver. */
@@ -446,6 +499,20 @@ function endsOf(
   const caps: Cubic[][] = [];
   for (const cut of cuts) {
     const plain = (): void => void made.push(cut);
+    if (cut.serif !== undefined) {
+      const stood = serifEnd(loops, cut, true);
+      if (stood === null) {
+        plain();
+      } else {
+        made.push(stood.cut);
+        caps.push(
+          stood.pieces
+            .map((piece) => piece.curve)
+            .filter((s) => Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) > 1e-9),
+        );
+      }
+      continue;
+    }
     if (!cut.nibbed || !(cut.pen.thickness > 0) || !(cut.pen.width > 0)) {
       plain();
       continue;
@@ -476,6 +543,53 @@ function endsOf(
     caps.push(halfPen(short, edge.from, edge.to, depth));
   }
   return { cuts: made, caps };
+}
+
+/**
+ * A serif stood on a cut: its outline, and the cut the stroke is stopped at
+ * under it. `null` where the cut misses the ink, or the serif has no height.
+ *
+ * The serif's foot is on the cut's line, so the last point is still where the
+ * ink ends. Its sides come back to the stroke's edges, which are read off the
+ * ink in two places — on the line, and at the top of the serif — and taken to
+ * be straight between: so the serif is as wide as the stroke is there, and
+ * leans as the stroke does.
+ *
+ * `joined`, the stroke is stopped at the top of the serif and the serif stands
+ * on the edge that leaves, sharing it, as an end shaped by the pen does: the
+ * two are one outline with nothing lying along anything. Not joined — a
+ * variable font, whose overlaps stay, or a stroke too short to be measured at
+ * the serif's top — the stroke is stopped inside the serif and the two overlap.
+ */
+function serifEnd(
+  loops: readonly (readonly Cubic[])[],
+  cut: StrokeCut,
+  joined: boolean,
+): { cut: StrokeCut; pieces: SerifPiece[] } | null {
+  const serif = cut.serif;
+  if (serif === undefined) return null;
+  const foot = crossing(loops, cut);
+  const rise = serifRise(serif);
+  if (foot === null || !(rise > 0)) return null;
+  const above = (by: number): StrokeCut => ({
+    ...cut,
+    through: { x: cut.through.x - cut.normal.x * by, y: cut.through.y - cut.normal.y * by },
+  });
+  const measured = crossing(loops, above(rise));
+  // Where it cannot be measured, as the stroke was going when it got here.
+  const along = { x: -cut.normal.y, y: cut.normal.x };
+  const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
+  const lean = (-(cut.onward.x * along.x + cut.onward.y * along.y) / facing) * rise;
+  const top = measured ?? { from: foot.from + lean, to: foot.to + lean };
+  const pieces = serifOutline(serif, {
+    through: cut.through,
+    normal: cut.normal,
+    foot,
+    top,
+    rise,
+  });
+  if (pieces === null) return null;
+  return { cut: above(joined && measured !== null ? rise : serifInset(serif)), pieces };
 }
 
 /**
@@ -554,6 +668,8 @@ export type StrokeCut = {
   readonly pen: PenShape;
   /** Whether the end is closed with half the pen's outline, not the cut itself. */
   readonly nibbed: boolean;
+  /** The serif standing on the cut, where there is one. */
+  readonly serif?: Serif;
 };
 
 /**
@@ -591,6 +707,11 @@ export function strokeCut(c: Contour, which: "start" | "end"): StrokeCut | null 
   }
   if (normal.x * onward.x + normal.y * onward.y < SHALLOWEST_CUT) return null;
   const pen = penShapeOf(penAt(c, which === "start" ? 0 : c.nodes.length - 1) ?? c.nib);
+  const serif = node.end.serif;
+  // A serif closes the end, whatever else it was closed with.
+  if (serif !== undefined && serif.height > 0) {
+    return { through: node.pt, normal, onward, pen, nibbed: false, serif };
+  }
   return { through: node.pt, normal, onward, pen, nibbed: node.end.shape === "nib" };
 }
 

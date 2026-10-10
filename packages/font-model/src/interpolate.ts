@@ -1,3 +1,4 @@
+import { type EndSerif, SERIF_NUMBERS, serifNumbers } from "./serif.js";
 import type { Vec2 } from "@typewright/geometry";
 
 import type { Anchor } from "./anchor.js";
@@ -220,6 +221,23 @@ function mixContour(
   };
 }
 
+/** An end's serif between masters: every number of it mixed. */
+function mixedSerif(
+  base: EndSerif,
+  others: readonly (Node | undefined)[],
+  weights: readonly number[],
+): EndSerif {
+  const numbers = { ...serifNumbers(base) };
+  for (const key of SERIF_NUMBERS) {
+    numbers[key] = mix(
+      others.map((n) => n?.end?.serif?.[key] ?? null),
+      weights,
+      base[key],
+    );
+  }
+  return { ...base, ...numbers };
+}
+
 function mixNode(
   base: Node,
   others: readonly (Node | undefined)[],
@@ -275,17 +293,23 @@ function mixNode(
     ...(base.end === undefined
       ? {}
       : {
-          end:
-            typeof base.end.cut === "number"
+          end: {
+            ...base.end,
+            ...(typeof base.end.cut === "number"
               ? {
-                  ...base.end,
                   cut: mix(
                     others.map((n) => (typeof n?.end?.cut === "number" ? n.end.cut : null)),
                     weights,
                     base.end.cut,
                   ),
                 }
-              : base.end,
+              : {}),
+            // A serif's numbers interpolate, each on its own; a master with no
+            // serif there counts as the base's.
+            ...(base.end.serif === undefined
+              ? {}
+              : { serif: mixedSerif(base.end.serif, others, weights) }),
+          },
         }),
     // A point's own pen interpolates with it, the way the contour's does. A master
     // whose point has no pen of its own counts as the base's here, as a missing
