@@ -7,6 +7,7 @@ import {
   reverse,
   subcurve,
   tangent,
+  unitRoots,
 } from "./cubic.js";
 import { halfNib, nibTangencies } from "./nib.js";
 import {
@@ -56,6 +57,21 @@ export type StrokeMaster = {
   readonly pens: readonly PenShape[];
   readonly closed: boolean;
   readonly blends?: readonly (SegmentBlend | undefined)[];
+  /** How each end of an open path is cut, where it is not left as the pen leaves it. */
+  readonly cuts?: { readonly start?: PlannedCut; readonly end?: PlannedCut };
+};
+
+/**
+ * A straight line an end of a stroke is cut by: the point it goes through, the
+ * way it faces — away from the ink that is kept — the way the path was going
+ * when it got there, and whether the end is then closed with half the pen's own
+ * outline instead of with the cut itself.
+ */
+export type PlannedCut = {
+  readonly through: Vec2;
+  readonly normal: Vec2;
+  readonly onward: Vec2;
+  readonly nibbed: boolean;
 };
 
 /** A piece of the line round the ink, and whether it is a straight one. */
@@ -103,6 +119,19 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
   // edge is followed round a join here: not yet drawn to one plan.
   if (masters.some((m) => m.pens.some(isSquared))) return null;
 
+  // An end is cut in every master or in none, and closed the same way in all:
+  // what closes it is pieces of the line, and the masters share their pieces.
+  const cutAt = (m: StrokeMaster, end: "start" | "end"): PlannedCut | undefined =>
+    m.closed ? undefined : m.cuts?.[end];
+  for (const end of ["start", "end"] as const) {
+    const one = cutAt(first, end);
+    for (const m of masters) {
+      const other = cutAt(m, end);
+      if ((other === undefined) !== (one === undefined)) return null;
+      if (other !== undefined && one !== undefined && other.nibbed !== one.nibbed) return null;
+    }
+  }
+
   const broad = masters.every((m) => m.pens.every(isBroad));
   const oval = masters.every((m) => m.pens.every((pen) => !isBroad(pen)));
   if (!broad && !oval) return null;
@@ -124,6 +153,27 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
   const sides = broad ? broadSides(masters) : ovalSides(masters, profiles);
   if (sides === null) return null;
 
+  // The ends that are cut: the side arriving at each and the side leaving it
+  // stopped at the cut, and what goes between them in place of the pen's edge.
+  const closures = masters.map(() => new Map<string, PlannedPiece[]>());
+  for (const [at, m] of masters.entries()) {
+    for (const end of ["end", "start"] as const) {
+      const cut = cutAt(m, end);
+      if (cut === undefined) continue;
+      const index = end === "end" ? count - 1 : 0;
+      // Out along the right to the far end and back along the left: so the far
+      // end is come to forwards, and the near end backwards.
+      const arriving: Leg = { index, forward: end === "end" };
+      const leaving: Leg = { index, forward: end !== "end" };
+      const pen = profiles[at]![index]!.at(end === "end" ? 1 : 0);
+      const made = cutTurn(sides[at]!.get(key(arriving))!, sides[at]!.get(key(leaving))!, cut, pen);
+      if (made === null) return null;
+      sides[at]!.set(key(arriving), made.arriving);
+      sides[at]!.set(key(leaving), made.leaving);
+      closures[at]!.set(`${key(arriving)}>${key(leaving)}`, made.closure);
+    }
+  }
+
   const out: PlannedPiece[][][] = masters.map(() => []);
   for (const cycle of cycles) {
     const loops: PlannedPiece[][] = masters.map(() => []);
@@ -136,7 +186,9 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
       const turns = joins.some((j) => j.turns);
       for (const [at, loop] of loops.entries()) {
         loop.push(...sides[at]!.get(key(leg))!);
-        if (turns) loop.push(...joins[at]!.pieces);
+        const closure = closures[at]!.get(`${key(leg)}>${key(next)}`);
+        if (closure !== undefined) loop.push(...closure);
+        else if (turns) loop.push(...joins[at]!.pieces);
       }
     }
     for (const [at, loop] of loops.entries()) out[at]!.push(loop);
@@ -344,6 +396,145 @@ const movedBy = (s: Cubic, by: Vec2): Cubic => {
   const moved = (p: Vec2): Vec2 => ({ x: p.x + by.x, y: p.y + by.y });
   return cubic(moved(s.a), moved(s.c1), moved(s.c2), moved(s.b));
 };
+
+/** How far a point is past a cut's line: nothing or less is kept. */
+const pastCut = (cut: PlannedCut, p: Vec2): number =>
+  (p.x - cut.through.x) * cut.normal.x + (p.y - cut.through.y) * cut.normal.y;
+
+/** Where a curve crosses a cut's line, as parameters in order. */
+function cutCrossings(cut: PlannedCut, c: Cubic): number[] {
+  const f0 = pastCut(cut, c.a);
+  const f1 = pastCut(cut, c.c1);
+  const f2 = pastCut(cut, c.c2);
+  const f3 = pastCut(cut, c.b);
+  return unitRoots(f3 - 3 * f2 + 3 * f1 - f0, 3 * (f2 - 2 * f1 + f0), 3 * (f1 - f0), f0).sort(
+    (a, b) => a - b,
+  );
+}
+
+/** A point carried along the way the path was going until it is on a cut's line. */
+function ontoCut(cut: PlannedCut, p: Vec2): Vec2 {
+  const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
+  const by = -pastCut(cut, p) / facing;
+  return { x: p.x + cut.onward.x * by, y: p.y + cut.onward.y * by };
+}
+
+const pointPiece = (p: Vec2, line: boolean): PlannedPiece => ({ curve: cubic(p, p, p, p), line });
+
+/**
+ * A side stopped where it comes to a cut, as the same number of pieces and one
+ * more: a straight one that carries it on to the line where it stops short.
+ *
+ * A side that is past the line when it ends is cut where it last crossed, and
+ * every piece after that is a piece of no length at the crossing: there in
+ * every master, as a master whose side stops short has the carrying-on piece
+ * and this one has it with no length. `null` where the whole side is past the
+ * line, and there is nothing of it to stop.
+ */
+function stoppedAt(
+  pieces: readonly PlannedPiece[],
+  cut: PlannedCut,
+): { pieces: PlannedPiece[]; at: Vec2 } | null {
+  const last = pieces[pieces.length - 1];
+  if (last === undefined) return null;
+  if (pastCut(cut, last.curve.b) <= 0) {
+    const at = ontoCut(cut, last.curve.b);
+    return { pieces: [...pieces, { curve: lineAsCubic(last.curve.b, at), line: true }], at };
+  }
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    const piece = pieces[i]!;
+    const crossings = cutCrossings(cut, piece.curve);
+    const t = crossings[crossings.length - 1];
+    if (t === undefined) continue;
+    const at = evaluate(piece.curve, t);
+    return {
+      pieces: [
+        ...pieces.slice(0, i),
+        { curve: subcurve(piece.curve, 0, t), line: piece.line },
+        ...pieces.slice(i + 1).map((p) => pointPiece(at, p.line)),
+        pointPiece(at, true),
+      ],
+      at,
+    };
+  }
+  return null;
+}
+
+/** A side started where it leaves a cut: {@link stoppedAt}, the other way round. */
+function startedAt(
+  pieces: readonly PlannedPiece[],
+  cut: PlannedCut,
+): { pieces: PlannedPiece[]; at: Vec2 } | null {
+  const turned = [...pieces].reverse().map((p) => ({ curve: reverse(p.curve), line: p.line }));
+  const stopped = stoppedAt(turned, cut);
+  if (stopped === null) return null;
+  return {
+    pieces: [...stopped.pieces].reverse().map((p) => ({ curve: reverse(p.curve), line: p.line })),
+    at: stopped.at,
+  };
+}
+
+/** A quarter of a circle as one curve: how far along its tangents the handles go. */
+const QUARTER = (4 / 3) * (Math.SQRT2 - 1);
+
+/**
+ * An end that is cut: the side that comes to it and the side that leaves it,
+ * each stopped at the cut, and what goes between them.
+ *
+ * Between them is the cut itself, one straight piece along it. Or, for an end
+ * closed with the pen's shape, half the pen's outline: as wide as the stroke is
+ * where the line crosses it, as deep in proportion as the pen is thick to its
+ * width, leaning the way the path was going, and standing on a line that much
+ * short of the cut so that its tip is on the cut. A half oval is two quarters,
+ * and each is one curve. A broad edge has no shape but a line, and is closed
+ * with the cut whichever was asked.
+ *
+ * The same as the ink a single font gets, which is the stroke carried on and
+ * cut: a side carried on is carried on straight, the pen not changing past the
+ * end of the path.
+ */
+function cutTurn(
+  arriving: readonly PlannedPiece[],
+  leaving: readonly PlannedPiece[],
+  cut: PlannedCut,
+  pen: PenShape,
+): { arriving: PlannedPiece[]; leaving: PlannedPiece[]; closure: PlannedPiece[] } | null {
+  const from = stoppedAt(arriving, cut);
+  const to = startedAt(leaving, cut);
+  if (from === null || to === null) return null;
+  if (!cut.nibbed || isBroad(pen)) {
+    return {
+      arriving: from.pieces,
+      leaving: to.pieces,
+      closure: [{ curve: lineAsCubic(from.at, to.at), line: true }],
+    };
+  }
+
+  const across = Math.hypot(to.at.x - from.at.x, to.at.y - from.at.y);
+  const depth = (pen.thickness / 2) * (across / pen.width);
+  const short: PlannedCut = {
+    ...cut,
+    through: { x: cut.through.x - cut.normal.x * depth, y: cut.through.y - cut.normal.y * depth },
+  };
+  const a = stoppedAt(arriving, short);
+  const b = startedAt(leaving, short);
+  if (a === null || b === null) return null;
+
+  const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
+  const out = { x: (cut.onward.x / facing) * depth, y: (cut.onward.y / facing) * depth };
+  const middle = { x: (a.at.x + b.at.x) / 2, y: (a.at.y + b.at.y) / 2 };
+  const half = { x: a.at.x - middle.x, y: a.at.y - middle.y };
+  const tip = { x: middle.x + out.x, y: middle.y + out.y };
+  const by = (p: Vec2, v: Vec2, k: number): Vec2 => ({ x: p.x + v.x * k, y: p.y + v.y * k });
+  return {
+    arriving: a.pieces,
+    leaving: b.pieces,
+    closure: [
+      { curve: cubic(a.at, by(a.at, out, QUARTER), by(tip, half, QUARTER), tip), line: false },
+      { curve: cubic(tip, by(tip, half, -QUARTER), by(b.at, out, QUARTER), b.at), line: false },
+    ],
+  };
+}
 
 /**
  * What goes between the end of one leg and the start of the next: the pen's edge,

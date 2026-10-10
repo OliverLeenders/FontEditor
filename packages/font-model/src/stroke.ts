@@ -110,11 +110,6 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
  */
 export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour[][] | null {
   if (strokes.some((c) => c.nib === undefined || c.nodes.length < 2)) return null;
-  // An end cut straight is the ink cut by a line, which is a different number
-  // of points wherever the line falls: not yet a thing every master shares.
-  if (strokes.some((c) => strokeCut(c, "start") !== null || strokeCut(c, "end") !== null)) {
-    return null;
-  }
   const planned = plannedStrokes(
     strokes.map((c) => {
       const curves: Cubic[] = [];
@@ -122,7 +117,22 @@ export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour
         const segment = segmentAt(c, i);
         if (segment !== null) curves.push(segmentCubic(segment));
       }
-      return { curves, pens: pensOf(c), closed: c.closed, blends: c.nodes.map((n) => n.blend) };
+      // The ends that are cut, as the plan wants them. An end whose cut is too
+      // nearly along the path to make is left as the pen leaves it, here as in
+      // a single font.
+      const start = strokeCut(c, "start");
+      const end = strokeCut(c, "end");
+      const cuts = {
+        ...(start === null ? {} : { start }),
+        ...(end === null ? {} : { end }),
+      };
+      return {
+        curves,
+        pens: pensOf(c),
+        closed: c.closed,
+        blends: c.nodes.map((n) => n.blend),
+        cuts,
+      };
     }),
   );
   if (planned === null) return null;

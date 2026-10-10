@@ -587,9 +587,7 @@ on that. The point does not move, and the drag is one step to undo.
 
 Only the segment that ends there is cut: the bowl of a u hangs below the tops of its stems and
 is not touched by cutting them. A cut within fifteen degrees of the way the path is going is
-not made, since the pen would never get past it, and the end is left as the pen leaves it. A
-stroke with a cut end does not yet vary in a variable font: it is written as the default
-master draws it and named in the export's warnings.
+not made, since the pen would never get past it, and the end is left as the pen leaves it.
 
 The **Stroke** tool (`N`) draws exactly as the pen tool does and makes strokes instead of
 outlines, with the last pen set in the Pen section — so a run of strokes in one hand is the pen
@@ -609,7 +607,8 @@ needs the same ones. Two things have no such line and are written as the default
 them at every weight, with a warning that says which glyphs: a broad edge whose angle or width
 changes along the stroke, and a pen that is a broad edge in one master and an oval in another.
 So is a stroke whose masters have not the same points, one with a **Step** in its blend, or
-one with an end cut straight, or a pen with any squareness.
+a pen with any squareness, or an end that is cut in one master and not in another, or closed
+differently. An end cut the same way in every master varies with the rest of the stroke.
 
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it

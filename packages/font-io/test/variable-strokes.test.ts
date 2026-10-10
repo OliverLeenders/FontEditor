@@ -55,9 +55,23 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
     ),
     { angle: 30, width: pen, thickness },
   );
+  // A stem whose foot is cut level and closed with the pen's shape, and whose
+  // head is cut on a slant: ends that are cut, drawn to the same points too.
+  const stem = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(260, 650), { out: at(260, 450), end: { cut: 12 } }),
+        node(ids.node(), at(300, 0), { in: at(300, 220), end: { cut: 0, shape: "nib" } }),
+      ],
+      false,
+    ),
+    { angle: 30, width: pen, thickness },
+  );
   return fontDocument(
     [
       glyph(".notdef", { advance: 500 }),
+      glyph("l", { advance: 600, unicodes: [0x6c], contours: [stem] }),
       glyph("s", { advance: 600, unicodes: [0x73], contours: [skeleton] }),
       glyph("dollar", {
         advance: 600,

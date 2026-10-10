@@ -134,7 +134,8 @@ after another, which along a line of two hundred points is a couple of units of 
 
 ```sh
 STROKES_OUT=/tmp/strokes pnpm --filter @typewright/font-io exec vitest run variable-strokes
-python check_vf_strokes.py /tmp/strokes
+python check_vf_strokes.py /tmp/strokes s
+python check_vf_strokes.py /tmp/strokes l
 ```
 
 ## The TrueType flavour

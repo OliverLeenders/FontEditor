@@ -1481,14 +1481,19 @@ its own outline by the direction it faces. A rectangle proper has no exponent an
 with the largest one used, short of square at its corners by a hundredth of the pen's
 half-width.
 
+A cut end varies in a variable font. The line round the ink stops at the cut on each side of
+the stroke — where the side last crosses it, or carried on straight to it where the side stops
+short — and goes along the cut, or round half the pen's outline in two curves, in place of the
+pen's edge at that end. A side that is cut short keeps its pieces, the ones past the cut with
+no length, so every master has the same. fontTools draws the proof font's cut stem at each
+weight beside its S.
+
 #### Open
 
 What is next in the same direction:
 
-- **A cut end, and a pen with corners, in a variable font**. A cut is the line round the ink
-  going straight along the cut where it now goes round the pen; a pen with corners is its
-  own outline followed round a join where the oval's is. Such strokes are still written as
-  the default master draws them.
+- **A pen with corners in a variable font**: its own outline followed round a join where
+  the oval's is. Such a stroke is still written as the default master draws it.
 - **A rectangle that is one**, exact as the broad edge is: its sides the path moved over by a
   corner, with a straight line across where the path runs along one of its edges.
 - **A broad edge that turns or widens along a stroke, in a variable font**, which is still

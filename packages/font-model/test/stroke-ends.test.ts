@@ -197,8 +197,9 @@ describe("a cut end between masters", () => {
     expect(between.contours[0]!.nodes[1]!.end).toEqual({ cut: 10 });
   });
 
-  it("is not yet drawn to one plan for a variable font", () => {
-    expect(plannedInk([stem(OVAL, { cut: 0 }), stem(OVAL, { cut: 0 })], ids)).toBeNull();
+  it("is drawn to one plan for a variable font, as an end left to the pen is", () => {
+    // What the plan comes to is held against the ink in `stroke-planned-ends`.
+    expect(plannedInk([stem(OVAL, { cut: 0 }), stem(OVAL, { cut: 0 })], ids)).not.toBeNull();
     expect(plannedInk([stem(OVAL), stem(OVAL)], ids)).not.toBeNull();
   });
 });

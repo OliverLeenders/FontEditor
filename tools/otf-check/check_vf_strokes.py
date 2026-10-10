@@ -87,7 +87,8 @@ for variable in ("Penned.otf", "Penned.ttf"):
         print(
             f"{variable} at {weight}: {checked} points, {missing} missing, {extra} extra"
         )
-        if checked < 500:
+        # A stem is a narrow thing, and most of a grid laid over it is near an edge.
+        if checked < 300:
             problems.append(f"{variable} at {weight}: only {checked} points to go by")
         if missing or extra:
             problems.append(

@@ -285,7 +285,9 @@ jobs:
         run: STROKES_OUT="$RUNNER_TEMP/strokes" pnpm --filter @typewright/font-io exec vitest run variable-strokes
 
       - name: Draw them at each weight with fontTools and compare the fill
-        run: python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes"
+        run: |
+          python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes" s
+          python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes" l
 
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"
