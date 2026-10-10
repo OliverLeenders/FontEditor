@@ -289,7 +289,12 @@ drawing under the new name. Serif styles are shared by name and not by number: a
 in one master is added to the others with the numbers it was given, to be made each master's
 own there; one renamed is renamed in all of them, on the ends that have it too; one removed is
 removed, the letters keeping their serifs. A style's numbers changed in one master change in
-no other, which is how a serif is slight in the light and heavy in the bold. Masters that differ already — a family drawn elsewhere, or from
+no other, which is how a serif is slight in the light and heavy in the bold. Which ends have a
+serif is shared the same way: give the foot of the l a serif in one master, take it off, or
+give it another style, and the same end in the others follows when you leave — the same end of
+the same stroke, by its place among the glyph's contours — with that master's own numbers for
+the style, and standing on that master's own cut where the end is cut already. A master with
+no such stroke there is left alone. Masters that differ already — a family drawn elsewhere, or from
 before this — are not made to agree, since nothing says which is right: **Check** in the
 Masters panel lists what two masters differ in, a part at a time, with a button to copy that
 part across.

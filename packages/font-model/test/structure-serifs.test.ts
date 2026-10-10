@@ -113,6 +113,121 @@ describe("a serif style changed in one master", () => {
   });
 });
 
+describe("a serif put on an end in one master", () => {
+  /** A master whose l has a bare stem, cut or not, and the style to give it. */
+  const bare = (style: SerifStyle, cut?: number): FontDocument => {
+    const m = master(style);
+    const g = m.glyphs["l"]!;
+    const c = g.contours[0]!;
+    const nodes = c.nodes.map((n, i) => {
+      if (i !== 1) return n;
+      const { end: _end, ...rest } = n;
+      return cut === undefined ? rest : { ...rest, end: { cut } };
+    });
+    return { ...m, glyphs: { l: { ...g, contours: [{ ...c, nodes }] } } };
+  };
+  /** The same master with its l's foot ended otherwise. */
+  const footed = (m: FontDocument, end: { cut: number; serif?: EndSerif } | null): FontDocument => {
+    const g = m.glyphs["l"]!;
+    const c = g.contours[0]!;
+    const nodes = c.nodes.map((n, i) => {
+      if (i !== 1) return n;
+      const { end: _end, ...rest } = n;
+      return end === null ? rest : { ...rest, end };
+    });
+    return { ...m, glyphs: { l: { ...g, contours: [{ ...c, nodes }] } } };
+  };
+  const { name: _name, ...LIGHT_NUMBERS } = LIGHT;
+  const endOf = (m: FontDocument) => m.glyphs["l"]!.contours[0]!.nodes[1]!.end;
+
+  it("is put on that end in the others, with each master's own numbers for the style", () => {
+    const light = bare(LIGHT);
+    const given = footed(light, { cut: 0, serif: { ...LIGHT_NUMBERS, style: "Foot" } });
+    const change = structuralChange(light, given)!;
+    expect(change.ends).toEqual([
+      { glyph: "l", contour: 0, which: "end", cut: 0, serif: { ...LIGHT_NUMBERS, style: "Foot" } },
+    ]);
+
+    const bold = applyStructure(bare(BOLD), change);
+    expect(endOf(bold)).toEqual({
+      cut: 0,
+      serif: { ...DEFAULT_SERIF, left: 80, right: 80, height: 40, style: "Foot" },
+    });
+    // Made twice it is made once.
+    expect(applyStructure(bold, change)).toBe(bold);
+  });
+
+  it("stands on the other master's own cut where its end is cut already", () => {
+    const light = bare(LIGHT);
+    const change = structuralChange(
+      light,
+      footed(light, { cut: 0, serif: { ...LIGHT_NUMBERS, style: "Foot" } }),
+    )!;
+    expect(endOf(applyStructure(bare(BOLD, 12), change))!.cut).toBe(12);
+  });
+
+  it("comes with its numbers where it has no style, to be made the other master's own", () => {
+    const light = bare(LIGHT);
+    const own = { ...LIGHT_NUMBERS, left: 7 };
+    const change = structuralChange(light, footed(light, { cut: 0, serif: own }))!;
+    expect(endOf(applyStructure(bare(BOLD), change))!.serif).toEqual(own);
+  });
+
+  it("is taken off in the others where it is taken off, their cut left", () => {
+    const light = master(LIGHT);
+    const change = structuralChange(light, footed(light, { cut: 0 }))!;
+    expect(change.ends).toEqual([{ glyph: "l", contour: 0, which: "end", cut: 0, serif: null }]);
+    expect(endOf(applyStructure(master(BOLD), change))).toEqual({ cut: 0 });
+  });
+
+  it("changes its style in the others where its style was changed", () => {
+    const head: SerifStyle = { ...DEFAULT_SERIF, name: "Head", height: 20 };
+    const { name: _head, ...headNumbers } = head;
+    const light = addedSerifStyle(master(LIGHT), head)!;
+    const change = structuralChange(
+      light,
+      footed(light, { cut: 0, serif: { ...headNumbers, style: "Head" } }),
+    )!;
+    const bold = applyStructure(addedSerifStyle(master(BOLD), { ...head, height: 66 })!, change);
+    expect(endOf(bold)!.serif).toMatchObject({ height: 66, style: "Head" });
+  });
+
+  it("is nothing to carry where only its numbers changed, on the end or in the style", () => {
+    const light = master(LIGHT);
+    const tuned = footed(light, {
+      cut: 0,
+      serif: { ...LIGHT_NUMBERS, right: 5, style: "Foot", own: ["right"] },
+    });
+    expect(structuralChange(light, tuned)).toBeNull();
+  });
+
+  it("arrives with a style added in the same sitting, the style first", () => {
+    const light = { ...bare(LIGHT), serifs: [] };
+    const styled = footed(addedSerifStyle(light, LIGHT)!, {
+      cut: 0,
+      serif: { ...LIGHT_NUMBERS, style: "Foot" },
+    });
+    const bold = applyStructure({ ...bare(BOLD), serifs: [] }, structuralChange(light, styled)!);
+    expect(bold.serifs).toEqual([LIGHT]);
+    expect(endOf(bold)!.serif).toEqual({ ...LIGHT_NUMBERS, style: "Foot" });
+  });
+
+  it("leaves a master alone that has no such stroke, or an outline in its place", () => {
+    const light = bare(LIGHT);
+    const change = structuralChange(
+      light,
+      footed(light, { cut: 0, serif: { ...LIGHT_NUMBERS, style: "Foot" } }),
+    )!;
+    const empty = { ...fontDocument([glyph("l", { advance: 400 })]), serifs: [BOLD] };
+    expect(applyStructure(empty, change)).toBe(empty);
+    const b = bare(BOLD);
+    const g = b.glyphs["l"]!;
+    const { nib: _nib, ...outline } = g.contours[0]!;
+    const outlined = { ...b, glyphs: { l: { ...g, contours: [outline] } } };
+    expect(applyStructure(outlined, change)).toBe(outlined);
+  });
+});
+
 describe("masters whose serif styles have come apart", () => {
   const head: SerifStyle = { ...DEFAULT_SERIF, name: "Head", height: 20 };
   const flag: SerifStyle = { ...DEFAULT_SERIF, name: "Flag", right: 0 };

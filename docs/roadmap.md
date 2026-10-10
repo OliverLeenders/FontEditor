@@ -1562,12 +1562,23 @@ A master that is a layer of another has no list and follows in its ends. Where m
 come apart the Masters panel's check names the styles only one of them has, to be added one
 way or the other.
 
+Which ends have a serif is the family's too, or a serif is there at one end of an axis and not
+at the other and does not vary. An end that gained a serif, lost one or changed its style in
+the master being left does so in the others: the same end of the stroke at the same place
+among the glyph's contours, which is what masters that interpolate have in common. Its numbers
+there are that master's — the style's as that master has it, or the numbers it came with where
+it has no style — and it stands on that master's cut where the end is cut already. Told only on
+a contour that is the same contour at both moments and an end that is the same point, so a
+stroke drawn since is still that master's drawing; and a serif whose numbers alone changed is
+not told.
+
 #### Open
 
 What is next in the same direction:
 
-- **A serif put on an end in every master at once**: the styles are the family's now, but
-  giving an end a serif is still done master by master, as drawing is.
+- **Ends whose serifs already differ between masters, told**: what changes from here on is
+  carried, and the Masters panel's check does not yet list an end that has a serif in one
+  master and none in another.
 - **A serif on a short last segment**, shorter than the serif is high: it is laid over the end
   and its sides run as the path was going, where a longer segment is measured.
 

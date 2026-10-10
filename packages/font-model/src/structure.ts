@@ -13,8 +13,14 @@ import type { Glyph } from "./glyph.js";
 import type { Grid } from "./grid.js";
 import { type Kerning, groupNameOf, isGroupKey, renameKernGroup } from "./kerning.js";
 import { scaledFont } from "./scale.js";
-import { type SerifStyle, sameSerif } from "./serif.js";
-import { addedSerifStyle, carriedSerifRemoval, carriedSerifRename } from "./serif-styles.js";
+import type { StrokeEnd } from "./node.js";
+import { type EndSerif, type SerifStyle, sameSerif, serifNumbers } from "./serif.js";
+import {
+  addedSerifStyle,
+  carriedSerifRemoval,
+  carriedSerifRename,
+  serifStyleNamed,
+} from "./serif-styles.js";
 
 /**
  * What the masters of one typeface have to have in common, and carrying a
@@ -43,6 +49,13 @@ import { addedSerifStyle, carriedSerifRemoval, carriedSerifRename } from "./seri
  * vary. What Foot's numbers are is each master's own, and is how it varies —
  * slight in the light, heavy in the bold. So a style added, renamed or removed
  * is carried, and a style changed is not.
+ *
+ * And so with which ends of strokes have a serif. That the foot of the l has
+ * one, and of which style, is the family's, or the serif is there at one end
+ * of an axis and not at the other and cannot vary; its numbers are the
+ * master's. An end is the same end in another master by where it is: the same
+ * end of the stroke at the same place among the glyph's contours, which is
+ * what masters that interpolate have in common.
  */
 
 /** The parts of a font's information that are the master's own, and are never carried across. */
@@ -93,6 +106,21 @@ export type StructuralChange = {
     readonly removed: readonly string[];
     readonly added: readonly SerifStyle[];
   } | null;
+  /**
+   * The ends of strokes that gained a serif, lost one, or have one of another
+   * style now: the glyph, which of its contours, which end, and the serif as
+   * it is now — `null` for none — with the cut it stands on.
+   */
+  readonly ends: readonly CarriedEnd[];
+};
+
+/** A stroke's end whose serif changed in what the masters share. */
+export type CarriedEnd = {
+  readonly glyph: GlyphName;
+  readonly contour: number;
+  readonly which: "start" | "end";
+  readonly cut: StrokeEnd["cut"];
+  readonly serif: EndSerif | null;
 };
 
 /**
@@ -181,8 +209,89 @@ export function structuralChange(base: FontDocument, now: FontDocument): Structu
     fixedWidth: base.fixedWidth === now.fixedWidth ? null : { to: now.fixedWidth },
     nameLigatures: base.nameLigatures === now.nameLigatures ? null : now.nameLigatures,
     serifs: serifsChanged(base.serifs, now.serifs),
+    ends: endsChanged(base, now, was),
   };
   return isNothing(change) ? null : change;
+}
+
+/**
+ * The ends of strokes whose serif came, went or changed its style between two
+ * moments of a master, in the glyphs both moments have.
+ *
+ * Told on the contours that are the same contour at the same place, at ends
+ * that are the same point: a stroke drawn since is this master's drawing, and
+ * arrives nowhere. A serif whose numbers alone changed is not told, those
+ * being the master's own.
+ */
+function endsChanged(
+  base: FontDocument,
+  now: FontDocument,
+  was: ReadonlyMap<GlyphName, GlyphName>,
+): CarriedEnd[] {
+  const out: CarriedEnd[] = [];
+  for (const name of now.glyphOrder) {
+    const after = now.glyphs[name];
+    const before = base.glyphs[was.get(name) ?? name];
+    if (after === undefined || before === undefined || before.contours === after.contours) continue;
+    for (const [index, c] of after.contours.entries()) {
+      const old = before.contours[index];
+      if (old === undefined || old === c || old.id !== c.id) continue;
+      if (c.nib === undefined || c.closed || c.nodes.length < 2) continue;
+      for (const which of ["start", "end"] as const) {
+        const node = which === "start" ? c.nodes[0]! : c.nodes[c.nodes.length - 1]!;
+        const then = which === "start" ? old.nodes[0] : old.nodes[old.nodes.length - 1];
+        if (then === undefined || then.id !== node.id) continue;
+        const serif = node.end?.serif;
+        const had = then.end?.serif;
+        if (serif === undefined && had === undefined) continue;
+        if (serif !== undefined && had !== undefined && serif.style === had.style) continue;
+        out.push({
+          glyph: name,
+          contour: index,
+          which,
+          cut: node.end?.cut ?? 0,
+          serif: serif ?? null,
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * A master with the serif of one end as another master has it now.
+ *
+ * Its numbers are this master's: the style's as this master has it, where the
+ * serif has a style this master has too, and otherwise the numbers it came
+ * with, to be made this master's own. The cut it stands on is this master's
+ * where the end is cut already, and comes with the serif where it is not. An
+ * end that has a serif of that style already is left as it is, and so is a
+ * glyph that has no such stroke here.
+ */
+function carriedEnd(document: FontDocument, end: CarriedEnd): FontDocument {
+  const g = document.glyphs[end.glyph];
+  const c = g?.contours[end.contour];
+  if (g === undefined || c === undefined) return document;
+  if (c.nib === undefined || c.closed || c.nodes.length < 2) return document;
+  const index = end.which === "start" ? 0 : c.nodes.length - 1;
+  const node = c.nodes[index]!;
+  const has = node.end?.serif;
+
+  let next: StrokeEnd | undefined;
+  if (end.serif === null) {
+    if (node.end === undefined || has === undefined) return document;
+    const { serif: _gone, ...rest } = node.end;
+    next = rest;
+  } else {
+    if (has !== undefined && has.style === end.serif.style) return document;
+    const style = end.serif.style === undefined ? null : serifStyleNamed(document, end.serif.style);
+    const serif: EndSerif =
+      style === null ? end.serif : { ...serifNumbers(style), style: style.name };
+    next = { cut: node.end?.cut ?? end.cut, serif };
+  }
+  const nodes = c.nodes.map((n, i) => (i === index ? { ...n, end: next } : n));
+  const contours = g.contours.map((each, i) => (i === end.contour ? { ...c, nodes } : each));
+  return putGlyph(document, { ...g, contours });
 }
 
 /**
@@ -226,7 +335,8 @@ function isNothing(change: StructuralChange): boolean {
     change.grid === null &&
     change.fixedWidth === null &&
     change.nameLigatures === null &&
-    change.serifs === null
+    change.serifs === null &&
+    change.ends.length === 0
   );
 }
 
@@ -323,9 +433,11 @@ export function applyStructure(
   // draws them: a master that is a layer of another follows that much.
   for (const [from, to] of change.serifs?.renamed ?? []) next = carriedSerifRename(next, from, to);
   for (const name of change.serifs?.removed ?? []) next = carriedSerifRemoval(next, name);
-  if (sparse) return next;
+  // And which ends have a serif, in the glyphs a master draws.
+  if (sparse) return change.ends.reduce(carriedEnd, next);
 
   for (const style of change.serifs?.added ?? []) next = addedSerifStyle(next, style) ?? next;
+  next = change.ends.reduce(carriedEnd, next);
   for (const g of change.added) {
     if (!(g.name in next.glyphs)) next = putGlyph(next, g);
   }
@@ -500,6 +612,7 @@ export function structureCopy(
     fixedWidth: null,
     nameLigatures: null,
     serifs: null,
+    ends: [],
   };
   const differences = structuralDifferences(from, to);
 
