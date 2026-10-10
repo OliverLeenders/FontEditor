@@ -278,6 +278,7 @@ function mixNode(
           end:
             typeof base.end.cut === "number"
               ? {
+                  ...base.end,
                   cut: mix(
                     others.map((n) => (typeof n?.end?.cut === "number" ? n.end.cut : null)),
                     weights,

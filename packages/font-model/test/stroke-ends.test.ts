@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type Contour, type Nib, contour, contourBounds } from "../src/contour.js";
+import { type Contour, type Nib, contour, contourBounds, readStrokeEnd } from "../src/contour.js";
 import { counterIds } from "../src/ids.js";
 import { interpolateGlyph } from "../src/interpolate.js";
 import { glyph } from "../src/glyph.js";
@@ -191,5 +191,83 @@ describe("a cut end between masters", () => {
   it("is not yet drawn to one plan for a variable font", () => {
     expect(plannedInk([stem(OVAL, { cut: 0 }), stem(OVAL, { cut: 0 })], ids)).toBeNull();
     expect(plannedInk([stem(OVAL), stem(OVAL)], ids)).not.toBeNull();
+  });
+});
+
+describe("a cut end closed with the pen's own shape", () => {
+  const nibbed: StrokeEnd = { cut: 0, shape: "nib" };
+  const ROUND: Nib = { angle: 0, width: 80, thickness: 80 };
+
+  it("still ends on the line through its last point, and is one outline", () => {
+    const ink = inkOf(stem(OVAL, nibbed), ids);
+    expect(ink).toHaveLength(1);
+    expect(boxOf(ink).minY).toBeCloseTo(0, 1);
+    // The middle of the foot is on the baseline.
+    const box = boxOf(ink);
+    expect(inked(ink, (box.minX + box.maxX) / 2, 1)).toBe(true);
+  });
+
+  it("is round at its corners where the plain cut is sharp", () => {
+    const sharp = inkOf(stem(OVAL, { cut: 0 }), ids);
+    const soft = inkOf(stem(OVAL, nibbed), ids);
+    const box = boxOf(sharp);
+    // Just inside each corner of the plain cut.
+    for (const x of [box.minX + 1.5, box.maxX - 1.5]) {
+      expect(inked(sharp, x, 1)).toBe(true);
+      expect(inked(soft, x, 1)).toBe(false);
+    }
+  });
+
+  it("is the stroke's own width, and no wider", () => {
+    const sharp = boxOf(inkOf(stem(OVAL, { cut: 0 }), ids));
+    const soft = boxOf(inkOf(stem(OVAL, nibbed), ids));
+    expect(soft.minX).toBeCloseTo(sharp.minX, 1);
+    expect(soft.maxX).toBeCloseTo(sharp.maxX, 1);
+  });
+
+  it("is half a circle for a round pen", () => {
+    const ink = inkOf(stem(ROUND, nibbed), ids);
+    expect(boxOf(ink).minY).toBeCloseTo(0, 1);
+    // On the circle of radius forty about (200, 40): inside it inked, outside not.
+    const on = (angle: number, r: number) =>
+      [200 + r * Math.cos(angle), 40 + r * Math.sin(angle)] as const;
+    for (const angle of [-0.5, -1.2, -2.0, -2.7]) {
+      expect(inked(ink, ...on(angle, 38))).toBe(true);
+      expect(inked(ink, ...on(angle, 42))).toBe(false);
+    }
+  });
+
+  it("is a box with its corners rounded for a pen with squareness, and the cut itself at a hundred", () => {
+    const boxy = inkOf(stem({ ...OVAL, squareness: 1 }, nibbed), ids);
+    const box = boxOf(boxy);
+    expect(box.minY).toBeCloseTo(0, 1);
+    expect(inked(boxy, box.minX + 1.5, 1)).toBe(true);
+    expect(inked(boxy, box.maxX - 1.5, 1)).toBe(true);
+  });
+
+  it("is the plain cut for a broad edge, which has no shape but a line", () => {
+    const plain = boxOf(inkOf(stem(BROAD, { cut: 0 }), ids));
+    const shaped = inkOf(stem(BROAD, nibbed), ids);
+    expect(boxOf(shaped)).toEqual(plain);
+    expect(inked(shaped, plain.minX + 1.5, 1)).toBe(true);
+  });
+
+  it("is what the canvas fills, too", () => {
+    const regions = inkRegions(stem(OVAL, nibbed));
+    expect(boxOf(regions).minY).toBeCloseTo(0, 1);
+    const box = boxOf(inkOf(stem(OVAL, { cut: 0 }), ids));
+    expect(inked(regions, box.minX + 1.5, 1)).toBe(false);
+  });
+
+  it("is read back with the cut, and is the plain cut where the shape is not known", () => {
+    expect(readStrokeEnd({ cut: 0, shape: "nib" })).toEqual({ cut: 0, shape: "nib" });
+    expect(readStrokeEnd({ cut: "square", shape: "wavy" })).toEqual({ cut: "square" });
+  });
+
+  it("is kept between masters, the angle still turning", () => {
+    const light = glyph("i", { contours: [stem(BROAD, { cut: 0, shape: "nib" })] });
+    const bold = glyph("i", { contours: [stem(BROAD, { cut: 20, shape: "nib" })] });
+    const between = interpolateGlyph([light, bold], [0.5, 0.5])!;
+    expect(between.contours[0]!.nodes[1]!.end).toEqual({ cut: 10, shape: "nib" });
   });
 });

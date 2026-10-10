@@ -1119,7 +1119,8 @@ const CONTINUE: Continuations = {
         if (node?.end === undefined) return null;
         const turned = strokeCutTowards(c, gesture.end, input.point);
         if (turned === null || turned.cut === node.end.cut) return null;
-        return { ...c, nodes: c.nodes.map((n, i) => (i === index ? { ...n, end: turned } : n)) };
+        const end = { ...node.end, cut: turned.cut };
+        return { ...c, nodes: c.nodes.map((n, i) => (i === index ? { ...n, end } : n)) };
       }),
     );
     return {

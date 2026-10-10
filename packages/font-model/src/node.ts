@@ -133,8 +133,15 @@ export type Node = {
  * `cut` is the line: `"square"`, across the path where it ends, or an angle in
  * degrees anticlockwise from level, as a pen's is — nought for a foot standing
  * on the baseline, ninety for the end of a bar.
+ *
+ * `shape` is what the end is closed with. Absent, the cut itself: a straight
+ * edge, and a sharp corner where it meets each side of the stroke. `"nib"`, half
+ * the pen's own outline, laid along the cut and made as wide as the stroke is
+ * there — the end the pen would leave if it were turned to the cut and were the
+ * stroke's width, which is the turning and the taking back of width done for
+ * you. A broad edge has no outline but a line, and its end is the same either way.
  */
-export type StrokeEnd = { readonly cut: "square" | number };
+export type StrokeEnd = { readonly cut: "square" | number; readonly shape?: "nib" };
 
 /** How a continuous corner is drawn. */
 export type ContinuousCorner = { readonly size: number; readonly smoothness: number };

@@ -2,6 +2,7 @@ import type { PenBlend } from "@typewright/geometry";
 import {
   type BlendChannel,
   type EndChoice,
+  type EndShape,
   begin,
   changePen,
   commit,
@@ -11,9 +12,11 @@ import {
   selectedPenValue,
   selectedPointPen,
   selectedStrokeEnd,
+  selectedStrokeEndShape,
   selectionNib,
   setPenBlend,
   setStrokeEnd,
+  setStrokeEndShape,
 } from "@typewright/tools";
 
 import { useRef } from "react";
@@ -54,6 +57,7 @@ export function PenSection(): React.JSX.Element {
   const shapeBlend = useStoreValue((s) => selectedPenBlend(s.session.editor, "shape"));
   // How the stroke ends at the selected points, where one of them is an end.
   const end = useStoreValue((s) => selectedStrokeEnd(s.session.editor));
+  const endShape = useStoreValue((s) => selectedStrokeEndShape(s.session.editor));
 
   const selected = stroke !== null;
   const drawing = stroke !== null && stroke !== "none";
@@ -208,7 +212,7 @@ export function PenSection(): React.JSX.Element {
       {/* How the stroke ends, where an end of an open one is selected. Beside the
           pen and not in it: a cut is what saves turning the pen to get a flat
           end, and widening the stroke by turning it. */}
-      {end !== null && <EndField value={end} />}
+      {end !== null && <EndField value={end} shape={endShape} />}
     </Section>
   );
 }
@@ -239,9 +243,16 @@ function sameEnd(value: EndChoice | "mixed", named: EndChoice): boolean {
  * through the point. A cut at an angle shows the angle, to be typed over; level
  * and upright are that angle at nought and ninety.
  */
-function EndField({ value }: { readonly value: EndChoice | "mixed" }): React.JSX.Element {
+function EndField({
+  value,
+  shape,
+}: {
+  readonly value: EndChoice | "mixed";
+  readonly shape: EndShape | "mixed" | null;
+}): React.JSX.Element {
   const store = useEditorStore();
   const set = (choice: EndChoice): void => store.applyTool(setStrokeEnd(store.editor, choice));
+  const close = (with_: EndShape): void => store.applyTool(setStrokeEndShape(store.editor, with_));
   return (
     <>
       <Field label="End" group>
@@ -259,6 +270,29 @@ function EndField({ value }: { readonly value: EndChoice | "mixed" }): React.JSX
           ))}
         </div>
       </Field>
+      {/* What a cut end is closed with, where there is a cut to close. */}
+      {shape !== null && (
+        <Field label="Closed with" group>
+          <div className={styles.segmented}>
+            <button
+              type="button"
+              aria-pressed={shape === "straight"}
+              title="The cut itself: a straight edge, and a sharp corner at each side"
+              onClick={() => close("straight")}
+            >
+              Straight
+            </button>
+            <button
+              type="button"
+              aria-pressed={shape === "nib"}
+              title="Half the pen's own shape, laid along the cut and as wide as the stroke: the end the pen would leave turned that way"
+              onClick={() => close("nib")}
+            >
+              Nib
+            </button>
+          </div>
+        </Field>
+      )}
       {typeof value === "number" && (
         <Field label="Cut at">
           <NumberField

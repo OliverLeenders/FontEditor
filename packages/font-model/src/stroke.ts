@@ -7,8 +7,10 @@ import {
   clipLoop,
   endTangent,
   evaluate,
+  fitCubics,
   lineAsCubic,
   loopArea,
+  penExponent,
   penPathStrokeParts,
   plannedStrokes,
   reverseLoop,
@@ -254,16 +256,16 @@ function strokeParts(c: Contour): {
       for (const chain of parts.sweeps) folds.push(chain.map(regionOf));
       continue;
     }
+    const ends = endsOf([...parts.loops, ...parts.sweeps.flat()], stretch.cuts);
     for (const loop of parts.loops) {
-      const kept = cutBy(loop, stretch.cuts);
+      const kept = cutBy(loop, ends.cuts);
       if (kept.length > 0) pieces.push(regionOf(kept));
     }
     for (const chain of parts.sweeps) {
-      const steps = chain
-        .map((step) => cutBy(step, stretch.cuts))
-        .filter((kept) => kept.length > 0);
+      const steps = chain.map((step) => cutBy(step, ends.cuts)).filter((kept) => kept.length > 0);
       if (steps.length > 0) folds.push(steps.map(regionOf));
     }
+    for (const cap of ends.caps) pieces.push(regionOf(cap));
   }
   const found = { pieces, folds };
   partsOf.set(c, found);
@@ -309,6 +311,120 @@ function cutBy(loop: readonly Cubic[], cuts: readonly StrokeCut[]): readonly Cub
   return kept;
 }
 
+/** Below this depth, in units, an end shaped by the pen is the plain cut. */
+const SHALLOWEST_CAP = 0.25;
+
+/**
+ * The cuts a stretch's ink is really cut by, and what closes each end that is
+ * shaped by the pen.
+ *
+ * An end shaped by the pen is half the pen's outline laid along the cut: as wide
+ * as the stroke is where it is cut, and as deep in proportion as the pen is
+ * thick to its width, so that it is the pen's own shape and not a squashed one.
+ * Its tip is on the line through the last point, where a plain cut's edge is, so
+ * the point is still where the ink ends. The stroke is cut that depth short of
+ * the point, and the half outline stands on the edge that leaves.
+ *
+ * How wide the stroke is there is read off the ink: where the line crosses it.
+ * A pen held at an angle makes a stroke narrower than itself, and by how much
+ * depends on which way the path was going.
+ */
+function endsOf(
+  loops: readonly (readonly Cubic[])[],
+  cuts: readonly StrokeCut[],
+): { cuts: StrokeCut[]; caps: Cubic[][] } {
+  const made: StrokeCut[] = [];
+  const caps: Cubic[][] = [];
+  for (const cut of cuts) {
+    const plain = (): void => void made.push(cut);
+    if (!cut.nibbed || !(cut.pen.thickness > 0) || !(cut.pen.width > 0)) {
+      plain();
+      continue;
+    }
+    const across = crossing(loops, cut);
+    if (across === null) {
+      plain();
+      continue;
+    }
+    const depth = (cut.pen.thickness / 2) * ((across.to - across.from) / cut.pen.width);
+    if (!(depth >= SHALLOWEST_CAP)) {
+      plain();
+      continue;
+    }
+    const short: StrokeCut = {
+      ...cut,
+      through: {
+        x: cut.through.x - cut.normal.x * depth,
+        y: cut.through.y - cut.normal.y * depth,
+      },
+    };
+    const edge = crossing(loops, short);
+    if (edge === null) {
+      plain();
+      continue;
+    }
+    made.push(short);
+    caps.push(halfPen(short, edge.from, edge.to, depth));
+  }
+  return { cuts: made, caps };
+}
+
+/**
+ * Where a cut's line crosses some ink: the first and the last of it, measured
+ * along the line from the point the cut goes through. `null` where it misses.
+ */
+function crossing(
+  loops: readonly (readonly Cubic[])[],
+  cut: StrokeCut,
+): { from: number; to: number } | null {
+  const along = { x: -cut.normal.y, y: cut.normal.x };
+  let from = Infinity;
+  let to = -Infinity;
+  for (const loop of loops) {
+    for (const piece of clipLoop(loop, cut.through, cut.normal)) {
+      for (const p of [piece.a, piece.b]) {
+        const dx = p.x - cut.through.x;
+        const dy = p.y - cut.through.y;
+        if (Math.abs(dx * cut.normal.x + dy * cut.normal.y) > 1e-6) continue;
+        const at = dx * along.x + dy * along.y;
+        from = Math.min(from, at);
+        to = Math.max(to, at);
+      }
+    }
+  }
+  return to - from > 1e-6 ? { from, to } : null;
+}
+
+/**
+ * Half the pen's outline standing on a cut, from one end of the edge to the
+ * other and `depth` out from it, closed along the edge.
+ *
+ * The outline said by its own equation, as wide as the edge: a point round half
+ * a circle with each coordinate raised to two over the pen's exponent, which is
+ * a half oval for an oval and a box with two rounded corners for a squarer pen.
+ */
+function halfPen(cut: StrokeCut, from: number, to: number, depth: number): Cubic[] {
+  const along = { x: -cut.normal.y, y: cut.normal.x };
+  const middle = (from + to) / 2;
+  const half = (to - from) / 2;
+  const power = 2 / penExponent(cut.pen);
+  const raised = (v: number): number => Math.sign(v) * Math.pow(Math.abs(v), power);
+  const STEPS = 48;
+  const points: Vec2[] = [];
+  for (let k = 0; k <= STEPS; k++) {
+    const u = (k / STEPS) * Math.PI;
+    // The two ends exactly on the edge, whatever the sine of half a turn is.
+    const a = middle + half * raised(Math.cos(u));
+    const out = k === 0 || k === STEPS ? 0 : depth * raised(Math.sin(u));
+    points.push({
+      x: cut.through.x + along.x * a + cut.normal.x * out,
+      y: cut.through.y + along.y * a + cut.normal.y * out,
+    });
+  }
+  const arc = fitCubics(points, 0.02);
+  return [...arc, lineAsCubic(points[STEPS]!, points[0]!)];
+}
+
 /**
  * A straight line a stroke's end is cut off by: the point it goes through, the
  * way it faces — away from the ink that is kept — and the way the path was
@@ -318,6 +434,10 @@ export type StrokeCut = {
   readonly through: Vec2;
   readonly normal: Vec2;
   readonly onward: Vec2;
+  /** The pen the stroke has at that end. */
+  readonly pen: PenShape;
+  /** Whether the end is closed with half the pen's outline, not the cut itself. */
+  readonly nibbed: boolean;
 };
 
 /**
@@ -354,7 +474,8 @@ export function strokeCut(c: Contour, which: "start" | "end"): StrokeCut | null 
     normal = facing < 0 ? { x: -across.x, y: -across.y } : across;
   }
   if (normal.x * onward.x + normal.y * onward.y < SHALLOWEST_CUT) return null;
-  return { through: node.pt, normal, onward };
+  const pen = penShapeOf(penAt(c, which === "start" ? 0 : c.nodes.length - 1) ?? c.nib);
+  return { through: node.pt, normal, onward, pen, nibbed: node.end.shape === "nib" };
 }
 
 /**
@@ -600,11 +721,16 @@ function joinedParts(c: Contour, ids: IdFactory): readonly Contour[] {
         : (removeOverlap(glyph("", { contours: regions }), ids)?.glyph.contours ??
           unionByPolygons(regions, ids) ??
           regions);
+    const loops = whole.map(curvesOf);
+    const ends = endsOf(loops, stretch.cuts);
     // Turned as the union left them: a hole in it stays a hole.
-    return whole.flatMap((region) => {
-      const kept = cutBy(curvesOf(region), stretch.cuts);
-      return kept.length === 0 ? [] : [asContour(kept)];
-    });
+    return [
+      ...loops.flatMap((loop) => {
+        const kept = cutBy(loop, ends.cuts);
+        return kept.length === 0 ? [] : [asContour(kept)];
+      }),
+      ...ends.caps.map(regionOf),
+    ];
   });
 }
 

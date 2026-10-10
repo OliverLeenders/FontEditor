@@ -141,16 +141,19 @@ export { offsetAt, simplifyAt } from "./reshape.js";
 export {
   type BlendChannel,
   type EndChoice,
+  type EndShape,
   changePen,
   convertStrokesToOutlines,
   drawWithPen,
   selectedPenBlend,
   selectedPenValue,
   selectedStrokeEnd,
+  selectedStrokeEndShape,
   selectedPointPen,
   selectionNib,
   setPenBlend,
   setStrokeEnd,
+  setStrokeEndShape,
   strokesToOutline,
 } from "./nib.js";
 export type { CombineReport } from "./combine.js";

@@ -315,3 +315,24 @@ describe("a pen's squareness", () => {
     expect(pen(store)?.squareness ?? 0).toBe(0);
   });
 });
+
+describe("what a cut end is closed with", () => {
+  it("is offered once the end is cut, and sets the pen's shape or the cut itself", () => {
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    expect(screen.queryByRole("group", { name: "Closed with" })).toBeNull();
+
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "End" })).getByRole("button", { name: "Level" }),
+    );
+    const closed = within(screen.getByRole("group", { name: "Closed with" }));
+    expect(closed.getByRole("button", { name: "Straight" }).getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+
+    fireEvent.click(closed.getByRole("button", { name: "Nib" }));
+    expect(path(store).nodes[0]!.end).toEqual({ cut: 0, shape: "nib" });
+    fireEvent.click(closed.getByRole("button", { name: "Straight" }));
+    expect(path(store).nodes[0]!.end).toEqual({ cut: 0 });
+  });
+});

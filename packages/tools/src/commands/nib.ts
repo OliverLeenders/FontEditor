@@ -390,11 +390,53 @@ export function setStrokeEnd(state: EditorState, choice: EndChoice): ToolResult 
         const { end: _dropped, ...rest } = n;
         return rest;
       }
-      return { ...n, end: { cut: choice } };
+      // What the end is closed with is kept: it is the cut that is being set.
+      return { ...n, end: { ...n.end, cut: choice } };
     });
     return nodes.some((n, i) => n !== c.nodes[i]) ? { ...c, nodes } : c;
   });
   return done(state, after, "Stroke end");
+}
+
+/** What a cut end is closed with: the cut itself, or half the pen's outline. */
+export type EndShape = "straight" | "nib";
+
+/**
+ * What the selected cut ends are closed with: what they share, `"mixed"` where
+ * they differ, `null` where no selected end is cut.
+ */
+export function selectedStrokeEndShape(state: EditorState): EndShape | "mixed" | null {
+  let found: EndShape | null = null;
+  for (const { contour: c, index } of endPoints(state)) {
+    const end = c.nodes[index]!.end;
+    if (end === undefined) continue;
+    const shape: EndShape = end.shape === "nib" ? "nib" : "straight";
+    if (found === null) found = shape;
+    else if (found !== shape) return "mixed";
+  }
+  return found;
+}
+
+/** Set what the selected cut ends are closed with. An end that is not cut is left alone. */
+export function setStrokeEndShape(state: EditorState, shape: EndShape): ToolResult {
+  const chosen = new Map<string, Set<number>>();
+  for (const { contour: c, index } of endPoints(state)) {
+    const set = chosen.get(c.id) ?? new Set<number>();
+    set.add(index);
+    chosen.set(c.id, set);
+  }
+
+  const after = edit(state, selected(state), (c) => {
+    const indices = chosen.get(c.id);
+    if (indices === undefined) return c;
+    const nodes = c.nodes.map((n, i) => {
+      if (!indices.has(i) || n.end === undefined) return n;
+      if ((n.end.shape === "nib") === (shape === "nib")) return n;
+      return { ...n, end: shape === "nib" ? { cut: n.end.cut, shape } : { cut: n.end.cut } };
+    });
+    return nodes.some((n, i) => n !== c.nodes[i]) ? { ...c, nodes } : c;
+  });
+  return done(state, after, "Stroke end shape");
 }
 
 /** The whole contours the selection claims, in the order the glyph has them. */

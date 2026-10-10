@@ -570,6 +570,16 @@ point — so the point is exactly where the ink ends, and the stroke is its own 
 way to it. Put the point on the baseline and choose Level, and the stem stands on the
 baseline. Choose Pen and the end is the pen's again.
 
+A cut end is **Closed with** one of two things. **Straight** is the cut itself: a straight
+edge and a sharp corner where it meets each side of the stroke. **Nib** is half the pen's own
+outline laid along the cut, as wide as the stroke is there and as deep in proportion as the
+pen is thick to its width — the end the pen would leave if it were turned to the cut and were
+the stroke's width, which is the turning and the taking back of width done for you. Its tip
+is on the same line through the point, so the stem still stands on the baseline; an oval
+gives a rounded foot, a round pen half a circle, a pen with squareness a box with two
+rounded corners, and at a hundred the straight cut again. A broad edge has no shape but a
+line, and its end is the same either way.
+
 While a cut end is selected its line is drawn through it, dashed, a little longer than the pen
 is wide, with a round knob at one end. Drag the knob round the point and the cut turns with
 it, in whole degrees; within four degrees of level, upright or square to the path it settles

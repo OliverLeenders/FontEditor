@@ -19,9 +19,11 @@ import {
   selectedPenBlend,
   selectedPenValue,
   selectedStrokeEnd,
+  selectedStrokeEndShape,
   selectionNib,
   setPenBlend,
   setStrokeEnd,
+  setStrokeEndShape,
 } from "../src/commands/nib.js";
 import { type EditorState, editorState } from "../src/state.js";
 
@@ -573,5 +575,53 @@ describe("changing the pen of a point that says other things", () => {
     expect(nodes.map((n) => n.pen)).toEqual([undefined, undefined]);
     expect(nodes[1]!.end).toEqual({ cut: 0 });
     expect(nodes[0]!.blend).toEqual({ angle: "linear", shape: "ease" });
+  });
+});
+
+describe("what a cut end is closed with", () => {
+  const stemState = () => withContours(withNib(stroke(0), { angle: 30, width: 80, thickness: 20 }));
+  const atTop = (state: EditorState): EditorState => {
+    const c = state.document.glyphs["l"]!.contours[0]!;
+    return {
+      ...state,
+      selection: [{ contourId: c.id, nodeId: c.nodes[1]!.id, part: "point" as const }],
+    };
+  };
+  const endOf = (state: EditorState) => state.document.glyphs["l"]!.contours[0]!.nodes[1]!.end;
+
+  it("is nothing to say of an end that is not cut", () => {
+    const state = atTop(stemState());
+    expect(selectedStrokeEndShape(state)).toBeNull();
+    expect(setStrokeEndShape(state, "nib").state).toBe(state);
+  });
+
+  it("is the cut itself until the pen's shape is asked for, and can be again", () => {
+    const cut = setStrokeEnd(atTop(stemState()), 0).state;
+    expect(selectedStrokeEndShape(cut)).toBe("straight");
+
+    const shaped = setStrokeEndShape(cut, "nib").state;
+    expect(endOf(shaped)).toEqual({ cut: 0, shape: "nib" });
+    expect(selectedStrokeEndShape(shaped)).toBe("nib");
+
+    const back = setStrokeEndShape(shaped, "straight").state;
+    expect(endOf(back)).toEqual({ cut: 0 });
+  });
+
+  it("is kept when the cut is turned, by the row or by the knob", () => {
+    const shaped = setStrokeEndShape(setStrokeEnd(atTop(stemState()), 0).state, "nib").state;
+    expect(endOf(setStrokeEnd(shaped, "square").state)).toEqual({ cut: "square", shape: "nib" });
+
+    const c = shaped.document.glyphs["l"]!.contours[0]!;
+    const knob = strokeCutHandle(c, "end")!.knob;
+    const held = pointerDown(shaped, pointerInput(knob), { ids }).state;
+    const turned = pointerUp(
+      pointerMove(held, pointerInput({ x: 60, y: 340 }), { ids }).state,
+    ).state;
+    expect(endOf(turned)).toEqual({ cut: 34, shape: "nib" });
+  });
+
+  it("goes with the cut when the cut is taken off", () => {
+    const shaped = setStrokeEndShape(setStrokeEnd(atTop(stemState()), 0).state, "nib").state;
+    expect(endOf(setStrokeEnd(shaped, "pen").state)).toBeUndefined();
   });
 });

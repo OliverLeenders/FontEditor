@@ -221,8 +221,11 @@ export function readSegmentBlend(raw: unknown): SegmentBlend | undefined {
 export function readStrokeEnd(raw: unknown): StrokeEnd | undefined {
   if (typeof raw !== "object" || raw === null) return undefined;
   const cut = (raw as Record<string, unknown>)["cut"];
-  if (cut === "square") return { cut };
-  return typeof cut === "number" && Number.isFinite(cut) ? { cut } : undefined;
+  // A shape this version does not know is the plain cut.
+  const shape =
+    (raw as Record<string, unknown>)["shape"] === "nib" ? { shape: "nib" as const } : {};
+  if (cut === "square") return { cut, ...shape };
+  return typeof cut === "number" && Number.isFinite(cut) ? { cut, ...shape } : undefined;
 }
 
 export function segments(c: Contour): Segment[] {
