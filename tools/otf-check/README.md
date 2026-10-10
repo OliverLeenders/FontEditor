@@ -137,6 +137,7 @@ STROKES_OUT=/tmp/strokes pnpm --filter @typewright/font-io exec vitest run varia
 python check_vf_strokes.py /tmp/strokes s
 python check_vf_strokes.py /tmp/strokes l
 python check_vf_strokes.py /tmp/strokes t
+python check_vf_strokes.py /tmp/strokes z
 ```
 
 ## The TrueType flavour

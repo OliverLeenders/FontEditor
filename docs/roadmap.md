@@ -1477,9 +1477,9 @@ and a pen with corners answers that as plainly as an oval does, so the sides, th
 the swept steps needed nothing new. What the oval had to itself were its exact sides, its
 caps and the wedges on the outside of its corners, all made where the pen is a circle; a pen
 with corners has no such place, and its sides are fitted and its caps and wedges walked round
-its own outline by the direction it faces. A rectangle proper has no exponent and is drawn
-with the largest one used, short of square at its corners by a hundredth of the pen's
-half-width.
+its own outline by the direction it faces. A rectangle proper has no exponent, and where it
+is not the one pen all along the stroke it is drawn with the largest one used, short of square
+at its corners by a hundredth of the pen's half-width.
 
 A cut end varies in a variable font. The line round the ink stops at the cut on each side of
 the stroke — where the side last crosses it, or carried on straight to it where the side stops
@@ -1500,12 +1500,27 @@ pen's shape is four pieces, a corner's worth to each. Where any master has corne
 master is drawn so, an oval among them: the same ink in other pieces. fontTools draws a hook
 that is an oval in the light and a rectangle in the black.
 
+A rectangle is exact, as the broad edge is and for the same reason. Its reach to one side is
+one of its four corners, so a side is the path itself moved over by that corner, until the
+path runs along one of the pen's edges: there the next corner takes over and the side crosses
+to it along that edge. A curve runs along a direction twice at most and the pen has two, so a
+stretch is five pieces of the path at most with a line between them, and masters that run
+along the pen in fewer places are cut where the one with most is. Between stretches and round
+an end are the pen's own edges, two straight pieces always, some with no length. That is the
+line a variable font gets, and the static outline is the same line with its overlaps removed
+and the points part way along a straight edge taken out: a stem drawn along the pen's edge is
+four points on whole units where it was fourteen and a hundredth short, an S twenty where it
+was forty-one. It holds where the pen is one rectangle all along the stroke, and in a variable
+font where it is so in every master; a rectangle that turns or changes size along the stroke,
+or is an oval in another master, is fitted as before. fontTools draws a zigzag whose pen is a
+rectangle turned differently in each master.
+
 #### Open
 
 What is next in the same direction:
 
-- **A rectangle that is one**, exact as the broad edge is: its sides the path moved over by a
-  corner, with a straight line across where the path runs along one of its edges.
+- **A rectangle that turns or changes size along a stroke**, exact as the constant one is:
+  it is fitted now, a hundredth short at its corners.
 - **A broad edge that turns or widens along a stroke, in a variable font**, which is still
   written as the default master draws it.
 - **Fitting to the fixed width in every layer**, where it now fits the main drawing.

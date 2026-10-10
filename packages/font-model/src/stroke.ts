@@ -69,6 +69,21 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   const known = joinedInk.get(c);
   if (known !== undefined) return known;
 
+  // A rectangular pen's ink is exact, and is one line round it: joined, that
+  // line is the outline, its sides the path itself moved over by a corner of
+  // the pen and its ends the pen's own straight edges.
+  const exact = boxLine(c);
+  if (exact !== null) {
+    const outline = removeOverlap(glyph("", { contours: [...exact] }), ids);
+    if (outline !== null) {
+      const tidy = markInk(
+        outline.glyph.contours.filter((r) => thickness(r) >= SLIVER).map(withoutPointsOnALine),
+      );
+      joinedInk.set(c, tidy);
+      return tidy;
+    }
+  }
+
   // Slivers left out: where the path runs along the nib's own edge a stretch of
   // ink can be a hair thin, less ink than anything shows, and its two long sides
   // lying all but on each other are more than the union can tell apart.
@@ -232,11 +247,92 @@ export function inkRegions(c: Contour): readonly Contour[] {
   if (c.nib === undefined) return [corneredContour(c)];
   const known = regionsOf.get(c);
   if (known !== undefined) return known;
+  // The one line round a rectangular pen's ink goes round every point of the
+  // ink and nothing else, so filled as it is, it is the ink.
+  const exact = boxLine(c);
+  if (exact !== null) {
+    regionsOf.set(c, exact);
+    return exact;
+  }
   const parts = strokeParts(c);
   const regions = [...parts.pieces, ...parts.folds.flat()];
   markInk(regions);
   regionsOf.set(c, regions);
   return regions;
+}
+
+/**
+ * The line round the ink of a stroke drawn with one rectangular pen all along
+ * it, or `null` for any other stroke.
+ *
+ * A rectangle is the one pen with thickness whose ink has an exact answer: its
+ * reach to either side is a corner, so the edge of the ink is the path moved
+ * over by that corner, with one of the pen's own edges across wherever the path
+ * runs along it. Any other pen with corners is fitted. The line is the one a
+ * variable font gets (see `plannedInk`), drawn here for the one master there
+ * is; it crosses itself inside a corner of the path, and is joined into an
+ * outline by whoever wants one.
+ */
+function boxLine(c: Contour): readonly Contour[] | null {
+  if (c.nib === undefined || c.nodes.length < 2) return null;
+  const known = boxLines.get(c);
+  if (known !== undefined) return known;
+  const pens = pensOf(c);
+  const first = pens[0]!;
+  const box =
+    first.thickness >= OVAL_FROM &&
+    first.width > 0 &&
+    pens.every(
+      (pen) =>
+        (pen.squareness ?? 0) >= 1 &&
+        pen.angle === first.angle &&
+        pen.width === first.width &&
+        pen.thickness === first.thickness,
+    );
+  const line = box ? (plannedInk([c], regionIds)?.[0] ?? null) : null;
+  boxLines.set(c, line);
+  return line;
+}
+
+const boxLines = new WeakMap<Contour, readonly Contour[] | null>();
+
+/**
+ * A contour without the points that sit part way along a straight edge.
+ *
+ * The line round a rectangular pen's ink has them by its making: the corner
+ * that draws a side hands over to the next along the pen's own edge, and where
+ * that edge runs the way the path does the two are one straight line with a
+ * point in the middle of it.
+ */
+function withoutPointsOnALine(c: Contour): Contour {
+  if (c.nodes.length < 4) return c;
+  const straight = (n: Contour["nodes"][number]): boolean => n.in === null && n.out === null;
+  // Two points in one place first, where a side cut short has pieces of no
+  // length: one of them is kept, to be asked about like any other.
+  const apart = c.nodes.filter((n, i) => {
+    const after = c.nodes[(i + 1) % c.nodes.length]!;
+    return !(
+      straight(n) &&
+      straight(after) &&
+      Math.hypot(after.pt.x - n.pt.x, after.pt.y - n.pt.y) < 1e-9
+    );
+  });
+  const count = apart.length;
+  if (count < 4) return count === c.nodes.length || count < 3 ? c : { ...c, nodes: apart };
+  const kept = apart.filter((n, i) => {
+    if (!straight(n)) return true;
+    const before = apart[(i - 1 + count) % count]!;
+    const after = apart[(i + 1) % count]!;
+    if (before.out !== null || after.in !== null) return true;
+    const ax = n.pt.x - before.pt.x;
+    const ay = n.pt.y - before.pt.y;
+    const bx = after.pt.x - n.pt.x;
+    const by = after.pt.y - n.pt.y;
+    const size = Math.hypot(ax, ay) * Math.hypot(bx, by);
+    // On the line, and going the same way along it.
+    return Math.abs(ax * by - ay * bx) > size * 1e-9 || ax * bx + ay * by < 0;
+  });
+  return kept.length === c.nodes.length || kept.length < 3 ? c : { ...c, nodes: kept };
 }
 
 /**

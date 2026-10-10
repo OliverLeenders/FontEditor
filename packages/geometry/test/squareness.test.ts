@@ -197,3 +197,93 @@ describe("the line round the ink of a pen with corners, drawn to one plan", () =
     expect(loops![0]![0]!.length).toBeLessThan(200);
   });
 });
+
+describe("a rectangular pen, drawn to one plan exactly", () => {
+  const box: PenShape = { angle: 0, width: 80, thickness: 40, squareness: 1 };
+  const line = (ax: number, ay: number, bx: number, by: number): Cubic => ({
+    a: { x: ax, y: ay },
+    c1: { x: ax + (bx - ax) / 3, y: ay + (by - ay) / 3 },
+    c2: { x: ax + ((bx - ax) * 2) / 3, y: ay + ((by - ay) * 2) / 3 },
+    b: { x: bx, y: by },
+  });
+  const corners = (loop: readonly { curve: Cubic }[]): string[] => {
+    const seen: string[] = [];
+    for (const piece of loop) {
+      const at = `${piece.curve.a.x.toFixed(6)},${piece.curve.a.y.toFixed(6)}`;
+      if (seen[seen.length - 1] !== at) seen.push(at);
+    }
+    return seen[0] === seen[seen.length - 1] && seen.length > 1 ? seen.slice(0, -1) : seen;
+  };
+
+  it("draws a stem along its own edge as the rectangle it is, to the unit", () => {
+    // Down a stem from 600 to the baseline with a level pen eighty by forty.
+    const loops = plannedStrokes([
+      { curves: [line(200, 600, 200, 0)], pens: [box, box], closed: false },
+    ])!;
+    expect(loops[0]).toHaveLength(1);
+    const xs = loops[0]![0]!.flatMap((p) => [p.curve.a.x, p.curve.b.x]);
+    const ys = loops[0]![0]!.flatMap((p) => [p.curve.a.y, p.curve.b.y]);
+    expect(Math.min(...xs)).toBe(160);
+    expect(Math.max(...xs)).toBe(240);
+    expect(Math.min(...ys)).toBe(-20);
+    expect(Math.max(...ys)).toBe(620);
+    // Every point of it on that rectangle's edge: two of them part way down a
+    // side, where the corner that draws the side hands over to the pen's end.
+    for (const at of corners(loops[0]![0]!)) {
+      const [x, y] = at.split(",").map(Number) as [number, number];
+      expect(x === 160 || x === 240 || y === -20 || y === 620).toBe(true);
+    }
+    expect(loops[0]![0]!.length).toBeLessThanOrEqual(8);
+  });
+
+  it("is a handful of pieces round a corner, where the cornered way was dozens", () => {
+    const c = named("an oval pen round a sharp V");
+    const pens = c.pens.map((p) => ({ ...p, squareness: 1 }));
+    const loops = plannedStrokes([{ curves: c.curves, pens, closed: c.closed }])!;
+    expect(loops[0]![0]!.length).toBeLessThanOrEqual(16);
+    // Every piece of it is straight: the path is, and so are the pen's edges.
+    for (const piece of loops[0]![0]!) {
+      const { a, c1, c2, b } = piece.curve;
+      const off = (p: { x: number; y: number }): number =>
+        Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x));
+      expect(off(c1)).toBeLessThan(1e-6);
+      expect(off(c2)).toBeLessThan(1e-6);
+    }
+  });
+
+  it("is the same pieces in two masters whose paths run along the pen in different places", () => {
+    const c = named("an oval pen along an S");
+    const with_ = (angle: number, width: number) => ({
+      curves: c.curves,
+      pens: c.pens.map(() => ({ angle, width, thickness: width / 3, squareness: 1 })),
+      closed: c.closed,
+    });
+    const masters = [with_(0, 60), with_(35, 120)];
+    const loops = plannedStrokes(masters)!;
+    expect(loops).not.toBeNull();
+    const shape = (k: number): string => loops[k]![0]!.map((p) => (p.line ? "l" : "c")).join("");
+    expect(shape(1)).toBe(shape(0));
+    for (const [k, m] of masters.entries()) {
+      const d = disagreement(
+        loops[k]!.map((l) => l.map((p) => p.curve)),
+        sweep(m.curves, m.pens, m.closed),
+        45,
+      );
+      expect(d.missing).toEqual([]);
+      expect(d.extra).toEqual([]);
+    }
+  });
+
+  it("is drawn the cornered way where the pen is not a rectangle in every master", () => {
+    const c = named("an oval pen along an S");
+    const with_ = (squareness: number) => ({
+      curves: c.curves,
+      pens: c.pens.map((p) => ({ ...p, squareness })),
+      closed: c.closed,
+    });
+    const loops = plannedStrokes([with_(0.5), with_(1)])!;
+    expect(loops).not.toBeNull();
+    // Fitted, so curves throughout: no straight pieces across the pen's edges.
+    expect(loops[1]![0]!.some((p) => p.line)).toBe(false);
+  });
+});

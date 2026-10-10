@@ -535,7 +535,9 @@ with thickness has a fourth, its **squareness**: nought is that oval, a hundred 
 the pen's width and thickness, and between them the corners fill out, a box with its corners
 rounded — a slider for the look of it and a number beside it, in per cent. Like the others it is
 set at points and blends along a segment with the pen's shape, so a stroke can go from round to
-square. A broad edge has no corners and no squareness. Every point tool works on the path as it does on any contour — drag its points and
+square. At a hundred, the same all along the stroke, the ink is exact: straight edges where
+the path is straight, to the unit, and no more points than the shape has corners — a stem is
+four. A broad edge has no corners and no squareness. Every point tool works on the path as it does on any contour — drag its points and
 handles, hold its joins, cut an open one in two with the knife and both halves keep the pen.
 Choose **Outline** to make it an ordinary contour again; the path stays where it is. To keep the ink
 instead, right-click the stroke and choose **Convert stroke to outlines**: it is replaced by the
@@ -610,7 +612,8 @@ So is a stroke whose masters have not the same points, one with a **Step** in it
 an end that is cut in one master and not in another, or closed differently. An end cut the same
 way in every master varies with the rest of the stroke, and so does a pen's squareness: an oval
 in the light and a box in the bold is a pen whose corners fill out along the axis. A stroke
-drawn with corners in any master comes to more points than an oval's.
+drawn with corners in any master comes to more points than an oval's — unless it is a rectangle
+in every master, the same one all along the stroke, which is exact and comes to fewer.
 
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it

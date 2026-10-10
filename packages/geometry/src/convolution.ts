@@ -3,6 +3,7 @@ import {
   cubic,
   endTangent,
   evaluate,
+  isFlat,
   lineAsCubic,
   reverse,
   subcurve,
@@ -21,6 +22,7 @@ import {
   penProfiles,
   penSupport,
   samePenShape,
+  squarenessOf,
 } from "./pen.js";
 import type { Vec2 } from "./vec2.js";
 
@@ -123,7 +125,12 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
   // oval's sides are given by their speed and its edge is made from a circle.
   // An oval drawn that way comes to the same ink in other pieces, and the
   // pieces are what the masters have to share.
-  const cornered = masters.some((m) => m.pens.some(isSquared));
+  // A rectangle, the same one all along the stroke, in every master: drawn
+  // exactly, as a broad edge is and for the same reason. See `boxSides`.
+  const box = masters.every((m) =>
+    m.pens.every((pen) => isBox(pen) && samePenShape(pen, m.pens[0]!)),
+  );
+  const cornered = !box && masters.some((m) => m.pens.some(isSquared));
 
   // An end is cut in every master or in none, and closed the same way in all:
   // what closes it is pieces of the line, and the masters share their pieces.
@@ -158,9 +165,11 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
 
   const sides = broad
     ? broadSides(masters)
-    : cornered
-      ? corneredSides(masters, profiles)
-      : ovalSides(masters, profiles);
+    : box
+      ? boxSides(masters)
+      : cornered
+        ? corneredSides(masters, profiles)
+        : ovalSides(masters, profiles);
   if (sides === null) return null;
 
   // The ends that are cut: the side arriving at each and the side leaving it
@@ -179,7 +188,8 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
       const made = cutTurn(
         sides[at]!.get(key(arriving))!,
         sides[at]!.get(key(leaving))!,
-        cut,
+        // Half a rectangle laid along a cut is the cut.
+        box ? { ...cut, nibbed: false } : cut,
         pen,
         cornered,
       );
@@ -201,9 +211,11 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
         before: sides[at]!.get(key(leg))!,
         after: sides[at]!.get(key(next))!,
       }));
-      const joins = cornered
-        ? corneredJoins(each, leg, next)
-        : each.map((j) => joinOf(j.master, j.profiles, leg, next, j.before, j.after));
+      const joins = box
+        ? boxJoins(each, leg, next)
+        : cornered
+          ? corneredJoins(each, leg, next)
+          : each.map((j) => joinOf(j.master, j.profiles, leg, next, j.before, j.after));
       // The pen's edge at a join goes into every master or into none.
       const turns = joins.some((j) => j.turns);
       for (const [at, loop] of loops.entries()) {
@@ -859,6 +871,180 @@ function broadSides(masters: readonly StrokeMaster[]): Map<string, PlannedPiece[
     }
   }
   return out;
+}
+
+/** Whether a pen is a rectangle outright: all the squareness there is, and some thickness. */
+function isBox(pen: PenShape): boolean {
+  return !isBroad(pen) && squarenessOf(pen) >= 1;
+}
+
+/**
+ * The four corners of a rectangular pen, from its middle, anticlockwise.
+ */
+function boxCorners(pen: PenShape): Vec2[] {
+  const a = pen.width / 2;
+  const b = pen.thickness / 2;
+  const angle = (pen.angle * Math.PI) / 180;
+  const u = { x: Math.cos(angle), y: Math.sin(angle) };
+  const v = { x: -u.y, y: u.x };
+  return [
+    [1, 1],
+    [-1, 1],
+    [-1, -1],
+    [1, -1],
+  ].map(([i, j]) => ({ x: u.x * a * i! + v.x * b * j!, y: u.y * a * i! + v.y * b * j! }));
+}
+
+/**
+ * The corner of a rectangular pen that reaches furthest to the right of the way
+ * it is going — and, where it is going along one of its own edges and two
+ * corners reach as far, the one behind. That is the corner whose path is the
+ * edge of the ink: the one in front is on the same line, further on, and is
+ * come to round the end of the stroke.
+ */
+function leadingCorner(corners: readonly Vec2[], going: Vec2): number {
+  const facing = rightOf(going);
+  let best = 0;
+  let bestReach = -Infinity;
+  let bestAhead = Infinity;
+  for (const [k, c] of corners.entries()) {
+    const reach_ = c.x * facing.x + c.y * facing.y;
+    const ahead = c.x * going.x + c.y * going.y;
+    if (reach_ > bestReach + 1e-9 || (Math.abs(reach_ - bestReach) <= 1e-9 && ahead < bestAhead)) {
+      best = k;
+      bestReach = reach_;
+      bestAhead = ahead;
+    }
+  }
+  return best;
+}
+
+/**
+ * Both sides of every stretch for a rectangular pen, which are exact.
+ *
+ * A rectangle's reach to one side is one of its four corners, so a side is the
+ * path itself moved over by that corner — until the path runs along one of the
+ * pen's edges, where the next corner takes over and the side crosses from one
+ * to the other along that edge. It is a broad edge's side with two directions
+ * to run along where a broad edge has one: a curve runs along a fixed direction
+ * at most twice, so a stretch is five pieces of the path at most with a line
+ * across between them, and that many in every master.
+ */
+function boxSides(masters: readonly StrokeMaster[]): Map<string, PlannedPiece[]>[] | null {
+  const out = masters.map(() => new Map<string, PlannedPiece[]>());
+  const count = masters[0]!.curves.length;
+
+  for (let index = 0; index < count; index++) {
+    const found = masters.map((m) => {
+      const pen = m.pens[0]!;
+      const angle = (pen.angle * Math.PI) / 180;
+      const u = { x: Math.cos(angle), y: Math.sin(angle) };
+      const cuts = [
+        ...nibTangencies(m.curves[index]!, u),
+        ...nibTangencies(m.curves[index]!, { x: -u.y, y: u.x }),
+      ].sort((a, b) => a - b);
+      return cuts.filter((t, i) => i === 0 || t - cuts[i - 1]! > 1e-9);
+    });
+    const most = found.reduce((best, f) => (f.length > best.length ? f : best), found[0]!);
+    // A stretch that is a straight line in every master is straight pieces in
+    // every master: said so, since whoever joins the line into an outline can
+    // then take the points off the middle of an edge.
+    const straight = masters.every((m) => isFlat(m.curves[index]!, 1e-9));
+
+    for (const [at, m] of masters.entries()) {
+      const curve = m.curves[index]!;
+      const corners = boxCorners(m.pens[0]!);
+      const bounds = [0, ...cutsLike(most, found[at]!), 1];
+      for (const leg of [
+        { index, forward: true },
+        { index, forward: false },
+      ]) {
+        const pieces: PlannedPiece[] = [];
+        const spans = bounds.slice(0, -1).map((from, k) => [from, bounds[k + 1]!] as const);
+        for (const [from, to] of leg.forward ? spans : [...spans].reverse()) {
+          const along = tangent(curve, (from + to) / 2) ?? endTangent(curve, 0);
+          if (along === null) return null;
+          const going = leg.forward ? along : { x: -along.x, y: -along.y };
+          const by = corners[leadingCorner(corners, going)]!;
+          const part = to > from ? subcurve(curve, from, to) : pointCurve(evaluate(curve, from));
+          const moved = movedBy(leg.forward ? part : reverse(part), by);
+          const before = pieces[pieces.length - 1];
+          if (before !== undefined) {
+            pieces.push({ curve: lineAsCubic(before.curve.b, moved.a), line: true });
+          }
+          pieces.push({ curve: moved, line: straight });
+        }
+        out[at]!.set(key(leg), pieces);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * What goes between the end of one leg and the start of the next for a
+ * rectangular pen: the pen's edges, from the corner the one ends at to the
+ * corner the other starts from, and always two of them.
+ *
+ * Round the end of an open path it is two edges, the pen's front; at a corner
+ * of the path one or two, the way the path turned; at a smooth join none, both
+ * with no length. Two straight pieces in every master whichever it is.
+ */
+function boxJoins(
+  each: readonly {
+    readonly master: StrokeMaster;
+    readonly before: readonly PlannedPiece[];
+    readonly after: readonly PlannedPiece[];
+  }[],
+  leg: Leg,
+  next: Leg,
+): { pieces: PlannedPiece[]; turns: boolean }[] {
+  const made = each.map(({ master, before, after }) => {
+    const from = before[before.length - 1]!.curve.b;
+    const to = after[0]!.curve.a;
+    const uTurn = leg.index === next.index && leg.forward !== next.forward && !master.closed;
+    const curve = master.curves[leg.index]!;
+    const centre = leg.forward ? curve.b : curve.a;
+    const corners = boxCorners(master.pens[0]!).map((c) => ({
+      x: centre.x + c.x,
+      y: centre.y + c.y,
+    }));
+    const nearest = (p: Vec2): number => {
+      let best = 0;
+      for (const [k, c] of corners.entries()) {
+        if (
+          Math.hypot(c.x - p.x, c.y - p.y) <
+          Math.hypot(corners[best]!.x - p.x, corners[best]!.y - p.y)
+        ) {
+          best = k;
+        }
+      }
+      return best;
+    };
+    const first = nearest(from);
+    const last = nearest(to);
+    const round = (last - first + 4) % 4;
+    // Half way round is the front of the pen at an open end, and at a corner
+    // of the path whichever way the path turned.
+    let through: Vec2 | null = null;
+    if (round === 2) {
+      const arriving = heading(curve, leg, 1);
+      const leaving = heading(master.curves[next.index]!, next, 0);
+      const turn =
+        arriving === null || leaving === null ? 1 : arriving.x * leaving.y - arriving.y * leaving.x;
+      through = corners[(first + (uTurn || turn >= 0 ? 1 : 3)) % 4]!;
+    }
+    const middle = through ?? to;
+    return {
+      pieces: [
+        { curve: lineAsCubic(from, middle), line: true },
+        { curve: lineAsCubic(middle, to), line: true },
+      ],
+      turns: uTurn || round !== 0,
+    };
+  });
+  const turns = made.some((j) => j.turns);
+  return made.map((j) => ({ pieces: j.pieces, turns }));
 }
 
 /**

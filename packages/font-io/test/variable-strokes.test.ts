@@ -86,11 +86,30 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
       ? { angle: 30, width: pen, thickness, squareness }
       : { angle: 30, width: pen, thickness },
   );
+  // A zigzag drawn with a rectangle in every master, turned differently in
+  // each, its last end cut level: the pen whose ink is exact, and is straight
+  // edges and the path itself moved over.
+  const slab = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(120, 600)),
+        node(ids.node(), at(480, 600)),
+        node(ids.node(), at(140, 60), { out: at(260, 0) }),
+        node(ids.node(), at(500, 60), { in: at(380, 0), end: { cut: 90 } }),
+      ],
+      false,
+    ),
+    thickness > 0
+      ? { angle: pen / 7, width: pen, thickness, squareness: 1 }
+      : { angle: pen / 7, width: pen, thickness },
+  );
   return fontDocument(
     [
       glyph(".notdef", { advance: 500 }),
       glyph("l", { advance: 600, unicodes: [0x6c], contours: [stem] }),
       glyph("t", { advance: 600, unicodes: [0x74], contours: [boxed] }),
+      glyph("z", { advance: 600, unicodes: [0x7a], contours: [slab] }),
       glyph("s", { advance: 600, unicodes: [0x73], contours: [skeleton] }),
       glyph("dollar", {
         advance: 600,
