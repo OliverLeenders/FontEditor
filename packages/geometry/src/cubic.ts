@@ -699,21 +699,55 @@ function pushIfInside(t: number, out: number[]): void {
  * Cardano's method for the genuine cubic, with the trigonometric form for three
  * real roots — the algebraic form needs complex arithmetic to get there, and this
  * avoids it.
+ *
+ * A coefficient is nothing by its size beside the others, not by its size
+ * alone. The coefficients of a straight line far from the origin are worked
+ * out from numbers in the hundreds, and the two that should be nothing come
+ * out as a few parts in ten to the thirteenth — more than any fixed smallness,
+ * and next to nothing beside the rest. Taken for a cubic, that line's one
+ * crossing was found through roots a million million away and came back in
+ * the wrong place by a twentieth of its length: a stroke's side cut thirty
+ * units from where the cut was. And each root of a cubic is put right against
+ * the cubic itself before it is believed, for the same reason.
  */
 export function unitRoots(c3: number, c2: number, c1: number, c0: number): number[] {
   const tiny = 1e-12;
+  /** Beside the largest of the rest, what is nothing. */
+  const NOTHING = 1e-10;
+  const nothing = (c: number, ...rest: number[]): boolean =>
+    Math.abs(c) < tiny || Math.abs(c) < NOTHING * Math.max(...rest.map(Math.abs));
 
   // Degree reduction, in order. Each is a real case rather than a safety net.
-  if (Math.abs(c3) < tiny) {
-    if (Math.abs(c2) < tiny) {
+  if (nothing(c3, c2, c1, c0)) {
+    if (nothing(c2, c1, c0)) {
       if (Math.abs(c1) < tiny) return [];
       return inUnit([-c0 / c1]);
     }
     const disc = c1 * c1 - 4 * c2 * c0;
     if (disc < 0) return [];
     const root = Math.sqrt(disc);
-    return inUnit([(-c1 + root) / (2 * c2), (-c1 - root) / (2 * c2)]);
+    // The two roots without taking one large number from another: the one
+    // where the signs agree, and the other from their product.
+    const q = -(c1 + (c1 < 0 ? -root : root)) / 2;
+    return inUnit(q === 0 ? [0] : [q / c2, c0 / q]);
   }
+
+  /**
+   * A root put right against the cubic itself: Newton's step, twice, kept
+   * only where it leaves the cubic nearer nothing than it was.
+   */
+  const settled = (t: number): number => {
+    const value = (x: number): number => ((c3 * x + c2) * x + c1) * x + c0;
+    let best = t;
+    for (let step = 0; step < 2; step++) {
+      const slope = (3 * c3 * best + 2 * c2) * best + c1;
+      if (slope === 0) break;
+      const next = best - value(best) / slope;
+      if (!Number.isFinite(next) || Math.abs(value(next)) >= Math.abs(value(best))) break;
+      best = next;
+    }
+    return best;
+  };
 
   // Depressed cubic: t = x - a/3 turns it into x³ + px + q.
   const a = c2 / c3;
@@ -730,14 +764,14 @@ export function unitRoots(c3: number, c2: number, c1: number, c0: number): numbe
     const root = Math.sqrt(disc);
     const u = Math.cbrt(-q / 2 + root);
     const v = Math.cbrt(-q / 2 - root);
-    return inUnit([u + v - shift]);
+    return inUnit([settled(u + v - shift)]);
   }
 
   if (disc > -tiny) {
     // Two distinct roots, one of them doubled — or a triple root when p is zero.
     if (Math.abs(p) < tiny) return inUnit([-shift]);
     const u = Math.cbrt(-q / 2);
-    return inUnit([2 * u - shift, -u - shift]);
+    return inUnit([settled(2 * u - shift), -u - shift]);
   }
 
   // Three real roots, reached through the angle rather than through complex
@@ -746,9 +780,9 @@ export function unitRoots(c3: number, c2: number, c1: number, c0: number): numbe
   const phi = Math.acos(clamp(-q / (2 * r), -1, 1));
   const m = 2 * Math.cbrt(r);
   return inUnit([
-    m * Math.cos(phi / 3) - shift,
-    m * Math.cos((phi + 2 * Math.PI) / 3) - shift,
-    m * Math.cos((phi + 4 * Math.PI) / 3) - shift,
+    settled(m * Math.cos(phi / 3) - shift),
+    settled(m * Math.cos((phi + 2 * Math.PI) / 3) - shift),
+    settled(m * Math.cos((phi + 4 * Math.PI) / 3) - shift),
   ]);
 }
 

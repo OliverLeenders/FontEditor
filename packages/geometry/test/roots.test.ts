@@ -6,6 +6,20 @@ const at = (x: number, y: number) => ({ x, y });
 const close = (v: number, want: number) => expect(v).toBeCloseTo(want, 6);
 
 describe("unitRoots", () => {
+  it("finds a cubic's roots to the last place where its leading term is small beside the rest", () => {
+    // (t - 0.25)(t - 0.75) with a millionth of a cube added: two roots in the
+    // unit interval, each a root of the cubic as given. Found through roots a
+    // million away they came back a ten-millionth out; with a leading term
+    // that is only rounding, a stroke's straight side was cut thirty units
+    // from where the cut was — see the k in the model's serif tests.
+    const [c3, c2, c1, c0] = [1e-6, 1, -1, 0.1875];
+    const roots = unitRoots(c3, c2, c1, c0);
+    expect(roots).toHaveLength(2);
+    for (const t of roots) {
+      expect(Math.abs(((c3 * t + c2) * t + c1) * t + c0)).toBeLessThan(1e-13);
+    }
+  });
+
   it("solves a linear equation", () => {
     // 2t - 1 = 0
     expect(unitRoots(0, 0, 2, -1)).toEqual([0.5]);

@@ -219,6 +219,38 @@ describe("a serif's shape", () => {
 });
 
 describe("a serif on the head of a stem", () => {
+  it("is as wide as the stem under a cut that slants, on the canvas as in the font", () => {
+    // The k whose head serif had a piece missing where it met the stem, on the
+    // canvas only: the stem's side was cut in the wrong place by the slanted
+    // line, and the serif took the stem for half as wide as it is.
+    const head: Serif = {
+      left: 60,
+      right: 287,
+      height: 30,
+      bracket: 0.16,
+      slope: 0.31,
+      cup: 5,
+      round: 1,
+    };
+    const stroke = withNib(
+      contour(
+        ids.contour(),
+        [
+          node(ids.node(), at(111.54800713159574, 750), { end: { cut: 17, serif: head } }),
+          node(ids.node(), at(111.54800713159574, 0), { end: { cut: "square" } }),
+        ],
+        false,
+      ),
+      { angle: 30, width: 120, thickness: 4, squareness: 0.54 },
+    );
+    const joined = inkOf(stroke, ids);
+    expect(joined).toHaveLength(1);
+    expect(differences(joined, inkRegions(stroke))).toEqual([]);
+    // Just right of the stem's middle and under the serif: ink, where the
+    // notch was.
+    expect(inked(inkRegions(stroke), 158, 712)).toBe(true);
+  });
+
   it("stands on the head's line and hangs down from it, left still on the left", () => {
     const ink = inkOf(stem(BOX, undefined, { cut: 0, serif: { ...SLAB, right: 0 } }), ids);
     expect(ink).toHaveLength(1);
