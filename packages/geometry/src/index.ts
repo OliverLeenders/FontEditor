@@ -146,8 +146,11 @@ export {
   ovalStroke,
   penPathStroke,
   penPathStrokeParts,
+  penExponent,
   penProfiles,
   penSupport,
+  isSquared,
+  squarenessOf,
   samePenShape,
 } from "./pen.js";
 

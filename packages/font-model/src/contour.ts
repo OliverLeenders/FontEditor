@@ -85,7 +85,49 @@ export type Nib = {
   readonly angle: number;
   readonly width: number;
   readonly thickness?: number;
+  /**
+   * How square an oval pen is, from nought to one: absent, or nought, it is the
+   * oval; one is a rectangle of its width and thickness, and between them a box
+   * with its corners rounded. A broad edge has no corners to square.
+   */
+  readonly squareness?: number;
 };
+
+/** A pen as the geometry asks for it: every number there, none of them absent. */
+export function penShapeOf(n: Nib): PenShape {
+  const squareness = n.squareness ?? 0;
+  return {
+    angle: n.angle,
+    width: n.width,
+    thickness: n.thickness ?? 0,
+    ...(squareness > 0 ? { squareness } : {}),
+  };
+}
+
+/**
+ * A pen as a stroke keeps it: no thickness for a broad edge, and no squareness
+ * for an oval or for a broad edge, so that each is written as it always was.
+ */
+export function nibOfShape(pen: PenShape): Nib {
+  if (!(pen.thickness > 0)) return { angle: pen.angle, width: pen.width };
+  const squareness = pen.squareness ?? 0;
+  return {
+    angle: pen.angle,
+    width: pen.width,
+    thickness: pen.thickness,
+    ...(squareness > 0 ? { squareness } : {}),
+  };
+}
+
+/**
+ * A stored squareness, read back as the field a pen is built with: between
+ * nought and one, or nothing. What cannot be read leaves the oval.
+ */
+export function readSquareness(raw: unknown): { readonly squareness?: number } {
+  return typeof raw === "number" && Number.isFinite(raw) && raw > 0
+    ? { squareness: Math.min(1, raw) }
+    : {};
+}
 
 export type SegmentKind = "line" | "curve";
 
@@ -133,11 +175,7 @@ export function segmentCount(c: Contour): number {
 export function penBetween(c: Contour, index: number, t: number): Nib | null {
   if (c.nib === undefined) return null;
   const nib = c.nib;
-  const shape = (n: Nib): PenShape => ({
-    angle: n.angle,
-    width: n.width,
-    thickness: n.thickness ?? 0,
-  });
+  const shape = penShapeOf;
   const curves: Cubic[] = [];
   for (let i = 0; i < segmentCount(c); i++) {
     const s = segmentAt(c, i);
@@ -151,14 +189,12 @@ export function penBetween(c: Contour, index: number, t: number): Nib | null {
   )[index];
   if (profile === undefined) return null;
   const mixed = profile.at(t);
-  const pen: Nib =
-    mixed.thickness > 0
-      ? { angle: mixed.angle, width: mixed.width, thickness: mixed.thickness }
-      : { angle: mixed.angle, width: mixed.width };
+  const pen = nibOfShape(mixed);
   const same =
     pen.angle === c.nib.angle &&
     pen.width === c.nib.width &&
-    (pen.thickness ?? 0) === (c.nib.thickness ?? 0);
+    (pen.thickness ?? 0) === (c.nib.thickness ?? 0) &&
+    (pen.squareness ?? 0) === (c.nib.squareness ?? 0);
   return same ? null : pen;
 }
 

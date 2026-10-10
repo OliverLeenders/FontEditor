@@ -321,7 +321,7 @@ const FOLD_DEPTH = 8;
  * the font keeps, and a wedge that thin is a sliver the union would have to find
  * and throw away.
  */
-const CORNER = (0.1 * Math.PI) / 180;
+export const CORNER = (0.1 * Math.PI) / 180;
 
 /**
  * The ink a unit circle leaves along one stretch, as bands that do not cross

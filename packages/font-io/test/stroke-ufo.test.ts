@@ -114,6 +114,15 @@ describe("a stroke through a .glif", () => {
     expect(back.contours[0]!.nodes[0]!.blend).toEqual({ angle: "smooth", shape: "step" });
   });
 
+  it("keeps a pen's squareness", () => {
+    const drawn = curl();
+    const boxed = { ...drawn, nib: { angle: 30, width: 80, thickness: 24, squareness: 0.6 } };
+    const { glyph: back, warnings } = throughGlif(glyph("s", { contours: [boxed] }));
+
+    expect(warnings).toEqual([]);
+    expect(back.contours[0]!.nib).toEqual({ angle: 30, width: 80, thickness: 24, squareness: 0.6 });
+  });
+
   it("keeps how its ends are cut, and writes the ink cut so", () => {
     const drawn = curl();
     const last = drawn.nodes.length - 1;

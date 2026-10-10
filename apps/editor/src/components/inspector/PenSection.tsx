@@ -2,8 +2,11 @@ import type { PenBlend } from "@typewright/geometry";
 import {
   type BlendChannel,
   type EndChoice,
+  begin,
   changePen,
+  commit,
   drawWithPen,
+  result,
   selectedPenBlend,
   selectedPenValue,
   selectedPointPen,
@@ -12,6 +15,8 @@ import {
   setPenBlend,
   setStrokeEnd,
 } from "@typewright/tools";
+
+import { useRef } from "react";
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
@@ -57,7 +62,25 @@ export function PenSection(): React.JSX.Element {
   const angle = useStoreValue((s) => selectedPenValue(s.session.editor, "angle"));
   const width = useStoreValue((s) => selectedPenValue(s.session.editor, "width"));
   const thickness = useStoreValue((s) => selectedPenValue(s.session.editor, "thickness"));
+  const squareness = useStoreValue((s) => selectedPenValue(s.session.editor, "squareness"));
   const number = (v: number | "mixed" | null): number | null => (typeof v === "number" ? v : null);
+
+  // The squareness slider's drag, which is one change however far it goes: the
+  // step is opened by the first move — lazily, a slider being worked with the
+  // arrow keys too, which never press — and closed when the slider is let go.
+  const sliding = useRef(false);
+  const slideSquareness = (percent: number): void => {
+    if (!sliding.current) {
+      sliding.current = true;
+      store.applyTool(result(store.editor, [begin("Pen squareness")]));
+    }
+    store.applyTool(result(changePen(store.editor, { squareness: percent / 100 }).state));
+  };
+  const endSlide = (): void => {
+    if (!sliding.current) return;
+    sliding.current = false;
+    store.applyTool(result(store.editor, [commit]));
+  };
   const dash = (v: number | "mixed" | null): string | undefined =>
     v === "mixed" ? "—" : undefined;
 
@@ -138,6 +161,40 @@ export function PenSection(): React.JSX.Element {
               onCommit={(thickness) => store.applyTool(changePen(store.editor, { thickness }))}
             />
           </Field>
+          {/* Only for a pen with thickness: a broad edge is a line, and has no
+              corners to square. As a percentage, as a corner's smoothness is. */}
+          {thickness !== 0 && thickness !== null && (
+            <Field label="Squareness">
+              <div className={styles.panRow}>
+                <input
+                  className={styles.slider}
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  aria-label="Pen squareness, from oval to rectangle"
+                  title="From an oval at the left to a rectangle at the right"
+                  value={typeof squareness === "number" ? Math.round(squareness * 100) : 0}
+                  onChange={(event) => slideSquareness(Number(event.target.value))}
+                  onPointerUp={endSlide}
+                  onKeyUp={endSlide}
+                  onBlur={endSlide}
+                />
+                <NumberField
+                  className={styles.input}
+                  label="Pen squareness"
+                  title="0 is an oval, 100 a rectangle of the pen's width and thickness"
+                  value={typeof squareness === "number" ? Math.round(squareness * 100) : null}
+                  placeholder={dash(squareness)}
+                  bigStep={10}
+                  bounds={{ min: 0, max: 100 }}
+                  onCommit={(percent) =>
+                    store.applyTool(changePen(store.editor, { squareness: percent / 100 }))
+                  }
+                />
+              </div>
+            </Field>
+          )}
         </>
       )}
 

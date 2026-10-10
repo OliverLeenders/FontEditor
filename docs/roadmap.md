@@ -1457,16 +1457,34 @@ A selected cut end shows its line on the canvas with a knob at one end, as a con
 shows where its round ends: dragged round the point it turns the cut, settling on level,
 upright and square.
 
+#### After phase 38 — A pen with corners — done
+
+A pen was an oval, or the broad edge an oval of no thickness is. It has one more number now,
+its squareness, from the oval at nought to a rectangle of its width and thickness at one, with
+a box whose corners are rounded between them: the outline `|x/a|ⁿ + |y/b|ⁿ = 1`, the exponent
+two for the oval and more the squarer it is. Squareness is measured as Metafont measures
+superness, by where the outline crosses the diagonal of the box it sits in, and runs only from
+the oval upward. With cut ends it is what a slab serif drawn as a stroke wants.
+
+Everything that draws a stroke asks the pen one thing — how far it reaches in a direction —
+and a pen with corners answers that as plainly as an oval does, so the sides, the folds and
+the swept steps needed nothing new. What the oval had to itself were its exact sides, its
+caps and the wedges on the outside of its corners, all made where the pen is a circle; a pen
+with corners has no such place, and its sides are fitted and its caps and wedges walked round
+its own outline by the direction it faces. A rectangle proper has no exponent and is drawn
+with the largest one used, short of square at its corners by a hundredth of the pen's
+half-width.
+
 #### Open
 
 What is next in the same direction:
 
-- **A cut end in a variable font**, which is the line round the ink going straight along the
-  cut where it now goes round the pen: such a stroke is still written as the default master
-  draws it.
-- **A pen with corners**: one more number, from an oval to a rectangle, so that a pen can be
-  a rounded box or a square one. With cut ends it is what a slab serif drawn as a stroke
-  needs.
+- **A cut end, and a pen with corners, in a variable font**. A cut is the line round the ink
+  going straight along the cut where it now goes round the pen; a pen with corners is its
+  own outline followed round a join where the oval's is. Such strokes are still written as
+  the default master draws them.
+- **A rectangle that is one**, exact as the broad edge is: its sides the path moved over by a
+  corner, with a straight line across where the path runs along one of its edges.
 - **A broad edge that turns or widens along a stroke, in a variable font**, which is still
   written as the default master draws it.
 - **Fitting to the fixed width in every layer**, where it now fits the main drawing.

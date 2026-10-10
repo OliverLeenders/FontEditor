@@ -268,3 +268,50 @@ describe("how a stroke ends", () => {
     expect(path(store).nodes[0]!.end).toBeUndefined();
   });
 });
+
+describe("a pen's squareness", () => {
+  it("is offered for a pen with thickness, and not for a broad edge", () => {
+    opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    // The pen a stroke starts with is a broad edge: a line has no corners.
+    expect(screen.queryByLabelText("Pen squareness")).toBeNull();
+
+    const thickness = screen.getByLabelText("Pen thickness");
+    fireEvent.change(thickness, { target: { value: "20" } });
+    fireEvent.blur(thickness);
+    expect(screen.getByLabelText("Pen squareness")).toBeTruthy();
+  });
+
+  it("is typed as a percentage of the way from an oval to a rectangle", () => {
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    selectAll(store);
+    const thickness = screen.getByLabelText("Pen thickness");
+    fireEvent.change(thickness, { target: { value: "20" } });
+    fireEvent.blur(thickness);
+
+    const squareness = screen.getByLabelText("Pen squareness");
+    fireEvent.change(squareness, { target: { value: "60" } });
+    fireEvent.blur(squareness);
+    expect(pen(store)?.squareness).toBeCloseTo(0.6, 9);
+  });
+
+  it("is dragged with the slider beside it, all of one drag being one step to undo", () => {
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    selectAll(store);
+    const thickness = screen.getByLabelText("Pen thickness");
+    fireEvent.change(thickness, { target: { value: "20" } });
+    fireEvent.blur(thickness);
+
+    const slider = screen.getByLabelText("Pen squareness, from oval to rectangle");
+    fireEvent.change(slider, { target: { value: "30" } });
+    fireEvent.change(slider, { target: { value: "55" } });
+    fireEvent.change(slider, { target: { value: "80" } });
+    fireEvent.pointerUp(slider);
+    expect(pen(store)?.squareness).toBeCloseTo(0.8, 9);
+
+    act(() => store.undo());
+    expect(pen(store)?.squareness ?? 0).toBe(0);
+  });
+});

@@ -10,6 +10,7 @@ import {
   node,
   readContinuous,
   readSegmentBlend,
+  readSquareness,
   readStrokeEnd,
   type StrokeEnd,
   removeContour,
@@ -51,7 +52,12 @@ type StoredNode = {
   readonly out: Vec2 | null;
   readonly hvLock: boolean | { readonly in?: boolean; readonly out?: boolean };
   readonly harmonised?: boolean;
-  readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+  readonly pen?: {
+    readonly angle: number;
+    readonly width: number;
+    readonly thickness?: number;
+    readonly squareness?: number;
+  };
   readonly blend?: { readonly angle: string; readonly shape: string };
   readonly continuous?: { readonly size: number; readonly smoothness: number };
   readonly end?: { readonly cut: "square" | number };
@@ -63,7 +69,12 @@ type Payload = {
   readonly contours: ReadonlyArray<{
     readonly closed: boolean;
     readonly nodes: readonly StoredNode[];
-    readonly nib?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+    readonly nib?: {
+      readonly angle: number;
+      readonly width: number;
+      readonly thickness?: number;
+      readonly squareness?: number;
+    };
   }>;
 };
 
@@ -181,9 +192,12 @@ function readLock(raw: unknown): { in: boolean; out: boolean } {
 }
 
 /** A pen from the clipboard, or `null` for none or for one that cannot be read. */
-function readNib(
-  raw: unknown,
-): { readonly angle: number; readonly width: number; readonly thickness?: number } | null {
+function readNib(raw: unknown): {
+  readonly angle: number;
+  readonly width: number;
+  readonly thickness?: number;
+  readonly squareness?: number;
+} | null {
   if (!isRecord(raw)) return null;
   const angle = raw["angle"];
   const width = raw["width"];
@@ -191,7 +205,7 @@ function readNib(
   if (typeof width !== "number" || !Number.isFinite(width) || width < 0) return null;
   const thickness = raw["thickness"];
   return typeof thickness === "number" && Number.isFinite(thickness) && thickness > 0
-    ? { angle, width, thickness }
+    ? { angle, width, thickness, ...readSquareness(raw["squareness"]) }
     : { angle, width };
 }
 
@@ -225,7 +239,12 @@ export function parseClipboard(text: string, ids: IdFactory): Contour[] | null {
           hvLock: readLock(rawNode["hvLock"]),
           harmonised: rawNode["harmonised"] === true,
           ...((): {
-            pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+            pen?: {
+              readonly angle: number;
+              readonly width: number;
+              readonly thickness?: number;
+              readonly squareness?: number;
+            };
           } => {
             const pen = readNib(rawNode["pen"]);
             return pen === null ? {} : { pen };

@@ -9,6 +9,7 @@ import {
   node,
   readContinuous,
   readSegmentBlend,
+  readSquareness,
   readStrokeEnd,
 } from "@typewright/font-model";
 import type { SegmentBlend } from "@typewright/geometry";
@@ -238,7 +239,7 @@ function readStroke(raw: unknown): StoredStroke | null {
     if (typeof angle !== "number" || typeof width !== "number" || !(width >= 0)) return null;
     nib =
       typeof thickness === "number" && thickness > 0
-        ? { angle, width, thickness }
+        ? { angle, width, thickness, ...readSquareness(pen["squareness"]) }
         : { angle, width };
   }
   if (!Array.isArray(r["nodes"])) return null;
@@ -302,7 +303,7 @@ function penOf(raw: unknown): { readonly pen?: Nib } {
   return {
     pen:
       typeof thickness === "number" && Number.isFinite(thickness) && thickness > 0
-        ? { angle, width, thickness }
+        ? { angle, width, thickness, ...readSquareness(r["squareness"]) }
         : { angle, width },
   };
 }

@@ -75,7 +75,7 @@ export function drawWithPen(state: EditorState, on: boolean): ToolResult {
  */
 export function selectedPenValue(
   state: EditorState,
-  field: "angle" | "width" | "thickness",
+  field: "angle" | "width" | "thickness" | "squareness",
 ): number | "mixed" | null {
   const glyph = currentGlyph(state);
   if (glyph === null) return null;
@@ -88,7 +88,12 @@ export function selectedPenValue(
     const n = c.nodes.find((each) => each.id === item.nodeId);
     if (n === undefined) continue;
     const pen = n.pen ?? c.nib;
-    const value = field === "thickness" ? (pen.thickness ?? 0) : pen[field];
+    const value =
+      field === "thickness"
+        ? (pen.thickness ?? 0)
+        : field === "squareness"
+          ? (pen.squareness ?? 0)
+          : pen[field];
     if (found === null) found = value;
     else if (found !== value) return "mixed";
   }
@@ -141,6 +146,9 @@ export function changePen(state: EditorState, change: Partial<Nib>): ToolResult 
   // typed into, not a pen: nothing changes until they are.
   if (change.width !== undefined && !(change.width >= 0)) return result(state);
   if (change.thickness !== undefined && !(change.thickness >= 0)) return result(state);
+  if (change.squareness !== undefined && !(change.squareness >= 0 && change.squareness <= 1)) {
+    return result(state);
+  }
   if (change.angle !== undefined && !Number.isFinite(change.angle)) return result(state);
 
   const points = new Map<string, Set<string>>();
@@ -162,7 +170,7 @@ export function changePen(state: EditorState, change: Partial<Nib>): ToolResult 
 
     const nodes = c.nodes.map((n) => {
       if (!chosen.has(n.id)) return n;
-      const pen = { ...(n.pen ?? stroke), ...change };
+      const pen = withoutNoSquareness({ ...(n.pen ?? stroke), ...change });
       remembered.pen = pen;
       if (sameNib(pen, n.pen ?? stroke)) return n;
       if (sameNib(pen, stroke)) return withoutOwnPen(n);
@@ -186,7 +194,9 @@ export function changePen(state: EditorState, change: Partial<Nib>): ToolResult 
       ? "Pen angle"
       : change.thickness !== undefined
         ? "Pen thickness"
-        : "Pen width";
+        : change.squareness !== undefined
+          ? "Pen squareness"
+          : "Pen width";
   return done(state, after, label);
 }
 
@@ -421,15 +431,27 @@ function samePen(a: Nib | undefined, b: Nib | undefined): boolean {
   return sameNib(a, b);
 }
 
-/** A point with no pen of its own, so its stroke's pen decides it again. */
+/**
+ * A point with no pen of its own, so its stroke's pen decides it again.
+ *
+ * Only the pen goes. Everything else the point says of the stroke — how the pen
+ * blends along the segment leaving it, how the stroke ends there — is not the
+ * pen's, and used to go with it: a width typed for a whole stroke took the cut
+ * off both its ends.
+ */
 function withoutOwnPen(n: Contour["nodes"][number]): Contour["nodes"][number] {
-  return {
-    id: n.id,
-    pt: n.pt,
-    type: n.type,
-    in: n.in,
-    out: n.out,
-    hvLock: n.hvLock,
-    harmonised: n.harmonised,
-  };
+  if (n.pen === undefined) return n;
+  const { pen: _dropped, ...rest } = n;
+  return rest;
+}
+
+/**
+ * A pen that says nothing of squareness where it has none: an oval is kept as
+ * it always was, and a broad edge, which has no corners to square, likewise.
+ */
+function withoutNoSquareness(pen: Nib): Nib {
+  if (pen.squareness === undefined) return pen;
+  if (pen.squareness > 0 && (pen.thickness ?? 0) > 0) return pen;
+  const { squareness: _dropped, ...rest } = pen;
+  return rest;
 }

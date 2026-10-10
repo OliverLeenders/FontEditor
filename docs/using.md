@@ -530,7 +530,12 @@ way a calligrapher states it — thirty for a foundational hand, forty-five or s
 **width**, along that angle. And its **thickness** across it: nothing is a broad edge, which is
 thick where the path runs across the pen and pinches to nothing where it runs along the pen's own
 edge, as a cut quill does; more than nothing is an oval, whose thin strokes keep some weight and
-whose ends and corners are round; the same as the width is a round pen, the same weight every way. Every point tool works on the path as it does on any contour — drag its points and
+whose ends and corners are round; the same as the width is a round pen, the same weight every way. A pen
+with thickness has a fourth, its **squareness**: nought is that oval, a hundred is a rectangle of
+the pen's width and thickness, and between them the corners fill out, a box with its corners
+rounded — a slider for the look of it and a number beside it, in per cent. Like the others it is
+set at points and blends along a segment with the pen's shape, so a stroke can go from round to
+square. A broad edge has no corners and no squareness. Every point tool works on the path as it does on any contour — drag its points and
 handles, hold its joins, cut an open one in two with the knife and both halves keep the pen.
 Choose **Outline** to make it an ordinary contour again; the path stays where it is. To keep the ink
 instead, right-click the stroke and choose **Convert stroke to outlines**: it is replaced by the
@@ -594,7 +599,7 @@ needs the same ones. Two things have no such line and are written as the default
 them at every weight, with a warning that says which glyphs: a broad edge whose angle or width
 changes along the stroke, and a pen that is a broad edge in one master and an oval in another.
 So is a stroke whose masters have not the same points, one with a **Step** in its blend, or
-one with an end cut straight.
+one with an end cut straight, or a pen with any squareness.
 
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it

@@ -10,7 +10,16 @@ import {
   tangent,
 } from "./cubic.js";
 import { fitCubics } from "./fit.js";
-import { halfNib, nibStroke, ovalBands, ovalCap, ovalCorner, ovalFolds, ovalWedge } from "./nib.js";
+import {
+  CORNER,
+  halfNib,
+  nibStroke,
+  ovalBands,
+  ovalCap,
+  ovalCorner,
+  ovalFolds,
+  ovalWedge,
+} from "./nib.js";
 import { OFFSET_TOLERANCE, leftNormal } from "./offset.js";
 import type { Vec2 } from "./vec2.js";
 
@@ -35,7 +44,49 @@ export type PenShape = {
   readonly angle: number;
   readonly width: number;
   readonly thickness: number;
+  /**
+   * How square the pen is, from nought to one: nought, or absent, is the oval;
+   * one is a rectangle of the pen's width and thickness; between them the
+   * corners fill out, a box with its corners rounded. See {@link penExponent}.
+   */
+  readonly squareness?: number;
 };
+
+/** A pen's squareness, absent being none, and kept between none and all. */
+export function squarenessOf(pen: PenShape): number {
+  const s = pen.squareness ?? 0;
+  return Number.isFinite(s) ? Math.min(1, Math.max(0, s)) : 0;
+}
+
+/** Whether a pen is anything but the oval its width and thickness make. */
+export function isSquared(pen: PenShape): boolean {
+  return squarenessOf(pen) > 0;
+}
+
+/** The most the exponent is let be: a rectangle to within a hundredth of its half-width. */
+const SQUAREST = 64;
+
+/**
+ * The exponent of the pen's outline, `|x/a|ⁿ + |y/b|ⁿ = 1`: two for an oval, and
+ * more the squarer it is.
+ *
+ * Squareness is measured the way Metafont measures superness, by where the
+ * outline crosses the diagonal of the box it sits in: 1/√2 of the way to the
+ * corner for an oval, all the way for a rectangle, and squareness the share of
+ * the distance between those. The exponent that crosses there is −1/log₂ of it.
+ *
+ * A true rectangle has no exponent. It is drawn with the largest one here,
+ * whose corners are short of square by a hundredth of the pen's half-width — a
+ * few tenths of a unit — because every other part of drawing a stroke asks the
+ * pen how far it reaches in a direction and expects the answer to change as the
+ * direction does.
+ */
+export function penExponent(pen: PenShape): number {
+  const s = squarenessOf(pen);
+  if (s === 0) return 2;
+  const diagonal = Math.SQRT1_2 + s * (1 - Math.SQRT1_2);
+  return diagonal >= 1 ? SQUAREST : Math.min(SQUAREST, -1 / Math.log2(diagonal));
+}
 
 /** Below this thickness a pen is drawn as the broad edge it cannot be told from. */
 const BROAD_BELOW = 0.5;
@@ -46,7 +97,17 @@ export function isBroad(pen: PenShape): boolean {
 }
 
 export function samePenShape(a: PenShape, b: PenShape): boolean {
-  return a.angle === b.angle && a.width === b.width && a.thickness === b.thickness;
+  return (
+    a.angle === b.angle &&
+    a.width === b.width &&
+    a.thickness === b.thickness &&
+    squarenessOf(a) === squarenessOf(b)
+  );
+}
+
+/** A pen with a squareness, which says nothing where it has none: an oval is written as it was. */
+function squared(pen: PenShape, squareness: number): PenShape {
+  return squareness > 0 ? { ...pen, squareness } : pen;
 }
 
 /**
@@ -61,11 +122,14 @@ export function blendPen(a: PenShape, b: PenShape, t: number): PenShape {
   let turn = (b.angle - a.angle) % 180;
   if (turn > 90) turn -= 180;
   if (turn < -90) turn += 180;
-  return {
-    angle: a.angle + turn * t,
-    width: a.width + (b.width - a.width) * t,
-    thickness: a.thickness + (b.thickness - a.thickness) * t,
-  };
+  return squared(
+    {
+      angle: a.angle + turn * t,
+      width: a.width + (b.width - a.width) * t,
+      thickness: a.thickness + (b.thickness - a.thickness) * t,
+    },
+    squarenessOf(a) + (squarenessOf(b) - squarenessOf(a)) * t,
+  );
 }
 
 /**
@@ -126,6 +190,7 @@ export function penProfiles(
   const angle: Channel = (p) => p.angle;
   const width: Channel = (p) => p.width;
   const thickness: Channel = (p) => p.thickness;
+  const squareness: Channel = squarenessOf;
   const change = (channel: Channel, segment: number): number =>
     channel === angle
       ? shortTurn(penAt(segment).angle, penAt(segment + 1).angle)
@@ -181,7 +246,10 @@ export function penProfiles(
 
     const held = (channel: Channel, kind: PenBlend) => kind === "step" || change(channel, i) === 0;
     const constant =
-      held(angle, blend.angle) && held(width, blend.shape) && held(thickness, blend.shape)
+      held(angle, blend.angle) &&
+      held(width, blend.shape) &&
+      held(thickness, blend.shape) &&
+      held(squareness, blend.shape)
         ? from
         : null;
     if (constant !== null) return { at: () => constant, constant };
@@ -189,11 +257,15 @@ export function penProfiles(
     const a = along(angle, blend.angle);
     const w = along(width, blend.shape);
     const k = along(thickness, blend.shape);
+    const q = along(squareness, blend.shape);
     const distance = distanceAlong(curve);
     return {
       at: (t) => {
         const s = distance(t);
-        return { angle: a(s), width: Math.max(0, w(s)), thickness: Math.max(0, k(s)) };
+        return squared(
+          { angle: a(s), width: Math.max(0, w(s)), thickness: Math.max(0, k(s)) },
+          Math.min(1, Math.max(0, q(s))),
+        );
       },
       constant: null,
     };
@@ -243,6 +315,12 @@ function distanceAlong(curve: Cubic): (t: number) => number {
  * furthest point in direction (dx, dy) is (a²dx, b²dy) divided by √(a²dx² + b²dy²).
  * For a broad edge, `b` is nothing and that is one end of the nib or the other,
  * whichever the direction favours.
+ *
+ * A pen with squareness is the same thing said with another exponent. Its outline
+ * is `|x/a|ⁿ + |y/b|ⁿ = 1`, and how far it reaches in a direction is the same
+ * sum with the exponent that goes with `n`, `m = n/(n − 1)`: the reach is the
+ * `m`-th root of `(a|dx|)ᵐ + (b|dy|)ᵐ`, and the point is each half-axis times
+ * its share of that reach to the power `m − 1`. At two both are the oval's.
  */
 export function penSupport(pen: PenShape, direction: Vec2): Vec2 {
   const angle = (pen.angle * Math.PI) / 180;
@@ -253,6 +331,24 @@ export function penSupport(pen: PenShape, direction: Vec2): Vec2 {
 
   const dx = direction.x * ux + direction.y * uy;
   const dy = -direction.x * uy + direction.y * ux;
+
+  const n = b > 0 ? penExponent(pen) : 2;
+  if (n !== 2) {
+    const m = n / (n - 1);
+    // A direction along one of the pen's own axes to within rounding is along it.
+    // The squarer the pen, the flatter its sides, and the less it takes to send
+    // the furthest point from the middle of a side to its end: the sine of half
+    // a turn is not quite nothing, and on a square pen that was eleven units.
+    const size = Math.hypot(dx, dy);
+    const px = Math.abs(dx) < size * 1e-9 ? 0 : a * Math.abs(dx);
+    const py = Math.abs(dy) < size * 1e-9 ? 0 : b * Math.abs(dy);
+    const far = Math.pow(Math.pow(px, m) + Math.pow(py, m), 1 / m);
+    if (far === 0 || !Number.isFinite(far)) return { x: 0, y: 0 };
+    const x = px === 0 ? 0 : a * Math.sign(dx) * Math.pow(px / far, m - 1);
+    const y = py === 0 ? 0 : b * Math.sign(dy) * Math.pow(py / far, m - 1);
+    return { x: x * ux - y * uy, y: x * uy + y * ux };
+  }
+
   const reach = Math.sqrt(a * a * dx * dx + b * b * dy * dy);
   if (reach === 0 || !Number.isFinite(reach)) return { x: 0, y: 0 };
 
@@ -337,7 +433,9 @@ export function penPathStrokeParts(
             // hundreds of slivers of a tight curve. Traced instead the way a pen
             // that changes is: the edge sampled, the folded samples left out, and
             // fitted — one band for the curve.
-            ovalFolds(curve, pen)
+            // And so is a pen with corners, always: the oval's exact sides are
+            // made where the pen is a circle, which only an oval can be made.
+            isSquared(pen) || ovalFolds(curve, pen)
             ? bandsOf(curve, () => pen)
             : ovalBands(curve, pen, tolerance)),
       );
@@ -353,7 +451,9 @@ export function penPathStrokeParts(
   for (let i = 0; i < joins; i++) {
     const pen = penAt(i + 1);
     if (isBroad(pen) || !(pen.width > 0)) continue;
-    const wedge = ovalWedge(curves[i]!, curves[(i + 1) % count]!, pen);
+    const wedge = isSquared(pen)
+      ? penWedge(curves[i]!, curves[(i + 1) % count]!, pen, tolerance)
+      : ovalWedge(curves[i]!, curves[(i + 1) % count]!, pen);
     if (wedge !== null) loops.push(wedge);
   }
 
@@ -363,11 +463,15 @@ export function penPathStrokeParts(
     const first = profiles[0]!.at(0);
     const last = profiles[count - 1]!.at(1);
     if (!isBroad(last) && last.width > 0) {
-      const end = ovalCap(curves[count - 1]!, true, last);
+      const end = isSquared(last)
+        ? penCap(curves[count - 1]!, true, last, tolerance)
+        : ovalCap(curves[count - 1]!, true, last);
       if (end !== null) loops.push(end);
     }
     if (!isBroad(first) && first.width > 0) {
-      const start = ovalCap(curves[0]!, false, first);
+      const start = isSquared(first)
+        ? penCap(curves[0]!, false, first, tolerance)
+        : ovalCap(curves[0]!, false, first);
       if (start !== null) loops.push(start);
     }
   }
@@ -404,7 +508,7 @@ function straightenedJoins(
     if (isBroad(pen) || !(pen.width > 0)) continue;
     const before = out[i]!;
     const after = out[j]!;
-    if (ovalCorner(before, after, pen)) continue;
+    if (isSquared(pen) ? turnsACorner(before, after) : ovalCorner(before, after, pen)) continue;
     const arriving = endTangent(before, 1);
     const leaving = endTangent(after, 0);
     if (arriving === null || leaving === null) continue;
@@ -426,6 +530,92 @@ function straightenedJoins(
     out[j] = cubic(next.a, turned(next.c1, next.a, -turn / 2), next.c2, next.b);
   }
   return out;
+}
+
+/** Whether the join between two curves turns enough to be a corner, as it is drawn. */
+function turnsACorner(before: Cubic, after: Cubic): boolean {
+  const arriving = endTangent(before, 1);
+  const leaving = endTangent(after, 0);
+  if (arriving === null || leaving === null) return false;
+  const turn = Math.atan2(
+    arriving.x * leaving.y - arriving.y * leaving.x,
+    arriving.x * leaving.x + arriving.y * leaving.y,
+  );
+  return Math.abs(turn) >= CORNER;
+}
+
+/**
+ * A stretch of a pen's own outline, standing at a point: from where it reaches
+ * furthest in one direction, round by `sweep` radians, to where it reaches
+ * furthest in another. Anticlockwise where the sweep is more than nothing.
+ *
+ * What an oval's cap and wedge are made of, for a pen that is not an oval and has
+ * no circle to be made into: the outline is walked by the direction it faces and
+ * fitted. Walking it that way puts the points where they are wanted — close
+ * together round a corner, where the pen faces a quarter turn of directions from
+ * nearly one place, and few along a flat side.
+ */
+function penArc(
+  pen: PenShape,
+  centre: Vec2,
+  from: Vec2,
+  sweep: number,
+  tolerance: number,
+): Cubic[] {
+  const steps = Math.max(8, Math.ceil(Math.abs(sweep) / (Math.PI / 48)));
+  const points: Vec2[] = [];
+  for (let k = 0; k <= steps; k++) {
+    const by = (sweep * k) / steps;
+    const cos = Math.cos(by);
+    const sin = Math.sin(by);
+    const reach = penSupport(pen, {
+      x: from.x * cos - from.y * sin,
+      y: from.x * sin + from.y * cos,
+    });
+    points.push({ x: centre.x + reach.x, y: centre.y + reach.y });
+  }
+  return fitCubics(points, tolerance);
+}
+
+/**
+ * What fills the outside of a corner for a pen with corners of its own: the pen
+ * standing at the corner, between where the band before it ends and where the
+ * band after it starts. As {@link ovalWedge} is for an oval, and `null` likewise
+ * for a join that is not a corner.
+ */
+function penWedge(before: Cubic, after: Cubic, pen: PenShape, tolerance: number): Cubic[] | null {
+  const arriving = endTangent(before, 1);
+  const leaving = endTangent(after, 0);
+  if (arriving === null || leaving === null) return null;
+  const turn = Math.atan2(
+    arriving.x * leaving.y - arriving.y * leaving.x,
+    arriving.x * leaving.x + arriving.y * leaving.y,
+  );
+  if (Math.abs(turn) < CORNER) return null;
+
+  // The outside of a left turn is the right-hand side.
+  const outside = turn > 0 ? -1 : 1;
+  const from = { x: -arriving.y * outside, y: arriving.x * outside };
+  const p = before.b;
+  const arc = penArc(pen, p, from, turn, tolerance);
+  if (arc.length === 0) return null;
+  return [line(p, arc[0]!.a), ...arc, line(arc[arc.length - 1]!.b, p)];
+}
+
+/**
+ * The end a pen with corners leaves where a path ends: the half of its outline
+ * past the end, closed straight across. As {@link ovalCap} is for an oval.
+ */
+function penCap(curve: Cubic, atEnd: boolean, pen: PenShape, tolerance: number): Cubic[] | null {
+  const normal = leftNormal(curve, atEnd ? 1 : 0);
+  if (normal === null) return null;
+  // At the far end from the left side round in front of the path to the right;
+  // at the near end from the right round behind it to the left. Both clockwise.
+  const from = atEnd ? normal : { x: -normal.x, y: -normal.y };
+  const p = atEnd ? curve.b : curve.a;
+  const arc = penArc(pen, p, from, -Math.PI, tolerance);
+  if (arc.length === 0) return null;
+  return [...arc, line(arc[arc.length - 1]!.b, arc[0]!.a)];
 }
 
 /** How many points a varying curve's sides are sampled at, before fitting. */

@@ -191,6 +191,35 @@ describe("serialization", () => {
     }
   });
 
+  it("keeps a pen's squareness, and says nothing of it for an oval", () => {
+    const ids = counterIds("q");
+    const stem = {
+      ...contour(ids.contour(), [
+        node(ids.node(), vec(0, 0)),
+        node(ids.node(), vec(0, 300), {
+          pen: { angle: 30, width: 80, thickness: 20, squareness: 0.25 },
+        }),
+      ]),
+      nib: { angle: 30, width: 80, thickness: 20, squareness: 1 },
+    };
+    const encoded = encodeGlyph(addContour(glyph("l"), stem));
+    const decoded = decodeGlyph(JSON.parse(JSON.stringify(encoded)) as unknown);
+
+    expect(decoded.ok).toBe(true);
+    if (decoded.ok) {
+      expect(decoded.value.contours[0]!.nib).toEqual({
+        angle: 30,
+        width: 80,
+        thickness: 20,
+        squareness: 1,
+      });
+      expect(decoded.value.contours[0]!.nodes[1]!.pen?.squareness).toBe(0.25);
+    }
+
+    const oval = { ...stem, nib: { angle: 30, width: 80, thickness: 20, squareness: 0 } };
+    expect("squareness" in encodeGlyph(addContour(glyph("l"), oval)).contours[0]!.nib!).toBe(false);
+  });
+
   it("keeps how a stroke's ends are cut", () => {
     const ids = counterIds("e");
     const stem = {

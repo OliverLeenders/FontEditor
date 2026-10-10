@@ -39,6 +39,9 @@ import {
   node,
   readContinuous,
   readSegmentBlend,
+  readSquareness,
+  nibOfShape,
+  penShapeOf,
   readStrokeEnd,
 } from "@typewright/font-model";
 import type { SegmentBlend, Vec2 } from "@typewright/geometry";
@@ -85,7 +88,12 @@ export type StoredNode = {
    */
   readonly harmonised?: true;
   /** The pen at this point of a stroke, where it has one of its own. */
-  readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+  readonly pen?: {
+    readonly angle: number;
+    readonly width: number;
+    readonly thickness?: number;
+    readonly squareness?: number;
+  };
   /** How the pen changes along the segment leaving this point, where not linear. */
   readonly blend?: { readonly angle: string; readonly shape: string };
   /** A continuous corner: how much of each side it spends, and how smoothly. */
@@ -106,7 +114,12 @@ export type StoredContour = {
    * because another application wants the shape of the letter, so the project file
    * is where a stroke is kept as a stroke.
    */
-  readonly nib?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+  readonly nib?: {
+    readonly angle: number;
+    readonly width: number;
+    readonly thickness?: number;
+    readonly squareness?: number;
+  };
 };
 
 export type StoredComponent = {
@@ -295,13 +308,9 @@ function encodeComponent(c: Component): StoredComponent {
 function encodeContour(c: Contour): StoredContour {
   const base = { id: c.id, closed: c.closed, nodes: c.nodes.map(encodeNode) };
   if (c.nib === undefined) return base;
-  const { angle, width, thickness } = c.nib;
-  // Thickness only for an oval: a broad edge is written as it always was.
-  return {
-    ...base,
-    nib:
-      thickness === undefined || thickness === 0 ? { angle, width } : { angle, width, thickness },
-  };
+  // Thickness only for an oval, and squareness only for one with corners: a
+  // broad edge and an oval are each written as they always were.
+  return { ...base, nib: nibOfShape(penShapeOf(c.nib)) };
 }
 
 function encodeNode(n: Node): StoredNode {
@@ -665,9 +674,19 @@ function blendField(blend: SegmentBlend | undefined): { readonly blend?: Segment
 
 /** A pen as the optional field a node is built with. */
 function penField(
-  pen: { readonly angle: number; readonly width: number; readonly thickness?: number } | null,
+  pen: {
+    readonly angle: number;
+    readonly width: number;
+    readonly thickness?: number;
+    readonly squareness?: number;
+  } | null,
 ): {
-  readonly pen?: { readonly angle: number; readonly width: number; readonly thickness?: number };
+  readonly pen?: {
+    readonly angle: number;
+    readonly width: number;
+    readonly thickness?: number;
+    readonly squareness?: number;
+  };
 } {
   return pen === null ? {} : { pen };
 }
@@ -679,9 +698,12 @@ function penField(
  * skeleton is still a path worth having, and a glyph that refused to open over a
  * malformed angle would lose the whole drawing to save one number.
  */
-function decodeNib(
-  raw: unknown,
-): { readonly angle: number; readonly width: number; readonly thickness?: number } | null {
+function decodeNib(raw: unknown): {
+  readonly angle: number;
+  readonly width: number;
+  readonly thickness?: number;
+  readonly squareness?: number;
+} | null {
   if (!isRecord(raw)) return null;
   const angle = raw["angle"];
   const width = raw["width"];
@@ -691,7 +713,7 @@ function decodeNib(
   // pen: the stroke is still worth having.
   const thickness = raw["thickness"];
   return typeof thickness === "number" && Number.isFinite(thickness) && thickness > 0
-    ? { angle, width, thickness }
+    ? { angle, width, thickness, ...readSquareness(raw["squareness"]) }
     : { angle, width };
 }
 

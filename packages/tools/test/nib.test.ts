@@ -17,6 +17,7 @@ import {
   changePen,
   drawWithPen,
   selectedPenBlend,
+  selectedPenValue,
   selectedStrokeEnd,
   selectionNib,
   setPenBlend,
@@ -502,5 +503,75 @@ describe("turning a cut by its knob", () => {
     expect(pointerDown(unselected, pointerInput(knob), { ids }).state.gesture?.kind).not.toBe(
       "dragStrokeCut",
     );
+  });
+});
+
+describe("a pen's squareness", () => {
+  const oval = () =>
+    selecting(withContours(withNib(stroke(0), { angle: 30, width: 80, thickness: 20 })), 0);
+  const all = (state: EditorState): EditorState => {
+    const c = state.document.glyphs["l"]!.contours[0]!;
+    return {
+      ...state,
+      selection: c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+    };
+  };
+
+  it("is none until it is set, and is then the stroke's when every point is selected", () => {
+    expect(selectedPenValue(oval(), "squareness")).toBe(0);
+    const boxed = changePen(all(oval()), { squareness: 0.5 }).state;
+    expect(penOf(boxed, 0)).toEqual({ angle: 30, width: 80, thickness: 20, squareness: 0.5 });
+    expect(selectedPenValue(boxed, "squareness")).toBe(0.5);
+  });
+
+  it("is not kept at nothing, an oval being written as it always was", () => {
+    const boxed = changePen(all(oval()), { squareness: 0.5 }).state;
+    const back = changePen(boxed, { squareness: 0 }).state;
+    expect(penOf(back, 0)).toEqual({ angle: 30, width: 80, thickness: 20 });
+  });
+
+  it("is refused outside nought to one, and means nothing to a broad edge", () => {
+    const state = all(oval());
+    expect(changePen(state, { squareness: 1.5 }).state).toBe(state);
+    expect(changePen(state, { squareness: -0.1 }).state).toBe(state);
+
+    const broad = all(withContours(withNib(stroke(0), { angle: 30, width: 80 })));
+    expect(penOf(changePen(broad, { squareness: 0.5 }).state, 0)).toEqual({ angle: 30, width: 80 });
+  });
+
+  it("goes with a stroke copied and pasted", () => {
+    const boxed = changePen(all(oval()), { squareness: 0.75 }).state;
+    const pasted = parseClipboard(clipboardText(boxed)!, ids)!;
+    expect(pasted[0]!.nib).toEqual({ angle: 30, width: 80, thickness: 20, squareness: 0.75 });
+  });
+});
+
+describe("changing the pen of a point that says other things", () => {
+  it("leaves how the stroke ends there, and how the pen blends from it", () => {
+    // A width typed for a whole stroke took the cut off its ends, and the
+    // blend off its segments: both went with the point's own pen.
+    const start = withContours(
+      withNib(
+        contour(ids.contour(), [
+          node(ids.node(), { x: 0, y: 0 }, { blend: { angle: "linear", shape: "ease" } }),
+          node(ids.node(), { x: 0, y: 300 }, { end: { cut: 0 } }),
+        ]),
+        { angle: 30, width: 80 },
+      ),
+    );
+    const c = start.document.glyphs["l"]!.contours[0]!;
+    const whole = {
+      ...start,
+      selection: c.nodes.map((n) => ({ contourId: c.id, nodeId: n.id, part: "point" as const })),
+    };
+    // One point given a pen of its own, then the whole stroke one pen again.
+    const one = changePen({ ...whole, selection: [whole.selection[1]!] }, { width: 40 }).state;
+    const after = changePen({ ...one, selection: whole.selection }, { width: 60 }).state;
+    const nodes = after.document.glyphs["l"]!.contours[0]!.nodes;
+
+    expect(penOf(after, 0)).toEqual({ angle: 30, width: 60 });
+    expect(nodes.map((n) => n.pen)).toEqual([undefined, undefined]);
+    expect(nodes[1]!.end).toEqual({ cut: 0 });
+    expect(nodes[0]!.blend).toEqual({ angle: "linear", shape: "ease" });
   });
 });

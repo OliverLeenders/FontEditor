@@ -205,6 +205,17 @@ function mixContour(
               base.nib.thickness ?? 0,
             ),
           }),
+      // And absent is an oval, a squareness of nothing: an oval in one master and
+      // a box in the other is a pen whose corners fill out along the axis.
+      ...(base.nib.squareness === undefined && others.every((c) => c?.nib?.squareness === undefined)
+        ? {}
+        : {
+            squareness: mix(
+              others.map((c) => (c?.nib === undefined ? null : (c.nib.squareness ?? 0))),
+              weights,
+              base.nib.squareness ?? 0,
+            ),
+          }),
     },
   };
 }
@@ -299,6 +310,15 @@ function mixNode(
                     others.map((n) => n?.pen?.thickness ?? null),
                     weights,
                     base.pen.thickness,
+                  ),
+                }),
+            ...(base.pen.squareness === undefined
+              ? {}
+              : {
+                  squareness: mix(
+                    others.map((n) => n?.pen?.squareness ?? null),
+                    weights,
+                    base.pen.squareness,
                   ),
                 }),
           },

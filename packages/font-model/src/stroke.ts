@@ -14,7 +14,15 @@ import {
   reverseLoop,
 } from "@typewright/geometry";
 
-import { type Contour, type Nib, segmentAt, segmentCount, segmentCubic } from "./contour.js";
+import {
+  type Contour,
+  type Nib,
+  nibOfShape,
+  penShapeOf,
+  segmentAt,
+  segmentCount,
+  segmentCubic,
+} from "./contour.js";
 import type { StrokeEnd } from "./node.js";
 import { type Glyph, glyph } from "./glyph.js";
 import { type IdFactory, counterIds } from "./ids.js";
@@ -623,8 +631,7 @@ export function penAt(c: Contour, i: number): Nib | null {
 /** The pen at every point of a stroke, as the geometry wants it. */
 function pensOf(c: Contour): PenShape[] {
   return c.nodes.map((_, i) => {
-    const pen = penAt(c, i) ?? { angle: 0, width: 0 };
-    return { angle: pen.angle, width: pen.width, thickness: pen.thickness ?? 0 };
+    return penShapeOf(penAt(c, i) ?? { angle: 0, width: 0 });
   });
 }
 
@@ -636,14 +643,7 @@ function pensOf(c: Contour): PenShape[] {
  * is changed. The angle turns the short way round, over half a turn.
  */
 export function blendNib(a: Nib, b: Nib, t: number): Nib {
-  const pen = blendPen(
-    { angle: a.angle, width: a.width, thickness: a.thickness ?? 0 },
-    { angle: b.angle, width: b.width, thickness: b.thickness ?? 0 },
-    t,
-  );
-  return pen.thickness > 0
-    ? { angle: pen.angle, width: pen.width, thickness: pen.thickness }
-    : { angle: pen.angle, width: pen.width };
+  return nibOfShape(blendPen(penShapeOf(a), penShapeOf(b), t));
 }
 
 /**
@@ -689,9 +689,14 @@ export function withNib(c: Contour, nib: Nib | null): Contour {
   return { ...c, nib };
 }
 
-/** Whether two pens are the same pen: angle, width, and thickness, absent being none. */
+/** Whether two pens are the same pen: angle, width, thickness and squareness, absent being none. */
 export function samePen(a: Nib, b: Nib): boolean {
-  return a.angle === b.angle && a.width === b.width && (a.thickness ?? 0) === (b.thickness ?? 0);
+  return (
+    a.angle === b.angle &&
+    a.width === b.width &&
+    (a.thickness ?? 0) === (b.thickness ?? 0) &&
+    (a.squareness ?? 0) === (b.squareness ?? 0)
+  );
 }
 
 /** Whether a curve is a straight line, which is how a line is kept a line. */

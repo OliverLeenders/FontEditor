@@ -1,5 +1,5 @@
 import { type Cubic, evaluate, flatten } from "../src/cubic.js";
-import { type PenShape, type SegmentBlend, penProfiles } from "../src/pen.js";
+import { type PenShape, type SegmentBlend, penExponent, penProfiles } from "../src/pen.js";
 import type { Vec2 } from "../src/vec2.js";
 
 /**
@@ -37,10 +37,14 @@ function penPolygon(pen: PenShape, at: Vec2): Vec2[] {
     ];
   }
   const out: Vec2[] = [];
+  // The outline said outright, by its own equation and no question of reach: a
+  // point round the circle with each coordinate raised to two over the exponent.
+  const power = 2 / penExponent(pen);
+  const raised = (v: number): number => Math.sign(v) * Math.pow(Math.abs(v), power);
   for (let i = 0; i < SIDES; i++) {
     const u = (i / SIDES) * Math.PI * 2;
-    const x = Math.cos(u) * along;
-    const y = Math.sin(u) * across;
+    const x = raised(Math.cos(u)) * along;
+    const y = raised(Math.sin(u)) * across;
     out.push({ x: at.x + cos * x - sin * y, y: at.y + sin * x + cos * y });
   }
   return out;

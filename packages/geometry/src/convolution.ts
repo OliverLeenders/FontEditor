@@ -14,6 +14,7 @@ import {
   type PenShape,
   type SegmentBlend,
   isBroad,
+  isSquared,
   penProfiles,
   penSupport,
   samePenShape,
@@ -97,6 +98,10 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
       if (endTangent(curve, 0) === null) return null;
     }
   }
+
+  // A pen with corners has no circle to be made into, which is how the pen's
+  // edge is followed round a join here: not yet drawn to one plan.
+  if (masters.some((m) => m.pens.some(isSquared))) return null;
 
   const broad = masters.every((m) => m.pens.every(isBroad));
   const oval = masters.every((m) => m.pens.every((pen) => !isBroad(pen)));
