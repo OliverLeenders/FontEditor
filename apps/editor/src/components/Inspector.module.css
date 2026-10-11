@@ -683,8 +683,9 @@ select.input {
   cursor: pointer;
 }
 .guideScope[aria-pressed="true"] {
-  color: var(--ink-2);
-  border-color: var(--rule-strong);
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 
 /* The base name in a component row: a link to that glyph, not a label. */
@@ -759,8 +760,9 @@ select.input {
   font-weight: 600;
 }
 .layerRow .rowAction[aria-pressed="true"] {
-  color: var(--accent);
-  border-color: currentColor;
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-ink);
 }
 .layerName {
   min-width: 0;
@@ -824,10 +826,12 @@ select.input {
   background: var(--hover);
   color: var(--ink);
 }
+/* The canvas behind it still, which is what its letter is drawn to be read
+     on; picked out by the accent round it. */
 .pixelSize[aria-pressed="true"] {
-  border-color: var(--rule-strong);
+  border-color: var(--accent);
   background: var(--canvas);
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 .pixelSize:focus-visible {
   outline: 2px solid var(--accent);

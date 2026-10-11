@@ -269,9 +269,10 @@
   opacity: var(--disabled);
   cursor: default;
 }
-.findButton[aria-pressed="true"] {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
-  color: var(--ink);
+.findButton[aria-pressed="true"],
+.findButton[aria-pressed="true"]:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }
 
 /* "Whole word", drawn the way editors draw it: the letters between bars. */

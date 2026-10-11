@@ -127,6 +127,24 @@
   /* A row under the pointer, and the row that is chosen, in a list. */
   --hover: var(--surface-2);
   --selected: var(--accent-soft);
+  /*
+   * What is pressed, which is one of two things and looks like which it is.
+   *
+   * One of several — corner or smooth, space or kern, light or dark, the tool
+   * in the hand: the accent whole. `background: var(--accent)`, its border the
+   * same, the words `var(--surface)`.
+   *
+   * On or off, and a thing picked out of a row of things — a toggle in the
+   * toolbar, a layer shown, the glyph open in the strip: the accent's tint.
+   * `background: var(--accent-soft)`, the words `var(--accent-ink)`, and where
+   * the control has a border, `var(--accent)`.
+   *
+   * Tabs are neither and have their own: the workspace's underline, a file's
+   * raised pill.
+   *
+   * And every small label in capitals is in the mono face: `--text-2xs`,
+   * `letter-spacing: 0.06em`, `font-family: var(--font-mono)`.
+   */
   /* How far below its button a popover hangs. */
   --popover-gap: 0.35rem;
   /* How far anything that cannot be pressed now fades, everywhere. */

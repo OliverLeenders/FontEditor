@@ -1598,6 +1598,20 @@ its rules, with one of their own — a solid line is ink, and a dashed one is wh
 cut by or made with. The first, the cut square to the path, is the designer's own drawing and
 the rest follow it. They are in `icons/stroke.tsx`, apart from the two files of Lucide's.
 
+A look over the whole interface after that found the same thing said several ways. What is
+pressed looked five ways; it looks two now, by what it is. One of several — corner or smooth,
+space or kern, the theme, the size of the points — is the accent whole, as the inspector's
+rows and the tool in the hand already were; the theme and the canvas's own choices had the
+tint. On or off, and a thing picked out of a row of things, is the accent's tint: a shown
+layer, a guide's scope, the options of the feature file's find, the size the pixels are
+previewed at. Tabs are neither and keep their own. Every small label in capitals is in the
+mono face, which half of them were: Font info's fields, the Proof and Spacing bars — whose
+size was "Size" in one and "SIZE" in the other, read out in two faces — the designspace, the
+kerning groups. And a number's arrows are not there until the pointer is over the field or the
+caret in it: some numbers have them and some, in rows too narrow, have not, and at rest a
+panel of numbers is a panel of numbers. The two looks and the label are written down in
+`tokens.css`, where the next control will be looking.
+
 #### Open
 
 What is next in the same direction:

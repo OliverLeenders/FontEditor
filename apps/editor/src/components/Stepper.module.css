@@ -24,6 +24,15 @@
   width: 1.05rem;
   overflow: hidden;
   border-radius: 0 var(--radius) var(--radius) 0;
+  /* Not there until the field is: some numbers have arrows and some, in rows
+     too narrow for them, have not, and at rest a panel of numbers should be a
+     panel of numbers. The pointer over the field or the caret in it brings
+     them. */
+  opacity: 0;
+}
+.holder:hover .arrows,
+.holder:focus-within .arrows {
+  opacity: 1;
 }
 
 /* Quiet until reached for: the number is what the field is for, and two arrows

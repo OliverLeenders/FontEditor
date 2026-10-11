@@ -128,10 +128,13 @@
   color: var(--ink);
   border-color: var(--accent);
 }
-.choice[aria-pressed="true"] {
-  background: var(--accent-soft);
+/* One of several, and so the accent whole: see the note on what is pressed in
+   tokens.css. */
+.choice[aria-pressed="true"],
+.choice[aria-pressed="true"]:hover {
+  background: var(--accent);
   border-color: var(--accent);
-  color: var(--accent-ink);
+  color: var(--surface);
 }
 
 /* The version, in the face numbers are read in here. */
