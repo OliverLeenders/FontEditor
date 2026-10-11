@@ -322,7 +322,8 @@
 .segmented button:hover:not(:disabled) {
   color: var(--ink);
 }
-.segmented button[aria-pressed="true"] {
+.segmented button[aria-pressed="true"],
+.segmented button[aria-pressed="true"]:hover:not(:disabled) {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--surface);
@@ -345,14 +346,82 @@ select.input {
   }
 }
 
-/* What can be done about the rows above, as small buttons side by side. */
-.rowButtons {
-  display: flex;
-  flex-wrap: wrap;
+/* A choice said by a drawing, where there are a few and each is a shape: how an
+   end is cut, what it is closed with. */
+.segmented button svg {
+  display: block;
+  width: var(--icon);
+  height: var(--icon);
+  margin: 0 auto;
+}
+
+/* How a stroke ends, in one row: as the pen leaves it or cut, the cut's angle,
+   and the three angles it is nearly always wanted at. The words take what room
+   there is; the angle is three digits and a sign, and the icons their own size. */
+.endRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 3.4rem auto auto auto;
+  align-items: stretch;
+}
+.endRow .iconChoice {
+  width: var(--tool);
+  padding: 0;
+}
+
+/* A control named inside its row, by a word or an icon before it, where a label
+   above was a row of the panel to every number. */
+.named {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.naming {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+.naming svg {
+  width: var(--icon-inline);
+  height: var(--icon-inline);
+}
+/* A number set on this end, where the rest follow the font's style. */
+.named[data-own] .naming {
+  color: var(--accent);
+}
+.named[data-own] .input {
+  border-color: var(--accent);
+}
+
+/* The serif's style, and beside it the one thing to do about it. */
+.styleRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   gap: 0.25rem;
 }
-.rowButton {
-  composes: small from "./Button.module.css";
+.styleRow .rowAction {
+  height: var(--control);
+  width: var(--control);
+}
+
+/* A part of a section folded away, opened by its own line. */
+.fold {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  align-self: start;
+  padding: 0.1rem 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+.fold:hover {
+  color: var(--ink);
 }
 
 /* Two numbers sharing one row and one label. */

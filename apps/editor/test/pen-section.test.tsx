@@ -236,7 +236,32 @@ describe("how a stroke ends", () => {
 
     const end = within(screen.getByRole("group", { name: "End" }));
     expect(end.getByRole("button", { name: "Pen" }).getAttribute("aria-pressed")).toBe("true");
-    expect(screen.queryByLabelText("Cut angle")).toBeNull();
+    expect(end.getByRole("button", { name: "Cut" }).getAttribute("aria-pressed")).toBe("false");
+    // The angle is there to be typed, and says nothing until there is a cut.
+    expect(screen.getByLabelText<HTMLInputElement>("Cut angle").value).toBe("");
+  });
+
+  it("is cut square to the path by Cut, until an angle is given", () => {
+    const store = atItsEnd();
+    const end = within(screen.getByRole("group", { name: "End" }));
+
+    fireEvent.click(end.getByRole("button", { name: "Cut" }));
+    expect(path(store).nodes[0]!.end).toEqual({ cut: "square" });
+    expect(end.getByRole("button", { name: "Cut" }).getAttribute("aria-pressed")).toBe("true");
+    expect(end.getByRole("button", { name: "Square" }).getAttribute("aria-pressed")).toBe("true");
+
+    // Pressed again it is still cut, and as it was: Cut does not undo an angle.
+    fireEvent.click(end.getByRole("button", { name: "Upright" }));
+    fireEvent.click(end.getByRole("button", { name: "Cut" }));
+    expect(path(store).nodes[0]!.end).toEqual({ cut: 90 });
+  });
+
+  it("is cut at an angle typed while it is still as the pen leaves it", () => {
+    const store = atItsEnd();
+    const angle = screen.getByLabelText("Cut angle");
+    fireEvent.change(angle, { target: { value: "20" } });
+    fireEvent.blur(angle);
+    expect(path(store).nodes[0]!.end).toEqual({ cut: 20 });
   });
 
   it("cuts the end level, shows the angle, and takes another typed over it", () => {
@@ -262,7 +287,8 @@ describe("how a stroke ends", () => {
 
     fireEvent.click(end.getByRole("button", { name: "Square" }));
     expect(path(store).nodes[0]!.end).toEqual({ cut: "square" });
-    expect(screen.queryByLabelText("Cut angle")).toBeNull();
+    // Square to the path is not an angle, and shows none.
+    expect(screen.getByLabelText<HTMLInputElement>("Cut angle").value).toBe("");
 
     fireEvent.click(end.getByRole("button", { name: "Pen" }));
     expect(path(store).nodes[0]!.end).toBeUndefined();
@@ -295,25 +321,6 @@ describe("a pen's squareness", () => {
     fireEvent.blur(squareness);
     expect(pen(store)?.squareness).toBeCloseTo(0.6, 9);
   });
-
-  it("is dragged with the slider beside it, all of one drag being one step to undo", () => {
-    const store = opened(withPath());
-    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
-    selectAll(store);
-    const thickness = screen.getByLabelText("Pen thickness");
-    fireEvent.change(thickness, { target: { value: "20" } });
-    fireEvent.blur(thickness);
-
-    const slider = screen.getByLabelText("Pen squareness, from oval to rectangle");
-    fireEvent.change(slider, { target: { value: "30" } });
-    fireEvent.change(slider, { target: { value: "55" } });
-    fireEvent.change(slider, { target: { value: "80" } });
-    fireEvent.pointerUp(slider);
-    expect(pen(store)?.squareness).toBeCloseTo(0.8, 9);
-
-    act(() => store.undo());
-    expect(pen(store)?.squareness ?? 0).toBe(0);
-  });
 });
 
 describe("what a cut end is closed with", () => {
@@ -334,5 +341,66 @@ describe("what a cut end is closed with", () => {
     expect(path(store).nodes[0]!.end).toEqual({ cut: 0, shape: "nib" });
     fireEvent.click(closed.getByRole("button", { name: "Straight" }));
     expect(path(store).nodes[0]!.end).toEqual({ cut: 0 });
+  });
+});
+
+describe("a serif on a cut end", () => {
+  function withSerif(): Store {
+    const store = opened(withPath());
+    fireEvent.click(screen.getByRole("button", { name: "Stroke" }));
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "End" })).getByRole("button", { name: "Level" }),
+    );
+    fireEvent.click(
+      within(screen.getByRole("group", { name: "Closed with" })).getByRole("button", {
+        name: "Serif",
+      }),
+    );
+    return store;
+  }
+  const serifOf = (store: Store) => path(store).nodes[0]!.end!.serif!;
+
+  it("has its style showing and its numbers folded away until they are asked for", () => {
+    withSerif();
+    expect(screen.getByLabelText<HTMLSelectElement>("Serif style").value).toBe("");
+    expect(screen.queryByLabelText("Serif height")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Numbers" }));
+    expect(screen.getByLabelText<HTMLInputElement>("Serif height").value).toBe("30");
+    expect(screen.getByRole("button", { name: "Numbers" }).getAttribute("aria-expanded")).toBe(
+      "true",
+    );
+  });
+
+  it("takes a number typed, lengths in units and shares in per cent", () => {
+    const store = withSerif();
+    fireEvent.click(screen.getByRole("button", { name: "Numbers" }));
+    const left = screen.getByLabelText("Serif reach left");
+    fireEvent.change(left, { target: { value: "75" } });
+    fireEvent.blur(left);
+    const bracket = screen.getByLabelText("Serif bracket");
+    fireEvent.change(bracket, { target: { value: "40" } });
+    fireEvent.blur(bracket);
+    expect(serifOf(store)).toMatchObject({ left: 75, bracket: 0.4 });
+  });
+
+  it("is made a style of the font by the button beside it, and followed again by the same", () => {
+    const store = withSerif();
+    fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    expect(store.editor.document.serifs.map((style) => style.name)).toEqual(["Serif"]);
+    expect(serifOf(store).style).toBe("Serif");
+    // Following its style, with nothing of its own: nothing to take back.
+    expect(screen.queryByRole("button", { name: "Follow style" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save as style" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Numbers" }));
+    const height = screen.getByLabelText("Serif height");
+    fireEvent.change(height, { target: { value: "44" } });
+    fireEvent.blur(height);
+    expect(serifOf(store).own).toEqual(["height"]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Follow style" }));
+    expect(serifOf(store)).toMatchObject({ height: 30, style: "Serif" });
+    expect(serifOf(store).own).toBeUndefined();
   });
 });

@@ -16,7 +16,8 @@ Lucide icons
 ------------------------------------------------------------------------------
 
 The icons in apps/editor/src/components/icons are Lucide's path data, copied
-from the lucide-static package. Some Lucide icons derive from Feather.
+from the lucide-static package, but for those in stroke.tsx, which were drawn
+for Typewright. Some Lucide icons derive from Feather.
 
 https://lucide.dev
 

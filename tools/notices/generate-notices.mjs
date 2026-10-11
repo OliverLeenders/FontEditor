@@ -118,7 +118,8 @@ const copied = [
   entry(
     "Lucide icons",
     "The icons in apps/editor/src/components/icons are Lucide's path data, copied\n" +
-      "from the lucide-static package. Some Lucide icons derive from Feather.",
+      "from the lucide-static package, but for those in stroke.tsx, which were drawn\n" +
+      "for Typewright. Some Lucide icons derive from Feather.",
     "https://lucide.dev",
     bundled("lucide.txt"),
   ),

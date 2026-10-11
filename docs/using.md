@@ -542,7 +542,8 @@ edge, as a cut quill does; more than nothing is an oval, whose thin strokes keep
 whose ends and corners are round; the same as the width is a round pen, the same weight every way. A pen
 with thickness has a fourth, its **squareness**: nought is that oval, a hundred is a rectangle of
 the pen's width and thickness, and between them the corners fill out, a box with its corners
-rounded — a slider for the look of it and a number beside it, in per cent. Like the others it is
+rounded, in per cent. The four are two to a row in the Pen section, each named in its row:
+Angle and Width, Thick and Square. Like the others squareness is
 set at points and blends along a segment with the pen's shape, so a stroke can go from round to
 square. At a hundred, the same all along the stroke, the ink is exact: straight edges where
 the path is straight, to the unit, and no more points than the shape has corners — a stem is
@@ -573,15 +574,21 @@ drawn with a pen at thirty degrees slants at thirty degrees and hangs below the 
 at. Turning the pen level at the last point flattens the foot and widens the stem, and the
 width then has to be taken off again. So the end can be cut instead, and the pen left alone.
 Select the first or last point of an open stroke and the Pen section shows an **End** row:
-**Pen**, as the pen leaves it; **Square**, cut straight across the path; **Level**, a foot
-standing on a line; **Upright**, the end of a bar. A cut that is not square shows its angle in
-**Cut at**, in degrees anticlockwise from level as the pen's is, to be typed over. The stroke
+**Pen**, as the pen leaves it, or **Cut**; then the cut's angle, in degrees anticlockwise
+from level as the pen's is, to be typed; then three buttons for the angles a cut is nearly
+always wanted at, each drawn as what it does — **Level**, a stem standing on a line;
+**Upright**, a bar ending on one; and **Square**, straight across the path whichever way it
+is going, which is not an angle and shows none. Cut by itself is square to the path until an
+angle is given, and typing an angle or pressing one of the three cuts an end that was the
+pen's. The stroke
 is carried on past its last point as far as the pen reaches and cut off by a line through that
 point — so the point is exactly where the ink ends, and the stroke is its own weight all the
 way to it. Put the point on the baseline and choose Level, and the stem stands on the
 baseline. Choose Pen and the end is the pen's again.
 
-A cut end is **Closed with** one of three things. **Straight** is the cut itself: a straight
+A cut end is **Closed with** one of three things, chosen by three drawings of a stroke's
+end: its two sides in solid line, and in dashes what closes it — a line across, the pen's
+oval, a serif. **Straight** is the cut itself: a straight
 edge and a sharp corner where it meets each side of the stroke. **Nib** is half the pen's own
 outline laid along the cut, as wide as the stroke is there and as deep in proportion as the
 pen is thick to its width — the end the pen would leave if it were turned to the cut and were
@@ -631,9 +638,14 @@ A serif has a **Serif style**, or numbers of its own. A style is a serif with a 
 font keeps — **Font info** has them under **Serifs**, where one is added from a slab, a
 bracketed serif, a wedge or a hairline, renamed, changed and removed — and an end that has a
 style has its numbers: change the style in Font info and every end that has it, in every
-glyph, follows in one step. A number typed on an end itself is that end's own from then on,
-marked with a dot beside its name, and stays when the style changes; **Follow style** takes
-those back. **Save as style** makes a serif with numbers of its own a style of the font, which
+glyph, follows in one step. The style is what the Pen section shows of a serif; its numbers
+are folded under **Numbers**, a line that opens them and stays as it was left, since all
+seven are also dragged on the canvas. Opened they are three rows, each number named by a
+drawing of what it moves: the two reaches, the height and the cup, and the three that are
+shares — bracket, slope and round tips. A number typed on an end itself is that end's own
+from then on, drawn in the accent colour, and stays when the style changes; the button beside
+the style, **Follow style**, takes those back. On a serif with numbers of its own the same
+button is **Save as style**, which makes it a style of the font, which
 is how a style is usually come by: drawn on one letter until it is right, then named. The
 first serif put on an end is the font's first style, where it has one. Removing a style leaves
 the serifs on the letters, as numbers of their own.

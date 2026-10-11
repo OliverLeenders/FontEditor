@@ -1584,6 +1584,20 @@ A serif's round is the stroke's own corner's on a side that reaches nowhere, by 
 tip there would be, slope and all, so a tip drawn in to the stroke keeps the round it had. A
 serif that reaches neither way has the round's handle hanging under the stroke's right edge.
 
+The Pen section had come to sixteen rows, nine of them a serif's, a row to every number. It
+is six now with a serif's numbers folded and nine with them open. The pen's four numbers are
+two to a row, each named inside its row, and squareness is a number like the others, its
+slider gone. How an end is cut is one row: as the pen leaves it or cut, the angle, and the
+three angles nearly always wanted as buttons that are drawings — level and upright are not
+kinds of cut but angles, and are shown as that. What closes a cut is three drawings. A serif
+shows its style, with the one thing to do about it beside it, and its numbers under a line
+that opens them, each named by a drawing of what it moves.
+
+Thirteen icons were drawn for it, Lucide having none for any of this: on Lucide's box and by
+its rules, with one of their own — a solid line is ink, and a dashed one is what the ink is
+cut by or made with. The first, the cut square to the path, is the designer's own drawing and
+the rest follow it. They are in `icons/stroke.tsx`, apart from the two files of Lucide's.
+
 #### Open
 
 What is next in the same direction:
