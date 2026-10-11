@@ -1639,6 +1639,14 @@ Left as it is, and found to be meant: Spacing, Features and Proof say their inst
 where the work is and nothing at the bottom of the window, where the Glyph and Font
 workspaces say theirs. A second set would repeat the first or disagree with it.
 
+The dark theme was looked over the same way and is sound: no colour in any stylesheet or
+component that is not a token's. Two things were found on the way, neither of them the dark
+theme's own. A stroke's ink was filled as an outline's body is, at a tenth of the accent, and
+an outline is seen by its line where a stroke's ink has nothing but the fill; it has a fill of
+its own now, about a quarter, laid once where strokes cross. And a panel hangs from the left
+edge of its button, so the last two of the Font bar's ran off the window: one that would is
+moved back by as much as it runs over.
+
 #### Open
 
 What is next in the same direction:

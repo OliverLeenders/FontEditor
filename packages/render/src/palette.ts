@@ -37,6 +37,13 @@ export type RenderPalette = {
   readonly outline: string;
   /** Fill for the glyph preview. Expected to carry its own alpha. */
   readonly fill: string;
+  /**
+   * Fill for the ink of a stroke, which is stronger: an outline has its own
+   * line round what it fills, and a stroke's ink has nothing but the fill —
+   * the line drawn is the path the pen went along, down the middle of it. At
+   * the outline's tenth it was a shape guessed at from its handles.
+   */
+  readonly ink: string;
   readonly node: string;
   readonly nodeSelected: string;
   /** Drawn behind a mark so it stays legible over the filled preview. */
@@ -137,6 +144,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   designGuideSelected: "#2C6DAF",
   outline: "#131922",
   fill: "rgba(44,109,175,0.10)",
+  ink: "rgba(44,109,175,0.26)",
   node: "#2C6DAF",
   nodeSelected: "#A96F22",
   halo: "#FFFFFF",
@@ -182,6 +190,7 @@ export const DARK_PALETTE: RenderPalette = {
   designGuideSelected: "#7FB4EE",
   outline: "#E5EBF2",
   fill: "rgba(116,174,226,0.13)",
+  ink: "rgba(116,174,226,0.32)",
   node: "#74AEE2",
   nodeSelected: "#D6A05A",
   halo: "#10171F",

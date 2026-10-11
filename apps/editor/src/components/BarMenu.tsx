@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import menu from "./BarMenu.module.css";
 import { type Item, MenuItems } from "./MenuItems.js";
@@ -19,6 +19,9 @@ import { ChevronDownIcon, type IconComponent } from "./icons.js";
  * *panel* is somewhere you stay — the masters, the snapshots, the font's
  * metadata — and it holds whatever its own component renders.
  */
+/** How near the window's edge a panel may come, in pixels. */
+const EDGE = 8;
+
 export function BarMenu({
   label,
   icon: Icon,
@@ -125,6 +128,28 @@ export function BarMenu({
 
   const close = (): void => setShown(false);
 
+  // A panel hangs from the left edge of its button, and one whose button is
+  // near the end of the bar is wider than the window has left: the last two of
+  // the Font bar's were cut off at the window's edge. Moved back by as much as
+  // it runs over, and no further than the window's other edge.
+  const panel = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!shown) return;
+    const fit = (): void => {
+      const box = panel.current;
+      if (box === null) return;
+      box.style.left = "";
+      const rect = box.getBoundingClientRect();
+      const over = rect.right - (window.innerWidth - EDGE);
+      if (over <= 0) return;
+      const back = Math.min(over, Math.max(0, rect.left - EDGE));
+      if (back > 0) box.style.left = `${String(-back)}px`;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, [shown]);
+
   return (
     <div className={menu.holder} ref={holder}>
       {look === "tool" ? (
@@ -179,6 +204,7 @@ export function BarMenu({
 
       {shown ? (
         <div
+          ref={panel}
           className={panelClassName ?? (items === undefined ? menu.panel : menu.menu)}
           role={items === undefined ? "group" : "menu"}
           aria-label={panelLabel ?? label}

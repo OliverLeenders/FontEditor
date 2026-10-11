@@ -6,6 +6,7 @@ import {
   type Node,
   type Segment,
   continuousCuts,
+  isInk,
   SERIF_HANDLES,
   serifHandles,
   strokeCutHandle,
@@ -513,10 +514,24 @@ export function drawFilledPreview(ctx: Canvas2D, s: Scene): void {
   const closed = s.filled.filter((c) => c.closed && c.nodes.length >= 2);
   if (closed.length === 0) return;
 
-  ctx.beginPath();
-  for (const c of closed) traceContour(ctx, s.view, c);
-  ctx.fillStyle = s.palette.fill;
-  ctx.fill();
+  // What was drawn, and what a pen left: two fills, the second the stronger.
+  // An outline is seen by its line; a stroke's ink has only this.
+  const drawn = closed.filter((c) => !isInk(c));
+  const ink = closed.filter(isInk);
+  if (drawn.length > 0) {
+    ctx.beginPath();
+    for (const c of drawn) traceContour(ctx, s.view, c);
+    ctx.fillStyle = s.palette.fill;
+    ctx.fill();
+  }
+  if (ink.length > 0) {
+    // One path for all of it, so where two strokes cross or a stroke's own
+    // regions overlap the fill is laid once and not twice as dark.
+    ctx.beginPath();
+    for (const c of ink) traceContour(ctx, s.view, c);
+    ctx.fillStyle = s.palette.ink;
+    ctx.fill();
+  }
 }
 
 export function drawOutline(ctx: Canvas2D, s: Scene): void {
