@@ -1626,6 +1626,19 @@ styles the font's own facts were a long way above them. A style is a line now, i
 how many ends have it, and opens to its name, its removal and its seven numbers in the Pen
 section's three rows, each named by the same drawing. One just added is open.
 
+And the small things the same look found. Space and Kern were one box with a line down it,
+the only choice of one from several drawn that way, and are two buttons like the rest. The
+sentence that stands where a list of anchors or guides would be was in the mono face, which
+is for names and numbers. A handle's side is named as a number is named in its row. The
+background layer's button has a line of its own, where three controls in one row left a new
+layer's name four letters. And four sizes of type that were off the scale are on it: a
+context menu's note and its keys, the name under a glyph in the strip, a sheet's tag. Three
+said in em beside code are left, being a share of whatever the code is set at.
+
+Left as it is, and found to be meant: Spacing, Features and Proof say their instructions
+where the work is and nothing at the bottom of the window, where the Glyph and Font
+workspaces say theirs. A second set would repeat the first or disagree with it.
+
 #### Open
 
 What is next in the same direction:

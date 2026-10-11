@@ -150,7 +150,7 @@ export function LayersSection(): React.JSX.Element {
           {hasLayer(store.editor.document, BACKGROUND) ? null : (
             <button
               type="button"
-              className={styles.layerAddButton}
+              className={`${styles.layerAddButton} ${styles.layerAddWhole}`}
               disabled={reading}
               title="Add the background layer, which B draws in"
               onClick={() => store.addLayer(BACKGROUND)}

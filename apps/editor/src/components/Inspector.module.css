@@ -554,9 +554,18 @@ select.input {
   gap: 0.3rem;
 }
 
+/* Which handle a row is, named as a number is named in its row everywhere
+   else in the panel. */
 .side {
-  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--ink-3);
+}
+
+/* A sentence where a list would be, were there anything in it: said in the
+   face sentences are said in, the mono being for names and numbers. */
+.emptyHint {
   font-size: var(--text-xs);
+  line-height: 1.45;
   color: var(--ink-3);
 }
 
@@ -778,9 +787,13 @@ select.input {
 }
 .layerAdd {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.25rem;
   margin-top: 0.2rem;
+}
+.layerAdd .layerAddWhole {
+  flex: 1 0 100%;
 }
 .layerAdd .input {
   flex: 1;

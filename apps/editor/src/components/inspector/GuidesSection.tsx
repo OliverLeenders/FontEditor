@@ -64,7 +64,7 @@ export function GuidesSection(): React.JSX.Element {
     >
       <div className={styles.components}>
         {guides.length === 0 && (
-          <span className={styles.readonly}>Right-click the canvas to add one</span>
+          <span className={styles.emptyHint}>Right-click the canvas to add one</span>
         )}
         {guides.map(({ guide: g, scope }) => (
           <div

@@ -77,7 +77,7 @@
   margin-left: auto;
   padding-left: 0.75rem;
   color: var(--ink-3);
-  font-size: 0.92em;
+  font-size: var(--text-xs);
 }
 
 /* The key, after the note if there is one: a column of its own at the right. */
@@ -86,7 +86,7 @@
   padding-left: 0.75rem;
   color: var(--ink-3);
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  font-size: var(--text-2xs);
   white-space: nowrap;
 }
 .note ~ .keys {

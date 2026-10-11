@@ -51,7 +51,7 @@ export function AnchorsSection(): React.JSX.Element {
     >
       <div className={styles.components}>
         {anchors.length === 0 && (
-          <span className={styles.readonly}>Right-click the canvas to add one</span>
+          <span className={styles.emptyHint}>Right-click the canvas to add one</span>
         )}
         {anchors.map((a) => (
           <div

@@ -194,34 +194,34 @@
   color: var(--warn);
 }
 
-/* Two exclusive modes, so they read as one control rather than two buttons. */
+/* Two exclusive modes, drawn as every choice of one from several is: buttons
+   side by side, the one that is so in the accent. They were one box with a line
+   down it, the only choice in the editor drawn that way. */
 .modes {
   box-sizing: border-box;
   height: var(--control);
   display: flex;
   flex: none;
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  overflow: hidden;
+  gap: 0.2rem;
 }
 
 .modes button {
   padding: 0 0.6rem;
-  border: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
   background: var(--canvas);
   color: var(--ink-2);
   cursor: pointer;
   font: inherit;
   font-size: var(--text-s);
 }
-.modes button + button {
-  border-left: 1px solid var(--rule-strong);
-}
 .modes button:hover {
   color: var(--ink);
 }
-.modes button[aria-pressed="true"] {
+.modes button[aria-pressed="true"],
+.modes button[aria-pressed="true"]:hover {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--surface);
 }
 
