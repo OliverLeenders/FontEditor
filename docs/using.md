@@ -602,7 +602,8 @@ goes where it meets it. **Bracket**, in per cent, is how much of the corner betw
 stroke is a curve: none, or all the way out to the tip. **Slope**, in per cent, is how much
 thinner the serif is at its tip than at the stroke: nought is a slab and a hundred a wedge
 that comes to a point. **Cup** is how far the middle of its foot is hollowed, in units, and
-**Round tips**, in per cent, how much of each tip is rounded off. A slab is a reach and a
+**Round tips**, in per cent, how much of each tip is rounded off — and on a side with no reach,
+where there is no tip, how much the stroke's own corner is. A slab is a reach and a
 height; a bracketed serif the same with a bracket; a wedge one with a slope.
 
 While the end is selected the serif has handles on the canvas, diamonds where the knob that

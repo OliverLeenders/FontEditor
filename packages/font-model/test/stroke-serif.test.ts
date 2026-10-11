@@ -166,6 +166,9 @@ describe("a serif's shape", () => {
     ["cupped deeper than it is high", { ...SLAB, cup: 400 }],
     ["cupped and sloped to a point", { ...SLAB, cup: 30, slope: 1 }],
     ["rounded", { ...SLAB, round: 1 }],
+    ["rounded, one side reaching nowhere", { ...SLAB, right: 0, round: 1 }],
+    ["rounded, one side reaching less than its round", { ...SLAB, right: 6, round: 1 }],
+    ["rounded, reaching neither way", { ...SLAB, left: 0, right: 0, round: 0.7 }],
     [
       "everything at once",
       { left: 70, right: 40, height: 36, bracket: 0.6, slope: 0.4, cup: 8, round: 0.8 },
@@ -206,6 +209,24 @@ describe("a serif's shape", () => {
     // The tips still stand on the line.
     expect(inked(ink, 104, 1)).toBe(true);
     expect(inked(ink, 296, 1)).toBe(true);
+  });
+
+  it("rounds the stroke's own corner on a side that reaches nowhere", () => {
+    // A stem from 160 to 240 on the line, its serif forty high and to the left
+    // only: the right corner is the stem's, and is rounded by twenty.
+    const sharp = inkOf(stem(BOX, footed({ ...SLAB, right: 0 })), ids);
+    const round = stem(BOX, footed({ ...SLAB, right: 0, round: 1 }));
+    const ink = inkOf(round, ids);
+    expect(inked(sharp, 238, 2)).toBe(true);
+    expect(inked(ink, 238, 2)).toBe(false);
+    // Still on the line, and still as wide as the stem above the round.
+    expect(inked(ink, 222, 1)).toBe(true);
+    expect(inked(ink, 239, 22)).toBe(true);
+    expect(boxOf(ink).maxX).toBeCloseTo(240, 6);
+    // And the same in a variable font, where the stroke is stopped inside the
+    // serif and must not show its own corner under it.
+    const planned = plannedInk([round, round], ids)!;
+    expect(differences(planned[0]!, ink)).toEqual([]);
   });
 
   it("fills the corner between serif and stem with its bracket", () => {

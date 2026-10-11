@@ -23,7 +23,8 @@ import { type Cubic, type Vec2, lineAsCubic, reverseLoop } from "@typewright/geo
  *   than at the stroke: nought a slab, one a wedge that comes to a point.
  * - `cup` is how far the middle of the serif's foot is hollowed, in units.
  * - `round`, from nought to one, is how much of the tip is rounded off: none,
- *   or the whole of it to a half circle.
+ *   or the whole of it to a half circle. On a side that reaches nowhere it is
+ *   the stroke's own corner that is rounded, by as much.
  */
 export type Serif = {
   readonly left: number;
@@ -295,10 +296,19 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
   const side = (reach: number, foot: number, top: number, out: 1 | -1): SerifPiece[] => {
     const edge = (h: number): Vec2 => at(foot + ((top - foot) * h) / seat.rise, h);
     const hasReach = reach > 1e-9;
-    const corner = hasReach ? at(foot + out * reach, 0) : edge(0);
-    const tipTop = hasReach ? at(foot + out * reach, tip) : edge(tip);
     const meets = edge(s.height);
-    const rounded = Math.min((s.round * tip) / 2, reach);
+    const corner = hasReach ? at(foot + out * reach, 0) : edge(0);
+    // A side that reaches nowhere has no tip: its corner is the stroke's own,
+    // and goes straight up the stroke's edge to the top of the serif.
+    const tipTop = hasReach ? at(foot + out * reach, tip) : meets;
+    // The round of the corner on the line the serif stands on comes in under
+    // the stroke where the side reaches less than its radius — and where it
+    // reaches nowhere, is the stroke's own corner rounded, as far as half the
+    // serif's height and no further in than the stroke's middle. The round at
+    // the top of the tip has only the reach to come in along.
+    const wanted = (s.round * (hasReach ? tip : s.height)) / 2;
+    const footRounded = Math.min(wanted, reach + (footRight - footLeft) / 2);
+    const rounded = Math.min(wanted, reach);
     const towards = (from: Vec2, to: Vec2, by: number): Vec2 => {
       const length = Math.hypot(to.x - from.x, to.y - from.y);
       if (!(length > 1e-12)) return from;
@@ -316,8 +326,8 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
     });
     const line = (a: Vec2, b: Vec2): SerifPiece => ({ curve: lineAsCubic(a, b), line: true });
 
-    const footEnd = towards(corner, at(foot, 0), rounded);
-    const tipFrom = towards(corner, tipTop, rounded);
+    const footEnd = towards(corner, at(foot - out * (footRight - footLeft), 0), footRounded);
+    const tipFrom = towards(corner, tipTop, footRounded);
     const tipTo = towards(tipTop, corner, rounded);
     const topLength = Math.hypot(meets.x - tipTop.x, meets.y - tipTop.y);
     const topRounded = Math.min(rounded, topLength);
