@@ -24,7 +24,9 @@ import { type Cubic, type Vec2, lineAsCubic, reverseLoop } from "@typewright/geo
  * - `cup` is how far the middle of the serif's foot is hollowed, in units.
  * - `round`, from nought to one, is how much of the tip is rounded off: none,
  *   or the whole of it to a half circle. On a side that reaches nowhere it is
- *   the stroke's own corner that is rounded, by as much.
+ *   the stroke's own corner that is rounded, by as much as a tip there would
+ *   be: less the more the serif slopes, and not at all where it comes to a
+ *   point.
  */
 export type Serif = {
   readonly left: number;
@@ -230,10 +232,18 @@ export function serifRise(serif: Serif): number {
  * How far short of the line the stroke is stopped where its serif is laid over
  * its end, not joined to it: past the hollow of a cupped foot, and well inside
  * the serif, so that no edge of the one lies along an edge of the other.
+ * `room` is how far back from the line the part of the stroke that is stopped
+ * begins.
  */
-export function serifInset(serif: Serif): number {
+export function serifInset(serif: Serif, room = Infinity): number {
   const s = soundSerif(serif);
-  return Math.max(Math.min(s.cup, s.height * CUP_MOST), s.height / 2);
+  // No further back than half of what there is to stop: the last of a stroke
+  // shorter than its serif is high would be stopped before it began, and
+  // leave a gap where it was.
+  return Math.min(
+    Math.max(Math.min(s.cup, s.height * CUP_MOST), s.height / 2),
+    Math.max(0, room / 2),
+  );
 }
 
 /** The most of a serif's height its foot may be hollowed by. */
@@ -303,10 +313,11 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
     const tipTop = hasReach ? at(foot + out * reach, tip) : meets;
     // The round of the corner on the line the serif stands on comes in under
     // the stroke where the side reaches less than its radius — and where it
-    // reaches nowhere, is the stroke's own corner rounded, as far as half the
-    // serif's height and no further in than the stroke's middle. The round at
-    // the top of the tip has only the reach to come in along.
-    const wanted = (s.round * (hasReach ? tip : s.height)) / 2;
+    // reaches nowhere, is the stroke's own corner rounded, by as much as a tip
+    // there would be and no further in than the stroke's middle: a tip drawn
+    // in to the stroke keeps the round it had. The round at the top of the tip
+    // has only the reach to come in along.
+    const wanted = (s.round * tip) / 2;
     const footRounded = Math.min(wanted, reach + (footRight - footLeft) / 2);
     const rounded = Math.min(wanted, reach);
     const towards = (from: Vec2, to: Vec2, by: number): Vec2 => {

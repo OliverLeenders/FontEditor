@@ -13,6 +13,7 @@ import {
   penExponent,
   penPathStrokeParts,
   penProfiles,
+  penSupport,
   plannedStrokes,
   reverseLoop,
   subcurve,
@@ -569,6 +570,15 @@ function endsOf(
  * two are one outline with nothing lying along anything. Not joined — a
  * variable font, whose overlaps stay, or a stroke too short to be measured at
  * the serif's top — the stroke is stopped inside the serif and the two overlap.
+ *
+ * Too short is the last of the stroke — its last segment, from where that
+ * turned to come to the line — not reaching back as far as the serif's top and
+ * the pen's own reach beyond it. Short of that the line at the serif's top
+ * crosses the pen standing at the corner before, or the stroke that came
+ * round that corner, and what it reads there is not the width of this part of
+ * the stroke: the arm of an r, the last stroke of a k's leg. There the serif's
+ * sides run as the path was going when it reached the line, from the width the
+ * stroke has on the line.
  */
 function serifEnd(
   loops: readonly (readonly Cubic[])[],
@@ -584,7 +594,10 @@ function serifEnd(
     ...cut,
     through: { x: cut.through.x - cut.normal.x * by, y: cut.through.y - cut.normal.y * by },
   });
-  const measured = crossing(loops, above(rise));
+  const room = cut.back ?? Infinity;
+  const reach = penSupport(cut.pen, cut.normal);
+  const past = Math.abs(reach.x * cut.normal.x + reach.y * cut.normal.y);
+  const measured = room >= rise + past ? crossing(loops, above(rise)) : null;
   // Where it cannot be measured, as the stroke was going when it got here.
   const along = { x: -cut.normal.y, y: cut.normal.x };
   const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
@@ -598,7 +611,10 @@ function serifEnd(
     rise,
   });
   if (pieces === null) return null;
-  return { cut: above(joined && measured !== null ? rise : serifInset(serif)), pieces };
+  return {
+    cut: above(joined && measured !== null ? rise : serifInset(serif, room)),
+    pieces,
+  };
 }
 
 /**
@@ -679,6 +695,12 @@ export type StrokeCut = {
   readonly nibbed: boolean;
   /** The serif standing on the cut, where there is one. */
   readonly serif?: Serif;
+  /**
+   * How far back from the line, square to it, the part of the stroke that is
+   * cut begins: the last of the stroke, from where it turned to come to the
+   * line. Said by whoever worked that part out, and absent until then.
+   */
+  readonly back?: number;
 };
 
 /**
@@ -904,9 +926,16 @@ export function serifHandles(c: Contour, which: "start" | "end"): SerifHandles |
     ),
   };
   const side = handledSide(serif, frame);
-  if (side === null) return always;
-
   const tip = serif.height * (1 - serif.slope);
+  if (side === null) {
+    // Reaching neither way, what is rounded is the stroke's own corners. The
+    // handle hangs under the right one, as the cup's does under the foot, and
+    // comes in under the stroke as the round grows.
+    if (!(tip > 1e-6)) return always;
+    const rounded = Math.min((serif.round * tip) / 2, (frame.footRight - frame.footLeft) / 2);
+    return { ...always, round: at(frame.footRight - rounded, -CUP_HANDLE_BELOW) };
+  }
+
   const rounded = Math.min((serif.round * tip) / 2, side.reach);
   const run = serif.bracket * Math.max(0, side.reach - rounded);
   return {
@@ -979,10 +1008,18 @@ export function serifDragged(
       break;
     }
     case "round": {
-      if (side === null || !(tip > 1e-6)) return null;
-      const most = Math.min(tip / 2, side.reach);
+      if (!(tip > 1e-6)) return null;
+      // In from the tip's corner along the top; or, reaching neither way, in
+      // from the stroke's right edge under the foot.
+      const most =
+        side === null
+          ? Math.min(tip / 2, (frame.footRight - frame.footLeft) / 2)
+          : Math.min(tip / 2, side.reach);
       if (!(most > 1e-9)) return null;
-      const inward = side.out * (side.edge + side.out * side.reach - along);
+      const inward =
+        side === null
+          ? frame.footRight - along
+          : side.out * (side.edge + side.out * side.reach - along);
       value = share((Math.min(most, Math.max(0, inward)) * 2) / tip);
       break;
     }
@@ -1137,7 +1174,10 @@ function stretchesOf(c: Contour): Stretch[] {
           ...(after === null ? [] : [undefined]),
         ],
         closed: false,
-        cuts: [...(start === null ? [] : [start]), ...(end === null ? [] : [end])],
+        cuts: [
+          ...(start === null ? [] : [withBack(start, curves[0]!.b)]),
+          ...(end === null ? [] : [withBack(end, curves[0]!.a)]),
+        ],
       },
     ];
   }
@@ -1149,7 +1189,7 @@ function stretchesOf(c: Contour): Stretch[] {
       pens: [pens[0]!, pens[0]!, pens[1]!],
       blends: [undefined, blends[0]],
       closed: false,
-      cuts: [start],
+      cuts: [withBack(start, curves[0]!.b)],
     });
   }
   const from = start === null ? 0 : 1;
@@ -1169,10 +1209,16 @@ function stretchesOf(c: Contour): Stretch[] {
       pens: [pens[count - 1]!, pens[count]!, pens[count]!],
       blends: [blends[count - 1], undefined],
       closed: false,
-      cuts: [end],
+      cuts: [withBack(end, curves[count - 1]!.a)],
     });
   }
   return out;
+}
+
+/** A cut with how far back from its line the part of the stroke it cuts begins, at `from`. */
+function withBack(cut: StrokeCut, from: Vec2): StrokeCut {
+  const back = (cut.through.x - from.x) * cut.normal.x + (cut.through.y - from.y) * cut.normal.y;
+  return { ...cut, back };
 }
 
 /**

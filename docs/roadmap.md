@@ -1572,6 +1572,18 @@ a contour that is the same contour at both moments and an end that is the same p
 stroke drawn since is still that master's drawing; and a serif whose numbers alone changed is
 not told.
 
+A serif on a last segment shorter than it is high is not measured at its top. The line there
+crosses the pen standing at the corner before, or the stroke that came round the corner, and
+what it read was their width: the serif of a short drop at the end of a bar came out as wide
+as the bar is long. Each cut is told how far back from its line the part of the stroke it cuts
+begins, and a serif whose top and the pen's reach beyond it are further back than that takes
+the stroke's width on the line and runs its sides the way the path was going; the stroke is
+stopped no further back than half of what there is of it.
+
+A serif's round is the stroke's own corner's on a side that reaches nowhere, by as much as a
+tip there would be, slope and all, so a tip drawn in to the stroke keeps the round it had. A
+serif that reaches neither way has the round's handle hanging under the stroke's right edge.
+
 #### Open
 
 What is next in the same direction:
@@ -1579,8 +1591,8 @@ What is next in the same direction:
 - **Ends whose serifs already differ between masters, told**: what changes from here on is
   carried, and the Masters panel's check does not yet list an end that has a serif in one
   master and none in another.
-- **A serif on a short last segment**, shorter than the serif is high: it is laid over the end
-  and its sides run as the path was going, where a longer segment is measured.
+- **A cut on a last segment a few units long, in a variable font**: there is no plan for it,
+  with a serif or without, and the default master's ink is written at every weight.
 
 - **A rectangle that turns or changes size along a stroke**, exact as the constant one is:
   it is fitted now, a hundredth short at its corners.

@@ -594,7 +594,10 @@ line, and its end is the same either way. **Serif** is a serif standing on the c
 **Serifs.** A serif stands on the line its end is cut along, so the stem still stands on the
 baseline, and it is measured from the stroke's own edges where that line crosses them: make
 the stem heavier, or turn the pen, and the serif goes out with it, and nothing is taken off or
-put back by hand. It leans as the stroke leans, its foot staying on the line. Seven numbers
+put back by hand. It leans as the stroke leans, its foot staying on the line. Where the stroke's
+last segment is shorter than the serif is high — the arm of an r, a short drop after a corner —
+the serif is as wide as the stroke is on the line and its sides run the way the path was going
+there, the stroke further back being another stroke's worth of ink. Seven numbers
 say what it is. **Reach left** and **Reach right** are how far it goes past the stroke's edge
 on each side, in units, left and right as they are on the page — nothing on one side is a
 serif on the other only, the flag at the head of an n. **Height** is how far up the stroke it
@@ -603,7 +606,8 @@ stroke is a curve: none, or all the way out to the tip. **Slope**, in per cent, 
 thinner the serif is at its tip than at the stroke: nought is a slab and a hundred a wedge
 that comes to a point. **Cup** is how far the middle of its foot is hollowed, in units, and
 **Round tips**, in per cent, how much of each tip is rounded off — and on a side with no reach,
-where there is no tip, how much the stroke's own corner is. A slab is a reach and a
+where there is no tip, how much the stroke's own corner is, by as much as a tip there would be:
+less the more the serif slopes, and not at all where it comes to a point. A slab is a reach and a
 height; a bracketed serif the same with a bracket; a wedge one with a slope.
 
 While the end is selected the serif has handles on the canvas, diamonds where the knob that
@@ -616,7 +620,9 @@ on the side that reaches further. The one at the corner between serif and stroke
 serif's top is the **slope**: bring it down and the tip thins, to a point at half the height.
 The one at the tip's upper corner is the **round**: bring it in along the top and the tip is
 rounded off. And the one hanging just under the foot is the **cup**: lift it and the foot is
-hollowed. Each goes one way and reads the pointer along that way only. Lengths in whole units
+hollowed. A serif that reaches neither way has no tip for the round's handle to stand on, and
+it hangs under the stroke's right edge, as the cup's does under the foot: bring it in under the
+stroke and both the stroke's corners are rounded. Each goes one way and reads the pointer along that way only. Lengths in whole units
 and shares in whole per cent, one step to undo, and on an end with a style the number dragged
 is the end's own, as one typed is. The knob stands clear of the tips, a little past the longer
 reach.

@@ -229,6 +229,17 @@ describe("a serif's shape", () => {
     expect(differences(planned[0]!, ink)).toEqual([]);
   });
 
+  it("rounds that corner as a tip there would be: less as the serif slopes, not at a point", () => {
+    const pointed = inkOf(stem(BOX, footed({ ...SLAB, right: 0, round: 1, slope: 1 })), ids);
+    expect(inked(pointed, 238, 2)).toBe(true);
+    // Half the slope, half the tip, half the round: ten where it was twenty.
+    const half = inkOf(stem(BOX, footed({ ...SLAB, right: 0, round: 1, slope: 0.5 })), ids);
+    expect(inked(half, 238, 2)).toBe(false);
+    expect(inked(half, 232, 2)).toBe(true);
+    const whole = inkOf(stem(BOX, footed({ ...SLAB, right: 0, round: 1 })), ids);
+    expect(inked(whole, 232, 2)).toBe(false);
+  });
+
   it("fills the corner between serif and stem with its bracket", () => {
     const square = inkOf(stem(BOX, footed({ ...SLAB, height: 24 })), ids);
     const bracketed = inkOf(stem(BOX, footed({ ...SLAB, height: 24, bracket: 1 })), ids);
@@ -236,6 +247,56 @@ describe("a serif's shape", () => {
     expect(inked(bracketed, 150, 34)).toBe(true);
     // And leaves the tip as thin as it was.
     expect(inked(bracketed, 104, 30)).toBe(false);
+  });
+});
+
+describe("a serif on a last stroke shorter than it is high", () => {
+  /** A bar to the right and a short drop at its end, cut level and footed. */
+  const hook = (drop: number, serif: Serif): Contour =>
+    withNib(
+      contour(
+        ids.contour(),
+        [
+          node(ids.node(), at(100, 400)),
+          node(ids.node(), at(300, 400)),
+          node(ids.node(), at(300, 400 - drop), { end: { cut: 0, serif } }),
+        ],
+        false,
+      ),
+      OVAL,
+    );
+  const FOOT: Serif = { ...SLAB, height: 20 };
+
+  it("is as wide as the drop, not as the bar the line at its top would cross", () => {
+    // The drop is forty and the serif twenty high: the line at the serif's
+    // top runs through the pen standing at the corner and the bar beyond it.
+    const stroke = hook(40, FOOT);
+    const ink = inkOf(stroke, ids);
+    expect(ink).toHaveLength(1);
+    const long = boxOf(inkOf(hook(300, FOOT), ids));
+    const box = boxOf(ink);
+    // Its right tip where a long drop's serif has it: sixty past the drop's edge.
+    expect(box.maxX).toBeCloseTo(long.maxX, 3);
+    expect(box.minY).toBeCloseTo(360, 6);
+    // Above the serif to the right there is the corner's pen and nothing else.
+    expect(inked(ink, long.maxX - 8, 370)).toBe(true);
+    expect(inked(ink, long.maxX - 8, 386)).toBe(false);
+  });
+
+  it("is the same ink joined, in regions and to one plan", () => {
+    for (const drop of [12, 40, 70]) {
+      for (const serif of [FOOT, { ...FOOT, bracket: 0.7, cup: 6, round: 0.5 }, SLAB]) {
+        const stroke = hook(drop, serif);
+        const joined = inkOf(stroke, ids);
+        expect(differences(joined, inkRegions(stroke))).toEqual([]);
+        // A drop a few units long, cut, has no plan with or without a serif:
+        // that is the cut's, and a variable font writes the default master's
+        // ink for it. Where there is a plan it is the same ink.
+        const planned = plannedInk([stroke, stroke], ids);
+        expect(planned === null).toBe(drop === 12);
+        if (planned !== null) expect(differences(planned[0]!, joined)).toEqual([]);
+      }
+    }
   });
 });
 
