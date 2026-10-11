@@ -89,8 +89,6 @@ export function TransformPanel(): React.JSX.Element {
 
   return (
     <div className={styles.panel}>
-      <span className={styles.label}>Transform{idle ? "" : ` · ${String(points)} selected`}</span>
-
       <div className={styles.about}>
         {/* Where it turns. The nine of the box, and the two a font needs: an
             italic leans about the glyph's origin or the spacing is gone, and a
@@ -138,12 +136,16 @@ export function TransformPanel(): React.JSX.Element {
       <div className={styles.row}>
         <Action
           label="Move x"
+          name="Move x"
+          title="Move across, in units"
           neutral={0}
           disabled={idle}
           onApply={(v) => apply(translation(v, 0), "Move")}
         />
         <Action
           label="Move y"
+          name="Move y"
+          title="Move up, in units"
           neutral={0}
           disabled={idle}
           onApply={(v) => apply(translation(0, v), "Move")}
@@ -153,12 +155,16 @@ export function TransformPanel(): React.JSX.Element {
       <div className={styles.row}>
         <Action
           label="Scale x %"
+          name="Scale x"
+          title="Scale across, in per cent"
           neutral={100}
           disabled={idle}
           onApply={(v) => apply(scaling(v / 100, 1), "Scale")}
         />
         <Action
           label="Scale y %"
+          name="Scale y"
+          title="Scale up and down, in per cent"
           neutral={100}
           disabled={idle}
           onApply={(v) => apply(scaling(1, v / 100), "Scale")}
@@ -168,12 +174,16 @@ export function TransformPanel(): React.JSX.Element {
       <div className={styles.row}>
         <Action
           label="Scale %"
+          name="Scale"
+          title="Scale both ways alike, in per cent"
           neutral={100}
           disabled={idle}
           onApply={(v) => apply(scaling(v / 100, v / 100), "Scale")}
         />
         <Action
           label="Rotate °"
+          name="Rotate"
+          title="Turn anticlockwise, in degrees"
           neutral={0}
           disabled={idle}
           onApply={(v) => apply(rotation(v * DEGREES), "Rotate", v * DEGREES)}
@@ -183,20 +193,21 @@ export function TransformPanel(): React.JSX.Element {
       <div className={styles.row}>
         <Action
           label="Slant °"
+          name="Slant"
           neutral={0}
           disabled={idle}
-          title="Leans the verticals, which is what an italic is"
+          title="Slant, in degrees: leans the verticals, which is what an italic is"
           // The one field that gets a drawing, because an italic is a slant and
-          // the icon says so faster than the word. The unit stays in the label:
-          // no drawing can carry a degree sign.
+          // the icon says so faster than the word.
           icon={<SlantIcon />}
           onApply={(v) => apply(skewing(v * DEGREES, 0), "Slant")}
         />
         <Action
           label="Lean °"
+          name="Lean"
           neutral={0}
           disabled={idle}
-          title="The same on the other axis: leans the horizontals"
+          title="Lean, in degrees: the same on the other axis, leaning the horizontals"
           onApply={(v) => apply(skewing(0, v * DEGREES), "Lean")}
         />
       </div>
@@ -310,17 +321,21 @@ export const DISTRIBUTIONS: readonly {
  */
 function Action({
   label,
+  name,
   neutral,
   disabled,
   title,
   icon,
   onApply,
 }: {
+  /** What it is to a screen reader, unit and all: "Scale x %". */
   readonly label: string;
+  /** What it is called in its row, before the box, where the unit has no room. */
+  readonly name: string;
   /** What the box shows when it has nothing to say: no move, or no scaling. */
   readonly neutral: number;
   readonly disabled: boolean;
-  readonly title?: string;
+  readonly title: string;
   /** Shown before the label, where one says more than the words do. */
   readonly icon?: React.ReactNode;
   readonly onApply: (value: number) => void;
@@ -334,10 +349,10 @@ function Action({
   };
 
   return (
-    <label className={styles.field}>
-      <span className={styles.small}>
+    <label className={styles.field} title={title}>
+      <span className={styles.small} aria-hidden="true">
         {icon === undefined ? null : <span className={styles.mark}>{icon}</span>}
-        {label}
+        {name}
       </span>
       <input
         className={styles.input}
@@ -348,7 +363,7 @@ function Action({
         value={draft}
         disabled={disabled}
         aria-label={label}
-        {...(title === undefined ? {} : { title })}
+        title={title}
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter") {

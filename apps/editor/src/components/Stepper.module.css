@@ -10,7 +10,12 @@
 .holder > input {
   flex: 1;
   min-width: 0;
-  /* Room for the arrows, so a long number does not run under them. */
+}
+/* Room for the arrows while they are there, so a long number does not run
+   under them — and not while they are not, when it was a fifth of a narrow
+   field kept empty and the number in it cut short. */
+.holder:hover > input,
+.holder:focus-within > input {
   padding-right: 1.25rem;
 }
 

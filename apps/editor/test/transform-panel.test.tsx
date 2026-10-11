@@ -76,18 +76,18 @@ describe("with nothing selected", () => {
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "Flip horizontally" }).disabled,
     ).toBe(true);
-    expect(screen.getByText("Transform")).toBeTruthy();
   });
 });
 
 describe("a typed number", () => {
-  it("says how much is selected", () => {
-    const store = selectingAll();
-    render(<TransformPanel />, store);
+  it("is named in its row, the unit kept for whoever cannot see the row", () => {
+    render(<TransformPanel />, selectingAll());
 
-    expect(
-      screen.getByText(`Transform · ${String(store.editor.selection.length)} selected`),
-    ).toBeTruthy();
+    // What is read beside the box, and what a screen reader is told.
+    expect(screen.getByText("Scale x")).toBeTruthy();
+    expect(field("Scale x %").title).toBe("Scale across, in per cent");
+    // And no heading of its own: the section says how much is selected.
+    expect(screen.queryByText(/^Transform/)).toBeNull();
   });
 
   it("applies once on Enter, and the field goes back to its neutral value", () => {

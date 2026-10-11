@@ -49,7 +49,7 @@ import {
   SerifSlopeIcon,
 } from "../icons.js";
 import { Section } from "./Section.js";
-import { Field } from "./fields.js";
+import { Field, Named } from "./fields.js";
 
 /**
  * The pen a contour is drawn with, when it is a stroke.
@@ -214,34 +214,6 @@ export function PenSection(): React.JSX.Element {
           end, and widening the stroke by turning it. */}
       {end !== null && <EndField value={end} shape={endShape} />}
     </Section>
-  );
-}
-
-/**
- * A control named inside its own row: a word or an icon before it, where a row
- * to itself and a label above was a line of the panel for every number.
- */
-function Named({
-  name,
-  icon: Icon,
-  title,
-  own = false,
-  children,
-}: {
-  readonly name?: string;
-  readonly icon?: IconComponent;
-  readonly title: string;
-  /** Set on this end, where the rest follow a style. */
-  readonly own?: boolean;
-  readonly children: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <label className={styles.named} title={title} data-own={own ? "true" : undefined}>
-      <span className={styles.naming} aria-hidden="true">
-        {Icon === undefined ? name : <Icon />}
-      </span>
-      {children}
-    </label>
   );
 }
 

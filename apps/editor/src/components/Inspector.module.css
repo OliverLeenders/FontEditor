@@ -743,8 +743,12 @@ select.input {
   align-items: center;
   gap: 0.25rem 0.4rem;
 }
-.curvature .align {
+/* The two things done about a join, side by side under what is read off it. */
+.curvature .joinActions {
   grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2rem;
 }
 
 /* A drawing of the glyph: the button that points the tools at it, its name, and

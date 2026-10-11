@@ -1,4 +1,5 @@
 import styles from "../Inspector.module.css";
+import type { IconComponent } from "../icons.js";
 
 /**
  * The small pieces every section of the inspector is built from.
@@ -42,6 +43,34 @@ export function Field({
   return (
     <label className={styles.field}>
       <span className={styles.label}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/**
+ * A control named inside its own row: a word or an icon before it, where a row
+ * to itself and a label above was a line of the panel for every number.
+ */
+export function Named({
+  name,
+  icon: Icon,
+  title,
+  own = false,
+  children,
+}: {
+  readonly name?: string;
+  readonly icon?: IconComponent;
+  readonly title: string;
+  /** Set on this thing itself, where the rest follow something shared. */
+  readonly own?: boolean;
+  readonly children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <label className={styles.named} title={title} data-own={own ? "true" : undefined}>
+      <span className={styles.naming} aria-hidden="true">
+        {Icon === undefined ? name : <Icon />}
+      </span>
       {children}
     </label>
   );

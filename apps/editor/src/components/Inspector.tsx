@@ -276,7 +276,10 @@ export function Inspector(): React.JSX.Element | null {
                 icon={ScalingIcon}
                 relevant={false}
                 empty={selectedPoints === 0}
-                emptyNote="nothing selected"
+                // Shorter than the others say it: beside this title the longer
+                // words ran to a second line.
+                emptyNote="no selection"
+                note={selectedPoints === 0 ? undefined : `${String(selectedPoints)} selected`}
               >
                 <TransformPanel />
               </Section>

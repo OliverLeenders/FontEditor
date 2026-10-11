@@ -29,7 +29,7 @@ import { NumberField } from "../NumberField.js";
 import { Stepper } from "../Stepper.js";
 import { ClefTrebleIcon, MusicIcon, SplineIcon } from "../icons.js";
 import { Section } from "./Section.js";
-import { Field, shown } from "./fields.js";
+import { Field, Named, shown } from "./fields.js";
 
 /**
  * The segment the selection is on: its tension, its curvature, and the pan.
@@ -191,27 +191,91 @@ export function CurveSection(): React.JSX.Element {
       empty={curveStatus === null}
       emptyNote="no segment"
     >
-      <Field label="Tension">
-        <Stepper
-          value={tension === null ? null : shown(tension * 100)}
-          label="tension"
-          disabled={!curveReady}
-          onStep={(next) => commitTension(next)}
-        >
-          <NumberField
-            className={styles.input}
-            label="Tension of the segment"
-            title={curveHint}
-            disabled={!curveReady}
-            // An empty box with a dash behind it, where the segments differ:
-            // there is no number to show, and a blank box with no explanation
-            // reads as a bug rather than as an answer.
-            placeholder={mixed && tension === null ? "—" : undefined}
-            value={tension === null ? null : shown(tension * 100)}
-            onCommit={commitTension}
-          />
-        </Stepper>
-      </Field>
+      {/* The segment's own two numbers, where there is a segment: with none
+          they were a row of empty boxes and a slider that did nothing. The pan's
+          slider is under them, the whole width, with nothing more to be said
+          about it than the number beside its name has. */}
+      {curveStatus !== null && (
+        <Field label="Segment" group>
+          <div className={styles.pair}>
+            <Named name="Tension" title={curveHint}>
+              <Stepper
+                value={tension === null ? null : shown(tension * 100)}
+                label="tension"
+                disabled={!curveReady}
+                onStep={(next) => commitTension(next)}
+              >
+                <NumberField
+                  className={styles.input}
+                  label="Tension of the segment"
+                  title={curveHint}
+                  disabled={!curveReady}
+                  // An empty box with a dash behind it, where the segments differ:
+                  // there is no number to show, and a blank box with no explanation
+                  // reads as a bug rather than as an answer.
+                  placeholder={mixed && tension === null ? "—" : undefined}
+                  value={tension === null ? null : shown(tension * 100)}
+                  onCommit={commitTension}
+                />
+              </Stepper>
+            </Named>
+            <Named
+              name="Pan"
+              title="Which way the reach leans, as a percentage of it: 0 is balanced, 100 is all at the start"
+            >
+              <Stepper
+                value={curveReady && pan !== null ? shown(pan * 100) : null}
+                label="pan"
+                disabled={!curveReady}
+                onStep={(next) => commitPan(next)}
+              >
+                <NumberField
+                  className={styles.input}
+                  bounds={{ min: -PAN_REACH * 100, max: PAN_REACH * 100 }}
+                  label="Pan as a percentage"
+                  title="Which way the reach leans, as a percentage of it: 0 is balanced, 100 is all at the start"
+                  disabled={!curveReady}
+                  placeholder={mixed && pan === null ? "—" : undefined}
+                  value={curveReady && pan !== null ? shown(pan * 100) : null}
+                  onCommit={commitPan}
+                />
+              </Stepper>
+            </Named>
+          </div>
+          {/* Pan moves length from one handle to the other without changing how
+              much there is of it, so the curve leans without swelling. The
+              middle is where the two are equal, which is what balancing a
+              segment does. */}
+          <div className={styles.panTrack}>
+            {/* Behind the slider, so the thumb covers it exactly when the pan
+                is where the mark says. */}
+            <span className={styles.centre} aria-hidden="true" />
+            <input
+              className={styles.slider}
+              type="range"
+              min={-PAN_REACH}
+              max={PAN_REACH}
+              step={0.01}
+              aria-label="Pan the curve between its two handles"
+              title="Lengthen one handle by as much as the other shortens; the middle is balanced — double-click to go there"
+              disabled={!curveReady}
+              value={curveReady ? panValue : 0}
+              onChange={(event) => movePan(Number(event.target.value))}
+              onPointerUp={endPan}
+              onKeyUp={endPan}
+              onBlur={endPan}
+              // Back to balanced, which is where the mark on the track is. The
+              // same gesture as double-clicking the Tunni point on the canvas,
+              // and for the same reason: the middle is a place aimed for often
+              // enough that hitting it by hand is a nuisance.
+              onDoubleClick={() => {
+                movePan(0);
+                endPan();
+              }}
+            />
+          </div>
+        </Field>
+      )}
 
       {/* What the curvature comb shows at this node, as a number: the radius
             of the circle fitting each side, and how far apart the two are. One
@@ -230,36 +294,40 @@ export function CurveSection(): React.JSX.Element {
           >
             {curvatureRatio === null ? "" : `× ${curvatureRatio.toFixed(2)}`}
           </span>
-          <button
-            type="button"
-            className={`${styles.align} ${styles.labelled}`}
-            disabled={pointCount === 0}
-            title="Move the selected points to where the curvature either side of them agrees"
-            onClick={() => store.applyTool(harmoniseSelection(store.editor))}
-          >
-            <ClefTrebleIcon />
-            Harmonise
-          </button>
-          {/* Beside the one-shot, because it is the same operation told to stay:
+          <div className={styles.joinActions}>
+            <button
+              type="button"
+              className={`${styles.align} ${styles.labelled}`}
+              disabled={pointCount === 0}
+              title="Move the selected points to where the curvature either side of them agrees"
+              onClick={() => store.applyTool(harmoniseSelection(store.editor))}
+            >
+              <ClefTrebleIcon />
+              Harmonise
+            </button>
+            {/* Beside the one-shot, because it is the same operation told to stay:
               harmonising once is undone by the next drag of a handle, and a join
               that is meant to be smooth should not have to be put right again
               after every one. Pressed means every selected join holds it; a
               mixed selection shows neither, and pressing it then holds them all. */}
-          <button
-            type="button"
-            className={`${styles.align} ${styles.labelled}`}
-            aria-pressed={holds === true}
-            disabled={holds === null && !canHold}
-            title={
-              holds === true
-                ? "Stop keeping these joins harmonised; they stay where they are"
-                : "Keep these joins harmonised as the curves either side are drawn"
-            }
-            onClick={() => store.applyTool(holdCurvatureInSelection(store.editor, holds !== true))}
-          >
-            <MusicIcon />
-            Hold
-          </button>
+            <button
+              type="button"
+              className={`${styles.align} ${styles.labelled}`}
+              aria-pressed={holds === true}
+              disabled={holds === null && !canHold}
+              title={
+                holds === true
+                  ? "Stop keeping these joins harmonised; they stay where they are"
+                  : "Keep these joins harmonised as the curves either side are drawn"
+              }
+              onClick={() =>
+                store.applyTool(holdCurvatureInSelection(store.editor, holds !== true))
+              }
+            >
+              <MusicIcon />
+              Hold
+            </button>
+          </div>
         </div>
       </Field>
 
@@ -293,63 +361,6 @@ export function CurveSection(): React.JSX.Element {
           >
             {bends === 0 ? "Inflections" : `Inflections (${String(bends)})`}
           </button>
-        </div>
-      </Field>
-
-      {/* Pan moves length from one handle to the other without changing how
-            much there is of it, so the curve leans without swelling. The middle
-            is where the two are equal, which is what balancing a segment does. */}
-      <Field label="Pan">
-        <div className={styles.panRow}>
-          <div className={styles.panTrack}>
-            {/* Behind the slider, so the thumb covers it exactly when the pan
-                is where the mark says. */}
-            <span className={styles.centre} aria-hidden="true" />
-            <input
-              className={styles.slider}
-              type="range"
-              min={-PAN_REACH}
-              max={PAN_REACH}
-              step={0.01}
-              aria-label="Pan the curve between its two handles"
-              title="Lengthen one handle by as much as the other shortens; the middle is balanced — double-click to go there"
-              disabled={!curveReady}
-              value={curveReady ? panValue : 0}
-              onChange={(event) => movePan(Number(event.target.value))}
-              onPointerUp={endPan}
-              onKeyUp={endPan}
-              onBlur={endPan}
-              // Back to balanced, which is where the mark on the track is. The
-              // same gesture as double-clicking the Tunni point on the canvas,
-              // and for the same reason: the middle is a place aimed for often
-              // enough that hitting it by hand is a nuisance.
-              onDoubleClick={() => {
-                movePan(0);
-                endPan();
-              }}
-            />
-          </div>
-
-          {/* The same number, to read and to type. A slider says roughly, and
-              a lean worth keeping is one worth being able to write down — and
-              to give the segment beside it. */}
-          <Stepper
-            value={curveReady && pan !== null ? shown(pan * 100) : null}
-            label="pan"
-            disabled={!curveReady}
-            onStep={(next) => commitPan(next)}
-          >
-            <NumberField
-              className={styles.input}
-              bounds={{ min: -PAN_REACH * 100, max: PAN_REACH * 100 }}
-              label="Pan as a percentage"
-              title="Which way the reach leans, as a percentage of it: 0 is balanced, 100 is all at the start"
-              disabled={!curveReady}
-              placeholder={mixed && pan === null ? "—" : undefined}
-              value={curveReady && pan !== null ? shown(pan * 100) : null}
-              onCommit={commitPan}
-            />
-          </Stepper>
         </div>
       </Field>
     </Section>

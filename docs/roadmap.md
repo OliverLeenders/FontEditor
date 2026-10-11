@@ -1612,6 +1612,15 @@ caret in it: some numbers have them and some, in rows too narrow, have not, and 
 panel of numbers is a panel of numbers. The two looks and the label are written down in
 `tokens.css`, where the next control will be looking.
 
+The Transform and Curve sections were given the Pen section's rows. Transform's eight numbers
+had a label above each pair, four lines that said eight words; each is named in its row now,
+its unit in its tooltip and to a screen reader, and the section's own bar says how much is
+selected, where a heading inside repeated the title to say it. Curve showed a segment's
+tension and pan when there was no segment, as an empty box and a slider that did nothing:
+they are there when a segment is, the two numbers in one row and the pan's slider under them.
+Harmonise and Hold are side by side. A number's arrows no longer keep their room while they
+are hidden, which in a narrow field was the number's last digit.
+
 #### Open
 
 What is next in the same direction:
