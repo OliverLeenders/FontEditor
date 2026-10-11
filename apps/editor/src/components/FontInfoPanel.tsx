@@ -37,7 +37,18 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./FontInfoPanel.module.css";
 import { BarMenu } from "./BarMenu.js";
-import { InfoIcon } from "./icons.js";
+import {
+  type IconComponent,
+  ChevronRightIcon,
+  InfoIcon,
+  SerifBracketIcon,
+  SerifCupIcon,
+  SerifHeightIcon,
+  SerifReachLeftIcon,
+  SerifReachRightIcon,
+  SerifRoundIcon,
+  SerifSlopeIcon,
+} from "./icons.js";
 import { Stepper } from "./Stepper.js";
 
 /**
@@ -949,34 +960,65 @@ function IconsSection({
   );
 }
 
-const SERIF_STYLE_FIELDS: readonly {
+/** A serif style's numbers, in the rows they are shown in: as the Pen section has them. */
+const SERIF_STYLE_ROWS: readonly (readonly {
   readonly key: SerifNumber;
   readonly label: string;
   readonly hint: string;
+  readonly icon: IconComponent;
   readonly percent?: boolean;
-}[] = [
-  { key: "left", label: "Reach left", hint: "Units past the stroke's left edge. 0 for none." },
-  { key: "right", label: "Reach right", hint: "Units past the stroke's right edge. 0 for none." },
-  { key: "height", label: "Height", hint: "Units up the stroke, where the serif meets it" },
-  {
-    key: "bracket",
-    label: "Bracket %",
-    hint: "How much of the corner between serif and stroke is a curve: 0 none, 100 out to the tip",
-    percent: true,
-  },
-  {
-    key: "slope",
-    label: "Slope %",
-    hint: "How much thinner the serif is at its tip: 0 a slab, 100 a wedge that comes to a point",
-    percent: true,
-  },
-  { key: "cup", label: "Cup", hint: "Units the middle of the serif's foot is hollowed by" },
-  {
-    key: "round",
-    label: "Round tips %",
-    hint: "How much of each tip is rounded off: 0 square, 100 half a circle",
-    percent: true,
-  },
+}[])[] = [
+  [
+    {
+      key: "left",
+      label: "Reach left",
+      hint: "Reach left: units past the stroke's left edge. 0 for none.",
+      icon: SerifReachLeftIcon,
+    },
+    {
+      key: "right",
+      label: "Reach right",
+      hint: "Reach right: units past the stroke's right edge. 0 for none.",
+      icon: SerifReachRightIcon,
+    },
+  ],
+  [
+    {
+      key: "height",
+      label: "Height",
+      hint: "Height: units up the stroke, where the serif meets it",
+      icon: SerifHeightIcon,
+    },
+    {
+      key: "cup",
+      label: "Cup",
+      hint: "Cup: units the middle of the serif's foot is hollowed by",
+      icon: SerifCupIcon,
+    },
+  ],
+  [
+    {
+      key: "bracket",
+      label: "Bracket %",
+      hint: "Bracket, in per cent: how much of the corner between serif and stroke is a curve — 0 none, 100 out to the tip",
+      icon: SerifBracketIcon,
+      percent: true,
+    },
+    {
+      key: "slope",
+      label: "Slope %",
+      hint: "Slope, in per cent: how much thinner the serif is at its tip — 0 a slab, 100 a wedge that comes to a point",
+      icon: SerifSlopeIcon,
+      percent: true,
+    },
+    {
+      key: "round",
+      label: "Round tips %",
+      hint: "Round tips, in per cent: how much of each tip is rounded off — 0 square, 100 half a circle",
+      icon: SerifRoundIcon,
+      percent: true,
+    },
+  ],
 ];
 
 /**
@@ -986,6 +1028,10 @@ const SERIF_STYLE_FIELDS: readonly {
  * Pen section, and a serif there can have one of these styles. Changing a
  * style here changes every end that has it, in every glyph, as one step —
  * but for a number that was set on an end itself, which is that end's own.
+ *
+ * A style is a line here until it is opened: its name and how many ends have
+ * it. Nine rows to a style was a panel of serifs with the font's own facts
+ * somewhere above them. One just added is open, being what was asked for.
  */
 function SerifsSection({
   document,
@@ -994,6 +1040,13 @@ function SerifsSection({
   readonly document: FontDocument;
   readonly store: ReturnType<typeof useEditorStore>;
 }): React.JSX.Element {
+  const [opened, setOpened] = useState<readonly string[]>([]);
+  const toggle = (name: string): void =>
+    setOpened((now) => (now.includes(name) ? now.filter((n) => n !== name) : [...now, name]));
+  /** A style renamed is the same style, and stays as open as it was. */
+  const renamed = (was: string, is: string): void =>
+    setOpened((now) => now.map((n) => (n === was ? is : n)));
+
   return (
     <section className={styles.section}>
       <h3 className={styles.heading}>Serifs</h3>
@@ -1004,7 +1057,15 @@ function SerifsSection({
         </p>
       ) : null}
       {document.serifs.map((style) => (
-        <SerifStyleFields key={style.name} style={style} document={document} store={store} />
+        <SerifStyleFields
+          key={style.name}
+          style={style}
+          document={document}
+          store={store}
+          open={opened.includes(style.name)}
+          onToggle={() => toggle(style.name)}
+          onRenamed={renamed}
+        />
       ))}
       <label className={styles.field}>
         <span className={styles.label}>Add a style</span>
@@ -1015,7 +1076,11 @@ function SerifsSection({
           title="A new serif style, starting from one of these"
           onChange={(event) => {
             const preset = SERIF_PRESETS.find((p) => p.name === event.target.value);
-            if (preset !== undefined) store.applyTool(addSerifStyle(store.editor, preset));
+            if (preset === undefined) return;
+            const before = new Set(store.editor.document.serifs.map((each) => each.name));
+            store.applyTool(addSerifStyle(store.editor, preset));
+            const made = store.editor.document.serifs.find((each) => !before.has(each.name));
+            if (made !== undefined) setOpened((now) => [...now, made.name]);
           }}
         >
           <option value="">Choose…</option>
@@ -1030,15 +1095,24 @@ function SerifsSection({
   );
 }
 
-/** One serif style: its name, its numbers, how many ends have it, and its removal. */
+/**
+ * One serif style: a line that says its name and how many ends have it, and
+ * opened, its name to change, its numbers, and its removal.
+ */
 function SerifStyleFields({
   style,
   document,
   store,
+  open,
+  onToggle,
+  onRenamed,
 }: {
   readonly style: SerifStyle;
   readonly document: FontDocument;
   readonly store: ReturnType<typeof useEditorStore>;
+  readonly open: boolean;
+  readonly onToggle: () => void;
+  readonly onRenamed: (was: string, is: string) => void;
 }): React.JSX.Element {
   const uses = useMemo(() => serifStyleUses(document, style.name), [document, style.name]);
   const [name, setName] = useState(style.name);
@@ -1051,60 +1125,82 @@ function SerifStyleFields({
       setName(style.name);
       return;
     }
+    onRenamed(style.name, wanted);
     store.applyTool(changeSerifStyle(store.editor, style.name, { ...style, name: wanted }));
   };
 
   return (
-    <>
-      <label className={styles.field}>
-        <span className={styles.label}>Style</span>
-        <input
-          className={styles.input}
-          type="text"
-          autoComplete="off"
-          spellCheck={false}
-          value={name}
-          data-wrong={taken}
-          aria-label={`Serif style name, ${style.name}`}
-          title="What the style is called, in the inspector's Pen section"
-          onChange={(event) => setName(event.target.value)}
-          onBlur={rename}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") event.currentTarget.blur();
-          }}
-        />
-        {taken ? <span className={styles.problem}>Another style has that name.</span> : null}
-      </label>
-      {SERIF_STYLE_FIELDS.map((field) => (
-        <UnitsField
-          key={field.key}
-          label={field.label}
-          hint={field.hint}
-          value={field.percent === true ? Math.round(style[field.key] * 100) : style[field.key]}
-          onCommit={(next) =>
-            store.applyTool(
-              changeSerifStyle(store.editor, style.name, {
-                ...style,
-                [field.key]: field.percent === true ? next / 100 : next,
-              }),
-            )
-          }
-        />
-      ))}
-      <p className={styles.caveat}>
-        {uses === 0
-          ? "No end of a stroke has this style yet."
-          : `${uses === 1 ? "One end has" : `${String(uses)} ends have`} this style.`}{" "}
-        <button
-          type="button"
-          className={styles.button}
-          title="Take the style out of the font. The ends that have it keep their serifs."
-          onClick={() => store.applyTool(removeSerifStyle(store.editor, style.name))}
-        >
-          Remove {style.name}
-        </button>
-      </p>
-    </>
+    <div className={styles.style}>
+      <button
+        type="button"
+        className={styles.styleHead}
+        aria-expanded={open}
+        title={open ? "Fold this style away" : "Open this style, to change it"}
+        onClick={onToggle}
+      >
+        <span className={styles.chevron} data-open={open ? "true" : undefined}>
+          <ChevronRightIcon />
+        </span>
+        <span className={styles.styleName}>{style.name}</span>
+        <span className={styles.styleUses}>
+          {uses === 0 ? "not used" : uses === 1 ? "1 end" : `${String(uses)} ends`}
+        </span>
+      </button>
+      {open ? (
+        <div className={styles.styleBody}>
+          <div className={styles.styleNameRow}>
+            <input
+              className={styles.input}
+              type="text"
+              autoComplete="off"
+              spellCheck={false}
+              value={name}
+              data-wrong={taken}
+              aria-label={`Serif style name, ${style.name}`}
+              title="What the style is called, in the inspector's Pen section"
+              onChange={(event) => setName(event.target.value)}
+              onBlur={rename}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") event.currentTarget.blur();
+              }}
+            />
+            <button
+              type="button"
+              className={styles.button}
+              aria-label={`Remove ${style.name}`}
+              title="Take the style out of the font. The ends that have it keep their serifs."
+              onClick={() => store.applyTool(removeSerifStyle(store.editor, style.name))}
+            >
+              Remove
+            </button>
+          </div>
+          {taken ? <span className={styles.problem}>Another style has that name.</span> : null}
+          {SERIF_STYLE_ROWS.map((row) => (
+            <div key={row[0]!.key} className={row.length === 3 ? styles.triple : styles.pair}>
+              {row.map((field) => (
+                <UnitsField
+                  key={field.key}
+                  label={field.label}
+                  hint={field.hint}
+                  icon={field.icon}
+                  value={
+                    field.percent === true ? Math.round(style[field.key] * 100) : style[field.key]
+                  }
+                  onCommit={(next) =>
+                    store.applyTool(
+                      changeSerifStyle(store.editor, style.name, {
+                        ...style,
+                        [field.key]: field.percent === true ? next / 100 : next,
+                      }),
+                    )
+                  }
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -1115,12 +1211,18 @@ function SerifStyleFields({
 function UnitsField({
   label,
   hint,
+  icon: Icon,
   value,
   disabled = false,
   onCommit,
 }: {
   readonly label: string;
   readonly hint: string;
+  /**
+   * A drawing to name it by, in a row it shares: the words are then for a
+   * screen reader, and its hint says them to everybody else.
+   */
+  readonly icon?: IconComponent;
   readonly value: number | null;
   readonly disabled?: boolean;
   readonly onCommit: (next: number) => void;
@@ -1153,8 +1255,14 @@ function UnitsField({
   const current = Number.isFinite(Number(draft)) && draft.trim() !== "" ? Number(draft) : value;
 
   return (
-    <label className={styles.field}>
-      <span className={styles.label}>{label}</span>
+    <label className={Icon === undefined ? styles.field : styles.compact} title={hint}>
+      {Icon === undefined ? (
+        <span className={styles.label}>{label}</span>
+      ) : (
+        <span className={styles.naming} aria-hidden="true">
+          <Icon />
+        </span>
+      )}
       <Stepper
         value={disabled ? null : current}
         label={label}

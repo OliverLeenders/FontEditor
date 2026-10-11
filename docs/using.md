@@ -636,7 +636,9 @@ reach.
 
 A serif has a **Serif style**, or numbers of its own. A style is a serif with a name that the
 font keeps — **Font info** has them under **Serifs**, where one is added from a slab, a
-bracketed serif, a wedge or a hairline, renamed, changed and removed — and an end that has a
+bracketed serif, a wedge or a hairline, renamed, changed and removed; each is a line there,
+its name and how many ends have it, that opens to its name and its seven numbers in the Pen
+section's three rows — and an end that has a
 style has its numbers: change the style in Font info and every end that has it, in every
 glyph, follows in one step. The style is what the Pen section shows of a serif; its numbers
 are folded under **Numbers**, a line that opens them and stays as it was left, since all

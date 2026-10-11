@@ -364,3 +364,55 @@ describe("the embedding permissions", () => {
     expect(store.editor.document.info.openTypeOS2Type).toEqual([8]);
   });
 });
+
+describe("the font's serif styles", () => {
+  const add = (name: string): void => {
+    fireEvent.change(screen.getByLabelText("Add a serif style"), { target: { value: name } });
+  };
+  const line = (name: RegExp): HTMLElement => screen.getByRole("button", { name });
+
+  it("are a line each until opened, the one just added open", () => {
+    const { store } = openPanel();
+    add("Slab");
+    add("Wedge");
+    expect(store.editor.document.serifs.map((style) => style.name)).toEqual(["Slab", "Wedge"]);
+
+    expect(line(/^Slab/).getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(line(/^Slab/));
+    expect(line(/^Slab/).getAttribute("aria-expanded")).toBe("false");
+    // One style's numbers showing, and not two: the Wedge's.
+    expect(screen.getAllByLabelText("Height")).toHaveLength(1);
+    expect(screen.getByLabelText<HTMLInputElement>("Height").value).toBe("60");
+    expect(line(/^Wedge/).textContent).toContain("not used");
+  });
+
+  it("take a number typed, lengths in units and shares in per cent, when the box is left", () => {
+    const { store } = openPanel();
+    add("Slab");
+    const bracket = screen.getByLabelText("Bracket %");
+    fireEvent.focus(bracket);
+    fireEvent.change(bracket, { target: { value: "40" } });
+    expect(store.editor.document.serifs[0]!.bracket).toBe(0);
+    fireEvent.blur(bracket);
+    expect(store.editor.document.serifs[0]!.bracket).toBeCloseTo(0.4, 9);
+
+    const left = screen.getByLabelText("Reach left");
+    fireEvent.focus(left);
+    fireEvent.change(left, { target: { value: "75" } });
+    fireEvent.blur(left);
+    expect(store.editor.document.serifs[0]!.left).toBe(75);
+  });
+
+  it("stay open through a rename, and go when removed", () => {
+    const { store } = openPanel();
+    add("Slab");
+    const name = screen.getByLabelText("Serif style name, Slab");
+    fireEvent.change(name, { target: { value: "Foot" } });
+    fireEvent.blur(name);
+    expect(store.editor.document.serifs[0]!.name).toBe("Foot");
+    expect(line(/^Foot/).getAttribute("aria-expanded")).toBe("true");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Foot" }));
+    expect(store.editor.document.serifs).toEqual([]);
+  });
+});

@@ -1621,6 +1621,11 @@ they are there when a segment is, the two numbers in one row and the pan's slide
 Harmonise and Hold are side by side. A number's arrows no longer keep their room while they
 are hidden, which in a narrow field was the number's last digit.
 
+A serif style in Font info was nine rows, as a serif in the Pen section had been: with three
+styles the font's own facts were a long way above them. A style is a line now, its name and
+how many ends have it, and opens to its name, its removal and its seven numbers in the Pen
+section's three rows, each named by the same drawing. One just added is open.
+
 #### Open
 
 What is next in the same direction:

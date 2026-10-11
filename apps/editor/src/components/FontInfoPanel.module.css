@@ -134,6 +134,87 @@ select.input {
   composes: small from "./Button.module.css";
 }
 
+/* A serif style: a line that opens, and under it what the style is. */
+.style {
+  display: grid;
+  gap: 0.35rem;
+}
+.styleHead {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-size: var(--text-s);
+  text-align: left;
+  cursor: pointer;
+}
+.styleHead:hover .styleName {
+  color: var(--accent-ink);
+}
+.chevron {
+  display: inline-flex;
+  color: var(--ink-3);
+}
+.chevron svg {
+  width: var(--icon-small);
+  height: var(--icon-small);
+}
+.chevron[data-open] {
+  transform: rotate(90deg);
+}
+.styleName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.styleUses {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.styleBody {
+  display: grid;
+  gap: 0.35rem;
+  padding-left: 1.1rem;
+}
+.styleNameRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.3rem;
+}
+.pair,
+.triple {
+  display: grid;
+  gap: 0.35rem;
+}
+.pair {
+  grid-template-columns: 1fr 1fr;
+}
+.triple {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+/* A number named by a drawing, in a row it shares with others. */
+.compact {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.naming {
+  display: inline-flex;
+  color: var(--ink-3);
+}
+.naming svg {
+  width: var(--icon-inline);
+  height: var(--icon-inline);
+}
+
 /* A sentence about the fields above, with the one thing to do about it. */
 .caveat {
   margin: 0;
