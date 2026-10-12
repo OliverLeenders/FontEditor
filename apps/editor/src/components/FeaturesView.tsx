@@ -52,18 +52,23 @@ const PAUSE = 200;
  * so a short file is compiled exactly as it was before there was a pause at all.
  */
 function useSettled<T>(value: T, pause: number): T {
-  const [settled, setSettled] = useState(value);
+  // What was last given out. Kept up to date while there is no pause, so that
+  // a file grown long enough to have one starts from what it holds now rather
+  // than what it once held — and kept in a ref, not in state: as state it was
+  // set from an effect at every key, which drew the whole view a second time
+  // for each letter typed to remember something nobody was shown.
+  const last = useRef(value);
+  const [, redraw] = useState(0);
+  if (pause <= 0) last.current = value;
   useEffect(() => {
-    // Kept up to date while there is no pause, so that a file grown long enough
-    // to have one starts from what it holds now rather than what it once held.
-    if (pause <= 0) {
-      setSettled(value);
-      return;
-    }
-    const timer = setTimeout(() => setSettled(value), pause);
+    if (pause <= 0) return;
+    const timer = setTimeout(() => {
+      last.current = value;
+      redraw((n) => n + 1);
+    }, pause);
     return () => clearTimeout(timer);
   }, [value, pause]);
-  return pause <= 0 ? value : settled;
+  return last.current;
 }
 
 export function FeaturesView({
