@@ -21,6 +21,55 @@ button {
 }
 
 /*
+ * Tick boxes, drawn rather than inherited.
+ *
+ * The platform's own took the accent when ticked and nothing when not: an
+ * unticked box was the browser's mid-grey square on a dark panel, the one
+ * control there that no token reached. A box of the rule colour on the ground,
+ * as a field is, and ticked the accent whole with the tick in the surface
+ * colour — a thing that is on, said as the toolbar says it.
+ */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 3px;
+  background: var(--ground);
+  cursor: pointer;
+}
+input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--ink-3);
+}
+input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+/* The tick: two sides of a small box, turned. */
+input[type="checkbox"]:checked::after {
+  content: "";
+  width: 0.5rem;
+  height: 0.26rem;
+  margin-top: -0.12rem;
+  border-left: 2px solid var(--surface);
+  border-bottom: 2px solid var(--surface);
+  transform: rotate(-45deg);
+}
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+input[type="checkbox"]:disabled {
+  cursor: default;
+  opacity: var(--disabled);
+}
+
+/*
  * Sliders, drawn rather than inherited.
  *
  * A thin rule with a round handle: the value is the handle's position, and a

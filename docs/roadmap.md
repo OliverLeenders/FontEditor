@@ -1647,6 +1647,17 @@ its own now, about a quarter, laid once where strokes cross. And a panel hangs f
 edge of its button, so the last two of the Font bar's ran off the window: one that would is
 moved back by as much as it runs over.
 
+The last of that look. A tick box is drawn from the tokens, where the platform's own took the
+accent when ticked and nothing when not, and was a mid-grey square on a dark panel. What
+cannot be pressed fades less far in the dark, where the light's fading left it all but gone,
+and the chosen file of the feature source has the stronger rule round it. The Pen section's
+numbers and the Transform's have the arrows every other number has, the Transform's changing
+what is in the box and leaving Enter to do it. And which of the font's serif styles are open
+in Font info is remembered with the inspector's folds.
+
+Found on the way and put right: the Features view kept the source it last compiled in state,
+set from an effect at every key, which drew the whole view twice for each letter typed.
+
 #### Open
 
 What is next in the same direction:

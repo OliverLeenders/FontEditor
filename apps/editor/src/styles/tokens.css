@@ -180,6 +180,9 @@
     --accent: #74aee2;
     --accent-ink: #a6ccee;
     --accent-soft: #142838;
+    /* Less far than in the light: on a dark surface the light's fading left
+       what cannot be pressed all but gone. */
+    --disabled: 0.5;
     --warn: #d6a05a;
     --danger: #e2776e;
     --ok: #74c08a;
@@ -212,6 +215,7 @@
   --accent: #74aee2;
   --accent-ink: #a6ccee;
   --accent-soft: #142838;
+  --disabled: 0.5;
   --warn: #d6a05a;
   --danger: #e2776e;
   --ok: #74c08a;

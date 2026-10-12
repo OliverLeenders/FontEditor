@@ -27,7 +27,6 @@ import {
 
 import { useEditorStore, useStoreValue } from "../../useStore.js";
 import styles from "../Inspector.module.css";
-import { NumberField } from "../NumberField.js";
 import {
   type IconComponent,
   BrushIcon,
@@ -49,7 +48,7 @@ import {
   SerifSlopeIcon,
 } from "../icons.js";
 import { Section } from "./Section.js";
-import { Field, Named } from "./fields.js";
+import { Field, Named, SteppedNumber } from "./fields.js";
 
 /**
  * The pen a contour is drawn with, when it is a stroke.
@@ -144,7 +143,7 @@ export function PenSection(): React.JSX.Element {
         <Field label="Pen" group>
           <div className={styles.pair}>
             <Named name="Angle" title="Degrees anticlockwise from level">
-              <NumberField
+              <SteppedNumber
                 className={styles.input}
                 label="Pen angle"
                 value={number(angle)}
@@ -154,7 +153,7 @@ export function PenSection(): React.JSX.Element {
               />
             </Named>
             <Named name="Width" title="Edge to edge, in design units">
-              <NumberField
+              <SteppedNumber
                 className={styles.input}
                 label="Pen width"
                 value={number(width)}
@@ -169,7 +168,7 @@ export function PenSection(): React.JSX.Element {
                 thins there are; more is an oval, whose thin strokes keep some
                 weight; the same as the width is a round pen. */}
             <Named name="Thick" title="Across the pen: 0 is a broad edge, the width is a round pen">
-              <NumberField
+              <SteppedNumber
                 className={styles.input}
                 label="Pen thickness"
                 value={number(thickness)}
@@ -185,7 +184,7 @@ export function PenSection(): React.JSX.Element {
                 name="Square"
                 title="0 is an oval, 100 a rectangle of the pen's width and thickness"
               >
-                <NumberField
+                <SteppedNumber
                   className={styles.input}
                   label="Pen squareness"
                   value={typeof squareness === "number" ? Math.round(squareness * 100) : null}
@@ -320,7 +319,7 @@ function EndField({
           >
             Cut
           </button>
-          <NumberField
+          <SteppedNumber
             className={styles.input}
             label="Cut angle"
             title="The cut's angle, in degrees anticlockwise from level"
@@ -544,7 +543,7 @@ function SerifFields(): React.JSX.Element | null {
                     : field.title
                 }
               >
-                <NumberField
+                <SteppedNumber
                   className={styles.input}
                   label={field.name}
                   value={

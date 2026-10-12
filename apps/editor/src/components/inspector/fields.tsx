@@ -1,4 +1,6 @@
 import styles from "../Inspector.module.css";
+import { NumberField } from "../NumberField.js";
+import { Stepper } from "../Stepper.js";
 import type { IconComponent } from "../icons.js";
 
 /**
@@ -73,6 +75,28 @@ export function Named({
       </span>
       {children}
     </label>
+  );
+}
+
+/**
+ * A number with its arrows: the field every number in the inspector is, with
+ * the up and down that come when it is reached for. One step is what an arrow
+ * key is, and the arrows commit as typing does.
+ */
+export function SteppedNumber(props: React.ComponentProps<typeof NumberField>): React.JSX.Element {
+  const { value, label, disabled = false, step, bigStep, bounds, onCommit } = props;
+  return (
+    <Stepper
+      value={disabled ? null : value}
+      label={label.toLowerCase()}
+      disabled={disabled}
+      {...(step === undefined ? {} : { step })}
+      {...(bigStep === undefined ? {} : { bigStep })}
+      {...(bounds === undefined ? {} : { bounds })}
+      onStep={onCommit}
+    >
+      <NumberField {...props} />
+    </Stepper>
   );
 }
 

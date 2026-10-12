@@ -1021,6 +1021,9 @@ const SERIF_STYLE_ROWS: readonly (readonly {
   ],
 ];
 
+/** What a serif style's fold is remembered under, before its name. */
+const SERIF_STYLE_FOLD = "font-info-serif:";
+
 /**
  * The serifs the font has names for.
  *
@@ -1040,12 +1043,20 @@ function SerifsSection({
   readonly document: FontDocument;
   readonly store: ReturnType<typeof useEditorStore>;
 }): React.JSX.Element {
-  const [opened, setOpened] = useState<readonly string[]>([]);
-  const toggle = (name: string): void =>
-    setOpened((now) => (now.includes(name) ? now.filter((n) => n !== name) : [...now, name]));
+  // Which styles are open is remembered where the inspector's folds are, by
+  // the style's name: the panel is closed and opened many times in a sitting,
+  // and a style being worked on was folded away again each time.
+  const folds = useStoreValue((state) => state.inspector.sections);
+  const isOpen = (name: string): boolean => folds[SERIF_STYLE_FOLD + name] === true;
+  const setOpen = (name: string, open: boolean): void =>
+    store.toggleInspectorSection(SERIF_STYLE_FOLD + name, open);
+  const toggle = (name: string): void => setOpen(name, !isOpen(name));
   /** A style renamed is the same style, and stays as open as it was. */
-  const renamed = (was: string, is: string): void =>
-    setOpened((now) => now.map((n) => (n === was ? is : n)));
+  const renamed = (was: string, is: string): void => {
+    if (!isOpen(was)) return;
+    setOpen(was, false);
+    setOpen(is, true);
+  };
 
   return (
     <section className={styles.section}>
@@ -1062,7 +1073,7 @@ function SerifsSection({
           style={style}
           document={document}
           store={store}
-          open={opened.includes(style.name)}
+          open={isOpen(style.name)}
           onToggle={() => toggle(style.name)}
           onRenamed={renamed}
         />
@@ -1080,7 +1091,7 @@ function SerifsSection({
             const before = new Set(store.editor.document.serifs.map((each) => each.name));
             store.applyTool(addSerifStyle(store.editor, preset));
             const made = store.editor.document.serifs.find((each) => !before.has(each.name));
-            if (made !== undefined) setOpened((now) => [...now, made.name]);
+            if (made !== undefined) setOpen(made.name, true);
           }}
         >
           <option value="">Choose…</option>

@@ -13,6 +13,7 @@ import { useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./TransformPanel.module.css";
+import { Stepper } from "./Stepper.js";
 import {
   AlignBottomIcon,
   AlignCentreIcon,
@@ -354,33 +355,44 @@ function Action({
         {icon === undefined ? null : <span className={styles.mark}>{icon}</span>}
         {name}
       </span>
-      <input
-        className={styles.input}
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        spellCheck={false}
-        value={draft}
+      {/* The arrows change what is in the box and no more: it is still Enter
+          that does it, as it is for a number typed. */}
+      <Stepper
+        value={
+          disabled || draft.trim() === "" || !Number.isFinite(Number(draft)) ? null : Number(draft)
+        }
+        label={label.toLowerCase()}
         disabled={disabled}
-        aria-label={label}
-        title={title}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            run();
-          }
-          if (event.key === "Escape") {
-            event.stopPropagation();
-            setDraft(String(neutral));
-            event.currentTarget.blur();
-          }
-        }}
-        // Blur does not apply. A number typed and then clicked away from is a
-        // number the user changed their mind about, and applying it would be an
-        // edit nobody asked for.
-        onBlur={() => setDraft(String(neutral))}
-      />
+        onStep={(next) => setDraft(String(next))}
+      >
+        <input
+          className={styles.input}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          spellCheck={false}
+          value={draft}
+          disabled={disabled}
+          aria-label={label}
+          title={title}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              run();
+            }
+            if (event.key === "Escape") {
+              event.stopPropagation();
+              setDraft(String(neutral));
+              event.currentTarget.blur();
+            }
+          }}
+          // Blur does not apply. A number typed and then clicked away from is a
+          // number the user changed their mind about, and applying it would be an
+          // edit nobody asked for.
+          onBlur={() => setDraft(String(neutral))}
+        />
+      </Stepper>
     </label>
   );
 }
