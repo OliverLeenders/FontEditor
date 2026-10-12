@@ -23,10 +23,12 @@
 .open:hover:not(:disabled) {
   color: var(--ink);
 }
+/* Open, it is a button with its panel under it, as the bars' menus are — not
+   pressed as Space and Kern beside it are pressed, which made it look a third
+   way of working the line. */
 .open[aria-expanded="true"] {
-  background: var(--accent);
   border-color: var(--accent);
-  color: var(--surface);
+  color: var(--ink);
 }
 .open:disabled {
   opacity: var(--disabled);
@@ -94,9 +96,10 @@
   gap: 0.35rem;
   min-width: 0;
 }
-.pairSide[data-side="first"] {
-  justify-items: end;
-  text-align: right;
+/* The first letter's name is set against the gap, as the letter is; what is
+   chosen and pressed under it is the width of its column, as the second's is. */
+.pairSide[data-side="first"] .pairLabel {
+  justify-self: end;
 }
 .pairLabel {
   display: inline-flex;

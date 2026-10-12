@@ -181,51 +181,60 @@ export function Masters({
               <span className={styles.at}>
                 {project.axes.length === 0 ? "" : describeLocation(project.axes, m.location)}
               </span>
-              <button
-                type="button"
-                className={styles.go}
-                // A tab that is only reading cannot park the master it leaves
-                // or make the working copy the other's, so it stays where it is.
-                disabled={busy || here || reading}
-                title={
-                  here
-                    ? "This is the one you are drawing"
-                    : reading
-                      ? "Another tab is saving this project"
-                      : `Draw ${m.name}`
-                }
-                onClick={() => void goTo(m.id)}
-              >
-                {here ? "drawing" : "Draw"}
-              </button>
-              <button
-                type="button"
-                className={styles.go}
-                disabled={busy || here}
-                title={`Compare this master with ${m.name}`}
-                onClick={() => void check(m.id)}
-              >
-                Check
-              </button>
-              <button
-                type="button"
-                className={styles.drop}
-                disabled={busy || reading || masters.length < 2}
-                title={
-                  masters.length < 2
-                    ? "A font needs at least one master"
-                    : `Remove ${m.name} from this font`
-                }
-                aria-label={`Remove the master ${m.name}`}
-                onClick={() =>
-                  void attempt(async () => {
-                    await store.removeMaster(m.id);
-                    return `Removed ${m.name}`;
-                  })
-                }
-              >
-                <TrashIcon />
-              </button>
+              {/* A font's only master has nowhere to go to, nothing to be
+                  compared with and cannot be removed: the three were there and
+                  could not be pressed. It says what it is, and no more. */}
+              {masters.length < 2 ? (
+                <span className={styles.only}>drawing</span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={styles.go}
+                    // A tab that is only reading cannot park the master it leaves
+                    // or make the working copy the other's, so it stays where it is.
+                    disabled={busy || here || reading}
+                    title={
+                      here
+                        ? "This is the one you are drawing"
+                        : reading
+                          ? "Another tab is saving this project"
+                          : `Draw ${m.name}`
+                    }
+                    onClick={() => void goTo(m.id)}
+                  >
+                    {here ? "drawing" : "Draw"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.go}
+                    disabled={busy || here}
+                    title={`Compare this master with ${m.name}`}
+                    onClick={() => void check(m.id)}
+                  >
+                    Check
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.drop}
+                    disabled={busy || reading || masters.length < 2}
+                    title={
+                      masters.length < 2
+                        ? "A font needs at least one master"
+                        : `Remove ${m.name} from this font`
+                    }
+                    aria-label={`Remove the master ${m.name}`}
+                    onClick={() =>
+                      void attempt(async () => {
+                        await store.removeMaster(m.id);
+                        return `Removed ${m.name}`;
+                      })
+                    }
+                  >
+                    <TrashIcon />
+                  </button>
+                </>
+              )}
             </li>
           );
         })}

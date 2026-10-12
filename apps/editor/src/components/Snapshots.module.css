@@ -55,6 +55,7 @@
 /* The shared secondary button (Button.module.css). */
 .keep {
   composes: small from "./Button.module.css";
+  font-family: var(--font-ui);
   letter-spacing: 0;
   text-transform: none;
 }

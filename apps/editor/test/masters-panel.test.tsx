@@ -63,17 +63,13 @@ describe("a font with one drawing of itself", () => {
   it("lists the one it has, and says it is the one being drawn", () => {
     openPanel();
 
-    expect(screen.getByRole("button", { name: "drawing" })).toBeTruthy();
-    // Nothing to go to, and nothing to compare against.
+    expect(screen.getByText("drawing")).toBeTruthy();
+    // Nothing to go to, nothing to compare against and nothing to remove: no
+    // buttons that could not be pressed.
     expect(screen.queryByRole("button", { name: "Draw" })).toBeNull();
-  });
-
-  it("will not let it be removed", () => {
-    openPanel();
-    const drop = screen.getByLabelText("Remove the master Regular");
-
-    expect((drop as HTMLButtonElement).disabled).toBe(true);
-    expect(drop.title).toMatch(/at least one master/);
+    expect(screen.queryByRole("button", { name: "drawing" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Check" })).toBeNull();
+    expect(screen.queryByLabelText("Remove the master Regular")).toBeNull();
   });
 });
 

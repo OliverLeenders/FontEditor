@@ -126,6 +126,12 @@
   border-color: var(--rule);
 }
 
+/* What a font's only master says of itself, where its buttons would be. */
+.only {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+
 /* The one control in this panel that pressing again does not undo. */
 .drop {
   display: grid;
