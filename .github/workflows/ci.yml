@@ -296,6 +296,7 @@ jobs:
           python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes" w
           python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes" x
           python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes" y
+          python tools/otf-check/check_vf_strokes.py "$RUNNER_TEMP/strokes" r
 
       - name: Read its GPOS with fontTools
         run: python tools/otf-check/check_otf.py "$RUNNER_TEMP/otf/TunniMarks-SemiboldItalic.otf"

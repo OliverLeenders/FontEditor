@@ -1779,13 +1779,26 @@ swept along the path: ninety of a hundred and two are drawn this way and none of
 point out; the other twelve are drawn as they were. In a variable font a broad edge that
 turns varies now (glyphs x and y for fontTools).
 
+And a drop at the end of a bar, shorter than the pen is thick, varies. The bar is not on its
+way to the line the drop is cut on and is not cut by it, and the drop's own side, on the side
+the pen leans to, is past that line from end to end: there was nothing to stop at the cut,
+no plan, and the default master's ink at every weight. Such a stroke is drawn as the two
+things it is. The bar whole, to the point the drop begins at, the pen standing there as it
+stands at any end. And the drop as what lies between its two sides, from the pen at that
+point to the cut — a side that is all past the line is no part of that, and what is kept
+then begins on the line across the pen from one side's beginning to the other's. The two
+overlap in the pen at the point between them, which a variable font fills as one. Only
+where the one line cannot be made, and only where the part begins at a point of the path;
+an arch, a bar, a stem with a short foot and a hairpin, with five pens, fill as the canvas
+does (`stroke-planned-drop.test.ts`, and glyph r for fontTools).
+
 #### Open
 
 What is next in the same direction:
 
-- **A drop shorter than the pen is thick at the end of a bar, in a variable font**: the bar's
-  own ink is past the foot's line all the way along, there is nothing to stop a side at, and
-  the default master's ink is written at every weight. A drawing to be drawn otherwise.
+- **A cut part that begins part way along a segment and cannot be stopped at its cut**, in a
+  variable font: where the path turns to come to the line in the middle of a curve. The
+  default master's ink, as before.
 
 - **A pen of corners pivoting through a point of the path with both ends going outward**,
   or pivoting where an open path ends: the line would have to go back from one stretch of

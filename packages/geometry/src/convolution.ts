@@ -223,64 +223,139 @@ export function plannedStrokes(
   // and the sides between are no more than the point it stopped at — with
   // nothing of the pen's edge at the joins between them. How far back, each
   // side, is the same in every master or there is no one plan.
+  //
+  // And where no side before it may be stopped either — a bar, and a drop at
+  // the end of it shorter than the pen is thick: the bar is not on its way to
+  // the foot's line, and is not cut by it — the stroke is drawn as the two
+  // things it is. The bar whole, to the point the drop begins at, with the pen
+  // standing there as it stands at any end. And the drop as what lies between
+  // its two sides, from the pen at that point to the cut: a side that is past
+  // the line all its length is no part of that, and what is kept then begins
+  // on the line across the pen from one side's beginning to the other's. The
+  // two overlap, in the pen at the point between them, and are filled as one.
   const closures = masters.map(() => new Map<string, PlannedPiece[]>());
-  const reached: string[] = [];
-  for (const [at, m] of masters.entries()) {
-    let how = "";
-    for (const end of ["end", "start"] as const) {
-      const cut = cutAt(m, end);
-      if (cut === undefined) continue;
-      const index = end === "end" ? count - 1 : 0;
-      // Out along the right to the far end and back along the left: so the far
-      // end is come to forwards, and the near end backwards. And the legs each
-      // way from there, back along the path.
-      const legsBack = (forward: boolean): Leg[] =>
-        Array.from({ length: count }, (_, i) => ({
-          index: end === "end" ? count - 1 - i : i,
-          forward,
-        }));
-      const arrivingLegs = legsBack(end === "end");
-      const leavingLegs = legsBack(end !== "end");
-      const most = Math.min(Math.max(0, cut.legs ?? 0), count - 1);
-      const stopper =
-        (legs: readonly Leg[], stop: typeof stoppedAt) =>
-        (by: PlannedCut): Stopped | null => {
-          for (let back = 0; back <= most; back++) {
-            const stopped = stop(sides[at]!.get(key(legs[back]!))!, by);
-            if (stopped !== null) return { ...stopped, back };
-          }
-          return null;
+  type Made = NonNullable<ReturnType<typeof cutTurn>>;
+  const legsOf = (end: "start" | "end", forward: boolean): Leg[] =>
+    // Out along the right to the far end and back along the left: so the far
+    // end is come to forwards, and the near end backwards. And the legs each
+    // way from there, back along the path.
+    Array.from({ length: count }, (_, i) => ({
+      index: end === "end" ? count - 1 - i : i,
+      forward,
+    }));
+  /** One master's end cut: as one line with the rest, or apart from the point `apart` legs back. */
+  const cutOf = (at: number, end: "start" | "end", apart: number | null): Made | null => {
+    const cut = cutAt(masters[at]!, end)!;
+    const index = end === "end" ? count - 1 : 0;
+    const arrivingLegs = legsOf(end, end === "end");
+    const leavingLegs = legsOf(end, end !== "end");
+    const most = apart ?? Math.min(Math.max(0, cut.legs ?? 0), count - 1);
+    const sideOf = (leg: Leg): PlannedPiece[] => sides[at]!.get(key(leg))!;
+    // Across the pen where the part begins: from where the side that arrives
+    // at the cut sets out to where the side that leaves it comes back.
+    const sets = sideOf(arrivingLegs[most]!)[0]!.curve.a;
+    const back = sideOf(leavingLegs[most]!);
+    const comes = back[back.length - 1]!.curve.b;
+    const across = (by: PlannedCut, here: Vec2, there: Vec2): Vec2 => {
+      const a = pastCut(by, here);
+      const b = pastCut(by, there);
+      const u = a <= 0 || b >= 0 ? 0 : a / (a - b);
+      return { x: here.x + (there.x - here.x) * u, y: here.y + (there.y - here.y) * u };
+    };
+    const stopper =
+      (legs: readonly Leg[], stop: typeof stoppedAt, here: Vec2, there: Vec2) =>
+      (by: PlannedCut): Stopped | null => {
+        for (let k = 0; k <= most; k++) {
+          const stopped = stop(sideOf(legs[k]!), by);
+          if (stopped !== null) return { ...stopped, back: k };
+        }
+        if (apart === null) return null;
+        // Past the line all its length: what is kept begins across the pen.
+        const on = across(by, here, there);
+        return {
+          pieces: [...sideOf(legs[most]!).map((p) => pointPiece(on, p.line)), pointPiece(on, true)],
+          at: on,
+          back: most,
         };
-      const pen = profiles[at]![index]!.at(end === "end" ? 1 : 0);
-      const made = cutTurn(
-        stopper(arrivingLegs, stoppedAt),
-        stopper(leavingLegs, startedAt),
-        // Half a rectangle laid along a cut is the cut.
-        box || sized ? { ...cut, nibbed: false } : cut,
-        pen,
-        cornered,
-      );
-      if (made === null) return null;
-      how += `${end}:${String(made.arriving.back)}/${String(made.leaving.back)} `;
-
-      sides[at]!.set(key(arrivingLegs[made.arriving.back]!), made.arriving.pieces);
-      for (let i = 0; i < made.arriving.back; i++) {
-        sides[at]!.set(key(arrivingLegs[i]!), [pointPiece(made.arriving.at, true)]);
+      };
+    return cutTurn(
+      stopper(arrivingLegs, stoppedAt, sets, comes),
+      stopper(leavingLegs, startedAt, comes, sets),
+      // Half a rectangle laid along a cut is the cut.
+      box || sized ? { ...cut, nibbed: false } : cut,
+      profiles[at]![index]!.at(end === "end" ? 1 : 0),
+      cornered,
+    );
+  };
+  const reached: string[] = masters.map(() => "");
+  /** How many legs back from each end its cut is drawn apart from, where it is. */
+  const parted: { start: number | null; end: number | null } = { start: null, end: null };
+  for (const end of ["end", "start"] as const) {
+    if (cutAt(first, end) === undefined) continue;
+    let made = masters.map((_, at) => cutOf(at, end, null));
+    if (made.some((m) => m === null)) {
+      // The point the part begins at: a point of the path, and the same one in
+      // every master, with something of the path either side of it.
+      const begins = masters.map((m) => cutAt(m, end)!.from);
+      const node = begins[0];
+      if (node === undefined || first.closed || !(node > 0) || !(node < count)) return null;
+      if (Math.abs(node - Math.round(node)) > 1e-9) return null;
+      if (begins.some((b) => b === undefined || Math.abs(b - node) > 1e-9)) return null;
+      const legs = end === "end" ? count - Math.round(node) : Math.round(node);
+      parted[end] = legs - 1;
+      made = masters.map((_, at) => cutOf(at, end, legs - 1));
+      if (made.some((m) => m === null)) return null;
+    }
+    const arrivingLegs = legsOf(end, end === "end");
+    const leavingLegs = legsOf(end, end !== "end");
+    for (const [at, m] of made.entries()) {
+      const { arriving, leaving, closure } = m!;
+      reached[at] = `${reached[at] ?? ""}${end}:${String(arriving.back)}/${String(leaving.back)} `;
+      sides[at]!.set(key(arrivingLegs[arriving.back]!), arriving.pieces);
+      for (let i = 0; i < arriving.back; i++) {
+        sides[at]!.set(key(arrivingLegs[i]!), [pointPiece(arriving.at, true)]);
         closures[at]!.set(`${key(arrivingLegs[i + 1]!)}>${key(arrivingLegs[i]!)}`, []);
       }
-      sides[at]!.set(key(leavingLegs[made.leaving.back]!), made.leaving.pieces);
-      for (let i = 0; i < made.leaving.back; i++) {
-        sides[at]!.set(key(leavingLegs[i]!), [pointPiece(made.leaving.at, true)]);
+      sides[at]!.set(key(leavingLegs[leaving.back]!), leaving.pieces);
+      for (let i = 0; i < leaving.back; i++) {
+        sides[at]!.set(key(leavingLegs[i]!), [pointPiece(leaving.at, true)]);
         closures[at]!.set(`${key(leavingLegs[i]!)}>${key(leavingLegs[i + 1]!)}`, []);
       }
-      closures[at]!.set(`${key(arrivingLegs[0]!)}>${key(leavingLegs[0]!)}`, made.closure);
+      closures[at]!.set(`${key(arrivingLegs[0]!)}>${key(leavingLegs[0]!)}`, closure);
+      const apart = parted[end];
+      if (apart !== null) {
+        // And across the pen, from where the one side came back to where the
+        // other sets out, in place of the pen's edge round that end.
+        const came = sides[at]!.get(key(leavingLegs[apart]!))!;
+        const sets = sides[at]!.get(key(arrivingLegs[apart]!))!;
+        closures[at]!.set(`${key(leavingLegs[apart]!)}>${key(arrivingLegs[apart]!)}`, [
+          { curve: lineAsCubic(came[came.length - 1]!.curve.b, sets[0]!.curve.a), line: true },
+        ]);
+      }
     }
-    reached.push(how);
   }
   if (reached.some((how) => how !== reached[0])) return null;
 
+  // Once round each thing that is drawn: the stroke, and a part of it cut
+  // apart at either end.
+  const rounds: Leg[][] = [];
+  if (parted.start === null && parted.end === null) {
+    rounds.push(...cycles);
+  } else {
+    const lo = parted.start === null ? 0 : parted.start + 1;
+    const hi = parted.end === null ? count : count - 1 - parted.end;
+    if (lo >= hi) return null;
+    const round = (a: number, b: number): Leg[] => {
+      const out_ = there.slice(a, b);
+      return [...out_, ...[...out_].reverse().map((leg) => ({ ...leg, forward: false }))];
+    };
+    rounds.push(round(lo, hi));
+    if (parted.start !== null) rounds.push(round(0, lo));
+    if (parted.end !== null) rounds.push(round(hi, count));
+  }
+
   const out: PlannedPiece[][][] = masters.map(() => []);
-  for (const cycle of cycles) {
+  for (const cycle of rounds) {
     const loops: PlannedPiece[][] = masters.map(() => []);
     for (const [k, leg] of cycle.entries()) {
       const next = cycle[(k + 1) % cycle.length]!;
@@ -320,6 +395,8 @@ export function plannedStrokes(
   // past the line in any.
   if (!broad) {
     for (const end of ["start", "end"] as const) {
+      // Drawn apart, the stroke before it ends with the pen standing there.
+      if (parted[end] !== null) continue;
       const stood = masters.map((m, at) => {
         const cut = cutAt(m, end);
         if (cut?.from === undefined || !(cut.from > 0) || !(cut.from < count)) return null;

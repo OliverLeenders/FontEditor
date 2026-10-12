@@ -290,12 +290,11 @@ describe("a serif on a last stroke shorter than it is high", () => {
         const stroke = hook(drop, serif);
         const joined = inkOf(stroke, ids);
         expect(differences(joined, inkRegions(stroke))).toEqual([]);
-        // A drop a few units long, cut, has no plan with or without a serif:
-        // that is the cut's, and a variable font writes the default master's
-        // ink for it. Where there is a plan it is the same ink.
+        // And to one plan, a drop of a few units too: its side is past the
+        // cut's line all its length, and it is drawn apart from the bar.
         const planned = plannedInk([stroke, stroke], ids);
-        expect(planned === null).toBe(drop === 12);
-        if (planned !== null) expect(differences(planned[0]!, joined)).toEqual([]);
+        expect(planned).not.toBeNull();
+        expect(differences(planned![0]!, joined)).toEqual([]);
       }
     }
   });

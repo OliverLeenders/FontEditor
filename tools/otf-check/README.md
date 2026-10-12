@@ -144,6 +144,7 @@ python check_vf_strokes.py /tmp/strokes v
 python check_vf_strokes.py /tmp/strokes w
 python check_vf_strokes.py /tmp/strokes x
 python check_vf_strokes.py /tmp/strokes y
+python check_vf_strokes.py /tmp/strokes r
 ```
 
 ## The TrueType flavour
