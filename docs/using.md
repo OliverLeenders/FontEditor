@@ -549,7 +549,9 @@ Angle and Width, Thick and Square. Like the others squareness is
 set at points and blends along a segment with the pen's shape, so a stroke can go from round to
 square. At a hundred, the same all along the stroke, the ink is exact: straight edges where
 the path is straight, to the unit, and no more points than the shape has corners — a stem is
-four. A broad edge has no corners and no squareness. Every point tool works on the path as it does on any contour — drag its points and
+four. A rectangle that is another size at each point, held at one angle, has true corners and
+straight edges too, and a stem that tapers is straight-sided; one that turns along the stroke
+is fitted, like a pen short of a hundred. A broad edge has no corners and no squareness. Every point tool works on the path as it does on any contour — drag its points and
 handles, hold its joins, cut an open one in two with the knife and both halves keep the pen.
 Choose **Outline** to make it an ordinary contour again; the path stays where it is. To keep the ink
 instead, right-click the stroke and choose **Convert stroke to outlines**: it is replaced by the
@@ -682,8 +684,10 @@ ink goes in differently there: as one line round it that crosses itself where th
 corner or folds inside a tight bend, which a variable font may hold and fills as the ink — the
 joined outline a single font gets has different points in every master, and a variable font
 needs the same ones. Two things have no such line and are written as the default master draws
-them at every weight, with a warning that says which glyphs: a broad edge whose angle or width
+them at every weight, with a warning that says which glyphs: a broad edge whose angle
 changes along the stroke, and a pen that is a broad edge in one master and an oval in another.
+A broad edge that only widens or narrows along the stroke, held at one angle, varies like any
+other.
 So is a stroke whose masters have not the same points, one with a **Step** in its blend, or
 an end that is cut in one master and not in another, or closed differently. An end cut the same
 way in every master varies with the rest of the stroke, and so does a pen's squareness: an oval
@@ -693,7 +697,8 @@ numbers of its own in each master, so one that is slight in the light and heavy 
 a foot that grows along the axis. The style's name is the family's, and follows from master to
 master as a glyph's does. A stroke
 drawn with corners in any master comes to more points than an oval's — unless it is a rectangle
-in every master, the same one all along the stroke, which is exact and comes to fewer.
+in every master, held at one angle all along the stroke, which comes to fewer: exact where it
+is the same one all along, and with true corners where it changes its size.
 
 **Holding a join smooth.** **Harmonise**, in the Curve section and on the menu, moves a point
 to where the curvature either side of it agrees — once. The next drag of a handle beside it

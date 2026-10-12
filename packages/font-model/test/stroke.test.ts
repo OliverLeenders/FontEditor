@@ -1117,10 +1117,13 @@ describe("a stroke turned into outlines", () => {
     // give up on these two — a hair-thin band where the path leaves along the
     // nib, and loops that met along the nib's line at a pinch — and the pieces
     // went into the letter as they were, lines across the stroke and all.
+    // A nib that only widens along the stroke is one line round its ink, which
+    // crosses itself: one region already, and joined it is not that line.
     for (const c of [stem(), arch()]) {
-      const regions = inkRegions(c).length;
+      const regions = inkRegions(c);
       const ink = inkOf(c, ids);
-      expect(ink.length).toBeLessThan(regions);
+      expect(ink.length).toBeLessThanOrEqual(Math.max(1, regions.length - 1));
+      expect(ink.some((outline) => regions.includes(outline))).toBe(false);
       expect(ink.length).toBeLessThanOrEqual(2);
     }
   });

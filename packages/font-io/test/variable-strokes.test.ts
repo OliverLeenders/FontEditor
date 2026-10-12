@@ -159,9 +159,51 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
     ),
     { angle: 30, width: pen, thickness },
   );
+  // A stroke round a bend and a corner with a rectangle that is another size
+  // at each point, held at one angle: its corners draw the edge still, each
+  // going its own way, and its foot is cut level.
+  const box = (width: number, deep: number) =>
+    thickness > 0
+      ? { angle: 15, width, thickness: deep, squareness: 1 }
+      : { angle: 15, width, thickness: 0 };
+  const tapered = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(140, 600), { out: at(300, 640), pen: box(pen, thickness * 2) }),
+        node(ids.node(), at(440, 460), { in: at(440, 580), pen: box(pen * 0.5, thickness) }),
+        node(ids.node(), at(180, 300), { pen: box(pen * 1.2, thickness * 1.5) }),
+        node(ids.node(), at(320, 0), { pen: box(pen * 0.7, thickness * 3), end: { cut: 0 } }),
+      ],
+      false,
+    ),
+    box(pen, thickness * 2),
+  );
+  // And an S with a broad edge that widens and narrows along it, held at one
+  // angle: its two ends, each going its own way.
+  const edge = (width: number) => ({ angle: 30, width, thickness: 0 });
+  const swelling = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(100, 100), { out: at(300, 100), pen: edge(pen * 0.4) }),
+        node(ids.node(), at(300, 350), {
+          type: "smooth",
+          in: at(400, 250),
+          out: at(200, 450),
+          pen: edge(pen * 1.3),
+        }),
+        node(ids.node(), at(500, 600), { in: at(300, 600), pen: edge(pen * 0.6) }),
+      ],
+      false,
+    ),
+    edge(pen),
+  );
   return fontDocument(
     [
       glyph(".notdef", { advance: 500 }),
+      glyph("v", { advance: 600, unicodes: [0x76], contours: [tapered] }),
+      glyph("w", { advance: 600, unicodes: [0x77], contours: [swelling] }),
       glyph("l", { advance: 600, unicodes: [0x6c], contours: [stem] }),
       glyph("t", { advance: 600, unicodes: [0x74], contours: [boxed] }),
       glyph("z", { advance: 600, unicodes: [0x7a], contours: [slab] }),

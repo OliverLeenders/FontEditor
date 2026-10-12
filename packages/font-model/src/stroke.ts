@@ -84,7 +84,8 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
 
   // A rectangular pen's ink is exact, and is one line round it: joined, that
   // line is the outline, its sides the path itself moved over by a corner of
-  // the pen and its ends the pen's own straight edges.
+  // the pen and its ends the pen's own straight edges. So with a broad edge
+  // that widens along the stroke.
   const exact = boxLine(c);
   if (exact !== null) {
     const outline = removeOverlap(glyph("", { contours: [...exact] }), ids);
@@ -420,6 +421,11 @@ export function inkRegions(c: Contour): readonly Contour[] {
  * variable font gets (see `plannedInk`), drawn here for the one master there
  * is; it crosses itself inside a corner of the path, and is joined into an
  * outline by whoever wants one.
+ *
+ * And of a broad edge that widens or narrows along the stroke, held at one
+ * angle: a pen of two corners, whose ink is their two paths and the edge itself
+ * across where the path runs along it. One that stays as it is has its own
+ * exact answer, and is left to it.
  */
 function boxLine(c: Contour): readonly Contour[] | null {
   if (c.nib === undefined || c.nodes.length < 2) return null;
@@ -430,14 +436,19 @@ function boxLine(c: Contour): readonly Contour[] | null {
   const box =
     first.thickness >= OVAL_FROM &&
     first.width > 0 &&
+    // Whatever size it is at each point: held at one angle, its corners draw
+    // the edge of its ink still. Turning, it is fitted like any pen with corners.
     pens.every(
       (pen) =>
         (pen.squareness ?? 0) >= 1 &&
         pen.angle === first.angle &&
-        pen.width === first.width &&
-        pen.thickness === first.thickness,
+        pen.width > 0 &&
+        pen.thickness >= OVAL_FROM,
     );
-  const line = box ? (plannedInk([c], regionIds)?.[0] ?? null) : null;
+  const edge =
+    pens.every((pen) => pen.thickness < OVAL_FROM && pen.angle === first.angle && pen.width > 0) &&
+    pens.some((pen) => pen.width !== first.width);
+  const line = box || edge ? (plannedInk([c], regionIds)?.[0] ?? null) : null;
   boxLines.set(c, line);
   return line;
 }

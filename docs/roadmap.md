@@ -1712,6 +1712,23 @@ a serif in one master and none in the other, or one of another style, and in whi
 with the open master's to be given to the other. Asked of the contours that are a stroke in
 both, by their place in the glyph.
 
+A pen of corners that changes its size along a stroke — a rectangle another size at each
+point, a broad edge that widens — is drawn by its corners now, where it is held at one
+angle. Each corner goes its own way, the path's and its own as the pen grows or shrinks, and
+draws the side where the whole pen is to the left of the way it is going; an edge of the pen
+keeps its direction, so it is the edge of the ink whole at the instant its corners stop
+going across it, a straight line from one to the next. A pen that has been growing ends with
+three of its edges showing and one that has been shrinking with one. A corner's path is the
+path moved over by something that changes with the distance gone, which is no cubic: it is
+drawn to a tenth of a unit with as many curves in every master, and with one straight line
+along a straight stretch. Asked against the pen itself swept along the path
+(`stroke-box-changing.test.ts`), and of fontTools at three weights (glyphs v and w).
+
+It put right something that was not being looked for. A broad edge that widened along a
+stroke was drawn, in a single font and on the canvas, with ink missing where the path runs
+along the nib — a patch some twenty units across at a width of a hundred and eighty. It is
+drawn by the same line now.
+
 #### Open
 
 What is next in the same direction:
@@ -1720,10 +1737,11 @@ What is next in the same direction:
   own ink is past the foot's line all the way along, there is nothing to stop a side at, and
   the default master's ink is written at every weight. A drawing to be drawn otherwise.
 
-- **A rectangle that turns or changes size along a stroke**, exact as the constant one is:
-  it is fitted now, a hundredth short at its corners.
-- **A broad edge that turns or widens along a stroke, in a variable font**, which is still
-  written as the default master draws it.
+- **A rectangle that turns along a stroke**, with true corners as one held at an angle has:
+  it is fitted, a hundredth short at its corners. A pen that turns has edges that turn, and
+  the edge of its ink between two corners is then a curve and not the pen's edge.
+- **A broad edge that turns along a stroke, in a variable font**, which is still written as
+  the default master draws it, for the same reason.
 - **Fitting to the fixed width in every layer**, where it now fits the main drawing.
 
 #### Parked
