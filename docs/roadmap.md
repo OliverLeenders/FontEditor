@@ -1729,6 +1729,16 @@ stroke was drawn, in a single font and on the canvas, with ink missing where the
 along the nib — a patch some twenty units across at a width of a hundred and eighty. It is
 drawn by the same line now.
 
+And a cut a few units past a corner, in a variable font. A cut is made of the last of the
+stroke and the stroke before that is whole: it ends with the pen standing at the corner, and
+where the corner is nearer the cut than the pen is wide the pen reaches past the cut's line —
+ink, on the canvas and in a single font, the stroke's before the corner. The line a variable
+font gets had it only as the pen's edge followed round the inside of the corner, which with
+the sides either side of it stopped at the cut goes round nothing: a patch some twenty-five
+units across was missing under a hairpin drawn with a pen of a hundred and forty. The pen is
+laid at that place now, whole, a loop of its own — in every master where it reaches past the
+line in any, and in none where it does not (`stroke-planned-standing.test.ts`).
+
 #### Open
 
 What is next in the same direction:

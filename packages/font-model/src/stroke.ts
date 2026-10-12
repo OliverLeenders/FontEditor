@@ -171,9 +171,36 @@ export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour
       const end = endSerifs?.[at]?.cut ?? strokeCut(c, "end");
       // And how far back along the path each may be made: as far as a single
       // font's is.
+      // And where the part of the stroke each is made of begins, the rest
+      // being whole with the pen standing there — nowhere, where the two reach
+      // into each other and the stroke is one stretch, as `stretchesOf` has it.
+      const along = (p: Along): number => p.index + p.t;
+      const endsFrom = end === null ? null : approach(curves, end.normal);
+      const startsTo =
+        start === null
+          ? null
+          : mirrored(approach(turnedRound(curves), start.normal), curves.length);
+      const apart =
+        endsFrom === null || startsTo === null || along(startsTo) < along(endsFrom) - 1e-9;
       const cuts = {
-        ...(start === null ? {} : { start: { ...start, legs: cutLegs(curves, start, "start") } }),
-        ...(end === null ? {} : { end: { ...end, legs: cutLegs(curves, end, "end") } }),
+        ...(start === null
+          ? {}
+          : {
+              start: {
+                ...start,
+                legs: cutLegs(curves, start, "start"),
+                ...(apart && startsTo !== null ? { from: along(startsTo) } : {}),
+              },
+            }),
+        ...(end === null
+          ? {}
+          : {
+              end: {
+                ...end,
+                legs: cutLegs(curves, end, "end"),
+                ...(apart && endsFrom !== null ? { from: along(endsFrom) } : {}),
+              },
+            }),
       };
       return {
         curves,

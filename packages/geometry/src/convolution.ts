@@ -83,6 +83,13 @@ export type PlannedCut = {
    * where a side before it crosses. None, where it is not said.
    */
   readonly legs?: number;
+  /**
+   * Where along the path the part of the stroke this cut is made of begins, as
+   * a segment's number and how far along it: the rest of the stroke is whole,
+   * and has the pen standing at that place. Not said where the cut is made of
+   * the whole stroke.
+   */
+  readonly from?: number;
 };
 
 /** A piece of the line round the ink, and whether it is a straight one. */
@@ -281,7 +288,91 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
     }
     for (const [at, loop] of loops.entries()) out[at]!.push(loop);
   }
+
+  // The pen standing where the part of the stroke a cut is made of begins.
+  //
+  // The stroke before that place is whole, and ends with the pen standing
+  // there: at a corner a few units short of the cut, the pen reaches past the
+  // cut's line, and that much of it is ink — the stroke's before the corner,
+  // which nothing cut. The line round the stroke has it only as the pen's edge
+  // followed round the inside of the corner, and with the sides either side
+  // of that stopped at the cut it goes round nothing. So the pen is laid there
+  // whole, a loop of its own over the rest, in every master where it reaches
+  // past the line in any.
+  if (!broad) {
+    for (const end of ["start", "end"] as const) {
+      const stood = masters.map((m, at) => {
+        const cut = cutAt(m, end);
+        if (cut?.from === undefined || !(cut.from > 0) || !(cut.from < count)) return null;
+        const index = Math.min(count - 1, Math.floor(cut.from));
+        const t = cut.from - index;
+        const pen = profiles[at]![index]!.at(t);
+        const centre = evaluate(m.curves[index]!, t);
+        const reach_ = penSupport(pen, cut.normal);
+        const past = pastCut(cut, centre) + reach_.x * cut.normal.x + reach_.y * cut.normal.y;
+        return { pen, centre, past };
+      });
+      if (stood.some((s) => s === null) || !stood.some((s) => s!.past > 0.01)) continue;
+      for (const [at, s] of stood.entries()) {
+        out[at]!.push(
+          penLoop(s!.pen, s!.centre, box || sized ? "box" : cornered ? "cornered" : "oval"),
+        );
+      }
+    }
+  }
   return out;
+}
+
+/**
+ * A pen's own outline, standing at a place, as a loop the way round that ink
+ * goes: four straight edges for a rectangle, four quarters for an oval, and
+ * for a pen with corners eight curves, a flat and the turn at the end of it
+ * each.
+ */
+function penLoop(pen: PenShape, centre: Vec2, kind: "box" | "cornered" | "oval"): PlannedPiece[] {
+  if (kind === "box") {
+    const corners = boxCorners(pen).map((c) => ({ x: centre.x + c.x, y: centre.y + c.y }));
+    return corners.map((c, k) => ({
+      curve: lineAsCubic(c, corners[(k + 1) % corners.length]!),
+      line: true,
+    }));
+  }
+  const angle = (pen.angle * Math.PI) / 180;
+  const half = { x: (Math.cos(angle) * pen.width) / 2, y: (Math.sin(angle) * pen.width) / 2 };
+  const out = {
+    x: (-Math.sin(angle) * pen.thickness) / 2,
+    y: (Math.cos(angle) * pen.thickness) / 2,
+  };
+  const to = (h: number, o: number): Vec2 => ({
+    x: centre.x + half.x * h + out.x * o,
+    y: centre.y + half.y * h + out.y * o,
+  });
+  if (kind === "cornered") {
+    const back = { x: -half.x, y: -half.y };
+    const under = { x: -out.x, y: -out.y };
+    return [
+      ...halfOutline(pen, to(1, 0), to(-1, 0), centre, half, out),
+      ...halfOutline(pen, to(-1, 0), to(1, 0), centre, back, under),
+    ];
+  }
+  const stops = [
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [0, -1],
+  ] as const;
+  return stops.map(([h, o], k) => {
+    const [h1, o1] = stops[(k + 1) % 4]!;
+    return {
+      curve: cubic(
+        to(h, o),
+        to(h + (h1 - h) * (h === 0 ? QUARTER : 0), o + (o1 - o) * (o === 0 ? QUARTER : 0)),
+        to(h1 + (h - h1) * (h1 === 0 ? QUARTER : 0), o1 + (o - o1) * (o1 === 0 ? QUARTER : 0)),
+        to(h1, o1),
+      ),
+      line: false,
+    };
+  });
 }
 
 const key = (leg: Leg): string => `${String(leg.index)}${leg.forward ? "+" : "-"}`;
