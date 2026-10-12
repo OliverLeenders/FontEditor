@@ -1699,12 +1699,34 @@ more. Two causes, neither of them new:
   it gives back is asked whether it is the parts' ink (`isTheInkOf`), and the polygon join
   takes its place where that one is and this one is not.
 
-What is left reads between three and five tenths of a unit nearly everywhere, which is the
-fit's quarter and the looking's tenth. Above that, and small: pinholes of about a unit in the
-joined outline of a very thin oval round a corner or a hairpin, which neither the canvas nor
-the swept ink has; two units of ink too many on two rows of that hairpin; a hook with
-retracted handles a unit and a half out under a serif; a slit along a serif on a bend tighter
-than its oval pen.
+What was left read between three and five tenths of a unit nearly everywhere, which is the
+fit's quarter and the looking's tenth, and above that in twenty-two places. Looked at one by
+one they were three things, and are put right:
+
+- **Spurs.** What had read as pinholes in a very thin oval's outline were not holes. Two
+  parts of the ink that meet along a line from the edge to the path's own point — the wedge
+  inside a corner and the band beside it — meet to within what a curve is flattened to, and
+  joined they left that line standing: the outline went in from its edge to the path's
+  point and back, by two lines a fiftieth of a unit apart. An outline is given back without
+  them (`withoutSpurs`).
+- **A fit that left the edges it was fitted to.** A fit is held to the points it is given,
+  and between two of them fifteen units apart a cubic went two units out and back: the tip
+  of a hairpin with a bulge on it, a dent a unit deep beside a serif. What is fitted is held
+  against the ring's edges now, and fitted again through points all along them where it
+  strays.
+- **A ring with no corner and a straight side.** The last stretch of a hook, round at both
+  ends and met smoothly: with no corner to take it apart at it was fitted round as a circle
+  is, and a cubic ran along its straight side a unit and a half out — under a serif, which
+  is where it showed. Such a ring is taken apart at the ends of its straight sides.
+
+One reading of the five hundred is above six tenths now, at seven. The standing check holds
+seven shapes with four pens and four ways of ending to under a unit, with nothing left out.
+
+Looking for these found a cost of the week's own: a pen of corners asked at two hundred and
+fifty-six places along each stretch which corner draws its side, and a broad edge that
+widens took three times as long to draw as it had — twelve milliseconds a stroke, at every
+move of a drag. Sixty-four places, the changes between them found as closely as before, and
+it is six.
 
 Ends whose serifs already differ between masters are told now. What changes is carried, and
 what had come apart before was not listed: the Masters panel's check says how many ends have

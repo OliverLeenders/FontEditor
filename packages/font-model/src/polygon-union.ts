@@ -1,4 +1,4 @@
-import { type Cubic, type Vec2, fitCubics, flatten } from "@typewright/geometry";
+import { type Cubic, type Vec2, evaluate, fitCubics, flatten } from "@typewright/geometry";
 import * as clipping from "polygon-clipping";
 
 import { type Contour, segmentAt, segmentCount, segmentCubic } from "./contour.js";
@@ -252,6 +252,21 @@ function contourOfRing(ring: clipping.Ring, ids: IdFactory): Contour | null {
   ) {
     corners.pop();
   }
+  // A ring with no corner may still have a straight side: the side of a stem
+  // between two round ends, met smoothly at both. It is a line all the same
+  // (see `STRAIGHT_SIDE`), and fitted round as a ring with no corner is, a
+  // cubic went along it a unit and a half out. Its two ends are where the
+  // ring is taken apart.
+  if (corners.length === 0) {
+    const ends = new Set<number>();
+    for (let i = 0; i < n; i++) {
+      if (distance(pts[i]!, pts[(i + 1) % n]!) >= STRAIGHT_SIDE) {
+        ends.add(i);
+        ends.add((i + 1) % n);
+      }
+    }
+    corners.push(...[...ends].sort((a, b) => a - b));
+  }
 
   const chain: CurvePiece[] = [];
   const run = (from: number, to: number): void => {
@@ -280,7 +295,7 @@ function contourOfRing(ring: clipping.Ring, ids: IdFactory): Contour | null {
       if (!round && (curved.length === 2 || straight(curved))) {
         chain.push({ curve: line(curved[0]!, curved[curved.length - 1]!), line: true });
       } else {
-        for (const curve of fitCubics(curved, FIT)) chain.push({ curve, line: false });
+        for (const curve of fitted(curved)) chain.push({ curve, line: false });
       }
     };
     for (let i = 1; i < points.length; i++) {
@@ -377,6 +392,66 @@ function line(a: Vec2, b: Vec2): Cubic {
     c2: { x: a.x + ((b.x - a.x) * 2) / 3, y: a.y + ((b.y - a.y) * 2) / 3 },
     b,
   };
+}
+
+/**
+ * Cubics through a run of a joined ring's points, and through its edges.
+ *
+ * A fit is held to the points it is given, and a joined ring has them where a
+ * curve was flattened and not along an edge that was straight: between two
+ * points fifteen units apart a cubic may go where it likes, and beside a turn
+ * too gentle to be taken for a corner it did — out past the edge by two units
+ * and back, the tip of a thin pen's hairpin drawn with a bulge on it. So what
+ * comes back is held against the edges themselves, and where it strays from
+ * them by more than the fit allows it is fitted again through points all along
+ * them. Only then: the points a curve was flattened to are the right ones to
+ * fit a curve through, and more of them, on the chords, is a worse curve.
+ */
+function fitted(points: readonly Vec2[]): Cubic[] {
+  const first = fitCubics(points, FIT);
+  const off = strays(first, points);
+  if (off <= 2 * FIT) return first;
+  const along: Vec2[] = [points[0]!];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1]!;
+    const b = points[i]!;
+    const steps = Math.ceil(distance(a, b) / EDGE_POINTS_APART);
+    for (let k = 1; k <= steps; k++) {
+      along.push(
+        k === steps
+          ? b
+          : { x: a.x + ((b.x - a.x) * k) / steps, y: a.y + ((b.y - a.y) * k) / steps },
+      );
+    }
+  }
+  const second = fitCubics(along, FIT);
+  return strays(second, points) < off ? second : first;
+}
+
+/** How far apart the points put along an edge are, where a fit is held to the edges, in units. */
+const EDGE_POINTS_APART = 2;
+
+/** The furthest any of some curves is from a line of points, at a few places along each. */
+function strays(curves: readonly Cubic[], points: readonly Vec2[]): number {
+  let worst = 0;
+  for (const curve of curves) {
+    for (let k = 1; k < 8; k++) {
+      const p = evaluate(curve, k / 8);
+      let nearest = Infinity;
+      for (let i = 1; i < points.length; i++) {
+        const a = points[i - 1]!;
+        const b = points[i]!;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const size = dx * dx + dy * dy;
+        const t =
+          size === 0 ? 0 : Math.min(1, Math.max(0, ((p.x - a.x) * dx + (p.y - a.y) * dy) / size));
+        nearest = Math.min(nearest, Math.hypot(p.x - a.x - dx * t, p.y - a.y - dy * t));
+      }
+      worst = Math.max(worst, nearest);
+    }
+  }
+  return worst;
 }
 
 const same = (p: Vec2, q: Vec2): boolean => p.x === q.x && p.y === q.y;

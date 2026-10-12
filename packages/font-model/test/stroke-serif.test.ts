@@ -284,7 +284,7 @@ describe("a serif on a last stroke shorter than it is high", () => {
     expect(inked(ink, long.maxX - 8, 386)).toBe(false);
   });
 
-  it("is the same ink joined, in regions and to one plan", () => {
+  it("is the same ink joined, in regions and to one plan", { timeout: 60_000 }, () => {
     for (const drop of [12, 40, 70]) {
       for (const serif of [FOOT, { ...FOOT, bracket: 0.7, cup: 6, round: 0.5 }, SLAB]) {
         const stroke = hook(drop, serif);
@@ -302,37 +302,43 @@ describe("a serif on a last stroke shorter than it is high", () => {
 });
 
 describe("a serif on the head of a stem", () => {
-  it("is as wide as the stem under a cut that slants, on the canvas as in the font", () => {
-    // The k whose head serif had a piece missing where it met the stem, on the
-    // canvas only: the stem's side was cut in the wrong place by the slanted
-    // line, and the serif took the stem for half as wide as it is.
-    const head: Serif = {
-      left: 60,
-      right: 287,
-      height: 30,
-      bracket: 0.16,
-      slope: 0.31,
-      cup: 5,
-      round: 1,
-    };
-    const stroke = withNib(
-      contour(
-        ids.contour(),
-        [
-          node(ids.node(), at(111.54800713159574, 750), { end: { cut: 17, serif: head } }),
-          node(ids.node(), at(111.54800713159574, 0), { end: { cut: "square" } }),
-        ],
-        false,
-      ),
-      { angle: 30, width: 120, thickness: 4, squareness: 0.54 },
-    );
-    const joined = inkOf(stroke, ids);
-    expect(joined).toHaveLength(1);
-    expect(differences(joined, inkRegions(stroke))).toEqual([]);
-    // Just right of the stem's middle and under the serif: ink, where the
-    // notch was.
-    expect(inked(inkRegions(stroke), 158, 712)).toBe(true);
-  });
+  it(
+    "is as wide as the stem under a cut that slants, on the canvas as in the font",
+    {
+      timeout: 60_000,
+    },
+    () => {
+      // The k whose head serif had a piece missing where it met the stem, on the
+      // canvas only: the stem's side was cut in the wrong place by the slanted
+      // line, and the serif took the stem for half as wide as it is.
+      const head: Serif = {
+        left: 60,
+        right: 287,
+        height: 30,
+        bracket: 0.16,
+        slope: 0.31,
+        cup: 5,
+        round: 1,
+      };
+      const stroke = withNib(
+        contour(
+          ids.contour(),
+          [
+            node(ids.node(), at(111.54800713159574, 750), { end: { cut: 17, serif: head } }),
+            node(ids.node(), at(111.54800713159574, 0), { end: { cut: "square" } }),
+          ],
+          false,
+        ),
+        { angle: 30, width: 120, thickness: 4, squareness: 0.54 },
+      );
+      const joined = inkOf(stroke, ids);
+      expect(joined).toHaveLength(1);
+      expect(differences(joined, inkRegions(stroke))).toEqual([]);
+      // Just right of the stem's middle and under the serif: ink, where the
+      // notch was.
+      expect(inked(inkRegions(stroke), 158, 712)).toBe(true);
+    },
+  );
 
   it("stands on the head's line and hangs down from it, left still on the left", () => {
     const ink = inkOf(stem(BOX, undefined, { cut: 0, serif: { ...SLAB, right: 0 } }), ids);

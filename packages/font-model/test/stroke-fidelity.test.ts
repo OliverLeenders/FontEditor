@@ -210,10 +210,10 @@ describe.skipIf(process.env["STROKE_DIAGNOSE"] === undefined)(
  * The same, of a few strokes with a few pens, at every run.
  *
  * Not everything: that is ten minutes. The shapes that have been wrong — a
- * corner between straight sides, a tight bend, a zigzag with its end cut — and
- * the pens a letter is drawn with. An edge two units from where the canvas has
- * it fails; the fitting is allowed its quarter of a unit and the looking its
- * tenth, and what is left of the two is well under one.
+ * corner between straight sides, a tight bend, a zigzag with its end cut, a
+ * hairpin, a hook whose last stretch has no corner in it — and the pens a
+ * letter is drawn with. An edge a unit from where the canvas has it fails; the
+ * fitting is allowed its quarter of a unit and the looking its tenth.
  */
 describe("the outline a font gets, against the canvas's ink", () => {
   const GATED = [
@@ -223,19 +223,19 @@ describe("the outline a font gets, against the canvas's ink", () => {
     "a zigzag with a broad nib",
     "a drawn hook with retracted handles",
     "a drawn J with a sharp corner",
+    "a round pen round a hairpin",
   ];
   const pens = PENS.filter(([name]) =>
     ["a broad nib", "an oval", "a thin oval", "a rectangle"].includes(name),
   );
   const ends = ENDS.filter(([name]) =>
-    ["as the pen leaves them", "its end cut level", "a serif on its end"].includes(name),
+    [
+      "as the pen leaves them",
+      "its end cut level",
+      "both ends cut square",
+      "a serif on its end",
+    ].includes(name),
   );
-  // A serif on the tight bend with the oval pen: the outline is inside the ink
-  // along a hair of it, which is a slit and not an edge out of place. Known,
-  // and listed in the roadmap; left out so that the rest is held.
-  const KNOWN = new Set([
-    "an oval pen round a bend tighter than itself|an oval|a serif on its end",
-  ]);
 
   it.each(STROKE_CASES.filter((c) => GATED.includes(c.name)))(
     "$name",
@@ -244,13 +244,38 @@ describe("the outline a font gets, against the canvas's ink", () => {
       for (const [pen, nib] of pens) {
         for (const [ending, start, end] of ends) {
           if (c.closed && (start !== undefined || end !== undefined)) continue;
-          if (KNOWN.has(`${c.name}|${pen}|${ending}`)) continue;
           const found = edgeError(strokeOf(c, nib, start, end));
           const where =
             found.at === null ? "" : ` at ${found.at.x.toFixed(0)},${found.at.y.toFixed(0)}`;
-          expect(found.off, `${pen}, ${ending}: ${String(found.way)}${where}`).toBeLessThan(2);
+          expect(found.off, `${pen}, ${ending}: ${String(found.way)}${where}`).toBeLessThan(1);
         }
       }
     },
   );
+});
+
+describe("the outline a font gets, as an outline", () => {
+  const thin: Nib = { angle: 20, width: 110, thickness: 4 };
+
+  it.each([
+    "an oval pen turning and swelling round a corner",
+    "a round pen round a small closed curve",
+  ])("has no spur into the stroke from its edge: %s", { timeout: 120_000 }, (name) => {
+    // Two parts of the ink met along a line from the edge to the path's own
+    // point, and joined they left the line standing: out to the point and
+    // back, by two lines a fiftieth of a unit apart.
+    const c = STROKE_CASES.find((each) => each.name === name)!;
+    for (const outline of inkOf(strokeOf(c, thin, undefined, undefined), ids)) {
+      const count = outline.nodes.length;
+      for (const [i, tip] of outline.nodes.entries()) {
+        const left = outline.nodes[(i - 1 + count) % count]!;
+        const back = outline.nodes[(i + 1) % count]!;
+        const mouth = Math.hypot(back.pt.x - left.pt.x, back.pt.y - left.pt.y);
+        const length = Math.hypot(tip.pt.x - left.pt.x, tip.pt.y - left.pt.y);
+        expect(mouth < 0.5 && length > 4, `at ${tip.pt.x.toFixed(0)},${tip.pt.y.toFixed(0)}`).toBe(
+          false,
+        );
+      }
+    }
+  });
 });

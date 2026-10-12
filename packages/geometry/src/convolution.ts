@@ -1155,8 +1155,14 @@ function nibEnds(pen: PenShape): Vec2[] {
   return [half, { x: -half.x, y: -half.y }];
 }
 
-/** How many places along a leg are asked which corner of the pen draws its side there. */
-const CORNER_STEPS = 256;
+/**
+ * How many places along a leg are asked which corner of the pen draws its side
+ * there. Where the answer changes between two of them the place is then found
+ * closely; this is only how near together two changes may be and both be seen.
+ * A stroke is drawn again at every move of a drag, and at four times as many
+ * places a broad edge that widens took three times as long as it had.
+ */
+const CORNER_STEPS = 64;
 
 /**
  * Both sides of every stretch for a pen of corners and straight edges — a

@@ -131,6 +131,7 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
     const other = unionByPolygons(regions, ids)?.filter((r) => thickness(r) >= SLIVER);
     if (other !== undefined && isTheInkOf(other, regions)) answer = other;
   }
+  answer = answer.map(withoutSpurs);
   markInk(answer);
   joinedInk.set(c, answer);
   return answer;
@@ -333,6 +334,51 @@ function isTheInkOf(outline: readonly Contour[], regions: readonly Contour[]): b
     }
   }
   return true;
+}
+
+/** How far apart the two ends of a spur's mouth may be, in units. */
+const SPUR_MOUTH = 0.5;
+
+/**
+ * An outline without its spurs: where it leaves its edge by a straight line,
+ * and comes back by another to all but the place it left.
+ *
+ * Two parts of a stroke's ink that meet along a line — the wedge that fills
+ * the inside of a corner and the band beside it, both with a side from the
+ * edge of the ink to the path's own point — meet to within what a curve is
+ * flattened to and no nearer, and joined they leave the line between them
+ * standing: a slit no wider than a fiftieth of a unit, from the edge into the
+ * middle of the stroke and back. Nothing a font shows, but two points and two
+ * lines lying on each other for whoever opens the outline, and a notch for a
+ * rasteriser that looks closely enough.
+ *
+ * Longer than its mouth is wide by a good deal, or it is a notch that was
+ * drawn; and the mouth closed at the point the outline left by.
+ */
+function withoutSpurs(c: Contour): Contour {
+  let nodes = c.nodes;
+  for (let again = true; again && nodes.length > 4;) {
+    again = false;
+    const count = nodes.length;
+    for (let i = 0; i < count; i++) {
+      const left = nodes[(i - 1 + count) % count]!;
+      const tip = nodes[i]!;
+      const back = nodes[(i + 1) % count]!;
+      if (tip.in !== null || tip.out !== null || left.out !== null || back.in !== null) continue;
+      const mouth = Math.hypot(back.pt.x - left.pt.x, back.pt.y - left.pt.y);
+      const length = Math.min(
+        Math.hypot(tip.pt.x - left.pt.x, tip.pt.y - left.pt.y),
+        Math.hypot(tip.pt.x - back.pt.x, tip.pt.y - back.pt.y),
+      );
+      if (mouth > SPUR_MOUTH || length < 8 * mouth || length < 2) continue;
+      const closed = { ...left, out: back.out, type: "corner" as const };
+      const gone = new Set([tip, back]);
+      nodes = nodes.map((n) => (n === left ? closed : n)).filter((n) => !gone.has(n));
+      again = true;
+      break;
+    }
+  }
+  return nodes === c.nodes ? c : { ...c, nodes };
 }
 
 /** Below this average thickness, in units, a region of ink is a sliver. */
