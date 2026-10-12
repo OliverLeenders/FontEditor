@@ -95,8 +95,19 @@ describe("the line round a stroke's ink, against the pen swept along it", () => 
     expect(most).toBeGreaterThanOrEqual(1);
   });
 
-  it("declines a broad edge that turns along the path, which pivots on itself", () => {
-    expect(plannedStrokes([master(named("a broad nib turning along a curve"))])).toBeNull();
+  it("follows a broad edge that turns along the path, which pivots on itself", () => {
+    // Its two ends' paths, and between them the path of the place it pivots on.
+    const c = named("a broad nib turning along a curve");
+    const planned = plannedStrokes([master(c)]);
+    expect(planned).not.toBeNull();
+    const d = disagreement(
+      planned![0]!.map((loop) => loop.map((piece) => piece.curve)),
+      sweep(c.curves, c.pens, c.closed, c.blends),
+      60,
+    );
+    expect(d.checked).toBeGreaterThan(500);
+    expect(d.missing).toEqual([]);
+    expect(d.extra).toEqual([]);
   });
 });
 

@@ -1739,6 +1739,24 @@ units across was missing under a hairpin drawn with a pen of a hundred and forty
 laid at that place now, whole, a loop of its own — in every master where it reaches past the
 line in any, and in none where it does not (`stroke-planned-standing.test.ts`).
 
+And a pen of corners that turns. An edge of a pen that turns pivots: its two corners go
+across it at different speeds, and between the instant one stops going outward and the
+instant the other begins the edge of the ink is neither corner's path but the place on the
+edge that is going along it and not across — the pivot — sliding from the one corner to the
+other. So a side is a corner's path, the pivot's, the next corner's (`turningSides`). Where
+the second corner begins before the first has stopped the pivot goes back in time between
+them and the line with it, round the ink both drew. A stretch may begin or end mid-pivot,
+its side then joined to the next along the pen's edge.
+
+How fast a pen turns is read off a table of chords and steps a little from chord to chord,
+which moved the pivot some units along its edge at each: along the line it draws, so
+nothing out of place, but nothing to fit a curve to. A corner's going is asked over a step
+as long as a chord. Every stroke the tests draw, with a rectangle and with a broad edge
+turned twelve, thirty-five and sixty degrees from point to point, against the pen itself
+swept along the path: ninety of a hundred and two are drawn this way and none of them is a
+point out; the other twelve are drawn as they were. In a variable font a broad edge that
+turns varies now (glyphs x and y for fontTools).
+
 #### Open
 
 What is next in the same direction:
@@ -1747,11 +1765,14 @@ What is next in the same direction:
   own ink is past the foot's line all the way along, there is nothing to stop a side at, and
   the default master's ink is written at every weight. A drawing to be drawn otherwise.
 
-- **A rectangle that turns along a stroke**, with true corners as one held at an angle has:
-  it is fitted, a hundredth short at its corners. A pen that turns has edges that turn, and
-  the edge of its ink between two corners is then a curve and not the pen's edge.
-- **A broad edge that turns along a stroke, in a variable font**, which is still written as
-  the default master draws it, for the same reason.
+- **A pen of corners pivoting through a point of the path with both ends going outward**,
+  or pivoting where an open path ends: the line would have to go back from one stretch of
+  the path into the one before. A rectangle is fitted there, as it was, and a broad edge is
+  written into a variable font as the default master draws it. Twelve of a hundred and two
+  in the sweep, all of them pens turned sixty degrees or so between two points.
+- **A turning pen whose masters' sides are not the same stretches**: a corner that draws a
+  side in one master and not in another. Where the difference is at one end of a stretch
+  the master without it has it with no length; anywhere else, the same fallback.
 - **Fitting to the fixed width in every layer**, where it now fits the main drawing.
 
 #### Parked

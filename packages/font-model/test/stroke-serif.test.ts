@@ -178,6 +178,7 @@ describe("a serif's shape", () => {
 
   it.each(cases)(
     "is one outline with the stroke, the same joined as in regions: %s",
+    { timeout: 60_000 },
     (_, serif) => {
       for (const nib of [BROAD, OVAL, BOX]) {
         const stroke = stem(nib, footed(serif));

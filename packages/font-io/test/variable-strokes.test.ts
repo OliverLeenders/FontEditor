@@ -199,9 +199,59 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
     ),
     edge(pen),
   );
+  // The same S with a broad edge that turns as it goes, and widens: between
+  // its two ends the edge of its ink is the place the nib pivots on.
+  const turning = (angle: number, width: number) => ({ angle, width, thickness: 0 });
+  const twisting = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(100, 100), { out: at(300, 100), pen: turning(15, pen * 0.8) }),
+        node(ids.node(), at(300, 350), {
+          type: "smooth",
+          in: at(400, 250),
+          out: at(200, 450),
+          pen: turning(40, pen * 1.2),
+        }),
+        node(ids.node(), at(500, 600), { in: at(300, 600), pen: turning(65, pen * 0.7) }),
+      ],
+      false,
+    ),
+    turning(15, pen),
+  );
+  // And the S with a rectangle that turns and changes size.
+  const turnedBox = (angle: number, width: number, deep: number) =>
+    thickness > 0
+      ? { angle, width, thickness: deep, squareness: 1 }
+      : { angle, width, thickness: 0 };
+  const wrung = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(100, 100), {
+          out: at(300, 100),
+          pen: turnedBox(15, pen * 0.8, thickness * 2),
+        }),
+        node(ids.node(), at(300, 350), {
+          type: "smooth",
+          in: at(400, 250),
+          out: at(200, 450),
+          pen: turnedBox(40, pen * 1.2, thickness * 1.5),
+        }),
+        node(ids.node(), at(500, 600), {
+          in: at(300, 600),
+          pen: turnedBox(65, pen * 0.7, thickness * 2.5),
+        }),
+      ],
+      false,
+    ),
+    turnedBox(15, pen * 0.8, thickness * 2),
+  );
   return fontDocument(
     [
       glyph(".notdef", { advance: 500 }),
+      glyph("x", { advance: 600, unicodes: [0x78], contours: [twisting] }),
+      glyph("y", { advance: 600, unicodes: [0x79], contours: [wrung] }),
       glyph("v", { advance: 600, unicodes: [0x76], contours: [tapered] }),
       glyph("w", { advance: 600, unicodes: [0x77], contours: [swelling] }),
       glyph("l", { advance: 600, unicodes: [0x6c], contours: [stem] }),

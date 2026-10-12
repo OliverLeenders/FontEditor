@@ -85,7 +85,7 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   // A rectangular pen's ink is exact, and is one line round it: joined, that
   // line is the outline, its sides the path itself moved over by a corner of
   // the pen and its ends the pen's own straight edges. So with a broad edge
-  // that widens along the stroke.
+  // that widens or turns along the stroke.
   const exact = boxLine(c);
   if (exact !== null) {
     const outline = removeOverlap(glyph("", { contours: [...exact] }), ids);
@@ -147,7 +147,11 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
  * that has the same points in every master, which the joined outline of
  * {@link inkOf} has not. See `plannedStrokes` for how, and for when not.
  */
-export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour[][] | null {
+export function plannedInk(
+  strokes: readonly Contour[],
+  ids: IdFactory,
+  byCornersOnly = false,
+): Contour[][] | null {
   if (strokes.some((c) => c.nib === undefined || c.nodes.length < 2)) return null;
   // The serifs, which are outlines of their own laid over the ends: each end
   // has one in every master or in none.
@@ -210,6 +214,7 @@ export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour
         cuts,
       };
     }),
+    byCornersOnly,
   );
   if (planned === null) return null;
   const laid = [startSerifs, endSerifs].flatMap((each) => {
@@ -449,10 +454,12 @@ export function inkRegions(c: Contour): readonly Contour[] {
  * is; it crosses itself inside a corner of the path, and is joined into an
  * outline by whoever wants one.
  *
- * And of a broad edge that widens or narrows along the stroke, held at one
- * angle: a pen of two corners, whose ink is their two paths and the edge itself
- * across where the path runs along it. One that stays as it is has its own
- * exact answer, and is left to it.
+ * And of a rectangle that changes its size or turns along the stroke, and of
+ * a broad edge that does — a pen of two corners: the ink is still its corners'
+ * paths, with the pen's edge across between them or, where the pen turns, the
+ * path of the place that edge pivots on. A broad edge that stays as it is has
+ * its own exact answer, and is left to it. `null` too where the pen turns in a
+ * way that cannot be followed, and the ink is then made the other way.
  */
 function boxLine(c: Contour): readonly Contour[] | null {
   if (c.nib === undefined || c.nodes.length < 2) return null;
@@ -463,19 +470,17 @@ function boxLine(c: Contour): readonly Contour[] | null {
   const box =
     first.thickness >= OVAL_FROM &&
     first.width > 0 &&
-    // Whatever size it is at each point: held at one angle, its corners draw
-    // the edge of its ink still. Turning, it is fitted like any pen with corners.
-    pens.every(
-      (pen) =>
-        (pen.squareness ?? 0) >= 1 &&
-        pen.angle === first.angle &&
-        pen.width > 0 &&
-        pen.thickness >= OVAL_FROM,
-    );
+    // Whatever size it is at each point and however it is turned: its corners
+    // draw the edge of its ink still, and between them the place an edge
+    // pivots on.
+    pens.every((pen) => (pen.squareness ?? 0) >= 1 && pen.width > 0 && pen.thickness >= OVAL_FROM);
   const edge =
-    pens.every((pen) => pen.thickness < OVAL_FROM && pen.angle === first.angle && pen.width > 0) &&
-    pens.some((pen) => pen.width !== first.width);
-  const line = box || edge ? (plannedInk([c], regionIds)?.[0] ?? null) : null;
+    pens.every((pen) => pen.thickness < OVAL_FROM && pen.width > 0) &&
+    pens.some((pen) => pen.width !== first.width || pen.angle !== first.angle);
+  // By its corners or not at all: a rectangle turning in a way that cannot be
+  // followed would be planned by its reach, and one master's ink has a nearer
+  // way than that.
+  const line = box || edge ? (plannedInk([c], regionIds, true)?.[0] ?? null) : null;
   boxLines.set(c, line);
   return line;
 }

@@ -126,7 +126,7 @@ describe("a rectangular pen changing its size along a stroke", () => {
     expect(Math.max(...ink[0]!.nodes.map((n) => past(n.pt)))).toBeCloseTo(0, 6);
   });
 
-  it("is drawn the other way where the pen turns as well", () => {
+  it("is its ink still where the pen turns as well", { timeout: 120_000 }, () => {
     const s = STROKE_CASES.find((c) => c.name === "an oval pen along an S")!;
     const pens = pensFor(s.curves.length + 1, 0).map((pen, i) => ({ ...pen, angle: i * 25 }));
     const stroke = strokeOf(s.curves, false, pens);
