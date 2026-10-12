@@ -34,6 +34,21 @@ const FIT = 0.25;
 const NEAR = 1e-3;
 /** A turn sharper than this between two flattened edges is a corner, in radians. */
 const CORNER = (30 * Math.PI) / 180;
+/**
+ * A gentler turn that is still a corner, where it stands alone: sharper than
+ * this, and several times sharper than the turns either side of it.
+ *
+ * A curve flattened turns a little at every point, and a tight one — the tip
+ * of a thin oval pen — turns more than ten degrees at each, which is why a
+ * corner is not simply any turn of ten degrees. But a turn of twenty-seven
+ * between two straight sides is a corner too, where a stem that came down a
+ * diagonal goes upright: taken for part of a curve, one cubic was fitted
+ * through it and the straight side of the diagonal bowed in by four units.
+ * What tells the two apart is their neighbours: a curve's turns are much the
+ * same from point to point, and a corner's are next to none.
+ */
+const KINK = (8 * Math.PI) / 180;
+const KINK_ALONE = 4;
 
 // The package's own types name its functions, and its module build exports them
 // on a default object: taken from whichever of the two the bundler hands over.
@@ -215,12 +230,14 @@ function contourOfRing(ring: clipping.Ring, ids: IdFactory): Contour | null {
   const n = pts.length;
   if (n < 3) return null;
 
+  const turns = pts.map((here, i) => turn(pts[(i - 1 + n) % n]!, here, pts[(i + 1) % n]!));
   const corners: number[] = [];
   for (let i = 0; i < n; i++) {
-    const before = pts[(i - 1 + n) % n]!;
     const here = pts[i]!;
-    const after = pts[(i + 1) % n]!;
-    if (turn(before, here, after) <= CORNER) continue;
+    const turning = turns[i]!;
+    const beside = Math.max(turns[(i - 1 + n) % n]!, turns[(i + 1) % n]!);
+    const alone = turning > KINK && turning > beside * KINK_ALONE;
+    if (turning <= CORNER && !alone) continue;
     // Two corners a fraction of a unit apart are one corner, turned in two steps
     // by the flattening: kept as two, they left a line of no visible length
     // between them, and two nodes all but on top of each other.
