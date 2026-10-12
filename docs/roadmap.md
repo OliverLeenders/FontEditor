@@ -1682,6 +1682,30 @@ straight side bowed in by four and a half units. A gentler turn is a corner now 
 stands alone, several times sharper than the turns either side of it, which a curve's never
 are.
 
+That was found by accident, so the outline a font gets was then looked at on purpose: every
+stroke the tests draw, with seven pens and five ways of ending, its exported outline held
+against the ink the canvas fills (`stroke-fidelity.test.ts`; the whole sweep is ten minutes
+and runs under `STROKE_DIAGNOSE`, six shapes with four pens run every time and fail at two
+units). Thirty-seven of some five hundred were a unit or more out, thirteen of them five or
+more. Two causes, neither of them new:
+
+- A joined polygon has a point wherever a curve was flattened and none along a straight
+  edge, and the fit is held to its points only. Through a long straight side and then a
+  gentle turn one cubic swung wide: a blob twenty-four units across on a thin oval's corner,
+  four or five on a tight bend. An edge of twenty units or more is written as the line it is
+  now, and only what is between such edges is fitted.
+- The join by curves can be fooled without showing it: one outline, joining no further, with
+  an edge some units from where any part has one — five, on a zigzag with its end cut. What
+  it gives back is asked whether it is the parts' ink (`isTheInkOf`), and the polygon join
+  takes its place where that one is and this one is not.
+
+What is left reads between three and five tenths of a unit nearly everywhere, which is the
+fit's quarter and the looking's tenth. Above that, and small: pinholes of about a unit in the
+joined outline of a very thin oval round a corner or a hairpin, which neither the canvas nor
+the swept ink has; two units of ink too many on two rows of that hairpin; a hook with
+retracted handles a unit and a half out under a serif; a slit along a serif on a bend tighter
+than its oval pen.
+
 #### Open
 
 What is next in the same direction:

@@ -269,7 +269,32 @@ function contourOfRing(ring: clipping.Ring, ids: IdFactory): Contour | null {
       chain.push({ curve: line(points[0]!, points[points.length - 1]!), line: true });
       return;
     }
-    for (const curve of fitCubics(points, FIT)) chain.push({ curve, line: false });
+    // Its straight sides are lines, and what is between them is fitted. See
+    // `STRAIGHT_SIDE` for why the two are not fitted together.
+    let curved: Vec2[] = [points[0]!];
+    const fit = (): void => {
+      if (curved.length < 2) return;
+      // Round the whole ring it starts and ends at one point, and is no line:
+      // every point of it is on the chord of no length between the two.
+      const round = same(curved[0]!, curved[curved.length - 1]!);
+      if (!round && (curved.length === 2 || straight(curved))) {
+        chain.push({ curve: line(curved[0]!, curved[curved.length - 1]!), line: true });
+      } else {
+        for (const curve of fitCubics(curved, FIT)) chain.push({ curve, line: false });
+      }
+    };
+    for (let i = 1; i < points.length; i++) {
+      const before = points[i - 1]!;
+      const here = points[i]!;
+      if (distance(before, here) >= STRAIGHT_SIDE) {
+        fit();
+        chain.push({ curve: line(before, here), line: true });
+        curved = [here];
+      } else {
+        curved.push(here);
+      }
+    }
+    fit();
   };
 
   if (corners.length === 0) {
@@ -299,6 +324,22 @@ function contourOfRing(ring: clipping.Ring, ids: IdFactory): Contour | null {
   }
   return chain.length < 2 ? null : contourOfCurves(chain, ids);
 }
+
+/**
+ * An edge of a joined polygon this long is a straight side, in units, and is
+ * written as the line it is.
+ *
+ * A joined polygon has a point wherever a curve was flattened and none along a
+ * straight edge: an edge three hundred units long is its two ends. The fit is
+ * held to its points and to nothing between them, so through a run that was a
+ * long straight side and then a gentle turn it could go where it liked along
+ * the side — and did. A thin pen's outline came back with a blob of ink twenty
+ * units across, where one cubic had swung wide between the two ends of a
+ * straight side, and the side of a stem bowed by four. A curve flattened to a
+ * fiftieth of a unit has no chord this long short of a radius of two and a
+ * half thousand, where the chord is the curve to that fiftieth.
+ */
+const STRAIGHT_SIDE = 20;
 
 /** A ring of points as a contour of straight lines, exactly as joined. */
 function contourOfLines(ring: clipping.Ring, ids: IdFactory): Contour | null {

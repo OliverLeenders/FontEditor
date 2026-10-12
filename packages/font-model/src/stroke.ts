@@ -8,6 +8,7 @@ import {
   derivative,
   endTangent,
   evaluate,
+  flatten,
   fitCubics,
   lineAsCubic,
   loopArea,
@@ -113,11 +114,21 @@ export function inkOf(c: Contour, ids: IdFactory): readonly Contour[] {
   // where it refused, and where what it gave back still joins further. Refusing
   // used to hand back the pieces as they were, which is a stroke that converted
   // into a pile of outlines to be joined by hand.
+  // And it can be fooled without showing it: one outline, that joins no
+  // further, with an edge some units from where any of the regions has one.
+  // So what it gives back is asked whether it is the regions' ink, below.
   if (regions.length > 1 && (joined === null || (answer.length > 1 && joinsFurther(answer)))) {
     // Sliver-thin rings left out of this answer as of the union's: a hole a unit
     // long and a fraction wide, where two parts all but met, is a pinhole in the
     // letter, not a counter.
     answer = (unionByPolygons(regions, ids) ?? answer).filter((r) => thickness(r) >= SLIVER);
+  } else if (regions.length > 1 && !isTheInkOf(answer, regions)) {
+    // Looked at and found wanting. The other way of joining takes its place
+    // only where it is itself the regions' ink: the looking can be wrong, beside
+    // a fold or a hair of ink, and an answer that was right is not to be given
+    // up for one that is not.
+    const other = unionByPolygons(regions, ids)?.filter((r) => thickness(r) >= SLIVER);
+    if (other !== undefined && isTheInkOf(other, regions)) answer = other;
   }
   markInk(answer);
   joinedInk.set(c, answer);
@@ -218,6 +229,77 @@ function laidSerif(c: Contour, which: "start" | "end"): LaidSerif | null {
   const parts = stretchParts(stretch);
   const stood = serifEnd([...parts.loops, ...parts.sweeps.flat()], cut, false);
   return stood === null ? null : { cut: stood.cut, pieces: stood.pieces };
+}
+
+/**
+ * How far an outline's edge may be from the ink it is the outline of, in units:
+ * it is not that ink where it is out by the first of these and by the second.
+ *
+ * Two, and both: beside a corner a step of the first may land in the ink of the
+ * side round the corner, and say "wrong" of an outline that is right — which
+ * costs the exact answer, the other way of joining being a fitted one. An edge
+ * that is really out is out by more than a unit, and for some length.
+ */
+const TRUE_WITHIN = [0.6, 1.2] as const;
+/** Pieces of an outline shorter than this are not asked about. */
+const TOO_SHORT_TO_ASK = 8;
+
+/**
+ * Whether an outline is the outline of some regions' ink: whether, a little
+ * inside its edge, there is ink, and a little outside it there is none.
+ *
+ * Asked of what the union of curves hands back. That union is exact where it
+ * is right, and is kept for that; but edges lying all but along each other can
+ * fool it into following the wrong one, and it then hands back an outline as
+ * confidently as ever — one outline, nothing to join further — with a side of a
+ * stroke five units from where the stroke's side is. Nothing told that from a
+ * right answer but looking.
+ *
+ * At a few points along each piece of the outline that is long enough to have
+ * a middle. Which side of a piece is inside is asked of the outline itself.
+ * Ink too thin for a step inside the edge to stay in it answers "no" with no
+ * fault of the union's, and is then joined the other way, which is no loss.
+ */
+function isTheInkOf(outline: readonly Contour[], regions: readonly Contour[]): boolean {
+  const ringsOf = (contours: readonly Contour[]): Vec2[][] =>
+    contours.map((c) => curvesOf(c).flatMap((curve) => flatten(curve, 0.02).slice(0, -1)));
+  const goesRound = (rings: readonly (readonly Vec2[])[], q: Vec2): boolean => {
+    let w = 0;
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length; i++) {
+        const a = ring[i]!;
+        const b = ring[(i + 1) % ring.length]!;
+        const side = (b.x - a.x) * (q.y - a.y) - (q.x - a.x) * (b.y - a.y);
+        if (a.y <= q.y) {
+          if (b.y > q.y && side > 0) w++;
+        } else if (b.y <= q.y && side < 0) w--;
+      }
+    }
+    return w !== 0;
+  };
+  const own = ringsOf(outline);
+  const ink = ringsOf(regions);
+  for (const c of outline) {
+    for (const piece of curvesOf(c)) {
+      if (Math.hypot(piece.b.x - piece.a.x, piece.b.y - piece.a.y) < TOO_SHORT_TO_ASK) continue;
+      for (const t of [0.3, 0.5, 0.7]) {
+        const p = evaluate(piece, t);
+        const v = derivative(piece, t);
+        const speed = Math.hypot(v.x, v.y);
+        if (speed < 1e-9) continue;
+        const right = { x: v.y / speed, y: -v.x / speed };
+        const at = (d: number): Vec2 => ({ x: p.x + right.x * d, y: p.y + right.y * d });
+        const onRight = goesRound(own, at(TRUE_WITHIN[0]));
+        const onLeft = goesRound(own, at(-TRUE_WITHIN[0]));
+        // Ink both sides or neither: too thin there to say anything of.
+        if (onRight === onLeft) continue;
+        const inward = onRight ? 1 : -1;
+        if (TRUE_WITHIN.every((d) => !goesRound(ink, at(inward * d)))) return false;
+        if (TRUE_WITHIN.every((d) => goesRound(ink, at(-inward * d)))) return false;
+      }
+    }
+  }
+  return true;
 }
 
 /** Below this average thickness, in units, a region of ink is a sliver. */
@@ -1409,12 +1491,18 @@ function joinedParts(c: Contour, ids: IdFactory): readonly Contour[] {
       }),
     ];
     if (stretch.cuts.length === 0) return regions;
-    const whole =
+    const byCurves =
       regions.length < 2
         ? regions
-        : (removeOverlap(glyph("", { contours: regions }), ids)?.glyph.contours ??
-          unionByPolygons(regions, ids) ??
-          regions);
+        : (removeOverlap(glyph("", { contours: regions }), ids)?.glyph.contours ?? null);
+    // Looked at, as the whole stroke's is: see `isTheInkOf`. The other way of
+    // joining takes its place where it declined, or where it is found wanting
+    // and the other is not.
+    let whole = byCurves ?? unionByPolygons(regions, ids) ?? regions;
+    if (byCurves !== null && regions.length > 1 && !isTheInkOf(byCurves, regions)) {
+      const other = unionByPolygons(regions, ids);
+      if (other !== null && isTheInkOf(other, regions)) whole = other;
+    }
     const loops = whole.map(curvesOf);
     const ends = endsOf(loops, stretch.cuts);
     // Turned as the union left them: a hole in it stays a hole.
