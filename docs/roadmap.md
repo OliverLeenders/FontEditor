@@ -1706,13 +1706,16 @@ the swept ink has; two units of ink too many on two rows of that hairpin; a hook
 retracted handles a unit and a half out under a serif; a slit along a serif on a bend tighter
 than its oval pen.
 
+Ends whose serifs already differ between masters are told now. What changes is carried, and
+what had come apart before was not listed: the Masters panel's check says how many ends have
+a serif in one master and none in the other, or one of another style, and in which glyphs,
+with the open master's to be given to the other. Asked of the contours that are a stroke in
+both, by their place in the glyph.
+
 #### Open
 
 What is next in the same direction:
 
-- **Ends whose serifs already differ between masters, told**: what changes from here on is
-  carried, and the Masters panel's check does not yet list an end that has a serif in one
-  master and none in another.
 - **A drop shorter than the pen is thick at the end of a bar, in a variable font**: the bar's
   own ink is past the foot's line all the way along, there is nothing to stop a side at, and
   the default master's ink is written at every weight. A drawing to be drawn otherwise.

@@ -9,6 +9,7 @@ import {
   setGlyphOrder,
   setKerning,
 } from "./document.js";
+import type { Contour } from "./contour.js";
 import type { Glyph } from "./glyph.js";
 import type { Grid } from "./grid.js";
 import { type Kerning, groupNameOf, isGroupKey, renameKernGroup } from "./kerning.js";
@@ -525,6 +526,12 @@ export type StructureDifferences = {
   readonly serifsOnlyHere: readonly string[];
   /** Serif styles the other has a name for and this one has not. */
   readonly serifsOnlyThere: readonly string[];
+  /**
+   * The ends of strokes both masters draw, that have a serif in one and none in
+   * the other, or one of another style: as this master has them, which is what
+   * the other is given where it is made to agree.
+   */
+  readonly ends: readonly CarriedEnd[];
 };
 
 /** The parts of {@link StructureDifferences}, as what can be copied across. */
@@ -564,7 +571,52 @@ export function structuralDifferences(
     serifsOnlyThere: there.serifs
       .filter((style) => !here.serifs.some((other) => other.name === style.name))
       .map((style) => style.name),
+    ends: endsApart(here, there, both),
   };
+}
+
+/**
+ * The ends whose serif is not the same serif in two masters, as the first has
+ * them.
+ *
+ * Asked of the strokes that are a stroke in both, by their place in the glyph:
+ * masters share no ids, and a contour that is a stroke here and an outline
+ * there is not an end that differs but a drawing that does, which the check of
+ * what can be interpolated says. The same serif is the same style, or one of
+ * no style in both; its numbers are each master's own.
+ */
+function endsApart(
+  here: FontDocument,
+  there: FontDocument,
+  both: readonly GlyphName[],
+): CarriedEnd[] {
+  const isStroke = (c: Contour): boolean => c.nib !== undefined && !c.closed && c.nodes.length >= 2;
+  const out: CarriedEnd[] = [];
+  for (const name of both) {
+    const ours = here.glyphs[name];
+    const theirs = there.glyphs[name];
+    if (ours === undefined || theirs === undefined) continue;
+    for (const [index, c] of ours.contours.entries()) {
+      const other = theirs.contours[index];
+      if (other === undefined || !isStroke(c) || !isStroke(other)) continue;
+      for (const which of ["start", "end"] as const) {
+        const node = which === "start" ? c.nodes[0]! : c.nodes[c.nodes.length - 1]!;
+        const far = which === "start" ? other.nodes[0]! : other.nodes[other.nodes.length - 1]!;
+        const serif = node.end?.serif;
+        const has = far.end?.serif;
+        if (serif === undefined && has === undefined) continue;
+        if (serif !== undefined && has !== undefined && serif.style === has.style) continue;
+        out.push({
+          glyph: name,
+          contour: index,
+          which,
+          cut: node.end?.cut ?? 0,
+          serif: serif ?? null,
+        });
+      }
+    }
+  }
+  return out;
 }
 
 /** Whether two masters agree in everything they should share. */
@@ -579,7 +631,8 @@ export function sameStructure(differences: StructureDifferences): boolean {
     differences.info.length === 0 &&
     !differences.unitsPerEm &&
     differences.serifsOnlyHere.length === 0 &&
-    differences.serifsOnlyThere.length === 0
+    differences.serifsOnlyThere.length === 0 &&
+    differences.ends.length === 0
   );
 }
 
@@ -654,6 +707,10 @@ export function structureCopy(
           added: from.serifs.filter((style) => differences.serifsOnlyHere.includes(style.name)),
         },
       };
+    case "ends":
+      // As any end's serif is carried: the style's numbers as the other master
+      // has them, the cut it has where it is cut already.
+      return { ...nothing, ends: differences.ends };
     case "unitsPerEm":
       // Scaled: a master whose em is made another's has to keep its shapes the
       // size they were on the page.

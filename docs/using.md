@@ -297,7 +297,9 @@ the style, and standing on that master's own cut where the end is cut already. A
 no such stroke there is left alone. Masters that differ already — a family drawn elsewhere, or from
 before this — are not made to agree, since nothing says which is right: **Check** in the
 Masters panel lists what two masters differ in, a part at a time, with a button to copy that
-part across.
+part across. Among them the ends that have a serif in one master and none in the other, or
+one of another style, by the glyphs they are in: **Use this master's** gives those ends in the
+other master what they have here.
 
 **Between the masters.** The Spacing line and the Proof have a **Between** switch and a
 slider for each axis: the text is then set with the family worked out at that place rather

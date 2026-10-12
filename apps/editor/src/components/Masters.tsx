@@ -668,6 +668,16 @@ function Shared({
     });
   }
 
+  if (differences.ends.length > 0) {
+    const glyphs = [...new Set(differences.ends.map((end) => end.glyph))];
+    lines.push({
+      part: "ends",
+      says: `${differences.ends.length === 1 ? "1 stroke end has" : `${String(differences.ends.length)} stroke ends have`} another serif, or none, in ${name}: ${some(glyphs)}`,
+      does: "Use this master's",
+      title: `Give these ends in ${name} the serif they have here, or none, with ${name}'s own numbers for the style`,
+    });
+  }
+
   return (
     <div className={styles.report}>
       <p className={styles.reportHead}>This master and {name} differ in what every master shares</p>

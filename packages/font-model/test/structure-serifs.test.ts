@@ -257,3 +257,61 @@ describe("masters whose serif styles have come apart", () => {
     expect(sameStructure(structuralDifferences(taken, given))).toBe(true);
   });
 });
+
+describe("masters whose ends have come apart", () => {
+  /** A master with its foot taken off, the cut left. */
+  const footless = (document: FontDocument): FontDocument => {
+    const g = document.glyphs["l"]!;
+    const c = g.contours[0]!;
+    const nodes = c.nodes.map((n, i) => (i === 1 ? { ...n, end: { cut: 0 as const } } : n));
+    return { ...document, glyphs: { l: { ...g, contours: [{ ...c, nodes }] } } };
+  };
+
+  it("agree where each end has a serif of the same style, whatever its numbers", () => {
+    expect(structuralDifferences(master(LIGHT), master(BOLD)).ends).toEqual([]);
+  });
+
+  it("are told of an end that has a serif in one and none in the other", () => {
+    const here = master(LIGHT);
+    const there = footless(master(BOLD));
+    const differences = structuralDifferences(here, there);
+    expect(differences.ends).toEqual([
+      { glyph: "l", contour: 0, which: "end", cut: 0, serif: footOf(here) },
+    ]);
+    expect(sameStructure(differences)).toBe(false);
+    // And from the other side, as an end with none.
+    expect(structuralDifferences(there, here).ends).toEqual([
+      { glyph: "l", contour: 0, which: "end", cut: 0, serif: null },
+    ]);
+  });
+
+  it("are told of an end with a serif of another style", () => {
+    const here = master(LIGHT);
+    const there = master({ ...BOLD, name: "Head" });
+    expect(structuralDifferences(here, there).ends).toEqual([
+      { glyph: "l", contour: 0, which: "end", cut: 0, serif: footOf(here) },
+    ]);
+  });
+
+  it("say nothing of a contour that is a stroke in one and an outline in the other", () => {
+    const here = master(LIGHT);
+    const g = master(BOLD).glyphs["l"]!;
+    const { nib: _nib, ...outline } = g.contours[0]!;
+    const there = { ...master(BOLD), glyphs: { l: { ...g, contours: [outline] } } };
+    expect(structuralDifferences(here, there).ends).toEqual([]);
+  });
+
+  it("are made to agree, the serif given with the other master's numbers", () => {
+    const here = master(LIGHT);
+    const there = footless(master(BOLD));
+    const given = applyStructure(there, structureCopy(here, there, "ends"));
+    const { name: _name, ...bold } = BOLD;
+    expect(footOf(given)).toEqual({ ...bold, style: "Foot" });
+    expect(sameStructure(structuralDifferences(here, given))).toBe(true);
+
+    // And the other way: the open master's word that there is none.
+    const taken = applyStructure(here, structureCopy(there, here, "ends"));
+    expect(taken.glyphs["l"]!.contours[0]!.nodes[1]!.end).toEqual({ cut: 0 });
+    expect(sameStructure(structuralDifferences(there, taken))).toBe(true);
+  });
+});
