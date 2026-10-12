@@ -76,6 +76,13 @@ export type PlannedCut = {
   readonly normal: Vec2;
   readonly onward: Vec2;
   readonly nibbed: boolean;
+  /**
+   * How many segments before the one the end is on the cut may be made of: the
+   * ones that come to its line steeply, as whoever asks has judged. A side of
+   * the last segment that is past the line all its length is then stopped
+   * where a side before it crosses. None, where it is not said.
+   */
+  readonly legs?: number;
 };
 
 /** A piece of the line round the ink, and whether it is a straight one. */
@@ -174,31 +181,69 @@ export function plannedStrokes(masters: readonly StrokeMaster[]): PlannedPiece[]
 
   // The ends that are cut: the side arriving at each and the side leaving it
   // stopped at the cut, and what goes between them in place of the pen's edge.
+  //
+  // A side is stopped where it crosses the line, and on a last segment a few
+  // units long it may not: the pen is wider than the segment is long, and the
+  // side of it is past the line from end to end. It is then the side of the
+  // segment before that is stopped, as far back as the cut is said to reach,
+  // and the sides between are no more than the point it stopped at — with
+  // nothing of the pen's edge at the joins between them. How far back, each
+  // side, is the same in every master or there is no one plan.
   const closures = masters.map(() => new Map<string, PlannedPiece[]>());
+  const reached: string[] = [];
   for (const [at, m] of masters.entries()) {
+    let how = "";
     for (const end of ["end", "start"] as const) {
       const cut = cutAt(m, end);
       if (cut === undefined) continue;
       const index = end === "end" ? count - 1 : 0;
       // Out along the right to the far end and back along the left: so the far
-      // end is come to forwards, and the near end backwards.
-      const arriving: Leg = { index, forward: end === "end" };
-      const leaving: Leg = { index, forward: end !== "end" };
+      // end is come to forwards, and the near end backwards. And the legs each
+      // way from there, back along the path.
+      const legsBack = (forward: boolean): Leg[] =>
+        Array.from({ length: count }, (_, i) => ({
+          index: end === "end" ? count - 1 - i : i,
+          forward,
+        }));
+      const arrivingLegs = legsBack(end === "end");
+      const leavingLegs = legsBack(end !== "end");
+      const most = Math.min(Math.max(0, cut.legs ?? 0), count - 1);
+      const stopper =
+        (legs: readonly Leg[], stop: typeof stoppedAt) =>
+        (by: PlannedCut): Stopped | null => {
+          for (let back = 0; back <= most; back++) {
+            const stopped = stop(sides[at]!.get(key(legs[back]!))!, by);
+            if (stopped !== null) return { ...stopped, back };
+          }
+          return null;
+        };
       const pen = profiles[at]![index]!.at(end === "end" ? 1 : 0);
       const made = cutTurn(
-        sides[at]!.get(key(arriving))!,
-        sides[at]!.get(key(leaving))!,
+        stopper(arrivingLegs, stoppedAt),
+        stopper(leavingLegs, startedAt),
         // Half a rectangle laid along a cut is the cut.
         box ? { ...cut, nibbed: false } : cut,
         pen,
         cornered,
       );
       if (made === null) return null;
-      sides[at]!.set(key(arriving), made.arriving);
-      sides[at]!.set(key(leaving), made.leaving);
-      closures[at]!.set(`${key(arriving)}>${key(leaving)}`, made.closure);
+      how += `${end}:${String(made.arriving.back)}/${String(made.leaving.back)} `;
+
+      sides[at]!.set(key(arrivingLegs[made.arriving.back]!), made.arriving.pieces);
+      for (let i = 0; i < made.arriving.back; i++) {
+        sides[at]!.set(key(arrivingLegs[i]!), [pointPiece(made.arriving.at, true)]);
+        closures[at]!.set(`${key(arrivingLegs[i + 1]!)}>${key(arrivingLegs[i]!)}`, []);
+      }
+      sides[at]!.set(key(leavingLegs[made.leaving.back]!), made.leaving.pieces);
+      for (let i = 0; i < made.leaving.back; i++) {
+        sides[at]!.set(key(leavingLegs[i]!), [pointPiece(made.leaving.at, true)]);
+        closures[at]!.set(`${key(leavingLegs[i]!)}>${key(leavingLegs[i + 1]!)}`, []);
+      }
+      closures[at]!.set(`${key(arrivingLegs[0]!)}>${key(leavingLegs[0]!)}`, made.closure);
     }
+    reached.push(how);
   }
+  if (reached.some((how) => how !== reached[0])) return null;
 
   const out: PlannedPiece[][][] = masters.map(() => []);
   for (const cycle of cycles) {
@@ -1150,6 +1195,12 @@ function startedAt(
   };
 }
 
+/**
+ * A side stopped at a cut: its pieces, where it stopped, and how many legs
+ * before the end's own the side is that was stopped.
+ */
+type Stopped = { readonly pieces: PlannedPiece[]; readonly at: Vec2; readonly back: number };
+
 /** A quarter of a circle as one curve: how far along its tangents the handles go. */
 const QUARTER = (4 / 3) * (Math.SQRT2 - 1);
 
@@ -1170,19 +1221,19 @@ const QUARTER = (4 / 3) * (Math.SQRT2 - 1);
  * end of the path.
  */
 function cutTurn(
-  arriving: readonly PlannedPiece[],
-  leaving: readonly PlannedPiece[],
+  arriving: (by: PlannedCut) => Stopped | null,
+  leaving: (by: PlannedCut) => Stopped | null,
   cut: PlannedCut,
   pen: PenShape,
   cornered: boolean,
-): { arriving: PlannedPiece[]; leaving: PlannedPiece[]; closure: PlannedPiece[] } | null {
-  const from = stoppedAt(arriving, cut);
-  const to = startedAt(leaving, cut);
+): { arriving: Stopped; leaving: Stopped; closure: PlannedPiece[] } | null {
+  const from = arriving(cut);
+  const to = leaving(cut);
   if (from === null || to === null) return null;
   if (!cut.nibbed || isBroad(pen)) {
     return {
-      arriving: from.pieces,
-      leaving: to.pieces,
+      arriving: from,
+      leaving: to,
       closure: [{ curve: lineAsCubic(from.at, to.at), line: true }],
     };
   }
@@ -1193,8 +1244,8 @@ function cutTurn(
     ...cut,
     through: { x: cut.through.x - cut.normal.x * depth, y: cut.through.y - cut.normal.y * depth },
   };
-  const a = stoppedAt(arriving, short);
-  const b = startedAt(leaving, short);
+  const a = arriving(short);
+  const b = leaving(short);
   if (a === null || b === null) return null;
 
   const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
@@ -1205,14 +1256,14 @@ function cutTurn(
   const by = (p: Vec2, v: Vec2, k: number): Vec2 => ({ x: p.x + v.x * k, y: p.y + v.y * k });
   if (cornered) {
     return {
-      arriving: a.pieces,
-      leaving: b.pieces,
+      arriving: a,
+      leaving: b,
       closure: halfOutline(pen, a.at, b.at, middle, half, out),
     };
   }
   return {
-    arriving: a.pieces,
-    leaving: b.pieces,
+    arriving: a,
+    leaving: b,
     closure: [
       { curve: cubic(a.at, by(a.at, out, QUARTER), by(tip, half, QUARTER), tip), line: false },
       { curve: cubic(tip, by(tip, half, -QUARTER), by(b.at, out, QUARTER), b.at), line: false },

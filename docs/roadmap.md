@@ -1658,6 +1658,30 @@ in Font info is remembered with the inspector's folds.
 Found on the way and put right: the Features view kept the source it last compiled in state,
 set from an effect at every key, which drew the whole view twice for each letter typed.
 
+A cut was made of the last segment, and the last of a stroke may be more than that. A stem
+that comes down a diagonal and turns upright a few units from its line has the pen still
+standing at the turn, and reaching past the line: it was left sticking out under the foot. A
+cut goes back now from the end to where the path last turned to come to the line, through as
+many segments as come to it steeply — within thirty degrees of square — and through the last
+part of the first that does not. Steeply, since a bar sloping a little towards the line of
+the foot under its end is not on its way there, and cut by it would lose its underside.
+
+In a variable font a side is stopped where it crosses the line, and on a last segment a few
+units long it never does: the pen is wider than the segment is long, and its side is past the
+line from end to end. There was no plan for that at all. The side of the segment before is
+stopped instead, as far back as a single font's cut reaches, the sides between left as the
+point it stopped at with nothing of the pen's edge at the joins; how far back, each side, is
+the same in every master or there is no one plan.
+
+Found on the way, in the outline a font gets. Joined as polygons, a stroke's outline has
+cubics fitted back through it between its corners, and a corner was a turn of more than
+thirty degrees: a tight curve flattened turns more than ten at every point, so less could not
+be asked. A turn of twenty-seven between two straight sides — the diagonal's side meeting the
+upright's — was taken for part of a curve, one cubic went through it, and the diagonal's
+straight side bowed in by four and a half units. A gentler turn is a corner now where it
+stands alone, several times sharper than the turns either side of it, which a curve's never
+are.
+
 #### Open
 
 What is next in the same direction:
@@ -1665,8 +1689,9 @@ What is next in the same direction:
 - **Ends whose serifs already differ between masters, told**: what changes from here on is
   carried, and the Masters panel's check does not yet list an end that has a serif in one
   master and none in another.
-- **A cut on a last segment a few units long, in a variable font**: there is no plan for it,
-  with a serif or without, and the default master's ink is written at every weight.
+- **A drop shorter than the pen is thick at the end of a bar, in a variable font**: the bar's
+  own ink is past the foot's line all the way along, there is nothing to stop a side at, and
+  the default master's ink is written at every weight. A drawing to be drawn otherwise.
 
 - **A rectangle that turns or changes size along a stroke**, exact as the constant one is:
   it is fitted now, a hundredth short at its corners.

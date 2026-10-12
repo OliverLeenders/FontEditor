@@ -657,8 +657,12 @@ is wide, with a round knob at one end. Drag the knob round the point and the cut
 it, in whole degrees; within four degrees of level, upright or square to the path it settles
 on that. The point does not move, and the drag is one step to undo.
 
-Only the segment that ends there is cut: the bowl of a u hangs below the tops of its stems and
-is not touched by cutting them. A cut within fifteen degrees of the way the path is going is
+Only the last of the stroke is cut: the bowl of a u hangs below the tops of its stems and is
+not touched by cutting them. The last of it is its last segment, from where that turns to come
+to the line, and with it the segments before that come to the line steeply — so a stem that
+comes down a diagonal and turns upright a few units from the baseline is cut whole, the pen
+standing at the turn included, and nothing is left under the foot. A segment that only passes
+near the line is not cut by it: a bar is not shaved by the foot of a short drop at its end. A cut within fifteen degrees of the way the path is going is
 not made, since the pen would never get past it, and the end is left as the pen leaves it.
 
 The **Stroke** tool (`N`) draws exactly as the pen tool does and makes strokes instead of

@@ -5,6 +5,7 @@ import {
   type Vec2,
   blendPen,
   clipLoop,
+  derivative,
   endTangent,
   evaluate,
   fitCubics,
@@ -156,9 +157,11 @@ export function plannedInk(strokes: readonly Contour[], ids: IdFactory): Contour
       // a single font.
       const start = startSerifs?.[at]?.cut ?? strokeCut(c, "start");
       const end = endSerifs?.[at]?.cut ?? strokeCut(c, "end");
+      // And how far back along the path each may be made: as far as a single
+      // font's is.
       const cuts = {
-        ...(start === null ? {} : { start }),
-        ...(end === null ? {} : { end }),
+        ...(start === null ? {} : { start: { ...start, legs: cutLegs(curves, start, "start") } }),
+        ...(end === null ? {} : { end: { ...end, legs: cutLegs(curves, end, "end") } }),
       };
       return {
         curves,
@@ -1128,19 +1131,57 @@ function stretchesOf(c: Contour): Stretch[] {
     // Both halves blend the way the whole one did.
     blends.splice(index + 1, 0, blends[index]);
   };
-  const last = drawn.length - 1;
-  const fromEnd = end === null ? null : lastApproach(drawn[last]!, end.normal, "end");
-  const fromStart = start === null ? null : lastApproach(drawn[0]!, start.normal, "start");
-  // On a stroke of one segment the two are cuts of the same curve, and are
-  // both made only where the start's comes before the end's.
-  const both = drawn.length === 1 && fromStart !== null && fromEnd !== null;
-  if (!both || fromStart < fromEnd) {
-    if (fromEnd !== null) splitAt(last, fromEnd, profiles[last]!.at(fromEnd));
-    if (fromStart !== null) {
-      // The first segment is the part before the end's cut, where there was one
-      // segment and that cut was made: the same place along it is further along.
-      const along = drawn.length === 1 && fromEnd !== null ? fromStart / fromEnd : fromStart;
-      splitAt(0, along, profiles[0]!.at(fromStart));
+  // How much of the stroke each cut is made of: back from its end to where the
+  // path last turned to come to the line, through as many segments as come
+  // steeply to it. See `approach`.
+  let endsFrom = end === null ? null : approach(drawn, end.normal);
+  let startsTo =
+    start === null ? null : mirrored(approach(turnedRound(drawn), start.normal), drawn.length);
+  const along = (p: { index: number; t: number }): number => p.index + p.t;
+  let whole = false;
+  // Meeting at the one place the path turns counts as reaching: an arch cut at
+  // both feet is one stretch, not two that meet at its top.
+  const reaching =
+    endsFrom !== null &&
+    startsTo !== null &&
+    (along(startsTo) > along(endsFrom) ||
+      (startsTo.found && endsFrom.found && along(startsTo) >= along(endsFrom)));
+  if (endsFrom !== null && startsTo !== null && reaching) {
+    // The two reach into each other. One that was found, by the path turning,
+    // is kept and the other stops at it; where both were found, or neither,
+    // the stroke is one stretch and both cuts are made of all of it.
+    if (endsFrom.found && !startsTo.found) startsTo = { ...endsFrom, found: false };
+    else if (startsTo.found && !endsFrom.found) endsFrom = { ...startsTo, found: false };
+    else whole = true;
+  }
+
+  // Indices into `curves` as they are cut in two: the last curve of the
+  // start's stretch, and the first of the end's.
+  let startLast: number | null = null;
+  let endFirst: number | null = null;
+  if (!whole) {
+    if (endsFrom !== null) {
+      endFirst = endsFrom.index;
+      if (endsFrom.t > 1e-9 && endsFrom.t < 1 - 1e-9) {
+        splitAt(endsFrom.index, endsFrom.t, profiles[endsFrom.index]!.at(endsFrom.t));
+        endFirst = endsFrom.index + 1;
+      } else if (endsFrom.t >= 1 - 1e-9) {
+        endFirst = endsFrom.index + 1;
+      }
+    }
+    if (startsTo !== null) {
+      startLast = startsTo.index;
+      // Where the end's cut was made in the same segment, the same place is
+      // further along what is left of it.
+      const sameSegment =
+        endsFrom !== null && endsFrom.index === startsTo.index && endFirst === endsFrom.index + 1;
+      const t = sameSegment && endsFrom !== null ? startsTo.t / endsFrom.t : startsTo.t;
+      if (startsTo.t <= 1e-9) {
+        startLast = startsTo.index - 1;
+      } else if (t < 1 - 1e-9) {
+        splitAt(startsTo.index, t, profiles[startsTo.index]!.at(startsTo.t));
+        if (endFirst !== null) endFirst += 1;
+      }
     }
   }
   const count = curves.length;
@@ -1154,28 +1195,27 @@ function stretchesOf(c: Contour): Stretch[] {
   const before = start === null ? null : lineAsCubic(carried(start, pens[0]!), start.through);
   const after = end === null ? null : lineAsCubic(end.through, carried(end, pens[count]!));
 
-  if (count === 1) {
+  if (whole || (startLast !== null && endFirst !== null && startLast >= endFirst)) {
     return [
       {
         curves: [
           ...(before === null ? [] : [before]),
-          curves[0]!,
+          ...curves,
           ...(after === null ? [] : [after]),
         ],
         pens: [
           ...(before === null ? [] : [pens[0]!]),
-          pens[0]!,
-          pens[1]!,
-          ...(after === null ? [] : [pens[1]!]),
+          ...pens,
+          ...(after === null ? [] : [pens[count]!]),
         ],
         blends: [
           ...(before === null ? [] : [undefined]),
-          blends[0],
+          ...blends.slice(0, count),
           ...(after === null ? [] : [undefined]),
         ],
         closed: false,
         cuts: [
-          ...(start === null ? [] : [withBack(start, curves[0]!.b)]),
+          ...(start === null ? [] : [withBack(start, curves[count - 1]!.b)]),
           ...(end === null ? [] : [withBack(end, curves[0]!.a)]),
         ],
       },
@@ -1183,36 +1223,115 @@ function stretchesOf(c: Contour): Stretch[] {
   }
 
   const out: Stretch[] = [];
-  if (start !== null && before !== null) {
+  if (start !== null && before !== null && startLast !== null && startLast >= 0) {
     out.push({
-      curves: [before, curves[0]!],
-      pens: [pens[0]!, pens[0]!, pens[1]!],
-      blends: [undefined, blends[0]],
+      curves: [before, ...curves.slice(0, startLast + 1)],
+      pens: [pens[0]!, ...pens.slice(0, startLast + 2)],
+      blends: [undefined, ...blends.slice(0, startLast + 1)],
       closed: false,
-      cuts: [withBack(start, curves[0]!.b)],
+      cuts: [withBack(start, curves[startLast]!.b)],
     });
   }
-  const from = start === null ? 0 : 1;
-  const to = end === null ? count : count - 1;
-  if (to > from) {
+  const middleFrom = startLast === null ? 0 : startLast + 1;
+  const middleTo = endFirst === null ? count : endFirst;
+  if (middleTo > middleFrom) {
     out.push({
-      curves: curves.slice(from, to),
-      pens: pens.slice(from, to + 1),
-      blends: blends.slice(from, to),
+      curves: curves.slice(middleFrom, middleTo),
+      pens: pens.slice(middleFrom, middleTo + 1),
+      blends: blends.slice(middleFrom, middleTo),
       closed: false,
       cuts: [],
     });
   }
-  if (end !== null && after !== null) {
+  if (end !== null && after !== null && endFirst !== null && endFirst < count) {
     out.push({
-      curves: [curves[count - 1]!, after],
-      pens: [pens[count - 1]!, pens[count]!, pens[count]!],
-      blends: [blends[count - 1], undefined],
+      curves: [...curves.slice(endFirst), after],
+      pens: [...pens.slice(endFirst, count + 1), pens[count]!],
+      blends: [...blends.slice(endFirst, count), undefined],
       closed: false,
-      cuts: [withBack(end, curves[count - 1]!.a)],
+      cuts: [withBack(end, curves[endFirst]!.a)],
     });
   }
   return out;
+}
+
+/**
+ * How many segments before the one an end is on its cut is made of: the ones
+ * {@link approach} takes it back through, whole or in part.
+ */
+function cutLegs(curves: readonly Cubic[], cut: StrokeCut, which: "start" | "end"): number {
+  if (curves.length < 2) return 0;
+  if (which === "end") {
+    const from = approach(curves, cut.normal);
+    return Math.max(0, curves.length - 1 - from.index - (from.t >= 1 - 1e-9 ? 1 : 0));
+  }
+  const to = mirrored(approach(turnedRound(curves), cut.normal), curves.length);
+  return Math.max(0, to.index - (to.t <= 1e-9 ? 1 : 0));
+}
+
+/** A place along a path: a segment and how far along it, and whether the path turning found it. */
+type Along = { readonly index: number; readonly t: number; readonly found: boolean };
+
+/**
+ * How steeply a segment has to come to a cut's line to be cut by it with the
+ * segment after it: the sine of thirty degrees.
+ *
+ * A cut is made of the last of the stroke, and the last of it may be more than
+ * its last segment — the foot of a stem that came down a diagonal and turned
+ * upright a few units from the line has the pen still standing at that turn,
+ * and reaching past the line. So the cut goes back through the segments that
+ * come to the line. Steeply: a bar that slopes a little towards the line of the
+ * foot under it is not on its way to that line, and cut by it would have the
+ * underside of the whole bar shaved off.
+ */
+const STEEPLY = 0.5;
+
+/**
+ * Where the last of a path begins that comes to a line facing `normal` at its
+ * end: the last segment from where it last turned to come to the line, or the
+ * whole of it, and before that every segment that comes to the line steeply
+ * all the way — or, of the first that does not, the last of it that does.
+ */
+function approach(curves: readonly Cubic[], normal: Vec2): Along {
+  const last = curves.length - 1;
+  const turned = lastApproach(curves[last]!, normal, "end");
+  if (turned !== null) return { index: last, t: turned, found: true };
+  for (let i = last - 1; i >= 0; i--) {
+    const curve = curves[i]!;
+    // From its end backwards, an eighth at a time: how far back it is still
+    // coming steeply.
+    let from = 8;
+    while (
+      from > 0 &&
+      comesSteeply(curve, (from - 1) / 8, normal) &&
+      comesSteeply(curve, from / 8, normal)
+    ) {
+      from--;
+    }
+    if (from === 8) return { index: i + 1, t: 0, found: false };
+    const turn = lastApproach(curve, normal, "end");
+    if (turn !== null && turn >= from / 8) return { index: i, t: turn, found: true };
+    if (from > 0) return { index: i, t: from / 8, found: false };
+  }
+  return { index: 0, t: 0, found: false };
+}
+
+/** Whether a curve, at `t`, is going towards a line facing `normal` at least so steeply. */
+function comesSteeply(curve: Cubic, t: number, normal: Vec2): boolean {
+  const v = derivative(curve, Math.min(1 - 1e-6, Math.max(1e-6, t)));
+  const speed = Math.hypot(v.x, v.y);
+  return speed > 1e-9 && (v.x * normal.x + v.y * normal.y) / speed >= STEEPLY;
+}
+
+/** A path the other way round: its last curve first, each from its end to its beginning. */
+function turnedRound(curves: readonly Cubic[]): Cubic[] {
+  return [...curves].reverse().map((c) => ({ a: c.b, c1: c.c2, c2: c.c1, b: c.a }));
+}
+
+/** A place along a path turned round, as the place it is along the path itself. */
+function mirrored(at: Along, count: number): Along {
+  // Turned round, `index` counted from the end and `t` from the segment's end.
+  return { index: count - 1 - at.index, t: 1 - at.t, found: at.found };
 }
 
 /** A cut with how far back from its line the part of the stroke it cuts begins, at `from`. */

@@ -144,6 +144,21 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
     ),
     { angle: 30, width: pen, thickness },
   );
+  // A stem that comes down a diagonal and turns upright eight units above the
+  // line its foot is cut on: a last segment shorter than the pen is wide, whose
+  // sides never cross the line, so that it is the diagonal's sides that are cut.
+  const hooked = withNib(
+    contour(
+      ids.contour(),
+      [
+        node(ids.node(), at(140, 620)),
+        node(ids.node(), at(340, 8)),
+        node(ids.node(), at(340, 0), { end: { cut: 0 } }),
+      ],
+      false,
+    ),
+    { angle: 30, width: pen, thickness },
+  );
   return fontDocument(
     [
       glyph(".notdef", { advance: 500 }),
@@ -151,6 +166,7 @@ const master = (pen: number, thickness = pen / 4): FontDocument => {
       glyph("t", { advance: 600, unicodes: [0x74], contours: [boxed] }),
       glyph("z", { advance: 600, unicodes: [0x7a], contours: [slab] }),
       glyph("f", { advance: 600, unicodes: [0x66], contours: [footed] }),
+      glyph("j", { advance: 600, unicodes: [0x6a], contours: [hooked] }),
       glyph("s", { advance: 600, unicodes: [0x73], contours: [skeleton] }),
       glyph("dollar", {
         advance: 600,
