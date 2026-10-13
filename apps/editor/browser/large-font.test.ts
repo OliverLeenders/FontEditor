@@ -67,6 +67,22 @@ describe("a large font, in a browser", () => {
       await saved(page);
 
       // Out of the browser's storage again, with the pane saying how far it is.
+      //
+      // What the pane says is written down by the page itself. Read from one
+      // file a font this size is on screen a second after it is asked for, and
+      // the press that asks for it loads the page again: looked for from out
+      // here, the pane had come and gone in Firefox before anything saw it.
+      await p.context.addInitScript(() => {
+        const counted: number[] = [];
+        (window as unknown as { counted: number[] }).counted = counted;
+        new MutationObserver(() => {
+          const bar = document.querySelector('[role="progressbar"][aria-label="Opening the font"]');
+          const now = bar?.getAttribute("aria-valuenow") ?? null;
+          if (now !== null) counted.push(Number(now));
+          // The document and not its root element, which Chromium has not made
+          // yet when this is run.
+        }).observe(document, { subtree: true, childList: true, attributes: true });
+      });
       await page.reload();
       await resume(page).waitFor();
       expect(await resume(page).textContent()).toMatch(/^Continue with Material Symbols/);
@@ -74,15 +90,10 @@ describe("a large font, in a browser", () => {
 
       const began = Date.now();
       await resume(page).click();
-      const bar = opening(page);
-      await bar.waitFor();
-      const counted: number[] = [];
-      while (await bar.isVisible()) {
-        const now = await bar.getAttribute("aria-valuenow").catch(() => null);
-        if (now !== null) counted.push(Number(now));
-        await page.waitForTimeout(20);
-      }
       await glyphs(page, LARGE_FONT_GLYPHS);
+      const counted = await page.evaluate(
+        () => (window as unknown as { counted: number[] }).counted,
+      );
       const took = Date.now() - began;
 
       expect(counted.length, "the pane counted while it read").toBeGreaterThan(0);

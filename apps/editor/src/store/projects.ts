@@ -172,7 +172,15 @@ export function switchTo(id: string): void {
     // A private window, or storage switched off. The reload then opens the most
     // recent font, which is very nearly always the one just asked for anyway.
   }
-  location.reload();
+  // Gone to again, rather than reloaded, which is the same thing asked another
+  // way and for one reason. In Firefox a reload that was once called off — the
+  // question on leaving answered with "stay" — leaves `location.reload()`
+  // doing nothing at all, on that page and on the next one loaded in the tab:
+  // the press that opens a font was a press that did nothing. Going to the
+  // address the page is already at is not a reload to the browser, and is not
+  // held up. Without the fragment, since an address that differs only by one
+  // is a place on the page already loaded and loads nothing.
+  location.replace(`${location.pathname}${location.search}`);
 }
 
 const CHOSEN = "typewright.project";
