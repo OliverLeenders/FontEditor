@@ -150,6 +150,9 @@ Done so far, since 0.1.110:
   ("3 warnings", and which three nowhere), and the glyphs a master gone to or a copy put back
   came without. The refused union is still to be looked at.
 
+- The user guide caught up — one glyph as an SVG, what a save that did not happen says,
+  which browsers — and a `CHANGELOG.md` begun, kept from 0.1.110.
+
 Still to do in Firefox: say in the File menu that a folder cannot be saved to there. Still to
 do for full storage: the desktop window's own question on closing does not yet ask about a
 save that failed, and nothing offers to make room (the copies under History are the largest

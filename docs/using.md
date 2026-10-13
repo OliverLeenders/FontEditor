@@ -386,6 +386,12 @@ points as JSON. The classes are named from the family, `my-icons my-icons-home`.
 writes every glyph that draws something as a picture of its own, as the font compiles it —
 strokes as their ink, components resolved, overlaps joined.
 
+**One glyph as an SVG.** **SVG** in the Export menu, under **SVGs**, writes the glyph picked
+in the grid alone, as the same picture: the `.svg` file itself for one glyph, and an archive
+of only those for several. A glyph's menu in the grid has **Export as SVG**, which does the
+same, and **Copy as SVG**, which puts one glyph's SVG on the clipboard to be pasted into a
+drawing program.
+
 **Bigger cells.** The slider at the end of the glyph grid's bar draws the cells up to three
 times their size, which is what an icon wants and a text font's two thousand glyphs do not.
 It is kept in this browser, not in the font.
@@ -948,8 +954,24 @@ the tab and coming back keeps your work. Note that this store belongs to the bro
 not to you — the files cannot be opened in a file manager. To keep a font where other
 tools can read it, save it from the File menu, or with Ctrl-S.
 
-**Opening a large font** takes a few seconds — an icon font of four thousand glyphs is four
-thousand files to read and as many glyphs to draw — and for those seconds the window says so:
+**When a save does not happen.** The browser gives a site so much room, and refuses a write
+past it. The status bar then says _not saved, trying again_ and why — _this browser's storage
+is full_ — and the save is tried again by itself, every few seconds at first and then every
+minute, so making room is all there is to do: forget a font you no longer want from the list
+of fonts, or clear other sites' data in the browser. Nothing is lost while the window is open,
+and closing the tab on a save that has not happened is asked about first.
+
+**What a font came in without.** Where a font file or a folder is opened, a master gone to
+or a copy put back, and something could not be read or kept, the status bar says so and how
+many; rest the pointer on it for a line about each.
+
+**Browsers.** Typewright runs in Chrome and Edge and in Firefox. Saving to a folder on disk
+needs something only Chrome and Edge have, so in Firefox a font is kept in the browser and
+taken out by exporting it, as a UFO or as a font; the File menu there has no folder in it.
+Safari has not been tried.
+
+**Opening a large font** takes a second or two — an icon font of four thousand glyphs is
+four thousand glyphs to read and to draw — and for that time the window says so:
 the font's name, a bar, and how far it has got, such as _Reading glyphs · 1,280 of 4,042_. It
 is shown when the program starts on a font, when a UFO folder is opened and when a font file
 is imported, and goes as soon as the font is on screen; a font that was opened or imported is
