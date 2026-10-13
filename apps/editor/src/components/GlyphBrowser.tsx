@@ -51,6 +51,7 @@ import { isDarkNow, watchScheme } from "../scheme.js";
 import { wholeOf } from "../store/masters.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { MAX_CELL_SCALE, MIN_CELL_SCALE } from "../limits.js";
+import { copyGlyphSvg, exportGlyphSvgs } from "../svgExport.js";
 import { areSvgFiles, readSvgFiles } from "../svgImport.js";
 
 /** The two lines of label under a cell's drawing, in pixels: the renderer's own number. */
@@ -61,6 +62,7 @@ import {
   ArrowLeftRightIcon,
   CopyIcon,
   CopyPlusIcon,
+  DownloadIcon,
   EqualApproximatelyIcon,
   PenToolIcon,
   SearchIcon,
@@ -525,6 +527,23 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
         },
       },
       { kind: "separator" },
+      // Out as a picture, as the font is compiled: the file for one glyph and
+      // an archive for several, and one glyph's as text for a drawing program
+      // to be pasted into.
+      {
+        kind: "item",
+        label: several ? `Export ${String(names.length)} as SVG` : "Export as SVG",
+        icon: DownloadIcon,
+        run: () => void exportGlyphSvgs(store, names),
+      },
+      {
+        kind: "item",
+        label: "Copy as SVG",
+        icon: CopyIcon,
+        disabled: several,
+        run: () => void copyGlyphSvg(store, name),
+      },
+      { kind: "separator" },
       // Between each glyph picked and a layer: the background whether or not the
       // font has one yet, since the first copy into it is how it is begun, and
       // every other layer the font has.
@@ -707,7 +726,7 @@ export function GlyphBrowser({ onOpen }: { onOpen: (name: string) => void }): Re
               does once at each end of a session. */}
           <div className={styles.group}>
             <FileMenu />
-            <ExportFont />
+            <ExportFont glyphs={selection} />
             <CleanUpMenu />
           </div>
 

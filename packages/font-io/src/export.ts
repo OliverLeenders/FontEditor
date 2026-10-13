@@ -202,6 +202,19 @@ export function flattenedGlyphs(source: FontDocument): Glyph[] {
 }
 
 /**
+ * One glyph prepared the same way, without preparing the font around it: what
+ * a single glyph is asked for as a picture with. `null` where the font has no
+ * glyph of that name.
+ */
+export function flattenedGlyph(document: FontDocument, name: string): Glyph | null {
+  const g = document.glyphs[name];
+  if (g === undefined) return null;
+  const ids = counterIds("t");
+  const contours = unioned(g, flatten(g, document, ids), ids, []);
+  return { ...g, components: [], contours: [...contours] };
+}
+
+/**
  * What a glyph's outlines were joined into, kept with the glyph.
  *
  * The TrueType flavour is the CFF flavour made and then given other outlines,

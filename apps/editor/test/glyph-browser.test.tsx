@@ -334,7 +334,7 @@ describe("what is done to the cells picked", () => {
       .getAllByRole("menuitemcheckbox")
       .find(
         (item) =>
-          !/Open|Rename|Duplicate|Round|No colour|Delete|Copy to|Swap with|Clear/.test(
+          !/Open|Rename|Duplicate|Round|No colour|Delete|Copy to|Swap with|Clear|SVG/.test(
             item.textContent,
           ),
       );

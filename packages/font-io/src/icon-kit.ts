@@ -9,7 +9,7 @@ import {
   segments,
 } from "@typewright/font-model";
 
-import { flattenedGlyphs } from "./export.js";
+import { flattenedGlyph, flattenedGlyphs } from "./export.js";
 import { fontFileStem } from "./file-name.js";
 import { nameLigatureCount } from "./name-ligatures.js";
 import type { ZipEntry } from "./zip.js";
@@ -258,10 +258,17 @@ export function glyphSvg(g: Glyph, document: FontDocument): string {
  * Every glyph that draws something, as an SVG file each: an icon set going
  * back out as the pictures it came in as. Named for the glyph, in a way that is
  * safe on every file system.
+ *
+ * Given `names`, only those glyphs, and only they are prepared: one icon out of
+ * a set of a thousand is not worth joining the other nine hundred for.
  */
-export function glyphSvgFiles(document: FontDocument): ZipEntry[] {
+export function glyphSvgFiles(document: FontDocument, names?: readonly string[]): ZipEntry[] {
+  const glyphs =
+    names === undefined
+      ? flattenedGlyphs(document)
+      : names.flatMap((name) => flattenedGlyph(document, name) ?? []);
   const out: ZipEntry[] = [];
-  for (const g of flattenedGlyphs(document)) {
+  for (const g of glyphs) {
     if (g.contours.length === 0) continue;
     out.push({ path: glyphFileName(g.name, ".svg"), text: glyphSvg(g, document) });
   }

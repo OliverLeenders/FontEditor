@@ -24,7 +24,12 @@ import type { FontDocument } from "@typewright/font-model";
 export type ExportJob =
   | { readonly kind: "otf"; readonly document: FontDocument }
   | { readonly kind: "ttf"; readonly document: FontDocument }
-  | { readonly kind: "svgs"; readonly document: FontDocument }
+  | {
+      readonly kind: "svgs";
+      readonly document: FontDocument;
+      /** Only these glyphs, where it is not every one that draws something. */
+      readonly names?: readonly string[];
+    }
   | { readonly kind: "variable"; readonly args: Parameters<typeof exportVariableFont> }
   | { readonly kind: "variableTtf"; readonly args: Parameters<typeof exportVariableTrueType> }
   | { readonly kind: "instances"; readonly args: Parameters<typeof exportInstances> };
@@ -68,7 +73,7 @@ export async function runExport<Job extends ExportJob>(
     case "ttf":
       return done(binary.exportTrueType(job.document, options));
     case "svgs":
-      return done(binary.glyphSvgFiles(job.document));
+      return done(binary.glyphSvgFiles(job.document, job.names));
     case "variable":
       return done(binary.exportVariableFont(...job.args));
     case "variableTtf":

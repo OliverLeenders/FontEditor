@@ -584,6 +584,11 @@ export class EditorStore {
     if (this.state.notice !== null) this.patch({ notice: null });
   }
 
+  /** Say on the status line that something asked for was done. */
+  showNotice(notice: Notice): void {
+    this.patch({ notice });
+  }
+
   // ---- an export on its way -----------------------------------------------
 
   /**

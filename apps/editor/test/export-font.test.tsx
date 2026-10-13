@@ -146,6 +146,39 @@ describe("pressing a format", () => {
     expect(downloads[0]?.type).toBe("font/ttf");
   });
 
+  it("hands over the one glyph picked in the grid as an SVG of its own", async () => {
+    const store = freshStore();
+    const drawn = Object.values(store.editor.document.glyphs).filter((g) => g.contours.length > 0);
+    const [first, second] = drawn.map((g) => g.name);
+    if (first === undefined || second === undefined) throw new Error("no drawn glyphs");
+
+    const one = render(<ExportFont glyphs={[first]} />, store);
+    openMenu();
+    press(/^SVG\b(?!s)/);
+    await waitFor(() => {
+      expect(downloads).toHaveLength(1);
+    });
+    expect(downloads[0]?.file).toMatch(/\.svg$/);
+    expect(downloads[0]?.type).toBe("image/svg+xml");
+    one.unmount();
+
+    // Several picked are an archive of those and no more.
+    render(<ExportFont glyphs={[first, second]} />, store);
+    openMenu();
+    press(/^SVG\b(?!s)/);
+    await waitFor(() => {
+      expect(downloads).toHaveLength(2);
+    });
+    expect(downloads[1]?.type).toBe("application/zip");
+    expect(store.getState().notice?.summary).toContain("2 files");
+  });
+
+  it("offers no single SVG with nothing picked", () => {
+    render(<ExportFont />);
+    openMenu();
+    expect(item(/^SVG\b(?!s)/)?.disabled).toBe(true);
+  });
+
   it("hands over the source as a zip", async () => {
     render(<ExportFont />);
     openMenu();

@@ -17,6 +17,7 @@ import { useMemo } from "react";
 
 import { desktop } from "../desktop.js";
 import { compile } from "../exporting.js";
+import { download, exportGlyphSvgs } from "../svgExport.js";
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import { BarMenu } from "./BarMenu.js";
 import type { Item } from "./MenuItems.js";
@@ -42,7 +43,12 @@ import { DownloadIcon } from "./icons.js";
  */
 const binary = () => import("@typewright/font-io/binary");
 
-export function ExportFont(): React.JSX.Element {
+export function ExportFont({
+  glyphs = [],
+}: {
+  /** The glyphs picked in the grid this menu sits beside, which one item is about. */
+  glyphs?: readonly string[];
+}): React.JSX.Element {
   const store = useEditorStore();
   const glyphCount = useStoreValue((s) => s.session.editor.document.glyphOrder.length);
   const masters = useStoreValue((s) => s.project.masters.length);
@@ -59,22 +65,6 @@ export function ExportFont(): React.JSX.Element {
       ).length,
     [document],
   );
-  /**
-   * Hand a file to the browser.
-   *
-   * The object URL is revoked on the next turn of the event loop rather than
-   * immediately: the click has to be dispatched before the URL stops meaning
-   * anything.
-   */
-  const download = (data: BlobPart, file: string, type: string): void => {
-    const url = URL.createObjectURL(new Blob([data], { type }));
-    const link = window.document.createElement("a");
-    link.href = url;
-    link.download = file;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 0);
-  };
-
   /**
    * Make an export, and say on the status line how it goes and how it ended.
    *
@@ -427,6 +417,21 @@ export function ExportFont(): React.JSX.Element {
       icon: DownloadIcon,
       disabled: glyphCount === 0,
       run: svgs,
+    },
+    // The same picture of what is picked in the grid alone: the file itself
+    // for one glyph, and an archive of only those for several.
+    {
+      kind: "item",
+      label: "SVG",
+      note:
+        glyphs.length === 0
+          ? "pick a glyph in the grid"
+          : glyphs.length === 1
+            ? `${glyphs[0] ?? ""} alone`
+            : `the ${String(glyphs.length)} glyphs picked, zipped`,
+      icon: DownloadIcon,
+      disabled: glyphs.length === 0,
+      run: () => void exportGlyphSvgs(store, glyphs),
     },
   ];
 

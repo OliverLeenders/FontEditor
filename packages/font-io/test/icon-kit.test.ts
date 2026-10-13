@@ -166,4 +166,13 @@ describe("glyphs as SVG files", () => {
     expect(Math.min(...xs)).toBeCloseTo(160, 0);
     expect(Math.max(...xs)).toBeCloseTo(840, 0);
   });
+
+  it("writes only the glyphs asked for, the same as it writes them among the rest", () => {
+    const all = glyphSvgFiles(font());
+    const one = glyphSvgFiles(font(), ["home"]);
+    expect(one).toEqual(all.filter((f) => f.path === "home.svg"));
+    expect(one).toHaveLength(1);
+    // A name the font has not got, and a glyph that draws nothing, are no file.
+    expect(glyphSvgFiles(font(), ["nowhere", ".notdef"])).toEqual([]);
+  });
 });
