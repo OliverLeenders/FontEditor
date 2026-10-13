@@ -1787,6 +1787,29 @@ describe("components on the canvas", () => {
     expect(down.effects).toEqual([{ kind: "beginTransaction", label: "Move component" }]);
   });
 
+  it("lands on the font's grid where it was placed off it", () => {
+    // Placed thirteen units along on a grid of forty: dragged, it is where it
+    // is placed that comes to a line, not how far it was taken.
+    const { state } = composite();
+    const off: EditorState = {
+      ...state,
+      document: {
+        ...state.document,
+        grid: { step: 40, major: 0 },
+        glyphs: {
+          ...state.document.glyphs,
+          x: {
+            ...state.document.glyphs["x"]!,
+            components: [component("k1", "n", { ...IDENTITY_AFFINE, xOffset: 13, yOffset: 0 })],
+          },
+        },
+      },
+    };
+
+    const moved = drag(off, vec(333, 690), [vec(353, 690)]);
+    expect(placedAt(moved).xOffset).toBe(40);
+  });
+
   it("is what Backspace removes while it is the thing selected", () => {
     const { state } = composite();
     const held = drag(state, vec(320, 690), [vec(330, 700)]);

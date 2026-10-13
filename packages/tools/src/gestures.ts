@@ -1087,7 +1087,12 @@ const CONTINUE: Continuations = {
     // the letter under it is what anchors are for.
     const started = glyphIn(gesture.before, state) ?? EMPTY_GLYPH;
     const snapping = snappingFor(state, input, options, started, []);
-    const snapped = snapDelta([gesture.origin], delta, snapping, gesture.snapped);
+    // What lands on the grid is where the component is placed: the number in
+    // its field, which a component brought in between two lines is put right
+    // by, as a node is.
+    const placed = started.components.find((c) => c.id === gesture.componentId)?.transform;
+    const lead = placed === undefined ? null : { x: placed.xOffset, y: placed.yOffset };
+    const snapped = snapDelta([gesture.origin], delta, snapping, gesture.snapped, lead);
 
     const document = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
       updateGlyphComponent(g, gesture.componentId, (c) =>
