@@ -41,11 +41,17 @@ export function engine(): Engine {
  * unless the run says where its browsers are, which is how one fetched into
  * Playwright's own cache is used.
  */
-export async function launch(): Promise<Browser> {
+export async function launch(
+  /**
+   * A browser that is installed on the machine instead, by the name Playwright
+   * has for it — `chrome`, `msedge` — for what the fetched one cannot do.
+   */
+  channel?: string,
+): Promise<Browser> {
   // Read when Playwright is loaded, so set before it is.
   process.env["PLAYWRIGHT_BROWSERS_PATH"] ??= "0";
   const playwright = await import("playwright");
-  return playwright[engine()].launch();
+  return playwright[engine()].launch(channel === undefined ? {} : { channel });
 }
 
 /**

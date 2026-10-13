@@ -189,6 +189,13 @@ Done so far:
 - The browser tests run in Chromium, Firefox and WebKit in CI, as a job each. Firefox stops a
   push as Chromium does. WebKit on Linux keeps a font as the others do; it does not yet stop a
   push, until it has been seen to pass a few times.
+- Saving to a folder and opening one are tested in a browser. What stands in for the picker
+  hands the editor a folder of the browser's private file system, which is a real handle with
+  the same things to ask of it, so everything after the picker is the editor's own code on
+  the browser's own files: the UFO made inside the folder, the one glyph's file rewritten by
+  the next save, the folder remembered across a reload, a font read back out of it. Run in
+  the Chrome or Edge that is installed: the browser Playwright fetches goes down when such a
+  folder is read back out of the database, which is its fault and not the editor's.
 - WebKit on Windows cannot be tested at all, and this is Playwright's build of it and not
   Safari: its file system has no access handles to give, and what is written to a file by
   stream never arrives. The editor says _not saving_ there, which is true. So WebKit is tried
