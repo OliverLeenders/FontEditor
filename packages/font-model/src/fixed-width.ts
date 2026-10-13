@@ -1,5 +1,6 @@
 import { type FontDocument, glyphNamed, putGlyph, setFontInfo } from "./document.js";
 import type { Glyph } from "./glyph.js";
+import { inLayer, withLayer } from "./layers.js";
 import {
   outlineBounds,
   setLeftSidebearing,
@@ -132,14 +133,29 @@ export function offWidthGlyphs(document: FontDocument, width: number): Glyph[] {
  * an `m` take the same cell and sit in the middle of it — and because a glyph
  * that was spaced proportionally has no other position that is more right.
  * A glyph with no drawing is only given the width.
+ *
+ * The layers behind the drawing go with it: the same width, and moved as far as
+ * the drawing was. A background is a sketch of this drawing or an earlier one
+ * of it, and one left where it was would no longer lie under what was drawn
+ * over it.
  */
 export function fittedToWidth(g: Glyph, width: number, document?: FontDocument): Glyph {
   const box = outlineBounds(g, document);
+  const shift = box === null ? 0 : Math.round((width - (box.maxX - box.minX)) / 2) - box.minX;
   const sized = g.advance === width ? g : { ...g, advance: width };
-  if (box === null) return sized;
-  const left = Math.round((width - (box.maxX - box.minX)) / 2);
-  const shift = left - box.minX;
-  return shift === 0 ? sized : translateGlyph(sized, { x: shift, y: 0 });
+  const moved = shift === 0 ? sized : translateGlyph(sized, { x: shift, y: 0 });
+  return layersFitted(moved, width, shift);
+}
+
+/** A glyph's other layers given a width, and moved along with its drawing. */
+function layersFitted(g: Glyph, width: number, shift: number): Glyph {
+  let out = g;
+  for (const layer of Object.keys(g.layers)) {
+    const behind = inLayer(out, layer);
+    const sized = behind.advance === width ? behind : { ...behind, advance: width };
+    out = withLayer(out, layer, translateGlyph(sized, { x: shift, y: 0 }));
+  }
+  return out;
 }
 
 /**
@@ -170,5 +186,14 @@ export function fitToFixedWidth(document: FontDocument, width: number): FontDocu
   };
 
   for (const name of wanted) fit(name);
+
+  // A glyph already the width, drawn at another in a layer behind: the layer is
+  // given the width and left where it lies, under a drawing that did not move.
+  for (const name of out.glyphOrder) {
+    const g = glyphNamed(out, name);
+    if (g === null || g.advance !== width || wanted.has(name)) continue;
+    const fitted = layersFitted(g, width, 0);
+    if (fitted !== g) out = putGlyph(out, fitted);
+  }
   return out;
 }

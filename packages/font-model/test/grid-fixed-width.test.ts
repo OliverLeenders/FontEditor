@@ -12,6 +12,7 @@ import {
 import { glyph } from "../src/glyph.js";
 import { DEFAULT_GRID, grid, iconGrid, isDefaultGrid, isWholeStep } from "../src/grid.js";
 import { counterIds } from "../src/ids.js";
+import { copyToLayer, inLayer } from "../src/layers.js";
 import { parseMetricKey } from "../src/metric-key-text.js";
 import { resolvedMetrics } from "../src/metric-keys.js";
 import { sidebearings } from "../src/metrics.js";
@@ -108,6 +109,24 @@ describe("a fixed width", () => {
     const m = font.glyphs["m"]!;
     expect(m.advance).toBe(600);
     expect(sidebearings(m)).toEqual({ left: -30, right: -30 });
+  });
+
+  it("takes the layers behind a drawing along with it", () => {
+    // The background is the drawing as it was, and has to stay under it.
+    const i = copyToLayer(box("i", 80, 100, 80), "background");
+    const font = fitToFixedWidth(fontDocument([i]), 600);
+    const fitted = font.glyphs["i"]!;
+    const behind = inLayer(fitted, "background");
+    expect(behind.advance).toBe(600);
+    expect(sidebearings(behind)).toEqual(sidebearings(fitted));
+
+    // A glyph already the width keeps its drawing, and its layer gets the width.
+    const m = copyToLayer(box("m", 50, 400, 50), "background");
+    const wide = { ...m, advance: 600 };
+    const kept = fitToFixedWidth(fontDocument([wide]), 600).glyphs["m"]!;
+    expect(sidebearings(kept)).toEqual(sidebearings(wide));
+    expect(inLayer(kept, "background").advance).toBe(600);
+    expect(sidebearings(inLayer(kept, "background"))?.left).toBe(50);
   });
 
   it("fits a composite after the glyph it is built from, so it is centred where that went", () => {
