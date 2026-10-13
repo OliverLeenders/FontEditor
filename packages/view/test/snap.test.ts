@@ -10,6 +10,7 @@ import {
   metricLine,
   sameLine,
   sameRay,
+  leadPoint,
   snapDelta,
   snapPoint,
   toGrid,
@@ -117,6 +118,25 @@ describe("snapDelta", () => {
   it("does nothing at all when snapping is off", () => {
     const delta = at(12.6, -40.2);
     expect(snapDelta([at(0, 0)], delta, NO_SNAPPING).delta).toEqual(delta);
+  });
+
+  it("lands the point in hand on the grid, and the others beside it", () => {
+    // Off the grid by half a unit: with a lead it is the landing that is whole.
+    const lead = at(100.5, 200.5);
+    const moved = snapDelta([lead, at(300.25, 400)], at(10.2, 0.4), snapping, NO_HOLD, lead);
+    expect(moved.delta).toEqual({ x: 10.5, y: 0.5 });
+  });
+
+  it("lands it on a coarser grid too", () => {
+    const lead = at(53, 7);
+    const coarse = { ...NO_SNAPPING, grid: 40 };
+    const moved = snapDelta([lead], at(17, 30), coarse, NO_HOLD, lead);
+    expect(moved.delta).toEqual({ x: 27, y: 33 });
+  });
+
+  it("takes the point nearest the press for the one in hand", () => {
+    expect(leadPoint([at(0, 0), at(53, 7), at(200, 0)], at(55, 5))).toEqual(at(53, 7));
+    expect(leadPoint([], at(0, 0))).toBeNull();
   });
 
   it("still rounds when nothing is moving", () => {

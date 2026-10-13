@@ -53,6 +53,7 @@ import {
   hasItem,
   itemForTarget,
   itemsInRect,
+  leadPoint,
   metricLine,
   screenTolerance,
   selectionPoints,
@@ -1001,7 +1002,7 @@ function straightSides(g: Glyph, moving: Selection): Vec2[] {
 }
 
 /** The offset, held to whichever of `directions` keeps most of it. */
-function heldTo(delta: Vec2, directions: readonly Vec2[], grid: number): Vec2 {
+function heldTo(delta: Vec2, directions: readonly Vec2[], grid: number, lead: Vec2 | null): Vec2 {
   let best: Vec2 | null = null;
   let kept = -1;
 
@@ -1010,8 +1011,12 @@ function heldTo(delta: Vec2, directions: readonly Vec2[], grid: number): Vec2 {
     if (Math.abs(along) <= kept) continue;
     kept = Math.abs(along);
     // Quantised along the direction rather than per axis: a diagonal held to
-    // whole units in x and y is not whole units along itself.
-    const length = grid > 0 ? Math.round(along / grid) * grid : along;
+    // whole units in x and y is not whole units along itself. Along an axis the
+    // grid's lines are crossed squarely, so there it is the point in hand that
+    // lands on one, as it does in a drag that is not held.
+    const upright = Math.abs(d.x) === 1 || Math.abs(d.y) === 1;
+    const from = lead !== null && upright ? lead.x * d.x + lead.y * d.y : 0;
+    const length = grid > 0 ? Math.round((from + along) / grid) * grid - from : along;
     best = { x: d.x * length, y: d.y * length };
   }
 
@@ -1031,12 +1036,16 @@ const CONTINUE: Continuations = {
     // along a stem must stay on it, and a line it happened to pass near is not
     // a better answer than the one being asked for. The grid still applies,
     // measured along the direction rather than per axis.
+    const moving = selectionPoints(started, gesture.items);
+    // The point the grid is for: the one that was picked up, or the nearest to
+    // where the press fell for a drag begun on a segment or inside the box.
+    const lead = leadPoint(moving, gesture.origin);
     const snapped = input.modifiers.shift
       ? {
-          delta: heldTo(delta, heldDirections(state, started, gesture.items), snapping.grid),
+          delta: heldTo(delta, heldDirections(state, started, gesture.items), snapping.grid, lead),
           hold: NO_HOLD,
         }
-      : snapDelta(selectionPoints(started, gesture.items), delta, snapping, gesture.snapped);
+      : snapDelta(moving, delta, snapping, gesture.snapped, lead);
 
     const document = updateGlyphInLayer(gesture.before, state.currentGlyph, state.layer, (g) =>
       translateSelection(g, gesture.items, snapped.delta),

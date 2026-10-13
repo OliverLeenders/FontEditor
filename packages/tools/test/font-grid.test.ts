@@ -56,6 +56,29 @@ describe("a drag on the font's grid", () => {
     s = pointerMove(s, pointerInput(vec(345, 400))).state;
     expect(s.document.guides[0]?.pt.x).toBe(360);
   });
+
+  it("puts a node that was off the grid on it, and the rest beside it", () => {
+    // The complaint this answers: a node an import left between two lines
+    // stayed as far between them wherever it was dragged, because it was the
+    // offset that was rounded and not where the node came to rest.
+    const document = {
+      ...fontDocument([box("n", 53, 200, 47)]),
+      grid: { step: 40, major: 0 },
+    };
+    const corners = (state: EditorState) =>
+      state.document.glyphs["n"]?.contours[0]?.nodes.map((n) => n.pt) ?? [];
+
+    // One corner alone: it lands on the grid both ways, and its neighbours stay.
+    let s = pointerDown(stateOf(document), pointerInput(vec(53, 0))).state;
+    s = pointerMove(s, pointerInput(vec(70, 30))).state;
+    const one = corners(s).filter((p) => p.x % 40 === 0 && p.y % 40 === 0);
+    expect(one).toEqual([vec(80, 40)]);
+
+    // Held to the horizontal, it still lands on a line of the grid.
+    let held = pointerDown(stateOf(document), pointerInput(vec(53, 0))).state;
+    held = pointerMove(held, pointerInput(vec(70, 4), { shift: true })).state;
+    expect(corners(held)).toContainEqual(vec(80, 0));
+  });
 });
 
 describe("setting the grid", () => {

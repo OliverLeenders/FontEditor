@@ -102,6 +102,7 @@ export type { SnapHold, SnapLine, SnapRay, SnapSource, Snapping } from "./snap.j
 export {
   NO_HOLD,
   NO_SNAPPING,
+  leadPoint,
   SNAP_PIXELS,
   SNAP_STAY_PIXELS,
   SNAP_STICKINESS,

@@ -303,16 +303,22 @@ export function snapPoint(
  * moving point is offered to every line, and the single smallest correction wins
  * the axis — whichever point found it.
  *
- * When nothing is caught the *offset* is quantised, not the landing positions.
- * A drag then preserves whatever relationship the points had: from whole
- * coordinates it lands on whole coordinates, and a shape that was already
- * fractional is moved rather than silently reshaped.
+ * When nothing is caught it is the grid's turn, and what lands on it is the
+ * `lead`: the one point the drag has hold of. The rest keep their place beside
+ * it, so a shape that was already off the grid is moved rather than silently
+ * reshaped — but the point in hand ends up on a line, which is what a grid is
+ * for: a node an import left between two lines is put right by picking it up.
+ *
+ * With no lead there is no point to land, and the *offset* is quantised
+ * instead: from the grid the points land on the grid, and from off it they stay
+ * as far off as they were.
  */
 export function snapDelta(
   moving: readonly Vec2[],
   delta: Vec2,
   snapping: Snapping,
   held: SnapHold = NO_HOLD,
+  lead: Vec2 | null = null,
 ): { readonly delta: Vec2; readonly hold: SnapHold } {
   const landedX = moving.map((p) => p.x + delta.x);
   const landedY = moving.map((p) => p.y + delta.y);
@@ -343,11 +349,33 @@ export function snapDelta(
 
   return {
     delta: {
-      x: x === null ? quantise(delta.x, snapping.grid) : delta.x + x.correction,
-      y: y === null ? quantise(delta.y, snapping.grid) : delta.y + y.correction,
+      x: x === null ? landed(lead?.x ?? 0, delta.x, snapping.grid) : delta.x + x.correction,
+      y: y === null ? landed(lead?.y ?? 0, delta.y, snapping.grid) : delta.y + y.correction,
     },
     hold: { x: x?.line ?? null, y: y?.line ?? null, ray: null },
   };
+}
+
+/** The offset that puts a coordinate starting at `from` on the grid. */
+function landed(from: number, offset: number, grid: number): number {
+  return quantise(from + offset, grid) - from;
+}
+
+/**
+ * The point a drag has hold of: of the ones it moves, the one nearest where the
+ * pointer went down. `null` where it moves none.
+ */
+export function leadPoint(moving: readonly Vec2[], pressed: Vec2): Vec2 | null {
+  let best: Vec2 | null = null;
+  let nearest = Infinity;
+  for (const p of moving) {
+    const away = Math.hypot(p.x - pressed.x, p.y - pressed.y);
+    if (away < nearest) {
+      best = p;
+      nearest = away;
+    }
+  }
+  return best;
 }
 
 /**
