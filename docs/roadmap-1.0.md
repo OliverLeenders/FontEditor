@@ -183,6 +183,17 @@ thing kept).
 **Exit:** every platform an installer is built for runs every test; no test is skipped
 without a nightly run that includes it.
 
+Done so far:
+
+- The whole suite runs on Windows in CI, and passes there.
+- The browser tests run in Chromium, Firefox and WebKit in CI, as a job each. Firefox stops a
+  push as Chromium does. WebKit on Linux keeps a font as the others do; it does not yet stop a
+  push, until it has been seen to pass a few times.
+- WebKit on Windows cannot be tested at all, and this is Playwright's build of it and not
+  Safari: its file system has no access handles to give, and what is written to a file by
+  stream never arrives. The editor says _not saving_ there, which is true. So WebKit is tried
+  on CI and not on this machine.
+
 ### 0.4 — Files from anywhere
 
 - Property and fuzz tests for all seven parsers. The rule for each: any bytes at all give

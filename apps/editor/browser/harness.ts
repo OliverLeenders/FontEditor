@@ -77,7 +77,10 @@ export async function profile(browser: Browser): Promise<Profile> {
     problems,
     open: async () => {
       const page = await context.newPage();
-      page.on("pageerror", (error) => problems.push(error.message));
+      // What was thrown, as it was said. WebKit hands a promise nobody caught
+      // over with the kind of error in front of its words, "Error: …", where
+      // the others hand over the words; the words are what is compared.
+      page.on("pageerror", (error) => problems.push(error.message.replace(/^Error: /, "")));
       page.on("console", (message) => {
         if (message.type() === "error") problems.push(message.text());
       });
