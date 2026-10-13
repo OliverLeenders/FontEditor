@@ -120,6 +120,25 @@ No new features. Everything on the menu works everywhere it is offered.
 
 **Exit:** the "Open" list in the roadmap is empty or each item is a documented limit.
 
+Done so far, since 0.1.110:
+
+- Fit to fixed width takes the layers behind the drawing along.
+- A component dragged lands on the grid.
+- Firefox opens a font at all. It did not: the font was read and then waited behind the pane
+  that says it is being opened, for an answer to whether its storage may be kept, which
+  Firefox asks the person for. And a font opens from the list of fonts after a reload was
+  once called off, where Firefox left `location.reload()` doing nothing.
+- A font's glyphs are packed into one file in the working copy, with the glyphs changed since
+  as files beside it. Firefox takes thirty milliseconds to open a file to write whatever is
+  written to it, and a font of four thousand glyphs took three minutes to save there; it
+  takes two seconds, and five became two in Chromium. This is the first change to the saved
+  format with a migration: a working copy from before is read as it is and packed when it is
+  opened, and a build from before cannot see a packed one, where it would have cleared it away.
+- The browser tests pass in Firefox as they do in Chromium, fourteen of fourteen, run with
+  `BROWSER=firefox`. Not yet on CI, which is 0.3.
+
+Still to do in Firefox: say in the File menu that a folder cannot be saved to there.
+
 ### 0.3 — Tested where it runs
 
 - The whole suite on Windows in CI, beside Linux: the two platforms an installer is built for.
