@@ -143,6 +143,13 @@ Done so far, since 0.1.110:
   owed and written whole when there is room, where it was never tried again. Closing the tab
   on a save that failed asks first.
 
+- The inventory of what is warned of and carried on past. What an export leaves out, and an
+  SVG, were already said in full. Four things were said as a number or not at all, and are
+  said on the status line now with a line to each: glyphs the browser's copy of a font could
+  not give back (said only to the console), the warnings of a font file or a folder opened
+  ("3 warnings", and which three nowhere), and the glyphs a master gone to or a copy put back
+  came without. The refused union is still to be looked at.
+
 Still to do in Firefox: say in the File menu that a folder cannot be saved to there. Still to
 do for full storage: the desktop window's own question on closing does not yet ask about a
 save that failed, and nothing offers to make room (the copies under History are the largest

@@ -403,7 +403,9 @@ export class EditorStore {
     /** The master it is a copy of, as the list has it: see `restore`. */
     master?: string | null,
   ): Promise<{ glyphs: number; problems: readonly string[] } | null> {
-    return await this.snapshots.restore(at, master);
+    const done = await this.snapshots.restore(at, master);
+    if (done !== null) this.tellOf("The copy put back", done.problems, true);
+    return done;
   }
 
   /** Change something that is not the document — the camera, or which glyph. */
@@ -531,7 +533,9 @@ export class EditorStore {
   /** Replace the document with a font read from a file. */
   async importFont(bytes: ArrayBuffer, fileName = ""): Promise<ImportReport> {
     try {
-      return await importFont(this.host, bytes, fileName);
+      const done = await importFont(this.host, bytes, fileName);
+      this.tellOf(done.family, done.warnings);
+      return done;
     } finally {
       // Taken away when the font is shown; this is for one that never was.
       shown(this.host);
@@ -587,6 +591,30 @@ export class EditorStore {
   /** Say on the status line that something asked for was done. */
   showNotice(notice: Notice): void {
     this.patch({ notice });
+  }
+
+  /**
+   * Say what a font came in without, or changed: each thing in its own line,
+   * where it can be read.
+   *
+   * A font read from a file, a folder, another master, a copy kept earlier or
+   * the browser's own storage may lose something on the way, and says what. It
+   * was said as a number — "3 warnings", "2 unreadable" — beside the menu that
+   * was used, or only where a developer would look; which three was nowhere.
+   * Nothing is said where there is nothing to say.
+   */
+  private tellOf(what: string, lines: readonly string[], lost = false): void {
+    if (lines.length === 0) return;
+    const many = lines.length;
+    this.patch({
+      notice: {
+        summary: lost
+          ? `${what}: ${String(many)} glyph${many === 1 ? "" : "s"} could not be read`
+          : `${what} · ${String(many)} warning${many === 1 ? "" : "s"}`,
+        details: lines.slice(0, 40),
+        ...(lost ? { failed: true } : {}),
+      },
+    });
   }
 
   // ---- an export on its way -----------------------------------------------
@@ -659,7 +687,9 @@ export class EditorStore {
 
   /** Go to another master, parking the one being drawn on the way. */
   async switchMaster(id: string): Promise<MasterReport | null> {
-    return await switchMaster(this.host, id);
+    const done = await switchMaster(this.host, id);
+    if (done !== null) this.tellOf(done.name, done.problems, true);
+    return done;
   }
 
   /** Add one, drawn from the master in front of you. */
@@ -852,7 +882,9 @@ export class EditorStore {
   /** Open a UFO folder the user picks, replacing what is open. */
   async openFolder(): Promise<FolderReport | null> {
     try {
-      return await openFolder(this.host);
+      const done = await openFolder(this.host);
+      if (done !== null) this.tellOf(done.family, done.warnings);
+      return done;
     } finally {
       shown(this.host);
     }
@@ -861,7 +893,9 @@ export class EditorStore {
   /** Read the open font's folder again, replacing what is in the editor. */
   async reopenFolder(): Promise<FolderReport | null> {
     try {
-      return await reopenFolder(this.host);
+      const done = await reopenFolder(this.host);
+      if (done !== null) this.tellOf(done.family, done.warnings);
+      return done;
     } finally {
       shown(this.host);
     }
@@ -1441,6 +1475,9 @@ export class EditorStore {
         project: projectFrom(await this.disk.getDesignspace(), loaded.document, loaded.master),
       });
       this.fitGlyph();
+      // A glyph the working copy has and could not give back. It is not in the
+      // font that was opened, and that was said only to the console.
+      this.tellOf("This font, as it was kept in this browser", loaded.problems, true);
     }
 
     // Layers a project from before kept beside the document, moved into it.
