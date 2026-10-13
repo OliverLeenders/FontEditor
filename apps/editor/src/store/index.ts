@@ -1001,6 +1001,14 @@ export class EditorStore {
     return this.disk.replacingNow;
   }
 
+  /**
+   * Whether the last save failed, and what was to be saved is in this window
+   * and nowhere else. It is tried again; until it lands, closing loses it.
+   */
+  get notSaved(): boolean {
+    return this.state.saveStatus === "failed";
+  }
+
   /** That writing, finished: at once where there is none. */
   async wholeFontWritten(): Promise<void> {
     await this.disk.replaced();

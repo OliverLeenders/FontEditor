@@ -27,11 +27,18 @@ export type AutosaveHooks = {
 export type AutosaveOptions = {
   /** Quiet period before writing, in milliseconds. */
   readonly debounceMs?: number;
+  /**
+   * How long after a save that failed it is tried again, the first time; twice
+   * as long each time after, up to {@link MAX_RETRY_MS}.
+   */
+  readonly retryMs?: number;
   readonly setTimer?: (fn: () => void, ms: number) => number;
   readonly clearTimer?: (handle: number) => void;
 };
 
 export const DEFAULT_DEBOUNCE_MS = 1000;
+export const DEFAULT_RETRY_MS = 5000;
+export const MAX_RETRY_MS = 60_000;
 
 export type AutosaveStatus = "idle" | "pending" | "saving" | "failed";
 
@@ -45,6 +52,9 @@ export class Autosave {
   private state: AutosaveStatus = "idle";
 
   private readonly debounceMs: number;
+  private readonly retryMs: number;
+  /** How long until the next try, while saves are failing. */
+  private retryIn: number;
   private readonly setTimer: (fn: () => void, ms: number) => number;
   private readonly clearTimer: (handle: number) => void;
 
@@ -53,6 +63,8 @@ export class Autosave {
     options: AutosaveOptions = {},
   ) {
     this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+    this.retryMs = options.retryMs ?? DEFAULT_RETRY_MS;
+    this.retryIn = this.retryMs;
     this.setTimer = options.setTimer ?? ((fn, ms) => setTimeout(fn, ms) as unknown as number);
     this.clearTimer = options.clearTimer ?? ((handle) => clearTimeout(handle));
   }
@@ -139,23 +151,57 @@ export class Autosave {
 
     this.inFlight = true;
     this.state = "saving";
+    let retry = false;
     const write = (async (): Promise<void> => {
       try {
         await this.hooks.save(document, this.lastSaved);
         this.lastSaved = document;
         this.state = this.queued === document ? "idle" : "pending";
+        this.retryIn = this.retryMs;
         this.hooks.saved?.(document);
       } catch (error) {
         this.state = "failed";
         this.hooks.failed?.(error instanceof Error ? error : new Error(String(error)));
+        retry = true;
       } finally {
         this.inFlight = false;
         this.writing = null;
       }
+      // Tried again without being asked. What failed is still not on disk, and
+      // waiting for the next edit to try was waiting for something that may not
+      // come: storage that was full and has had room made in it, by somebody
+      // who then went on looking at the font, stayed unsaved until they drew.
+      if (retry) this.retryLater();
     })();
 
     this.writing = write;
     await write;
+  }
+
+  /** Try the save again in a while, and in a longer while each time it fails. */
+  private retryLater(): void {
+    if (this.timer !== null) return;
+    const wait = this.retryIn;
+    this.retryIn = Math.min(this.retryIn * 2, MAX_RETRY_MS);
+    this.timer = this.setTimer(() => {
+      this.timer = null;
+      void this.flush();
+    }, wait);
+  }
+
+  /**
+   * A whole font was to be written as `document`, and was not: nothing of it
+   * is on disk, and it is owed.
+   *
+   * What a replacement that failed calls, having called {@link abandon} before
+   * it began. Whatever has been committed since is newer and is what is owed;
+   * otherwise it is the document itself. Tried again like any save that failed.
+   */
+  owe(document: FontDocument): void {
+    this.lastSaved = null;
+    this.queued ??= document;
+    this.state = "failed";
+    this.retryLater();
   }
 
   /**

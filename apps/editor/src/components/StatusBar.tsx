@@ -99,7 +99,11 @@ export function StatusBar({
         ? "connecting"
         : saveStatus === "idle"
           ? "saved"
-          : saveStatus;
+          : // With why, and that it is not over: the save is tried again, and a
+            // word alone said neither that nor what to do about it.
+            saveStatus === "failed"
+            ? `not saved, trying again — ${detail}`
+            : saveStatus;
 
   // Spinning, not merely drawn. The mark for "saving" was already a loader and
   // already sat there through the wait — it just never moved, which makes it an

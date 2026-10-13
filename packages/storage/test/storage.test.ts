@@ -849,6 +849,93 @@ describe("autosave", () => {
     expect(autosave.status).toBe("failed");
   });
 
+  it("tries a save that failed again without being asked, and is saved once it lands", async () => {
+    // Storage that is full, and then has room made in it: nobody draws
+    // anything in between, so there is no edit to bring the save round again.
+    let full = true;
+    const { autosave, save, tick } = harness(1000, async () => {
+      if (full) throw new Error("disk full");
+    });
+
+    autosave.commit(document());
+    tick();
+    await settle();
+    expect(autosave.status).toBe("failed");
+    expect(autosave.dirty).toBe(true);
+
+    // Still full the next time it is tried: failed still, and tried again after.
+    tick();
+    await settle();
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(autosave.status).toBe("failed");
+
+    full = false;
+    tick();
+    await settle();
+    expect(save).toHaveBeenCalledTimes(3);
+    expect(autosave.status).toBe("idle");
+    expect(autosave.dirty).toBe(false);
+  });
+
+  it("waits longer each time it tries again, up to a minute, and starts over once it has saved", async () => {
+    const waits: number[] = [];
+    let fire: (() => void) | null = null;
+    let full = true;
+    const autosave = new Autosave(
+      {
+        journal: async () => {},
+        save: async () => {
+          if (full) throw new Error("disk full");
+        },
+      },
+      {
+        debounceMs: 1000,
+        retryMs: 5000,
+        setTimer: (fn, ms) => {
+          fire = fn;
+          waits.push(ms);
+          return 1;
+        },
+        clearTimer: () => {
+          fire = null;
+        },
+      },
+    );
+    const tick = async (): Promise<void> => {
+      (fire as (() => void) | null)?.();
+      await settle();
+    };
+
+    autosave.commit(document());
+    for (let i = 0; i < 6; i++) await tick();
+    expect(waits).toEqual([1000, 5000, 10_000, 20_000, 40_000, 60_000, 60_000]);
+
+    full = false;
+    await tick();
+    expect(autosave.status).toBe("idle");
+
+    // And the next failure waits as the first did.
+    full = true;
+    autosave.commit({ ...document() });
+    await tick();
+    expect(waits.slice(-2)).toEqual([1000, 5000]);
+  });
+
+  it("owes a whole font that was not written, and writes what has been committed since", async () => {
+    const { autosave, save, tick } = harness();
+    const shown = document();
+    await autosave.abandon();
+
+    autosave.owe(shown);
+    expect(autosave.status).toBe("failed");
+    expect(autosave.pending).toBe(shown);
+
+    tick();
+    await settle();
+    expect(save).toHaveBeenCalledWith(shown, null);
+    expect(autosave.status).toBe("idle");
+  });
+
   it("does not re-save a document that came straight off disk", () => {
     const { autosave, journal } = harness();
     const loaded = document();

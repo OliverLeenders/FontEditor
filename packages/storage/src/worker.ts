@@ -110,6 +110,7 @@ export function storageHandler(
         id: request.id,
         ok: false,
         reason: error instanceof Error ? error.message : String(error),
+        ...(error instanceof Error ? { name: error.name } : {}),
       };
     }
   };

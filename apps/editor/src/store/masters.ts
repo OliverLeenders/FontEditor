@@ -44,6 +44,7 @@ import {
 import { noteDesignspace, noteMasterAdded, noteMasterOpened } from "./family-folder.js";
 import type { FontHost } from "./fonts.js";
 import { showDocument } from "./fonts.js";
+import { whyNotSaved } from "../persistence.js";
 import { painted, shown } from "./opening.js";
 import { shareStructure } from "./structure.js";
 
@@ -155,10 +156,10 @@ async function makeCurrent(host: FontHost, id: MasterId, document: FontDocument)
       await writeDesignspace(host, { ...project, current: id });
     }
   } catch (error) {
-    host.patch({
-      saveStatus: "failed",
-      storageDetail: error instanceof Error ? error.message : String(error),
-    });
+    // Said as any save that failed is. Where it was the glyphs that were not
+    // written they are owed, and written whole when the save is tried again —
+    // with which master they are, which a reader believes over the project.
+    host.patch({ saveStatus: "failed", storageDetail: whyNotSaved(error) });
   }
 }
 

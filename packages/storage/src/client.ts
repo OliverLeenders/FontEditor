@@ -85,7 +85,13 @@ export class StorageClient {
         }
         this.waiting.delete(response.id);
         if (response.ok) pending.resolve(response.value);
-        else pending.reject(new Error(response.reason));
+        else {
+          // Under the name it had in the worker, which is how storage that is
+          // full is told from storage that has failed some other way.
+          const error = new Error(response.reason);
+          if (response.name !== undefined) error.name = response.name;
+          pending.reject(error);
+        }
       },
     );
 

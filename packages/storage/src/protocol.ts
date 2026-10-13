@@ -175,7 +175,17 @@ export type LoadedPayload = {
 
 export type StorageResponse =
   | { readonly id: number; readonly ok: true; readonly value: unknown }
-  | { readonly id: number; readonly ok: false; readonly reason: string };
+  | {
+      readonly id: number;
+      readonly ok: false;
+      readonly reason: string;
+      /**
+       * What kind of error it was, where it had a name: `QuotaExceededError`
+       * is storage that is full, which is said differently from storage that
+       * is broken, and is worth trying again.
+       */
+      readonly name?: string;
+    };
 
 /**
  * How far a request has got, said before its reply.

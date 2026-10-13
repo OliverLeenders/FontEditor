@@ -137,7 +137,16 @@ Done so far, since 0.1.110:
 - The browser tests pass in Firefox as they do in Chromium, fourteen of fourteen, run with
   `BROWSER=firefox`. Not yet on CI, which is 0.3.
 
-Still to do in Firefox: say in the File menu that a folder cannot be saved to there.
+- Storage that is full is said as that on the status line, and what was not saved is tried
+  again without anything being drawn: after five seconds, and twice as long each time up to a
+  minute. A whole font there was no room to write — one being opened, a master gone to — is
+  owed and written whole when there is room, where it was never tried again. Closing the tab
+  on a save that failed asks first.
+
+Still to do in Firefox: say in the File menu that a folder cannot be saved to there. Still to
+do for full storage: the desktop window's own question on closing does not yet ask about a
+save that failed, and nothing offers to make room (the copies under History are the largest
+thing kept).
 
 ### 0.3 — Tested where it runs
 

@@ -20,6 +20,20 @@ import {
 export type StorageState = "connecting" | "ready" | "unavailable";
 
 /**
+ * Why a save did not happen, as the status line says it.
+ *
+ * Storage that is full is said as that: it is the one failure somebody can do
+ * something about, and the browser's own words for it name a quota nobody has
+ * heard of.
+ */
+export function whyNotSaved(error: unknown): string {
+  if (error instanceof Error && error.name === "QuotaExceededError") {
+    return "this browser's storage is full";
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
  * Whether this tab owns the project, and may therefore write to it.
  *
  * `reading` is a full editor over a document it will not save. That is a strange
@@ -71,6 +85,17 @@ export class Persistence {
       journal: (document) => this.journal(document),
       save: async (document, previous) => {
         if (!this.owner) return;
+        // A whole font that could not be written is written whole now. Saved
+        // as an edit is — the glyphs that differ from what is on disk — it
+        // would go in among the files of the font it was to replace.
+        const owed = this.owedWhole;
+        if (owed !== null) {
+          this.journalEpoch += 1;
+          this.lastJournalled = document;
+          await this.client?.replaceAll(document, owed.master);
+          if (this.owedWhole === owed) this.owedWhole = null;
+          return;
+        }
         await this.client?.saveGlyphs(dirtyGlyphs(previous, document));
         // Before the index is rewritten, so a crash in between leaves files the
         // index still lists rather than files it does not.
@@ -87,10 +112,20 @@ export class Persistence {
         this.report({ saveStatus: this.status });
       },
       failed: (error) => {
-        this.report({ saveStatus: "failed", storageDetail: error.message });
+        this.report({ saveStatus: "failed", storageDetail: whyNotSaved(error) });
       },
     });
   }
+
+  /**
+   * A whole font shown and not written, because the writing of it failed: the
+   * master it is, for when it is written. `null` where nothing is owed.
+   *
+   * Storage that is full is the usual reason, and a font being opened is the
+   * usual thing to fill it. The font is on screen and in no file; autosave is
+   * told it is owed and tries again, and what it then writes is this, whole.
+   */
+  private owedWhole: { readonly master: string | null } | null = null;
 
   /**
    * The journal's writes, one after another in the order they were asked for.
@@ -438,7 +473,18 @@ export class Persistence {
     // will be beside.
     this.journalEpoch += 1;
     this.lastJournalled = document;
-    await client.replaceAll(document, master);
+    try {
+      await client.replaceAll(document, master);
+    } catch (error) {
+      // Not written, and on screen. Owed, and tried again by autosave as a
+      // save that failed is; said here, and thrown on for whoever asked, whose
+      // next steps were to follow a font that is on disk.
+      this.owedWhole = { master };
+      this.autosave.owe(document);
+      this.report({ saveStatus: "failed", storageDetail: whyNotSaved(error) });
+      throw error;
+    }
+    this.owedWhole = null;
 
     // Disk now holds exactly this document, so autosave starts from it rather
     // than believing every glyph is still unwritten — and keeps whatever was

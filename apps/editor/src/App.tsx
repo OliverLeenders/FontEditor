@@ -283,7 +283,9 @@ export function App(): React.JSX.Element {
       // with the three answers this dialog cannot offer.
       // And a font opened a moment ago and still being written: the flush
       // above is the edits, which is all a closing page has time for.
-      if ((store.unsavedOnDisk || store.writingWholeFont) && desktop() === null) {
+      // And one that could not be saved at all, storage being full or broken:
+      // what is not on disk then is the work, and not only a folder behind it.
+      if ((store.unsavedOnDisk || store.writingWholeFont || store.notSaved) && desktop() === null) {
         event.preventDefault();
       }
     };
