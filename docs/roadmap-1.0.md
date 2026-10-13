@@ -153,8 +153,14 @@ Done so far, since 0.1.110:
 - The user guide caught up — one glyph as an SVG, what a save that did not happen says,
   which browsers — and a `CHANGELOG.md` begun, kept from 0.1.110.
 
-Still to do in Firefox: say in the File menu that a folder cannot be saved to there. Still to
-do for full storage: the desktop window's own question on closing does not yet ask about a
+- A workspace that throws while it is drawn takes its own pane and no more: the pane says the
+  view stopped, that the font is as it was, and offers to draw it again, and the status line
+  says what was thrown. It took the window.
+- The File menu in a browser with no way to be handed a folder says why the folder is not on
+  it, and what to do instead.
+
+Found on the way, and not yet looked at: the desktop window on Linux has no way to be handed
+a folder either, so a font cannot be saved to a folder there. Still to do for full storage: the desktop window's own question on closing does not yet ask about a
 save that failed, and nothing offers to make room (the copies under History are the largest
 thing kept).
 

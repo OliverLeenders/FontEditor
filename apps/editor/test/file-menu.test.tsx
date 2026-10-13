@@ -211,6 +211,17 @@ describe("the font's folder in the bar", () => {
     expect(screen.getByRole("menuitemcheckbox", { name: "Import font file…" })).toBeTruthy();
     expect(screen.queryByRole("menuitemcheckbox", { name: "Open UFO folder…" })).toBeNull();
     expect(screen.queryByRole("menuitemcheckbox", { name: /^Save/ })).toBeNull();
+    // And why they are not, with what to do instead: somebody who has read of
+    // saving to a folder would otherwise go looking for it.
+    expect(screen.getByRole("note").textContent).toBe(
+      "Saving to a folder needs Chrome or Edge. Here, take a font out with Export.",
+    );
+  });
+
+  it("says nothing of that where folders can be saved to", () => {
+    render(<FileMenu />);
+    openMenu();
+    expect(screen.queryByRole("note")).toBeNull();
   });
 });
 

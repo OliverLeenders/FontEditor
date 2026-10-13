@@ -1,0 +1,48 @@
+/*
+ * A pane whose workspace threw while it was being drawn.
+ *
+ * The ground and the sheet of the list of fonts and of a font being opened,
+ * inside the pane rather than over the window: the rest of the window is still
+ * working, and is left to be seen.
+ */
+.pane {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  min-height: 0;
+  padding: 2rem 1rem;
+  overflow: auto;
+  background: var(--ground);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  width: min(30rem, 100%);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.safe {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.again {
+  composes: large from "./Button.module.css";
+}
+
+/* What was thrown, for whoever is told about it: small, and as it was said. */
+.what {
+  margin: 0.4rem 0 0;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}

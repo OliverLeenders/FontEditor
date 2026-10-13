@@ -56,7 +56,12 @@ export type Item =
        */
       readonly hint?: string;
     }
-  | { readonly kind: "separator" };
+  | { readonly kind: "separator" }
+  /**
+   * A sentence in the menu that is not something to press: why something is
+   * not on it, where that would otherwise be found out by looking for it.
+   */
+  | { readonly kind: "aside"; readonly text: string };
 
 /**
  * The rows themselves.
@@ -76,6 +81,10 @@ export function MenuItems({
       {items.map((item, index) =>
         item.kind === "separator" ? (
           <div key={`sep-${String(index)}`} className={styles.separator} role="separator" />
+        ) : item.kind === "aside" ? (
+          <p key={`aside-${String(index)}`} className={styles.aside} role="note">
+            {item.text}
+          </p>
         ) : (
           <button
             key={item.label}

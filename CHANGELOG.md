@@ -27,6 +27,8 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 - A save there was no room for says so — _this browser's storage is full_ — and is tried
   again by itself. A font being opened when the room ran out is written once there is room,
   where it used to stay on screen and unsaved.
+- A view that fails while it is drawn says so in its own pane, with **Try again**, and the
+  rest of the window carries on. It used to take the whole window with it.
 - What a font came in without is said on the status line, a line to each thing: the warnings
   of a font file or folder opened, and the glyphs a master, a copy put back or the browser's
   own copy could not give back. It was said as a number, or not at all.

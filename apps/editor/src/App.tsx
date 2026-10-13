@@ -22,6 +22,7 @@ import { ProofView } from "./components/ProofView.js";
 import { Opening } from "./components/Opening.js";
 import { Projects } from "./components/Projects.js";
 import { CloseWarning } from "./components/CloseWarning.js";
+import { ViewBoundary } from "./components/ViewBoundary.js";
 import { UpdateNotice } from "./components/UpdateNotice.js";
 import { desktop } from "./desktop.js";
 import { SpacingView } from "./components/SpacingView.js";
@@ -578,7 +579,10 @@ export function App(): React.JSX.Element {
             }
             onClose={two && index === 1 ? () => setPanes(closeSecondPane) : undefined}
           />
-          {workspace(shown, index)}
+          {/* Made anew for each workspace, so going to another starts over. */}
+          <ViewBoundary key={shown} onError={(error) => store.reportFailure(error)}>
+            {workspace(shown, index)}
+          </ViewBoundary>
         </section>
       </PaneContext.Provider>
     );

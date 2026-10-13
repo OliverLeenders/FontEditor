@@ -98,3 +98,14 @@
   background: var(--rule);
   margin: 0.18rem 0.3rem;
 }
+
+/* A sentence among the items that is not one of them: quieter than they are,
+   and let to wrap, where a row is one line. */
+.aside {
+  max-width: 17rem;
+  margin: 0.25rem 0.6rem 0.3rem;
+  color: var(--ink-3);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  white-space: normal;
+}
