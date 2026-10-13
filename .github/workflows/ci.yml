@@ -44,13 +44,21 @@ jobs:
   # The floor is 22 because pnpm 11 reads its store through node:sqlite, which
   # Node 20 does not have — on 20 the package manager crashes before installing
   # anything, so there is no version of this repository a Node 20 could build.
+  #
+  # And on Windows, which an installer is built for and nothing was ever tested
+  # on: paths, line endings and the file system are all its own. Once, on the
+  # newer Node, since which Node it is has been asked above.
   test:
-    name: Tests on Node ${{ matrix.node }}
-    runs-on: ubuntu-latest
+    name: Tests on Node ${{ matrix.node }}, ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         node: [22, 24]
+        include:
+          - os: windows-latest
+            node: 24
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -69,14 +77,25 @@ jobs:
   # asked of it, two tabs and the lock between them. The first time these ran
   # they found a font called saved that was not yet written.
   #
-  # Chromium only, and headless: it is the engine the browser build is offered
-  # for, since the others have no way to open a folder.
+  # In each engine the editor is offered in, and headless. Chromium is the one
+  # with a way to open a folder; Firefox keeps a font in the browser and is
+  # supported as that. WebKit is Safari's engine, which is as near to Safari as
+  # can be had without a Mac: it is run to be seen, and does not yet stop a
+  # push, because whether its file system works where this runs is not known
+  # until it has — on Windows, Playwright's build of it cannot write a file.
   browser:
-    name: In a browser
+    name: In ${{ matrix.browser }}
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.browser == 'webkit' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
     env:
-      # Playwright's Chromium inside node_modules, where the tests look for it.
+      # Playwright's browsers inside node_modules, where the tests look for them.
       PLAYWRIGHT_BROWSERS_PATH: "0"
+      # Which of them the tests launch: see `engine` in browser/harness.ts.
+      BROWSER: ${{ matrix.browser }}
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -85,8 +104,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Fetch Chromium, and the libraries it wants
-        run: pnpm --filter @typewright/editor exec playwright install --with-deps --only-shell chromium
+      - name: Fetch the browser, and the libraries it wants
+        run: >
+          pnpm --filter @typewright/editor exec playwright install --with-deps
+          ${{ matrix.browser == 'chromium' && '--only-shell' || '' }} ${{ matrix.browser }}
       - run: pnpm test:browser
 
   # The two things this repository actually ships, built.

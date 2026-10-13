@@ -902,7 +902,7 @@ describe("autosave", () => {
       },
     );
     const tick = async (): Promise<void> => {
-      (fire as (() => void) | null)?.();
+      (fire)?.();
       await settle();
     };
 

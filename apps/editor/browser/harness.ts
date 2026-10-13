@@ -1,3 +1,6 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { Browser, BrowserContext, Locator, Page } from "playwright";
@@ -62,11 +65,12 @@ export type Profile = {
 };
 
 export async function profile(browser: Browser): Promise<Profile> {
-  const context = await browser.newContext({
+  const options = {
     viewport: { width: 1440, height: 900 },
     reducedMotion: "reduce",
     acceptDownloads: true,
-  });
+  } as const;
+  const context = engine() === "webkit" ? await kept(options) : await browser.newContext(options);
   const problems: string[] = [];
   return {
     context,
@@ -81,6 +85,22 @@ export async function profile(browser: Browser): Promise<Profile> {
       return page;
     },
   };
+}
+
+/**
+ * A profile kept in a folder, which is the only kind WebKit gives a file system
+ * of its own to: in one that is not kept, as a private window is not, asking
+ * for it fails. The folder is new each time and goes when the profile does, so
+ * it is as empty as any other.
+ */
+async function kept(options: Parameters<Browser["newContext"]>[0]): Promise<BrowserContext> {
+  const { webkit } = await import("playwright");
+  const folder = await mkdtemp(join(tmpdir(), "typewright-webkit-"));
+  const context = await webkit.launchPersistentContext(folder, options);
+  context.on("close", () => {
+    void rm(folder, { recursive: true, force: true }).catch(() => undefined);
+  });
+  return context;
 }
 
 /** The button on the start page that goes on with the font last open. */
