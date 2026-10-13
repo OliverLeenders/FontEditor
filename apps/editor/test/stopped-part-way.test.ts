@@ -253,6 +253,42 @@ describe("stopped part of the way", () => {
     });
   });
 
+  it("packing the glyphs of a font as it is opened", { timeout: 120_000 }, async () => {
+    // A working copy with a file to every glyph, which is how every one was
+    // kept before a font's glyphs were packed into one: opened, it is packed,
+    // behind the font being shown. Stopped anywhere in that, it is the font it
+    // was. Armed before it is opened, since the opening is what is stopped.
+    const base: Files = new MemoryFileStore();
+    const first = await opened(base);
+    mark(first, "the font");
+    await first.flushNow();
+    expect(await base.list("packed.")).toEqual([]);
+    const before = await found(base);
+
+    const quiet = async (): Promise<void> => {
+      for (let i = 0; i < 50; i++) await settled();
+    };
+
+    // To the end once: how many changes it makes, and that it packs at all.
+    const whole = new StoppingFiles(await copyOf(base));
+    await opened(whole);
+    await quiet();
+    const changes = whole.changes;
+    expect(changes).toBeGreaterThan(3);
+    expect((await whole.inner.list("packed.")).length).toBe(1);
+    expect(await found(whole.inner)).toEqual(before);
+
+    for (let n = 0; n < changes; n++) {
+      const files = new StoppingFiles(await copyOf(base));
+      files.arm(n);
+      await opened(files).catch(() => undefined);
+      await quiet();
+
+      const where = `stopped after ${String(n)} of ${String(changes)} changes`;
+      expect(await found(files.inner), where).toEqual(before);
+    }
+  });
+
   it("renaming a master", { timeout: 120_000 }, async () => {
     await stoppedAnywhere(twoMasters, async (store) => {
       await store.renameMaster("bold", "Black");

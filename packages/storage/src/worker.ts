@@ -39,6 +39,8 @@ import {
   glyphPath,
   loadDocument,
   readHeldMaster,
+  removeGlyph,
+  repack,
   replaceDocument,
   wipe,
 } from "./project.js";
@@ -149,6 +151,7 @@ async function runOn(
           kerning: null,
           recovered: false,
           problems: [],
+          untidy: false,
           master: null,
           gone: [],
         };
@@ -160,6 +163,7 @@ async function runOn(
         kerning: encodeKerning(result.document.kerning),
         recovered: result.recovered,
         problems: result.problems,
+        untidy: result.untidy,
         master: await readHeldMaster(required()),
         gone: result.gone,
       };
@@ -185,14 +189,15 @@ async function runOn(
     case "removeGlyphs": {
       const removed: string[] = [];
       for (const name of request.names) {
-        const path = glyphPath(name);
-        // A file that is not there is the state being asked for, so removing it
-        // twice is not an error worth failing a save over.
-        await required().remove(path);
-        removed.push(path);
+        // A glyph that is not there is the state being asked for, so removing
+        // it twice is not an error worth failing a save over.
+        removed.push(await removeGlyph(required(), name));
       }
       return removed;
     }
+
+    case "tidy":
+      return await repack(required());
 
     case "replaceAll": {
       // Validated the same way a single save is, and *before* anything is

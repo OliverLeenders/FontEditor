@@ -381,6 +381,16 @@ export class Persistence {
     if (loaded.kind === "loaded" && this.owner && loaded.gone.length > 0) {
       await client.removeGlyphs(loaded.gone);
     }
+    // The glyphs packed into one file again, where the font was last written a
+    // glyph a file or enough of them have been since. Not waited for: it moves
+    // the font's files and changes nothing read from them, the worker does it
+    // before whatever is asked of it next, and stopped part way it leaves the
+    // font where it was. The font is not kept off the screen for housekeeping.
+    if (loaded.kind === "loaded" && this.owner && loaded.untidy) {
+      void client.tidy().catch((error: unknown) => {
+        console.warn("[storage] the glyphs were not packed:", error);
+      });
+    }
     return loaded;
   }
 

@@ -49,6 +49,8 @@ export type LoadedProject =
       readonly master: string | null;
       /** Glyphs the journal says were removed, whose files may still be there. */
       readonly gone: readonly string[];
+      /** Whether the glyphs want packing: see {@link StorageClient.tidy}. */
+      readonly untidy: boolean;
     };
 
 /**
@@ -152,6 +154,7 @@ export class StorageClient {
       problems,
       master: payload.master,
       gone: payload.gone,
+      untidy: payload.untidy,
     };
   }
 
@@ -358,6 +361,16 @@ export class StorageClient {
 
   async clearJournal(): Promise<void> {
     await this.send({ kind: "clearJournal" });
+  }
+
+  /**
+   * Pack the font's glyphs into one file again, where enough of them have been
+   * written apart since, or where the working copy is from before they were
+   * packed. Changes where the font is kept and nothing about it. Answers
+   * whether it did anything.
+   */
+  async tidy(): Promise<boolean> {
+    return (await this.send({ kind: "tidy" })) === true;
   }
 
   async wipe(): Promise<void> {

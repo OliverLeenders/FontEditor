@@ -10,7 +10,7 @@ import {
   readAll,
 } from "../src/file-store.js";
 import { GenerationalStore } from "../src/generations.js";
-import { loadDocument, replaceDocument, saveDocument } from "../src/project.js";
+import { loadDocument, replaceDocument, saveDocument, saveGlyphs } from "../src/project.js";
 import type { StorageProgress, StorageRequest, StorageResponse } from "../src/protocol.js";
 import { storageHandler } from "../src/worker.js";
 
@@ -85,7 +85,11 @@ describe("reading a folder whole", () => {
     const inner = new Fast();
     const store = await GenerationalStore.over(inner);
     await replaceDocument(store, font(3));
+    // Written whole, the glyphs are packed; written since, each is a file.
+    await saveGlyphs(store, Object.values(font(3).glyphs));
 
+    // Counted from here: replacing a font reads the one it replaces first.
+    inner.asked = 0;
     const read = await store.readFolder("glyphs/");
     expect(inner.asked).toBe(1);
     expect(read.map((file) => file.path).sort()).toEqual((await store.list("glyphs/")).sort());

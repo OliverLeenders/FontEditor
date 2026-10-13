@@ -11,7 +11,7 @@ import {
   setLayers,
 } from "@typewright/font-model";
 
-import { type FileStore, type ReadProgress, readAll } from "./file-store.js";
+import { type FileStore, PROGRESS_EVERY, type ReadProgress, readAll } from "./file-store.js";
 import { isGenerational } from "./generations.js";
 import { inParallel } from "./parallel.js";
 
@@ -27,20 +27,36 @@ import {
 } from "./schema.js";
 
 /**
- * The layout on disk, shaped like a UFO.
+ * The layout on disk.
  *
  *     fontinfo.json
+ *     glyphs.pack
  *     glyphs/o.json
  *     journal.ndjson
  *
- * One file per glyph is the load-bearing choice. A font has thousands of them;
- * if a save rewrote a single large file, every pause in typing would cost
- * megabytes. Per-glyph files mean a save writes the couple of kilobytes that
- * actually changed. That the layout also mirrors UFO makes the eventual
- * import/export closer to a rename than a converter.
+ * A glyph is in one of two places, and the reason is what each is written for.
+ *
+ * A font written whole — opened from a file, a master gone to, a copy put back
+ * — is thousands of glyphs at once, and a file each is thousands of files
+ * opened: five seconds of a large font in one browser and three minutes of it
+ * in another, where opening a file to write costs thirty milliseconds whatever
+ * is written. So the whole font goes down as one file, the *pack*: a glyph a
+ * line.
+ *
+ * An edit is one glyph, and rewriting megabytes at every pause in drawing to
+ * say so would be the same mistake the other way round. So a glyph changed
+ * since the pack was written is a file of its own in `glyphs/`, as every glyph
+ * once was, and is read over its line in the pack. One taken away leaves a
+ * file there too, saying it is gone: there is no taking a line out of the pack
+ * without writing all of it. When those files are many they are folded into a
+ * new pack — see {@link repack}.
+ *
+ * A working copy from before the pack has every glyph in `glyphs/` and no pack,
+ * which is the same layout with nothing packed yet, and is read as that.
  */
 export const FONT_INFO_PATH = "fontinfo.json";
 export const GLYPHS_PREFIX = "glyphs/";
+export const GLYPH_PACK_PATH = "glyphs.pack";
 export const JOURNAL_PATH = "journal.ndjson";
 /**
  * Kerning gets its own file, as it does in a UFO.
@@ -76,6 +92,42 @@ export async function readHeldMaster(store: FileStore): Promise<string | null> {
 
 export function glyphPath(name: string): string {
   return GLYPHS_PREFIX + glyphFileName(name);
+}
+
+/** Glyphs as a pack holds them: one to a line, so that a line cut short costs one glyph. */
+function packOf(glyphs: readonly Glyph[]): string {
+  return glyphs.map((g) => `${JSON.stringify(encodeGlyph(g))}\n`).join("");
+}
+
+/**
+ * What a glyph's own file holds once the glyph has been taken away: its name,
+ * which the file's does not give back, and nothing else. A glyph that is in
+ * the pack cannot be removed by removing a file, so the file says so instead.
+ */
+type Gone = { readonly gone: string };
+
+function goneOf(parsed: unknown): string | null {
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const name = (parsed as { gone?: unknown }).gone;
+  return typeof name === "string" ? name : null;
+}
+
+/**
+ * Take a glyph out of the working copy.
+ *
+ * Where the glyphs are packed, by leaving word in its place that it is gone;
+ * where they are a file each, by removing the file, which is all there is of
+ * it. A file that is not there is the state being asked for either way.
+ */
+export async function removeGlyph(store: FileStore, name: string): Promise<string> {
+  const path = glyphPath(name);
+  if (isGenerational(store) && store.packed) {
+    const gone: Gone = { gone: name };
+    await store.write(path, JSON.stringify(gone));
+  } else {
+    await store.remove(path);
+  }
+  return path;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +191,7 @@ export async function saveDocument(
   const changed = dirtyGlyphs(previous, document);
   const report = await saveGlyphs(store, changed);
 
-  await inParallel(removedGlyphs(previous, document), (name) => store.remove(glyphPath(name)));
+  await inParallel(removedGlyphs(previous, document), (name) => removeGlyph(store, name));
 
   // The index is small and cheap; rewriting it whenever anything moved keeps it
   // honest about which glyphs exist and in what order.
@@ -187,10 +239,10 @@ export async function replaceDocument(
   // its place in one step: see `generations.ts`. Nothing of the old font is
   // left to remove, and the journal belonged to it.
   if (isGenerational(store)) {
-    const before = (await store.list(GLYPHS_PREFIX)).length;
+    const before = (await readGlyphFiles(store)).glyphs.size;
     let written = 0;
     await store.replace(async (next) => {
-      written = (await writeWhole(next, document, master)).length;
+      written = await writeWhole(next, document, master);
     });
     return { written, removed: Math.max(0, before - written) };
   }
@@ -218,24 +270,148 @@ export async function replaceDocument(
   return { written: keep.size, removed };
 }
 
-/** Every file of a font into a store that has none of them yet: its glyphs, its info, its kerning. */
+/**
+ * Every file of a font into a store that has none of them yet: its glyphs
+ * packed, its info, its kerning. Answers how many glyphs that was.
+ */
 async function writeWhole(
   store: FileStore,
   document: FontDocument,
   master: string | null,
-): Promise<string[]> {
+): Promise<number> {
   const wanted = document.glyphOrder
     .map((name) => document.glyphs[name])
     .filter((g): g is Glyph => g !== undefined);
-  const paths = await inParallel(wanted, async (g) => {
-    const path = glyphPath(g.name);
-    await store.write(path, JSON.stringify(encodeGlyph(g)));
-    return path;
-  });
+  await store.write(GLYPH_PACK_PATH, packOf(wanted));
   await store.write(FONT_INFO_PATH, JSON.stringify(encodeFontInfo(document)));
   await store.write(KERNING_PATH, JSON.stringify(encodeKerning(document.kerning)));
   if (master !== null) await store.write(MASTER_PATH, master);
-  return paths;
+  return wanted.length;
+}
+
+// ---------------------------------------------------------------------------
+// the glyphs, wherever they are
+// ---------------------------------------------------------------------------
+
+/** A font's glyphs as its files have them, before anything is made of them. */
+type GlyphFiles = {
+  /** By name, as stored and not yet decoded: the pack's, and over them each glyph's own file. */
+  readonly glyphs: Map<string, { readonly at: string; readonly stored: unknown }>;
+  /** What could not be read, with where it was. */
+  readonly problems: string[];
+  /** How many files `glyphs/` holds: the glyphs changed or gone since the pack was written. */
+  readonly loose: number;
+  /** Whether there is a pack at all. */
+  readonly packed: boolean;
+};
+
+/**
+ * Read the pack and then the glyphs' own files over it.
+ *
+ * In that order because a file of its own is newer than the pack by
+ * construction: the pack is only ever written whole, into a generation with no
+ * such files in it yet.
+ *
+ * A line of the pack that will not parse is one glyph lost and said so, as a
+ * file that will not parse is. A glyph's own file that will not parse leaves
+ * the pack's line for it standing, which is the glyph as it last was whole.
+ */
+async function readGlyphFiles(store: FileStore, progress?: ReadProgress): Promise<GlyphFiles> {
+  const glyphs: GlyphFiles["glyphs"] = new Map();
+  const problems: string[] = [];
+
+  const pack = await store.read(GLYPH_PACK_PATH);
+  const lines = pack === null ? [] : pack.split("\n");
+  // How far it has got is counted in glyphs, as it was when each was a file:
+  // the pack's lines, and then the files beside it.
+  const packed = lines.at(-1) === "" ? lines.length - 1 : lines.length;
+  let line = 0;
+  for (const raw of lines) {
+    line += 1;
+    if (line % PROGRESS_EVERY === 0) progress?.(line, packed);
+    if (raw === "") continue;
+    const at = `${GLYPH_PACK_PATH}, line ${String(line)}`;
+    const stored = parsed(raw);
+    const name = nameOf(stored);
+    if (name === null) problems.push(`${at}: ${NOT_A_GLYPH}`);
+    else glyphs.set(name, { at, stored });
+  }
+
+  // Folded in afterwards in the order the paths came in: which glyph wins a
+  // name collision and which problem is reported first must not depend on
+  // which read finished first.
+  const files = await readAll(
+    store,
+    GLYPHS_PREFIX,
+    progress === undefined ? undefined : (done, total) => progress(packed + done, packed + total),
+  );
+  for (const { path, raw } of files) {
+    const stored = parsed(raw);
+    const gone = goneOf(stored);
+    if (gone !== null) {
+      glyphs.delete(gone);
+      continue;
+    }
+    const name = nameOf(stored);
+    if (name === null) problems.push(`${path}: ${NOT_A_GLYPH}`);
+    else glyphs.set(name, { at: path, stored });
+  }
+
+  return { glyphs, problems, loose: files.length, packed: pack !== null };
+}
+
+const NOT_A_GLYPH = "file is not valid JSON";
+
+function parsed(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The name a stored glyph gives itself, or `null` for what is not one at all. */
+function nameOf(stored: unknown): string | null {
+  if (typeof stored !== "object" || stored === null) return null;
+  const name = (stored as { name?: unknown }).name;
+  return typeof name === "string" ? name : null;
+}
+
+/** How many files of their own the glyphs may have before they are packed again. */
+export const LOOSE_GLYPHS_ALLOWED = 256;
+
+/**
+ * Fold the glyphs' own files into a new pack, where there are enough of them
+ * to be worth it — or no pack yet, which is a working copy from before there
+ * were packs. Answers whether it did.
+ *
+ * The files and nothing made of them: each glyph goes into the new pack as it
+ * is stored, read or not, and the font's info, its kerning, the master it is
+ * and the journal of what has not been saved go across as they are. So this
+ * changes where the font is kept and nothing about the font, and whatever is
+ * read afterwards is what would have been read before.
+ *
+ * Written as the next generation, so that stopping part of the way through
+ * leaves the font where it was.
+ */
+export async function repack(store: FileStore): Promise<boolean> {
+  if (!isGenerational(store)) return false;
+  const found = await readGlyphFiles(store);
+  if (found.glyphs.size === 0) return false;
+  if (found.packed && found.loose <= LOOSE_GLYPHS_ALLOWED) return false;
+
+  const carried = await Promise.all(
+    [FONT_INFO_PATH, KERNING_PATH, MASTER_PATH, JOURNAL_PATH].map(
+      async (path) => [path, await store.read(path)] as const,
+    ),
+  );
+  await store.replace(async (next) => {
+    let pack = "";
+    for (const { stored } of found.glyphs.values()) pack += `${JSON.stringify(stored)}\n`;
+    await next.write(GLYPH_PACK_PATH, pack);
+    for (const [path, raw] of carried) if (raw !== null) await next.write(path, raw);
+  });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +532,11 @@ export type LoadResult =
        * takes them out, and a save that only writes what changed never would.
        */
       readonly gone: readonly string[];
+      /**
+       * Whether the glyphs want packing: none packed yet, or more of them with
+       * files of their own than {@link LOOSE_GLYPHS_ALLOWED}. See {@link repack}.
+       */
+      readonly untidy: boolean;
     };
 
 /**
@@ -369,18 +550,14 @@ export type LoadResult =
  * one glyph is corrupt is worse.
  */
 export async function loadDocument(store: FileStore, progress?: ReadProgress): Promise<LoadResult> {
-  const problems: string[] = [];
   const glyphs = new Map<string, Glyph>();
 
-  // Read several at a time, and fold the results in afterwards in the order
-  // the paths came in: which glyph wins a name collision and which problem is
-  // reported first must not depend on which read finished first.
-  const files = await readAll(store, GLYPHS_PREFIX, progress);
-
-  for (const { path, raw } of files) {
-    const decoded = decodeFile(raw);
+  const files = await readGlyphFiles(store, progress);
+  const problems = files.problems;
+  for (const { at, stored } of files.glyphs.values()) {
+    const decoded = decodeGlyph(stored);
     if (decoded.ok) glyphs.set(decoded.value.name, decoded.value);
-    else problems.push(`${path}: ${decoded.reason}`);
+    else problems.push(`${at}: ${decoded.reason}`);
   }
 
   let recovered = false;
@@ -452,7 +629,8 @@ export async function loadDocument(store: FileStore, progress?: ReadProgress): P
     ),
     layers,
   );
-  return { kind: "loaded", document, recovered, problems, gone: [...gone] };
+  const untidy = !files.packed || files.loose > LOOSE_GLYPHS_ALLOWED;
+  return { kind: "loaded", document, recovered, problems, gone: [...gone], untidy };
 }
 
 function parseOrNull(raw: string | null): unknown {
@@ -461,14 +639,6 @@ function parseOrNull(raw: string | null): unknown {
     return JSON.parse(raw) as unknown;
   } catch {
     return null;
-  }
-}
-
-function decodeFile(raw: string): ReturnType<typeof decodeGlyph> {
-  try {
-    return decodeGlyph(JSON.parse(raw) as unknown);
-  } catch {
-    return { ok: false, reason: "file is not valid JSON" };
   }
 }
 

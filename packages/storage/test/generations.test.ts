@@ -46,8 +46,8 @@ describe("a font replaced whole", () => {
     await replaceDocument(store, named("First", "a", "b"));
 
     expect(await familyIn(store)).toBe("First");
-    expect(inner.has(`generation-1/${glyphPath("a")}`)).toBe(true);
-    expect(inner.has("generation.1")).toBe(true);
+    expect(inner.has("packed-1/glyphs.pack")).toBe(true);
+    expect(inner.has("packed.1")).toBe(true);
     // Not part of a font's replacement, so not moved.
     expect(inner.has("snapshots/one.json")).toBe(true);
   });
@@ -59,8 +59,8 @@ describe("a font replaced whole", () => {
     await replaceDocument(store, named("Second", "c"));
 
     expect(await namesIn(store)).toEqual(["c"]);
-    expect((await inner.list("generation-1/")).length).toBe(0);
-    expect(inner.has("generation.1")).toBe(false);
+    expect((await inner.list("packed-1/")).length).toBe(0);
+    expect(inner.has("packed.1")).toBe(false);
   });
 
   it("goes on saving into the generation that is current", async () => {
@@ -69,7 +69,7 @@ describe("a font replaced whole", () => {
     await replaceDocument(store, named("First", "a"));
     await saveGlyphs(store, [glyph("z", { advance: 600 })]);
 
-    expect(inner.has(`generation-1/${glyphPath("z")}`)).toBe(true);
+    expect(inner.has(`packed-1/${glyphPath("z")}`)).toBe(true);
     expect(await namesIn(store)).toEqual(["a", "z"]);
   });
 
@@ -102,7 +102,7 @@ describe("a font replaced whole", () => {
     const again = await GenerationalStore.over(inner);
     expect(await familyIn(again)).toBe("First");
     expect(await namesIn(again)).toEqual(["a", "b"]);
-    expect((await inner.list("generation-2/")).length).toBe(0);
+    expect((await inner.list("packed-2/")).length).toBe(0);
   });
 
   it("does not take a pointer cut off as it was written for a whole one", async () => {
@@ -110,12 +110,12 @@ describe("a font replaced whole", () => {
     const store = await GenerationalStore.over(inner);
     await replaceDocument(store, named("First", "a"));
     // The next generation written, and its pointer stopped half way.
-    await inner.write(`generation-2/${glyphPath("x")}`, "{}");
-    await inner.write("generation.2", "generat");
+    await inner.write(`packed-2/${glyphPath("x")}`, "{}");
+    await inner.write("packed.2", "pack");
 
     const again = await GenerationalStore.over(inner);
     expect(await familyIn(again)).toBe("First");
-    expect(inner.has("generation.2")).toBe(false);
+    expect(inner.has("packed.2")).toBe(false);
   });
 
   it("reads a working copy from before generations, and moves it into one when replaced", async () => {
@@ -156,7 +156,7 @@ describe("which master a working copy holds", () => {
     await replaceDocument(store, named("Family", "a"), "bold");
 
     expect(await readHeldMaster(store)).toBe("bold");
-    expect(inner.has("generation-1/master.txt")).toBe(true);
+    expect(inner.has("packed-1/master.txt")).toBe(true);
   });
 
   it("is not said for a font with nothing to tell apart, and is not left over from one that had", async () => {

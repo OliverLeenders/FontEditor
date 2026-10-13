@@ -70,6 +70,12 @@ export type StorageRequest =
     }
   | { readonly id: number; readonly kind: "clearJournal" }
   /**
+   * Pack the glyphs again where enough of them have files of their own, or
+   * where none are packed yet. Answers whether anything was done. Only for the
+   * tab that may write.
+   */
+  | { readonly id: number; readonly kind: "tidy" }
+  /**
    * Keep a copy of the whole font, and drop the oldest copies.
    *
    * The whole document in one message, unlike a save, which sends only what
@@ -159,6 +165,8 @@ export type LoadedPayload = {
   readonly kerning: StoredKerning | null;
   readonly recovered: boolean;
   readonly problems: readonly string[];
+  /** Whether the glyphs want packing, which is for the tab that may write to ask for. */
+  readonly untidy: boolean;
   /** The master the working copy says its glyphs are, or `null` where it does not say. */
   readonly master: string | null;
   /** Glyphs the journal says were removed, whose files may still be there. */

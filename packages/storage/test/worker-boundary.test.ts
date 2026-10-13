@@ -128,8 +128,14 @@ describe("deleting a glyph", () => {
     await client.saveFontInfo(after);
 
     // In the generation the font was written into when it was replaced whole.
-    expect(worker.store.has(`generation-1/${glyphPath("vee")}`)).toBe(true);
-    expect(worker.store.has(`generation-1/${glyphPath("v")}`)).toBe(false);
+    expect(worker.store.has(`packed-1/${glyphPath("vee")}`)).toBe(true);
+    // The old name is in the pack, where a file cannot be taken away to take
+    // it out: its own file says that it has gone.
+    expect(await worker.store.read(`packed-1/${glyphPath("v")}`)).toBe('{"gone":"v"}');
+
+    const loaded = await client.load();
+    if (loaded.kind !== "loaded") throw new Error("expected a document");
+    expect(loaded.document.glyphOrder).toEqual(["o", "vee"]);
   });
 
   it("does not mind being asked to remove nothing", async () => {

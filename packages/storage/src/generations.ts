@@ -29,6 +29,17 @@ import { inParallel } from "./parallel.js";
  * the masters not being drawn — is not part of a replacement and stays where it
  * was. A working copy written before generations has its font's files at the
  * top, and is read from there until it is first replaced.
+ *
+ * A generation is written with its glyphs packed into one file — see
+ * `GLYPH_PACK_PATH` in `project.ts` — and such a generation has a name of
+ * another kind, `packed-N` behind `packed.N`. The name is what keeps a build
+ * from before packing away from it. That build reads a glyph a file, would find
+ * none, take the working copy for an empty one, and clear away a generation it
+ * could make nothing of; these names it does not know for generations at all,
+ * and leaves alone. So a packed generation, once there is one, is the font
+ * whatever else is beside it: a `generation-N` next to it is an older build's,
+ * written by something that could not see the font, and goes with the
+ * leftovers.
  */
 export class GenerationalStore implements FileStore {
   private constructor(
@@ -41,15 +52,35 @@ export class GenerationalStore implements FileStore {
   /** The store over a working copy, its current generation found and the leftovers cleared. */
   static async over(inner: FileStore): Promise<GenerationalStore> {
     const names = await inner.list("");
-    let best = 0;
+    // The highest whole pointer of each kind, and the highest number of either:
+    // the next generation is numbered past both, so that it is never one an
+    // older build has already used.
+    const best = { packed: 0, plain: 0 };
+    let highest = 0;
     for (const path of names) {
-      const n = pointerNumber(path);
-      if (n === null || n <= best) continue;
-      if ((await inner.read(path)) === pointerText(n)) best = n;
+      const pointer = pointerOf(path);
+      if (pointer === null) continue;
+      highest = Math.max(highest, pointer.number);
+      const kind = pointer.packed ? "packed" : "plain";
+      if (pointer.number <= best[kind]) continue;
+      if ((await inner.read(path)) === pointerText(pointer.number, pointer.packed)) {
+        best[kind] = pointer.number;
+      }
     }
-    const store = new GenerationalStore(inner, best === 0 ? "" : folderOf(best), best);
+    const packed = best.packed > 0;
+    const number = packed ? best.packed : best.plain;
+    const store = new GenerationalStore(
+      inner,
+      number === 0 ? "" : folderOf(number, packed),
+      Math.max(highest, number),
+    );
     await store.clearLeftovers(names);
     return store;
+  }
+
+  /** Whether the font's glyphs are packed into one file here, with any written since beside it. */
+  get packed(): boolean {
+    return this.current.startsWith(PACKED_FOLDER);
   }
 
   /** Whether a path is one of the font's own files, which belong to a generation. */
@@ -122,7 +153,7 @@ export class GenerationalStore implements FileStore {
    */
   async replace(write: (next: FileStore) => Promise<void>): Promise<void> {
     const number = this.number + 1;
-    const folder = folderOf(number);
+    const folder = folderOf(number, true);
     const next: FileStore = {
       read: (path) => this.inner.read(this.at(path, folder)),
       write: (path, contents) => this.inner.write(this.at(path, folder), contents),
@@ -138,7 +169,7 @@ export class GenerationalStore implements FileStore {
     await write(next);
 
     // The step that makes it so.
-    await this.inner.write(pointerName(number), pointerText(number));
+    await this.inner.write(pointerName(number, true), pointerText(number, true));
     this.current = folder;
     this.number = number;
 
@@ -154,17 +185,17 @@ export class GenerationalStore implements FileStore {
    */
   private async clearLeftovers(names: readonly string[]): Promise<void> {
     const mine = this.current === "" ? null : `${this.current}/`;
-    const folders = new Set<number>();
+    const folders = new Set<string>();
     const files: string[] = [];
     for (const path of names) {
-      const n = pointerNumber(path);
-      if (n !== null) {
-        if (n !== this.number) files.push(path);
+      const pointer = pointerOf(path);
+      if (pointer !== null) {
+        if (folderOf(pointer.number, pointer.packed) !== this.current) files.push(path);
         continue;
       }
       const generation = generationOf(path);
       if (generation !== null) {
-        if (generation !== this.number) folders.add(generation);
+        if (generation !== this.current) folders.add(generation);
         continue;
       }
       // The font's own files at the top, from before generations.
@@ -173,10 +204,10 @@ export class GenerationalStore implements FileStore {
 
     // A folder in one step where the store can; otherwise its files one by one.
     const removeFolder = this.inner.removeFolder?.bind(this.inner);
-    for (const n of folders) {
-      if (removeFolder !== undefined) await removeFolder(folderOf(n));
+    for (const folder of folders) {
+      if (removeFolder !== undefined) await removeFolder(folder);
       else {
-        for (const path of names) if (generationOf(path) === n) files.push(path);
+        for (const path of names) if (generationOf(path) === folder) files.push(path);
       }
     }
     await inParallel(files, (path) => this.inner.remove(path));
@@ -190,23 +221,35 @@ export class GenerationalStore implements FileStore {
 /** The folder glyph files live in, inside a generation or at the top. */
 const GLYPHS = "glyphs/";
 
-/** The font's own files that are not glyphs. */
-const OWN_FILES = new Set(["fontinfo.json", "kerning.json", "journal.ndjson", "master.txt"]);
+/** The font's own files that are not a glyph's own: the pack of them among these. */
+const OWN_FILES = new Set([
+  "fontinfo.json",
+  "kerning.json",
+  "journal.ndjson",
+  "master.txt",
+  "glyphs.pack",
+]);
 
-const folderOf = (n: number): string => `generation-${String(n)}`;
-const pointerName = (n: number): string => `generation.${String(n)}`;
-const pointerText = (n: number): string => `${folderOf(n)}\n`;
+/** What a generation with its glyphs packed is called, and one from before packing. */
+const PACKED_FOLDER = "packed-";
+const PLAIN_FOLDER = "generation-";
 
-/** The generation a pointer file names, or `null` for anything else. */
-function pointerNumber(path: string): number | null {
-  const found = /^generation\.(\d+)$/.exec(path);
-  return found === null ? null : Number(found[1]);
+const folderOf = (n: number, packed: boolean): string =>
+  `${packed ? PACKED_FOLDER : PLAIN_FOLDER}${String(n)}`;
+const pointerName = (n: number, packed: boolean): string =>
+  `${packed ? "packed" : "generation"}.${String(n)}`;
+const pointerText = (n: number, packed: boolean): string => `${folderOf(n, packed)}\n`;
+
+/** The generation a pointer file names and of which kind, or `null` for anything else. */
+function pointerOf(path: string): { number: number; packed: boolean } | null {
+  const found = /^(generation|packed)\.(\d+)$/.exec(path);
+  return found === null ? null : { number: Number(found[2]), packed: found[1] === "packed" };
 }
 
-/** The generation a file is inside, or `null` for one at the top. */
-function generationOf(path: string): number | null {
-  const found = /^generation-(\d+)\//.exec(path);
-  return found === null ? null : Number(found[1]);
+/** The folder of the generation a file is inside, or `null` for one at the top. */
+function generationOf(path: string): string | null {
+  const found = /^((?:generation|packed)-\d+)\//.exec(path);
+  return found === null ? null : (found[1] ?? null);
 }
 
 /** Whether a store keeps generations, and so can replace a font in one step. */
