@@ -1,0 +1,70 @@
+# What is too slow to run on every push, run once a night.
+#
+# Two things in this repository are asked for by a variable and skipped
+# otherwise, because each is minutes: every stroke the tests draw held against
+# the pen swept along its path, where a push asks it of a handful; and the
+# store walked at random for six hundred fonts' worth of edits, where a push
+# walks sixty. Skipped and never run, a check is a check nobody has — which is
+# what both were until somebody remembered to ask. Here they are asked every
+# night, and from the Actions tab whenever somebody wants to know now.
+#
+# A night that fails does not stop anything: nothing is waiting on it. It is
+# there to be looked at, and a failure here is a fault that the push that made
+# it was let past.
+
+name: Nightly
+
+on:
+  schedule:
+    # Three in the morning, UTC: after a day's pushes, and on nobody's time.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  # Every stroke case, in both the packages that draw them: the line round the
+  # ink against the swept pen, and the outline a font gets against the canvas's.
+  strokes:
+    name: Every stroke, against the pen
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      STROKE_DIAGNOSE: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: The line round the ink, in geometry
+        run: pnpm --filter @typewright/geometry test
+      # Run whether or not the first found something: they ask different
+      # things, and a night should say all that is wrong.
+      - name: The outline a font gets, in font-model
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @typewright/font-model test
+
+  # The store, walked at random for much longer than a push walks it.
+  walk:
+    name: The long random walk
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      WALK_SEEDS: "600"
+      WALK_STEPS: "90"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: >
+          pnpm --filter @typewright/editor exec vitest run
+          test/random-walk.test.ts --testTimeout=1800000
