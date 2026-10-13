@@ -148,7 +148,10 @@ Done so far, since 0.1.110:
   said on the status line now with a line to each: glyphs the browser's copy of a font could
   not give back (said only to the console), the warnings of a font file or a folder opened
   ("3 warnings", and which three nowhere), and the glyphs a master gone to or a copy put back
-  came without. The refused union is still to be looked at.
+  came without.
+- The refused union is no longer refused. Measured again, the four thousand icons are read
+  and written with no warning at all, and in eight seconds where the notes said twenty-six;
+  whichever change to the joining mended it, a test now asks it of every icon.
 
 - The user guide caught up — one glyph as an SVG, what a save that did not happen says,
   which browsers — and a `CHANGELOG.md` begun, kept from 0.1.110.

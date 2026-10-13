@@ -142,3 +142,24 @@ describe("icons drawn as pieces that overlap", () => {
     expect(sameInk(inFile(name), correctDirections(back.contours), 4)).toBe(true);
   });
 });
+
+describe("the whole set of four thousand", () => {
+  it(
+    "is read and written without a word: every overlap joined, none left in the font",
+    {
+      timeout: 240_000,
+    },
+    () => {
+      // One of them was not, for a while: an icon whose pieces lie along each
+      // other's edges was written with its overlap in it and a warning saying
+      // so. Asked of every icon, so that the next one to be refused is noticed.
+      const bytes = readFileSync(FONT);
+      const whole = parseFont(
+        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+      );
+      const all = documentFrom(whole, counterIds("all"));
+      expect(all.warnings).toEqual([]);
+      expect(exportFont(all.document, counterIds("allout")).warnings).toEqual([]);
+    },
+  );
+});
