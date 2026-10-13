@@ -21,12 +21,28 @@ export const LARGE_FONT = fileURLToPath(
 );
 export const LARGE_FONT_GLYPHS = 4042;
 
-/** Playwright's own Chromium, kept inside node_modules as the screenshots' is. */
+/** The browsers the editor is tried in: Chromium unless `BROWSER` names another. */
+const ENGINES = ["chromium", "firefox", "webkit"] as const;
+export type Engine = (typeof ENGINES)[number];
+
+/** Which of them this run is in. */
+export function engine(): Engine {
+  const asked = process.env["BROWSER"] ?? "chromium";
+  const found = ENGINES.find((each) => each === asked);
+  if (found === undefined) throw new Error(`BROWSER is ${asked}: not one of ${ENGINES.join(", ")}`);
+  return found;
+}
+
+/**
+ * Playwright's own browser, kept inside node_modules as the screenshots' is —
+ * unless the run says where its browsers are, which is how one fetched into
+ * Playwright's own cache is used.
+ */
 export async function launch(): Promise<Browser> {
   // Read when Playwright is loaded, so set before it is.
-  process.env["PLAYWRIGHT_BROWSERS_PATH"] = "0";
-  const { chromium } = await import("playwright");
-  return chromium.launch();
+  process.env["PLAYWRIGHT_BROWSERS_PATH"] ??= "0";
+  const playwright = await import("playwright");
+  return playwright[engine()].launch();
 }
 
 /**

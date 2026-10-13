@@ -298,9 +298,16 @@ export class Persistence {
       if (dirty && this.owner) await this.autosave.flush();
       this.report({ storage: "ready", saveStatus: this.autosave.status });
 
-      if (!(await requestPersistence())) {
-        console.info("[storage] persistence not granted; the browser may evict this data");
-      }
+      // Asked, and not waited for. Chromium answers at once; Firefox asks the
+      // person, and answers when they do — which is never, where the question
+      // is dismissed or nobody is looking. Waited for, that was a font read and
+      // ready behind the pane that says it is being opened, for as long as the
+      // question went unanswered.
+      void requestPersistence().then((granted) => {
+        if (!granted) {
+          console.info("[storage] persistence not granted; the browser may evict this data");
+        }
+      });
     } catch (error) {
       this.fail(error);
     }
