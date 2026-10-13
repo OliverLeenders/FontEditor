@@ -1792,6 +1792,25 @@ where the one line cannot be made, and only where the part begins at a point of 
 an arch, a bar, a stem with a short foot and a hairpin, with five pens, fill as the canvas
 does (`stroke-planned-drop.test.ts`, and glyph r for fontTools).
 
+And a pen of corners that is pivoting as the path comes to a point: one corner began to draw
+the side before the point and the other stops after it, so that the line would go back from
+the one stretch of the path into the one before, and a stretch has only its own. Each is
+given what is its own of it. The stretch before: its corner to the point, along the pen's
+edge to the pivot, the pivot back to where the second corner began, and that corner to the
+point. The stretch after: the first corner on to where it stops, the pivot back to the
+point, along the edge to the second corner, and that corner on. They meet on the pen's edge
+as it is at the point, and what is added to the line is that edge gone along and back,
+round nothing. A pen pivoting as a stretch begins pivots on its near edge, the one whose two
+corners are each going outward of the pen's other edge there: on the far edge neither
+corner is going outward either, and it was taken for the near one. And where the path comes
+to a corner with a side ending part way along the pen's edge, the pen is laid at the corner
+whole, a loop of its own: the line from part way along an edge to a corner left some of the
+standing pen out — a rectangle turned twelve degrees back from point to point round a
+square was fifteen points short, before any of this. The sweep again, and with the pen
+turned back as well as on, and ninety degrees: two hundred and fifteen of two hundred and
+thirty-eight are drawn by their corners and none is a point out; of the hundred and two it
+was first made of, a hundred.
+
 #### Open
 
 What is next in the same direction:
@@ -1800,11 +1819,12 @@ What is next in the same direction:
   variable font: where the path turns to come to the line in the middle of a curve. The
   default master's ink, as before.
 
-- **A pen of corners pivoting through a point of the path with both ends going outward**,
-  or pivoting where an open path ends: the line would have to go back from one stretch of
-  the path into the one before. A rectangle is fitted there, as it was, and a broad edge is
-  written into a variable font as the default master draws it. Twelve of a hundred and two
-  in the sweep, all of them pens turned sixty degrees or so between two points.
+- **A pen of corners pivoting where an open path ends**: the pen stands whole there, and
+  the side comes to it part way along an edge; taking it on along the edge to a corner, either
+  corner, fills what the pen does not. A rectangle is fitted there, as it was, and a broad
+  edge is written into a variable font as the default master draws it. Most of the
+  twenty-three the sweep does not draw by their corners, all of them pens turned sixty
+  degrees or more between two points.
 - **A turning pen whose masters' sides are not the same stretches**: a corner that draws a
   side in one master and not in another. Where the difference is at one end of a stretch
   the master without it has it with no length; anywhere else, the same fallback.

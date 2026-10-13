@@ -124,6 +124,38 @@ describe("a pen of corners turning along a stroke", () => {
   );
 });
 
+describe("a pen of corners pivoting as the path comes to a point", () => {
+  // One corner began to draw the side before the point and the other stops
+  // after it: the line goes back from the one stretch into the one before, and
+  // each stretch is given what is its own of that. And a path that comes to a
+  // corner with the pen part way through pivoting has the pen laid there.
+  const cases = [
+    ["a pen widening along a line", "box", 60],
+    ["an oval pen turning and swelling round a corner", "box", 35],
+    ["an oval pen turning and swelling round a corner", "broad", 35],
+    ["a zigzag with a broad nib", "box", 12],
+    ["a zigzag with a broad nib", "box", 90],
+    ["a round pen round a small closed curve", "box", 90],
+    ["an oval pen round a closed square", "box", -12],
+    ["a thin oval round a bend that folds on the inside", "box", 60],
+  ] as const;
+
+  it.each(cases)(
+    "is one plan, by its corners, and the pen's ink: %s, %s, turning %i",
+    { timeout: 240_000 },
+    (name, kind, turn) => {
+      const c = named(name);
+      const pens = pensFor(c.closed ? c.curves.length : c.curves.length + 1, kind, turn);
+      const planned = plannedInk([strokeOf(c.curves, c.closed, pens)], ids, true);
+      expect(planned).not.toBeNull();
+      const d = disagreement(loopsOf(planned![0]!), sweep(c.curves, pens, c.closed), 70);
+      expect(d.checked).toBeGreaterThan(500);
+      expect(d.missing).toEqual([]);
+      expect(d.extra).toEqual([]);
+    },
+  );
+});
+
 describe("a pen of corners turning along a stroke, in two masters", () => {
   // The pen turned twelve degrees on at each point, and in the bold more than
   // twice the size: so a corner the light pen comes to just before the end of

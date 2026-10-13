@@ -355,6 +355,9 @@ export function plannedStrokes(
   }
 
   const out: PlannedPiece[][][] = masters.map(() => []);
+  // The corners of the path a turning rectangle comes to in the middle of
+  // pivoting: see below, where the pen is laid at them.
+  const pivotedAt = new Map<number, Leg>();
   for (const cycle of rounds) {
     const loops: PlannedPiece[][] = masters.map(() => []);
     for (const [k, leg] of cycle.entries()) {
@@ -371,6 +374,21 @@ export function plannedStrokes(
           : cornered
             ? corneredJoins(each, leg, next)
             : each.map((j) => joinOf(j.master, j.profiles, leg, next, j.before, j.after));
+      if (turned !== null && !(leg.index === next.index && leg.forward !== next.forward)) {
+        const partWay = each.some(({ master, profiles: own, before, after }) => {
+          const curve = master.curves[leg.index]!;
+          const centre = leg.forward ? curve.b : curve.a;
+          const arriving = heading(curve, leg, 1);
+          const leaving = heading(master.curves[next.index]!, next, 0);
+          if (arriving === null || leaving === null) return false;
+          if (Math.abs(arriving.x * leaving.y - arriving.y * leaving.x) <= TURN) return false;
+          const corners = boxCorners(own[leg.index]!.at(leg.forward ? 1 : 0));
+          const off = (p: Vec2): boolean =>
+            corners.every((c) => Math.hypot(centre.x + c.x - p.x, centre.y + c.y - p.y) > 1e-6);
+          return off(before[before.length - 1]!.curve.b) || off(after[0]!.curve.a);
+        });
+        if (partWay) pivotedAt.set(leg.forward ? leg.index + 1 : leg.index, leg);
+      }
       // The pen's edge at a join goes into every master or into none.
       const turns = joins.some((j) => j.turns);
       for (const [at, loop] of loops.entries()) {
@@ -381,6 +399,28 @@ export function plannedStrokes(
       }
     }
     for (const [at, loop] of loops.entries()) out[at]!.push(loop);
+  }
+
+  // The pen standing at a corner of the path it came to pivoting.
+  //
+  // A side that ends part way along the pen's edge is joined to the next
+  // along that edge: which is the edge of the ink where the path goes
+  // straight on, the pen going on turning. At a corner of the path it is not.
+  // The pen stands there, all of it ink, and the line from part way along one
+  // of its edges to a corner of it leaves some of that out. So it is laid
+  // there whole, a loop of its own over the rest, in every master where a side
+  // ends so in any.
+  for (const leg of pivotedAt.values()) {
+    for (const [at, m] of masters.entries()) {
+      const curve = m.curves[leg.index]!;
+      out[at]!.push(
+        penLoop(
+          profiles[at]![leg.index]!.at(leg.forward ? 1 : 0),
+          leg.forward ? curve.b : curve.a,
+          "box",
+        ),
+      );
+    }
   }
 
   // The pen standing where the part of the stroke a cut is made of begins.
@@ -1428,7 +1468,19 @@ type TurningRun =
       readonly open?: "start" | "end";
     }
   /** No length: where a corner is at an instant, standing in for a run another master has. */
-  | { readonly kind: "point"; readonly k: number; readonly from: number; readonly to: number };
+  | { readonly kind: "point"; readonly k: number; readonly from: number; readonly to: number }
+  | {
+      /** Along the pen's edge as it is at an instant, between corner `k` and the place it pivots on. */
+      readonly kind: "over";
+      readonly k: number;
+      readonly next: number;
+      readonly from: number;
+      readonly to: number;
+      /** To the corner from the pivot, or from the corner to it. */
+      readonly toCorner: boolean;
+      /** All the edge: to the corner from corner `next`, and not from the pivot. */
+      readonly whole?: boolean;
+    };
 
 /**
  * Both sides of every stretch for a pen of corners and straight edges that
@@ -1452,15 +1504,26 @@ type TurningRun =
  * corner drawing: its side then begins or ends part way along the pen's edge,
  * and is joined to the next stretch's along that edge.
  *
+ * And the pen may be in the middle of that as the path comes to a point: one
+ * corner began before the point and the other stops after it. The line would
+ * go back from the one stretch into the one before, and each stretch has its
+ * own. So each is given what is its own of it, and they meet on the pen's edge
+ * as it is at the point. The stretch before: its corner to the point, along the
+ * edge to the pivot, the pivot back to where the second corner began, and that
+ * corner to the point. The stretch after: the first corner on to where it
+ * stops, the pivot back to the point, along the edge to the second corner, and
+ * that corner on. What is added is the edge gone along and back, which is
+ * round nothing.
+ *
  * A master whose side has fewer of these than another's — a heavier pen comes
  * to the next corner a little before the end of a stretch where a lighter one
  * comes to it a little after — has the rest with no length, at whichever end
  * of the stretch the other has them.
  *
- * `null` where the corners cannot be followed so — two draw the side where a
- * stretch begins, the pen pivoting through a point of the path with both ends
- * going outward — and where the masters' sides are not made of the same
- * stretches in the same order even so.
+ * `null` where the corners cannot be followed so — two draw the side all a
+ * stretch long, or two that have no edge between them, or the pen is pivoting
+ * as an open path ends — and where the masters' sides are not made of the
+ * same stretches in the same order even so.
  */
 function turningSides(
   masters: readonly StrokeMaster[],
@@ -1477,265 +1540,372 @@ function turningSides(
     );
     for (const forward of [true, false]) {
       const leg: Leg = { index, forward };
-      const each = masters.map((m, at) => {
-        const curve = m.curves[index]!;
-        const profile = profiles[at]![index]!;
-        const t = (s: number): number => (forward ? s : 1 - s);
-        const cornersAt = (s: number): Vec2[] => cornersOf(profile.at(t(s)));
-        const n = cornersAt(0).length;
-        const trace = (k: number, s: number): Vec2 => {
-          const p = evaluate(curve, t(s));
-          const c = cornersAt(s)[k]!;
-          return { x: p.x + c.x, y: p.y + c.y };
-        };
-        // How fast a corner is going, over a step and not at an instant. A pen
-        // changes by the distance gone, which is read off a table of chords:
-        // how fast it turns steps a little from one chord to the next, and the
-        // place an edge pivots on — one going divided by the difference of two
-        // — steps some units along the edge with it. Along the edge, which is
-        // along the line it draws, so nothing is out of place; but a line that
-        // jumps is not one to fit a curve to. Over a step as long as a chord
-        // the turning has no steps in it.
-        const speed = (k: number, s: number): Vec2 => {
-          const a = Math.max(0, s - GOING_OVER);
-          const b = Math.min(1, s + GOING_OVER);
-          const p = trace(k, a);
-          const q = trace(k, b);
-          return { x: (q.x - p.x) / (b - a), y: (q.y - p.y) / (b - a) };
-        };
-        /** How far corner `k` is going to the right of its edge towards corner `k + by`. */
-        const across = (k: number, by: number, s: number): number => {
-          const corners = cornersAt(s);
-          const c = corners[k]!;
-          const e = corners[(k + by) % n]!;
-          const w = speed(k, s);
-          return w.x * (e.y - c.y) - w.y * (e.x - c.x);
-        };
-        /** That, as a share of all its going, and with a tie taken for drawing. */
-        const drawn = (k: number, by: number, s: number): number => {
-          const corners = cornersAt(s);
-          const c = corners[k]!;
-          const e = corners[(k + by) % n]!;
-          const w = speed(k, s);
-          const size = Math.hypot(w.x, w.y) * Math.hypot(e.x - c.x, e.y - c.y);
-          return size > 0 ? across(k, by, s) / size + TIE : TIE;
-        };
-        const edgesOf = n === 2 ? [1] : [1, n - 1];
-        const draws = (k: number, s: number, margin = 0): boolean =>
-          edgesOf.every((by) => drawn(k, by, s) > margin);
-
-        /** Where corner `k` stops or starts going outward of an edge, along the leg. */
-        const turns = (k: number, by: number): { s: number; starts: boolean }[] => {
-          const found: { s: number; starts: boolean }[] = [];
-          let before = drawn(k, by, 0);
-          for (let i = 1; i <= CORNER_STEPS; i++) {
-            const here = drawn(k, by, i / CORNER_STEPS);
-            if (before > 0 !== here > 0) {
-              let lo = (i - 1) / CORNER_STEPS;
-              let hi = i / CORNER_STEPS;
-              for (let j = 0; j < 48; j++) {
-                const mid = (lo + hi) / 2;
-                if (drawn(k, by, mid) > 0 === before > 0) lo = mid;
-                else hi = mid;
-              }
-              found.push({ s: (lo + hi) / 2, starts: here > 0 });
-            }
-            before = here;
-          }
-          return found;
-        };
-        const known = new Map<string, { s: number; starts: boolean }[]>();
-        const turnsOf = (k: number, by: number): { s: number; starts: boolean }[] => {
-          const name = `${String(k)}/${String(by)}`;
-          const had = known.get(name);
-          if (had !== undefined) return had;
-          const made = turns(k, by);
-          known.set(name, made);
-          return made;
-        };
-
-        // Whether the stretch begins or ends where an open path does. The pen
-        // stands whole there and the line goes round it, from a corner to a
-        // corner: a pen pivoting as the path ends is not followed.
-        const atAnEnd = {
-          start: !m.closed && index === (forward ? 0 : count - 1),
-          end: !m.closed && index === (forward ? count - 1 : 0),
-        };
-
-        // The corner the stretch begins with: the one that draws there, and of
-        // two going along an edge of the pen, the one behind.
-        const going = heading(curve, leg, 0);
-        if (going === null) return null;
-        const first = cornersAt(0);
-        const candidates = first.map((_, k) => k).filter((k) => draws(k, 0));
-        if (candidates.filter((k) => draws(k, 0, 2 * TIE)).length > 1) return null;
-        const ahead = (k: number): number => first[k]!.x * going.x + first[k]!.y * going.y;
-        const backOf = (by: number): number => (n - by) % n || 1;
-
-        const runs: TurningRun[] = [];
-        let from = 0;
-        let k: number;
-        if (candidates.length > 0) {
-          k = candidates.reduce((best, c) => (ahead(c) < ahead(best) ? c : best));
-        } else {
-          // None: the pen is pivoting on an edge as the stretch begins. The
-          // corner that is first to begin drawing, across an edge neither it
-          // nor the corner at the other end of it is going outward of yet.
-          let begin: { s: number; next: number; by: number } | null = null;
-          for (let c = 0; c < n; c++) {
-            for (const by of edgesOf) {
-              if (drawn(c, by, 0) > 0 || drawn((c + by) % n, backOf(by), 0) > 0) continue;
-              for (const turn of turnsOf(c, by)) {
-                if (!turn.starts) continue;
-                if (begin === null || turn.s < begin.s) begin = { s: turn.s, next: c, by };
-              }
-            }
-          }
-          if (begin === null || atAnEnd.start) return null;
-          runs.push({
-            kind: "edge",
-            k: (begin.next + begin.by) % n,
-            next: begin.next,
-            from: 0,
-            to: begin.s,
-            open: "start",
-          });
-          k = begin.next;
-          from = begin.s;
-        }
-        for (;;) {
-          if (runs.length > 24) return null;
-          let stop: { s: number; by: number } | null = null;
-          for (const by of edgesOf) {
-            for (const turn of turnsOf(k, by)) {
-              if (turn.starts || turn.s <= from + 1e-9) continue;
-              if (stop === null || turn.s < stop.s) stop = { s: turn.s, by };
-            }
-          }
-          if (stop === null) {
-            runs.push({ kind: "corner", k, from, to: 1 });
-            break;
-          }
-          runs.push({ kind: "corner", k, from, to: stop.s });
-          const next = (k + stop.by) % n;
-          let begins: number | null = null;
-          for (const turn of turnsOf(next, backOf(stop.by))) {
-            if (!turn.starts) continue;
-            if (begins === null || Math.abs(turn.s - stop.s) < Math.abs(begins - stop.s)) {
-              begins = turn.s;
-            }
-          }
-          if (begins === null) {
-            // Not in this stretch. Not yet, and the stretch ends with the pen
-            // pivoting — or it began before the stretch did, which is two
-            // corners drawing through a point of the path.
-            if (drawn(next, backOf(stop.by), stop.s) > 0 || atAnEnd.end) return null;
-            runs.push({ kind: "edge", k, next, from: stop.s, to: 1, open: "end" });
-            break;
-          }
-          runs.push({ kind: "edge", k, next, from: stop.s, to: begins });
-          k = next;
-          from = begins;
-        }
-
-        /** A run as where it is and how fast it is going, from nought to one. */
-        const along = (
-          run: TurningRun,
-        ): { at: (f: number) => Vec2; speed: (f: number) => Vec2 } => {
-          const span = run.to - run.from;
-          if (run.kind === "point") {
-            const here = trace(run.k, run.from);
-            return { at: () => here, speed: () => ({ x: 0, y: 0 }) };
-          }
-          if (run.kind === "corner") {
-            return {
-              at: (f) => trace(run.k, run.from + span * f),
-              speed: (f) => {
-                const s = run.from + span * f;
-                const lo = Math.min(run.from, run.to);
-                const hi = Math.max(run.from, run.to);
-                const a = Math.max(lo, s - 1e-5);
-                const b = Math.min(hi, s + 1e-5);
-                if (!(b > a)) return { x: 0, y: 0 };
-                const p = trace(run.k, a);
-                const q = trace(run.k, b);
-                return { x: ((q.x - p.x) / (b - a)) * span, y: ((q.y - p.y) / (b - a)) * span };
-              },
-            };
-          }
-          const by = (run.next - run.k + n) % n;
-          const between = (f: number): Vec2 => {
-            // No time between them: the pen's edge as it is at that instant.
-            if (Math.abs(span) < 1e-7) {
-              const start = trace(run.k, run.from);
-              const end = trace(run.next, run.to);
-              return { x: start.x + (end.x - start.x) * f, y: start.y + (end.y - start.y) * f };
-            }
-            const s = run.from + span * f;
-            const a = across(run.k, by, s);
+      // With the line taken back round what two corners drew as a stretch
+      // ends, and without: one master may end a stretch so and another not,
+      // and it is a few units of the pen's own ink at the point, laid there
+      // by the stretch after as well.
+      const followed = (closing: boolean) => {
+        const each = masters.map((m, at) => {
+          const curve = m.curves[index]!;
+          const profile = profiles[at]![index]!;
+          const t = (s: number): number => (forward ? s : 1 - s);
+          const cornersAt = (s: number): Vec2[] => cornersOf(profile.at(t(s)));
+          const n = cornersAt(0).length;
+          const trace = (k: number, s: number): Vec2 => {
+            const p = evaluate(curve, t(s));
+            const c = cornersAt(s)[k]!;
+            return { x: p.x + c.x, y: p.y + c.y };
+          };
+          // How fast a corner is going, over a step and not at an instant. A pen
+          // changes by the distance gone, which is read off a table of chords:
+          // how fast it turns steps a little from one chord to the next, and the
+          // place an edge pivots on — one going divided by the difference of two
+          // — steps some units along the edge with it. Along the edge, which is
+          // along the line it draws, so nothing is out of place; but a line that
+          // jumps is not one to fit a curve to. Over a step as long as a chord
+          // the turning has no steps in it.
+          const speed = (k: number, s: number): Vec2 => {
+            const a = Math.max(0, s - GOING_OVER);
+            const b = Math.min(1, s + GOING_OVER);
+            const p = trace(k, a);
+            const q = trace(k, b);
+            return { x: (q.x - p.x) / (b - a), y: (q.y - p.y) / (b - a) };
+          };
+          /** How far corner `k` is going to the right of its edge towards corner `k + by`. */
+          const across = (k: number, by: number, s: number): number => {
             const corners = cornersAt(s);
-            const c = corners[run.k]!;
-            const e = corners[run.next]!;
-            const w = speed(run.next, s);
+            const c = corners[k]!;
+            const e = corners[(k + by) % n]!;
+            const w = speed(k, s);
+            return w.x * (e.y - c.y) - w.y * (e.x - c.x);
+          };
+          /** That, as a share of all its going, and with a tie taken for drawing. */
+          const drawn = (k: number, by: number, s: number): number => {
+            const corners = cornersAt(s);
+            const c = corners[k]!;
+            const e = corners[(k + by) % n]!;
+            const w = speed(k, s);
+            const size = Math.hypot(w.x, w.y) * Math.hypot(e.x - c.x, e.y - c.y);
+            return size > 0 ? across(k, by, s) / size + TIE : TIE;
+          };
+          const edgesOf = n === 2 ? [1] : [1, n - 1];
+          const draws = (k: number, s: number, margin = 0): boolean =>
+            edgesOf.every((by) => drawn(k, by, s) > margin);
+
+          /** Where corner `k` stops or starts going outward of an edge, along the leg. */
+          const turns = (k: number, by: number): { s: number; starts: boolean }[] => {
+            const found: { s: number; starts: boolean }[] = [];
+            let before = drawn(k, by, 0);
+            for (let i = 1; i <= CORNER_STEPS; i++) {
+              const here = drawn(k, by, i / CORNER_STEPS);
+              if (before > 0 !== here > 0) {
+                let lo = (i - 1) / CORNER_STEPS;
+                let hi = i / CORNER_STEPS;
+                for (let j = 0; j < 48; j++) {
+                  const mid = (lo + hi) / 2;
+                  if (drawn(k, by, mid) > 0 === before > 0) lo = mid;
+                  else hi = mid;
+                }
+                found.push({ s: (lo + hi) / 2, starts: here > 0 });
+              }
+              before = here;
+            }
+            return found;
+          };
+          const known = new Map<string, { s: number; starts: boolean }[]>();
+          const turnsOf = (k: number, by: number): { s: number; starts: boolean }[] => {
+            const name = `${String(k)}/${String(by)}`;
+            const had = known.get(name);
+            if (had !== undefined) return had;
+            const made = turns(k, by);
+            known.set(name, made);
+            return made;
+          };
+
+          /** The place the edge from corner `k` to corner `next` pivots on, at `s`. */
+          const pivotAt = (k: number, next: number, s: number, tie = 0.5): Vec2 => {
+            const a = across(k, (next - k + n) % n, s);
+            const corners = cornersAt(s);
+            const c = corners[k]!;
+            const e = corners[next]!;
+            const w = speed(next, s);
             const b = w.x * (e.y - c.y) - w.y * (e.x - c.x);
-            const share = a === b ? f : a / (a - b);
-            const p = trace(run.k, s);
-            const q = trace(run.next, s);
+            const share = a === b ? tie : a / (a - b);
+            const p = trace(k, s);
+            const q = trace(next, s);
             return { x: p.x + (q.x - p.x) * share, y: p.y + (q.y - p.y) * share };
           };
-          return {
-            // Its ends on the corners exactly; how fast it is going is asked of
-            // the pivot itself, which is a hair from them there.
-            at: (f) =>
-              f <= 0 && run.open !== "start"
-                ? trace(run.k, run.from)
-                : f >= 1 && run.open !== "end"
-                  ? trace(run.next, run.to)
-                  : between(Math.min(1, Math.max(0, f))),
-            speed: (f) => {
-              const a = Math.max(0, f - 1e-4);
-              const b = Math.min(1, f + 1e-4);
-              const p = between(a);
-              const q = between(b);
-              return { x: (q.x - p.x) / (b - a), y: (q.y - p.y) / (b - a) };
-            },
+
+          // Whether the stretch begins or ends where an open path does. The pen
+          // stands whole there and the line goes round it, from a corner to a
+          // corner: a pen pivoting as the path ends is not followed.
+          const atAnEnd = {
+            start: !m.closed && index === (forward ? 0 : count - 1),
+            end: !m.closed && index === (forward ? count - 1 : 0),
           };
-        };
-        return { runs, along };
-      });
-      if (each.some((e) => e === null)) return null;
-      // As many runs in every master as in the one with most: the rest with
-      // no length, at the end of the stretch that one has its last at.
-      const most = each.reduce(
-        (best, e) => (e!.runs.length > best.length ? e!.runs : best),
-        [...each[0]!.runs],
-      );
-      const atTheEnd = most[most.length - 1]!.from >= 0.5;
-      const made = each.map((e) => {
-        const runs = [...e!.runs];
-        while (runs.length < most.length) {
-          if (atTheEnd) {
-            const last = runs[runs.length - 1]!;
-            const k = last.kind === "edge" ? last.next : last.k;
-            runs.push({ kind: "point", k, from: last.to, to: last.to });
+
+          // The corner the stretch begins with: the one that draws there, and of
+          // two going along an edge of the pen, the one behind.
+          const going = heading(curve, leg, 0);
+          if (going === null) return null;
+          const first = cornersAt(0);
+          const candidates = first.map((_, k) => k).filter((k) => draws(k, 0));
+          const sure = candidates.filter((k) => draws(k, 0, 2 * TIE));
+          if (sure.length > 2) return null;
+          const ahead = (k: number): number => first[k]!.x * going.x + first[k]!.y * going.y;
+          const backOf = (by: number): number => (n - by) % n || 1;
+
+          const runs: TurningRun[] = [];
+          let from = 0;
+          let k: number;
+          // A corner that has drawn the side since before the stretch began,
+          // with the one the stretch begins with: the edge between them is
+          // going outward at both its ends.
+          let began: number | null = null;
+          if (sure.length === 2) {
+            // The stretch begins with the one that stops, and the first to.
+            const [a, b] = sure as [number, number];
+            const by = edgesOf.find((e) => (a + e) % n === b);
+            if (by === undefined) return null;
+            const stops = (c: number, e: number): number =>
+              turnsOf(c, e).find((turn) => !turn.starts)?.s ?? Infinity;
+            const mine = stops(a, by);
+            const its = stops(b, backOf(by));
+            if (mine === Infinity && its === Infinity) return null;
+            k = mine <= its ? a : b;
+            began = mine <= its ? b : a;
+            runs.push({
+              kind: "over",
+              k,
+              next: began,
+              from: 0,
+              to: 0,
+              toCorner: true,
+              whole: true,
+            });
+          } else if (candidates.length > 0) {
+            k = candidates.reduce((best, c) => (ahead(c) < ahead(best) ? c : best));
           } else {
-            const first = runs[0]!;
-            runs.unshift({ kind: "point", k: first.k, from: first.from, to: first.from });
+            // None: the pen is pivoting on an edge as the stretch begins. The
+            // corner that is first to begin drawing, across an edge neither it
+            // nor the corner at the other end of it is going outward of yet.
+            let begin: { s: number; next: number; by: number } | null = null;
+            for (let c = 0; c < n; c++) {
+              for (const by of edgesOf) {
+                if (drawn(c, by, 0) > 0 || drawn((c + by) % n, backOf(by), 0) > 0) continue;
+                // The near edge of the pen and not the far one: each of its two
+                // corners is going outward of the other edge it is a corner of.
+                if (n > 2 && (drawn(c, backOf(by), 0) <= 0 || drawn((c + by) % n, by, 0) <= 0)) {
+                  continue;
+                }
+                for (const turn of turnsOf(c, by)) {
+                  if (!turn.starts) continue;
+                  if (begin === null || turn.s < begin.s) begin = { s: turn.s, next: c, by };
+                }
+              }
+            }
+            if (begin === null || atAnEnd.start) return null;
+            runs.push({
+              kind: "edge",
+              k: (begin.next + begin.by) % n,
+              next: begin.next,
+              from: 0,
+              to: begin.s,
+              open: "start",
+            });
+            k = begin.next;
+            from = begin.s;
           }
+          for (;;) {
+            if (runs.length > 24) return null;
+            let stop: { s: number; by: number } | null = null;
+            for (const by of edgesOf) {
+              for (const turn of turnsOf(k, by)) {
+                if (turn.starts || turn.s <= from + 1e-9) continue;
+                if (stop === null || turn.s < stop.s) stop = { s: turn.s, by };
+              }
+            }
+            if (stop === null) {
+              if (began !== null) return null;
+              runs.push({ kind: "corner", k, from, to: 1 });
+              // And another may have begun to draw before this one stops: the
+              // pivot back to where it did, and it to the end of the stretch.
+              for (const by of edgesOf) {
+                const other = (k + by) % n;
+                if (!closing || !draws(other, 1, 2 * TIE)) continue;
+                let begins: number | null = null;
+                for (const turn of turnsOf(other, backOf(by))) {
+                  if (turn.starts && turn.s > from + 1e-9) begins = turn.s;
+                }
+                if (begins === null) continue;
+                // Drawing from there to the end, by both its edges.
+                const began_ = begins;
+                if (
+                  !draws(other, (began_ + 1) / 2) ||
+                  edgesOf.some((e) => turnsOf(other, e).some((turn) => turn.s > began_ + 1e-9))
+                ) {
+                  continue;
+                }
+                runs.push({ kind: "over", k, next: other, from: 1, to: 1, toCorner: false });
+                runs.push({ kind: "edge", k, next: other, from: 1, to: begins, open: "start" });
+                runs.push({ kind: "corner", k: other, from: begins, to: 1 });
+                // And ends at the corner it came to the end with.
+                runs.push({
+                  kind: "over",
+                  k,
+                  next: other,
+                  from: 1,
+                  to: 1,
+                  toCorner: true,
+                  whole: true,
+                });
+                break;
+              }
+              break;
+            }
+            runs.push({ kind: "corner", k, from, to: stop.s });
+            const next = (k + stop.by) % n;
+            if (began !== null) {
+              // Back to the beginning of the stretch, and on with the corner
+              // that was drawing already.
+              if (next !== began) return null;
+              runs.push({ kind: "edge", k, next, from: stop.s, to: 0, open: "end" });
+              runs.push({ kind: "over", k: next, next: k, from: 0, to: 0, toCorner: true });
+              k = next;
+              from = 0;
+              began = null;
+              continue;
+            }
+            let begins: number | null = null;
+            for (const turn of turnsOf(next, backOf(stop.by))) {
+              if (!turn.starts) continue;
+              if (begins === null || Math.abs(turn.s - stop.s) < Math.abs(begins - stop.s)) {
+                begins = turn.s;
+              }
+            }
+            if (begins === null) {
+              // Not in this stretch. Not yet, and the stretch ends with the pen
+              // pivoting — or it began before the stretch did, which is two
+              // corners drawing through a point of the path.
+              if (drawn(next, backOf(stop.by), stop.s) > 0 || atAnEnd.end) return null;
+              runs.push({ kind: "edge", k, next, from: stop.s, to: 1, open: "end" });
+              break;
+            }
+            runs.push({ kind: "edge", k, next, from: stop.s, to: begins });
+            k = next;
+            from = begins;
+          }
+
+          /** A run as where it is and how fast it is going, from nought to one. */
+          const along = (
+            run: TurningRun,
+          ): { at: (f: number) => Vec2; speed: (f: number) => Vec2 } => {
+            const span = run.to - run.from;
+            if (run.kind === "point") {
+              const here = trace(run.k, run.from);
+              return { at: () => here, speed: () => ({ x: 0, y: 0 }) };
+            }
+            if (run.kind === "over") {
+              const corner = trace(run.k, run.from);
+              const pivot =
+                run.whole === true ? trace(run.next, run.from) : pivotAt(run.k, run.next, run.from);
+              const [a, b] = run.toCorner ? [pivot, corner] : [corner, pivot];
+              const by = { x: b.x - a.x, y: b.y - a.y };
+              return { at: (f) => ({ x: a.x + by.x * f, y: a.y + by.y * f }), speed: () => by };
+            }
+            if (run.kind === "corner") {
+              return {
+                at: (f) => trace(run.k, run.from + span * f),
+                speed: (f) => {
+                  const s = run.from + span * f;
+                  const lo = Math.min(run.from, run.to);
+                  const hi = Math.max(run.from, run.to);
+                  const a = Math.max(lo, s - 1e-5);
+                  const b = Math.min(hi, s + 1e-5);
+                  if (!(b > a)) return { x: 0, y: 0 };
+                  const p = trace(run.k, a);
+                  const q = trace(run.k, b);
+                  return { x: ((q.x - p.x) / (b - a)) * span, y: ((q.y - p.y) / (b - a)) * span };
+                },
+              };
+            }
+            const between = (f: number): Vec2 => {
+              // No time between them: the pen's edge as it is at that instant.
+              if (Math.abs(span) < 1e-7) {
+                const start = trace(run.k, run.from);
+                const end = trace(run.next, run.to);
+                return { x: start.x + (end.x - start.x) * f, y: start.y + (end.y - start.y) * f };
+              }
+              return pivotAt(run.k, run.next, run.from + span * f, f);
+            };
+            return {
+              // Its ends on the corners exactly; how fast it is going is asked of
+              // the pivot itself, which is a hair from them there.
+              at: (f) =>
+                f <= 0 && run.open !== "start"
+                  ? trace(run.k, run.from)
+                  : f >= 1 && run.open !== "end"
+                    ? trace(run.next, run.to)
+                    : between(Math.min(1, Math.max(0, f))),
+              speed: (f) => {
+                const a = Math.max(0, f - 1e-4);
+                const b = Math.min(1, f + 1e-4);
+                const p = between(a);
+                const q = between(b);
+                return { x: (q.x - p.x) / (b - a), y: (q.y - p.y) / (b - a) };
+              },
+            };
+          };
+          return { runs, along };
+        });
+        if (each.some((e) => e === null)) return null;
+        // As many runs in every master as in the one with most: the rest with
+        // no length, at the end of the stretch that one has its last at.
+        const most = each.reduce(
+          (best, e) => (e!.runs.length > best.length ? e!.runs : best),
+          [...each[0]!.runs],
+        );
+        const atTheEnd = most[most.length - 1]!.from >= 0.5;
+        const made = each.map((e) => {
+          const runs = [...e!.runs];
+          while (runs.length < most.length) {
+            if (atTheEnd) {
+              const last = runs[runs.length - 1]!;
+              const k = last.kind === "edge" ? last.next : last.k;
+              runs.push({ kind: "point", k, from: last.to, to: last.to });
+            } else {
+              const first = runs[0]!;
+              const k = first.kind === "over" && first.whole === true ? first.next : first.k;
+              runs.unshift({ kind: "point", k, from: first.from, to: first.from });
+            }
+          }
+          return runs;
+        });
+        const kindOf = (r: TurningRun): string =>
+          r.kind === "corner"
+            ? "c"
+            : r.kind === "edge"
+              ? (r.open ?? "edge")[0]!
+              : r.kind === "over"
+                ? `over ${String(r.toCorner)} ${String(r.whole === true)}`
+                : "";
+        for (let r = 0; r < most.length; r++) {
+          const said = made.map((runs) => kindOf(runs[r]!)).filter((kind) => kind !== "");
+          if (said.some((kind) => kind !== said[0])) return null;
         }
-        return runs;
-      });
-      const kindOf = (r: TurningRun): string =>
-        r.kind === "corner" ? "c" : r.kind === "edge" ? (r.open ?? "edge")[0]! : "";
-      for (let r = 0; r < most.length; r++) {
-        const said = made.map((runs) => kindOf(runs[r]!)).filter((kind) => kind !== "");
-        if (said.some((kind) => kind !== said[0])) return null;
-      }
+        return { each, made, most };
+      };
+      const way = followed(true) ?? followed(false);
+      if (way === null) return null;
+      const { each, made, most } = way;
 
       const chosen: PlannedPiece[][] = masters.map(() => []);
       for (let r = 0; r < most.length; r++) {
         const runs = each.map((e, at) => e!.along(made[at]![r]!));
-        const line = straight && made.every((m) => m[r]!.kind !== "edge");
+        // Along the pen's edge is a straight line, whatever the path is.
+        const line =
+          made.some((m) => m[r]!.kind === "over") ||
+          (straight && made.every((m) => m[r]!.kind !== "edge"));
         let fitted: Cubic[][] = [];
         if (line) {
           fitted = runs.map((run) => [lineAsCubic(run.at(0), run.at(1))]);
