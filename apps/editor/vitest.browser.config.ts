@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
 
+import Durations from "../../tools/durations/reporter.mjs";
+
 /**
  * The tests that need a browser, kept apart from the ones that do not.
  *
@@ -14,6 +16,8 @@ import { defineConfig } from "vitest/config";
  */
 export default defineConfig({
   test: {
+    // And what passed close to its time limit: see tools/durations.
+    reporters: ["default", new Durations()],
     include: ["browser/**/*.test.ts"],
     environment: "node",
     globalSetup: ["browser/serve.ts"],

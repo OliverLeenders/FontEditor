@@ -123,7 +123,12 @@ const sum = (key) => ({
   covered: measured.reduce((n, one) => n + one[key].covered, 0),
   total: measured.reduce((n, one) => n + one[key].total, 0),
 });
-const all = { path: "all", lines: sum("lines"), branches: sum("branches"), functions: sum("functions") };
+const all = {
+  path: "all",
+  lines: sum("lines"),
+  branches: sum("branches"),
+  functions: sum("functions"),
+};
 
 const floorsPath = join(dirname(fileURLToPath(import.meta.url)), "floors.json");
 const floors = existsSync(floorsPath) ? JSON.parse(readFileSync(floorsPath, "utf8")) : {};
@@ -155,7 +160,10 @@ const table = [
 
 process.stdout.write(`${table}\n`);
 if (process.env.GITHUB_STEP_SUMMARY) {
-  appendFileSync(process.env.GITHUB_STEP_SUMMARY, `## What the tests run of the source\n\n${table}\n`);
+  appendFileSync(
+    process.env.GITHUB_STEP_SUMMARY,
+    `## What the tests run of the source\n\n${table}\n`,
+  );
 }
 
 const under = rows.filter((row) => row.under);

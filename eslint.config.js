@@ -24,6 +24,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/node_modules/**",
       "**/*.d.ts",
+      "**/*.d.mts",
       "**/src-tauri/target/**",
       "**/src-tauri/gen/**",
     ],
