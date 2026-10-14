@@ -14,6 +14,7 @@
     "test": "pnpm --filter \"./packages/*\" --filter @typewright/editor test",
     "test:watch": "pnpm --filter @typewright/geometry test:watch",
     "test:browser": "pnpm --filter @typewright/editor test:browser",
+    "coverage": "node tools/coverage/coverage.mjs",
     "screenshots": "pnpm --filter @typewright/editor screenshots",
     "typecheck": "pnpm -r typecheck",
     "format": "prettier --write .",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^22.20.2",
+    "@vitest/coverage-v8": "^5.0.4",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
     "fast-check": "^4.9.0",

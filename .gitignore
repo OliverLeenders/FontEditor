@@ -1,6 +1,8 @@
 node_modules/
 dist/
 coverage/
+# The script that measures it, which is not what it measures.
+!/tools/coverage/
 *.tsbuildinfo
 
 .DS_Store

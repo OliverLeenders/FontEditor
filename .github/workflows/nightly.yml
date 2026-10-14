@@ -8,6 +8,9 @@
 # what both were until somebody remembered to ask. Here they are asked every
 # night, and from the Actions tab whenever somebody wants to know now.
 #
+# And how much of the source the tests run at all, which is the suite once
+# more with every line counted, and several times as slow for it.
+#
 # A night that fails does not stop anything: nothing is waiting on it. It is
 # there to be looked at, and a failure here is a fault that the push that made
 # it was let past.
@@ -48,6 +51,45 @@ jobs:
       - name: The outline a font gets, in font-model
         if: ${{ !cancelled() }}
         run: pnpm --filter @typewright/font-model test
+
+  # How much of each package's source its own tests run, as a table in this
+  # job's summary, and held against the floor each package was given: see
+  # tools/coverage.
+  #
+  # A job to each package, side by side: the ones that draw strokes and compile
+  # fonts are an hour and more of this each, and one after another they would
+  # be most of a night.
+  packages:
+    name: Which packages there are
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.list.outputs.list }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: list
+        run: echo "list=$(node tools/coverage/coverage.mjs --list)" >> "$GITHUB_OUTPUT"
+
+  coverage:
+    name: What the tests run of ${{ matrix.package }}
+    needs: packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.packages.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: node tools/coverage/coverage.mjs --check ${{ matrix.package }}
 
   # The store, walked at random for much longer than a push walks it.
   walk:
