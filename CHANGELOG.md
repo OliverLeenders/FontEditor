@@ -8,6 +8,8 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.1.111
+
 ### New
 
 - **Firefox.** Typewright opens and keeps fonts in Firefox. Saving to a folder on disk is not
