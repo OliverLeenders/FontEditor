@@ -36,6 +36,18 @@ export const MAX_DEPTH = 6;
 const READS_AT_ONCE = 32;
 
 /**
+ * How many glyph files are written at once.
+ *
+ * Writing a file on a disk of somebody's own is slow in a way that has nothing
+ * to do with its size: the browser writes it beside the real one, checks it,
+ * and moves it into place, and the operating system's scanner looks at it as
+ * it lands. About a tenth of a second a file, on a Windows machine in Chrome —
+ * and one after another, a font of four thousand glyphs was seven minutes of
+ * that. Most of the tenth of a second is waiting, and waits overlap.
+ */
+const WRITES_AT_ONCE = 16;
+
+/**
  * Read every file under a folder, as `unzip` would have returned them.
  *
  * Listed first and read afterwards, several at a time: a font of four thousand
@@ -228,15 +240,39 @@ export async function writeFolder(
 
   let done = 0;
   options.onProgress?.(0, wanted.length);
-  for (const entry of wanted) {
-    await writeFile(folder, entry.path, entryBytes(entry));
+  const folders = new Folders(folder);
+  const one = async (entry: ZipEntry): Promise<void> => {
+    await writeFile(folders, entry.path, entryBytes(entry));
     done += 1;
     options.onProgress?.(done, wanted.length);
     wrote.set(entry.path, {
       crc: sums.get(entry.path) ?? 0,
-      at: await modifiedAt(folder, entry.path),
+      at: await modifiedAt(folders, entry.path),
     });
+  };
+  // Glyph files several at a time, and everything else on its own, in the
+  // order it came: a run of glyphs is written whole before the file after it
+  // is begun, so whatever order the files are handed in is the order they are
+  // on disk in, as it was when they were written one by one.
+  let run: ZipEntry[] = [];
+  const flush = async (): Promise<void> => {
+    const queue = run;
+    run = [];
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      for (let entry = queue[next++]; entry !== undefined; entry = queue[next++]) await one(entry);
+    };
+    await Promise.all(Array.from({ length: Math.min(WRITES_AT_ONCE, queue.length) }, worker));
+  };
+  for (const entry of wanted) {
+    if (entry.path.endsWith(".glif")) {
+      run.push(entry);
+      continue;
+    }
+    await flush();
+    await one(entry);
   }
+  await flush();
 
   const now = new Set(entries.map((e) => e.path));
 
@@ -267,9 +303,55 @@ export async function writeFolder(
  * "Now" is the forgiving answer: it means the next save trusts the checksum,
  * which is what a filesystem with no timestamps leaves us with anyway.
  */
-async function modifiedAt(folder: DiskFolder, path: string): Promise<number> {
-  const file = await fileAt(folder, path);
+async function modifiedAt(folders: Folders, path: string): Promise<number> {
+  const file = await folders.file(path);
   return file?.lastModified ?? Date.now();
+}
+
+/**
+ * The folders under the one being written, each looked up once.
+ *
+ * Every glyph file is in `glyphs/`, and looking it up again for each of four
+ * thousand of them — twice, once to write and once to ask when it was written
+ * — was eight thousand round trips to the browser for one folder.
+ */
+class Folders {
+  private readonly found = new Map<string, Promise<DiskFolder>>();
+
+  constructor(private readonly root: DiskFolder) {}
+
+  /** The folder a path is in, made where it is not there yet. */
+  async of(path: string): Promise<{ readonly folder: DiskFolder; readonly name: string }> {
+    const parts = path.split("/");
+    const name = parts.pop();
+    if (name === undefined || name === "") throw new Error(`not a file path: ${path}`);
+    return { folder: await this.made(parts), name };
+  }
+
+  /** A file as it is now, or `null` where it is not there or will not say. */
+  async file(path: string): Promise<{ readonly lastModified: number } | null> {
+    try {
+      const { folder, name } = await this.of(path);
+      return await (await folder.getFileHandle(name)).getFile();
+    } catch {
+      return null;
+    }
+  }
+
+  private made(parts: readonly string[]): Promise<DiskFolder> {
+    if (parts.length === 0) return Promise.resolve(this.root);
+    const key = parts.join("/");
+    let found = this.found.get(key);
+    if (found === undefined) {
+      // Kept as the promise, so two files asking at once look it up once.
+      found = this.made(parts.slice(0, -1)).then((parent) =>
+        parent.getDirectoryHandle(parts[parts.length - 1] ?? "", { create: true }),
+      );
+      found.catch(() => this.found.delete(key));
+      this.found.set(key, found);
+    }
+    return found;
+  }
 }
 
 /** Whether a file is still the one we wrote, by when it last changed. */
@@ -301,14 +383,8 @@ async function fileAt(
 }
 
 /** Write one file, making the directories on the way to it. */
-async function writeFile(folder: DiskFolder, path: string, data: Uint8Array): Promise<void> {
-  const parts = path.split("/");
-  const name = parts.pop();
-  if (name === undefined || name === "") throw new Error(`not a file path: ${path}`);
-
-  let at = folder;
-  for (const part of parts) at = await at.getDirectoryHandle(part, { create: true });
-
+async function writeFile(folders: Folders, path: string, data: Uint8Array): Promise<void> {
+  const { folder: at, name } = await folders.of(path);
   const handle = await at.getFileHandle(name, { create: true });
   const writable = await handle.createWritable();
   await writable.write(data);
