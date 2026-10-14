@@ -196,6 +196,15 @@ Done so far:
   the next save, the folder remembered across a reload, a font read back out of it. Run in
   the Chrome or Edge that is installed: the browser Playwright fetches goes down when such a
   folder is read back out of the database, which is its fault and not the editor's.
+- What the tests run of the source is measured every night, a package at a time, and held
+  to a floor for each in `tools/coverage/floors.json`: a point under what it measured the
+  first time. Lines run, then: font-io 93.5%, font-model 93.4%, tools 93.8%, geometry 86.3%,
+  storage 85.4%, the editor 80.2%; the least are the renderer at 77.7% and the StuffIt
+  reader at 79.2%. Branches are lower everywhere, 63 to 91%.
+- The stroke sweep and the long random walk run every night too, and pass: six minutes and
+  one.
+- Each package's tests end by listing the ones that passed using more than half the time
+  they are allowed, and CI marks each with a warning.
 - WebKit on Windows cannot be tested at all, and this is Playwright's build of it and not
   Safari: its file system has no access handles to give, and what is written to a file by
   stream never arrives. The editor says _not saving_ there, which is true. So WebKit is tried

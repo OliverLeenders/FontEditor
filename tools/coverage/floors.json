@@ -1,0 +1,16 @@
+{
+  "apps/editor": 79,
+  "packages/catalog": 96,
+  "packages/disk": 86,
+  "packages/edit-core": 93,
+  "packages/font-io": 92,
+  "packages/font-model": 92,
+  "packages/geometry": 85,
+  "packages/preflight": 95,
+  "packages/render": 76,
+  "packages/shaping": 97,
+  "packages/storage": 84,
+  "packages/stuffit": 78,
+  "packages/tools": 92,
+  "packages/view": 82
+}
