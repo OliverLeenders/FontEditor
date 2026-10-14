@@ -55,7 +55,8 @@ export function exportVariableTrueType(
 
   // As the font compiled above numbers them: `.notdef` first, given or not.
   const order = writtenOrder(first.document);
-  const drawn = flattenedMasters(prepared.masters, order);
+  const why = new Map<string, string>();
+  const drawn = flattenedMasters(prepared.masters, order, why);
 
   // Every glyph converted across the masters that take part in it at once.
   // This is what `glyf` is written from as well, so the two tables cannot
@@ -139,7 +140,7 @@ export function exportVariableTrueType(
     warnings: [
       ...base.warnings,
       ...prepared.warnings,
-      ...notVaryingWarning(notVarying, first.document),
+      ...notVaryingWarning(notVarying, first.document, why),
     ],
     notVarying,
   };

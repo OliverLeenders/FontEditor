@@ -400,6 +400,12 @@ describe("a stroke in a variable font", () => {
       // Which ones is `notVarying`, above: the warning names the first few.
       expect.stringMatching(/drawn with a pen do not vary/),
     );
+    // And why, once for every glyph it is the reason for: what to change.
+    expect(warnings).toContainEqual(
+      expect.stringMatching(
+        /because its pen is a broad edge in one place and a rounder pen in another.*: .*s/,
+      ),
+    );
     expect(warnings.some((w) => w.includes("masters disagree"))).toBe(false);
   });
 });

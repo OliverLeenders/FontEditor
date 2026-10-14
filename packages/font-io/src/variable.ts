@@ -7,7 +7,14 @@ import type {
   Rule,
   RulesProcessing,
 } from "@typewright/font-model";
-import { counterIds, glyph, isDiscrete, plannedInk, sameLocation } from "@typewright/font-model";
+import {
+  counterIds,
+  glyph,
+  isDiscrete,
+  plannedInk,
+  sameLocation,
+  whyNotOnePlan,
+} from "@typewright/font-model";
 
 import { cff2Table, sameShape } from "./cff2.js";
 import {
@@ -238,7 +245,8 @@ export function exportVariableFont(
   // put a delta between them.
   // As the font compiled above numbers them: `.notdef` first, given or not.
   const order = writtenOrder(first.document);
-  const drawn = flattenedMasters(prepared.masters, order);
+  const why = new Map<string, string>();
+  const drawn = flattenedMasters(prepared.masters, order, why);
 
   // Which masters take part in each glyph: all of them, a sparse one only where
   // it draws the glyph, and none but the default where they disagree.
@@ -281,7 +289,7 @@ export function exportVariableFont(
     warnings: [
       ...base.warnings,
       ...prepared.warnings,
-      ...notVaryingWarning(notVarying, first.document),
+      ...notVaryingWarning(notVarying, first.document, why),
     ],
     notVarying,
   };
@@ -364,6 +372,8 @@ export function withVariationTables(
 export function notVaryingWarning(
   notVarying: readonly string[],
   document?: FontDocument,
+  /** Why each glyph's stroke had no one plan, where that is known: see {@link flattenedMasters}. */
+  why: ReadonlyMap<string, string> = new Map(),
 ): string[] {
   const listed = (names: readonly string[]): string =>
     `${names.slice(0, 8).join(", ")}${names.length > 8 ? "…" : ""}`;
@@ -377,13 +387,22 @@ export function notVaryingWarning(
           `${String(others.length)} glyphs do not vary because their masters disagree: ` +
             listed(others),
         ]),
-    ...(penned.length === 0
-      ? []
-      : [
-          `${String(penned.length)} glyphs drawn with a pen do not vary, and are written as the ` +
-            `default master draws them: ${listed(penned)}`,
-        ]),
+    // By what about the pen is the reason, so that one thing to change is said
+    // once with every glyph it is the reason for.
+    ...[...groupedBy(penned, (name) => why.get(name) ?? "")].map(([reason, names]) =>
+      reason === ""
+        ? `${String(names.length)} glyphs drawn with a pen do not vary, and are written as the ` +
+          `default master draws them: ${listed(names)}`
+        : `${String(names.length)} glyphs drawn with a pen do not vary, and are written as the ` +
+          `default master draws them, because ${reason}: ${listed(names)}`,
+    ),
   ];
+}
+
+function groupedBy(names: readonly string[], key: (name: string) => string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  for (const name of names) out.set(key(name), [...(out.get(key(name)) ?? []), name]);
+  return out;
 }
 
 /** Whether a glyph has a stroke in it, its own or one a component brings. */
@@ -449,6 +468,8 @@ export function flattened(
 export function flattenedMasters(
   masters: readonly VariableMaster[],
   order: readonly string[],
+  /** Told, for each glyph with a stroke there was no one plan for, why: see `whyNotOnePlan`. */
+  why?: Map<string, string>,
 ): Glyph[][] {
   const first = masters[0]!.document;
   const ids = counterIds("p");
@@ -467,7 +488,10 @@ export function flattenedMasters(
       const same = having.map((h) => h.contours[k]);
       if (same.some((c) => c === undefined)) continue;
       const planned = plannedInk(same as Contour[], ids);
-      if (planned === null) continue;
+      if (planned === null) {
+        if (why !== undefined && !why.has(name)) why.set(name, whyNotOnePlan(same as Contour[]));
+        continue;
+      }
       for (const [h, ink] of planned.entries()) {
         inks[having[h]!.at]!.set(same[h]!, ink.map(onWholeUnits));
       }

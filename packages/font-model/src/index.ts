@@ -336,6 +336,8 @@ export {
   DEFAULT_NIB,
   inkOf,
   plannedInk,
+  whyNotOnePlan,
+  knownPenProblem,
   strokeCut,
   SERIF_HANDLES,
   serifDragged,

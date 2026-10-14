@@ -10,6 +10,7 @@ import {
   evaluate,
   flatten,
   fitCubics,
+  isBroad,
   lineAsCubic,
   loopArea,
   penExponent,
@@ -1624,6 +1625,66 @@ export function penAt(c: Contour, i: number): Nib | null {
   const own = c.nodes[i]?.pen;
   return own ?? c.nib ?? null;
 }
+
+/**
+ * Why a stroke cannot be drawn to one plan in every master, in words for
+ * somebody who drew it: what about the pen to change, where there is one
+ * thing that is the reason.
+ *
+ * Asked of a stroke {@link plannedInk} has said no to, and of the same stroke
+ * as each master has it. The reasons are the ones a pen gives that there is
+ * no plan for: a broad edge in one master and a rounder pen in another, a pen
+ * held and then changed at a point, a broad edge turned so far between two of
+ * its points that its ends cannot be followed round. Anything else is said as
+ * what it is, that the ink does not come to the same points.
+ */
+export function whyNotOnePlan(strokes: readonly Contour[]): string {
+  return knownPenProblem(strokes) ?? "its ink does not come to the same points in every master";
+}
+
+/**
+ * What about a stroke's pen is known to keep it from varying, without trying
+ * to plan it: `null` where nothing is, which is not to say it will vary.
+ *
+ * What the check between two masters asks, where planning every stroke of the
+ * font would be seconds; {@link whyNotOnePlan} asks it first.
+ */
+export function knownPenProblem(strokes: readonly Contour[]): string | null {
+  if (strokes.some((c) => c.nib === undefined)) return null;
+  const pens = strokes.map(pensOf);
+  const all = pens.flat();
+  const broad = all.filter(isBroad).length;
+  if (broad > 0 && broad < all.length) {
+    return "its pen is a broad edge in one place and a rounder pen in another, and a pen cannot change kind between masters or along a stroke";
+  }
+  if (
+    strokes.some((c) => c.nodes.some((n) => n.blend?.angle === "step" || n.blend?.shape === "step"))
+  ) {
+    return "its pen is held and then changed at a point, which cannot vary";
+  }
+  if (broad > 0) {
+    let most = 0;
+    for (const [at, own] of pens.entries()) {
+      const c = strokes[at]!;
+      const count = c.closed ? own.length : own.length - 1;
+      for (let i = 0; i < count; i++) {
+        const turn = Math.abs(own[(i + 1) % own.length]!.angle - own[i]!.angle) % 180;
+        most = Math.max(most, Math.min(turn, 180 - turn));
+      }
+    }
+    if (most >= SHARPEST_TURN) {
+      return `its broad edge turns ${String(Math.round(most))}° between two of its points, further than its ends can be followed round; put a point between them`;
+    }
+  }
+  return null;
+}
+
+/**
+ * How far a broad edge may turn between two points of a stroke and still be
+ * followed round, as far as the strokes it has been tried on go: sixty degrees
+ * between two points is where every one of them stopped being followed.
+ */
+const SHARPEST_TURN = 60;
 
 /** The pen at every point of a stroke, as the geometry wants it. */
 function pensOf(c: Contour): PenShape[] {

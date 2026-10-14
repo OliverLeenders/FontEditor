@@ -2,6 +2,7 @@ import { contourWinding } from "./direction.js";
 import type { FontDocument, GlyphName } from "./document.js";
 import type { Glyph } from "./glyph.js";
 import type { Contour } from "./contour.js";
+import { knownPenProblem } from "./stroke.js";
 
 /**
  * Whether two drawings of a glyph can be worked out in between.
@@ -23,7 +24,7 @@ export type Incompatibility = {
   readonly glyph: GlyphName;
   /** What differs, in a word, so a list can be grouped. */
   readonly kind:
-    "missing" | "contours" | "points" | "closed" | "handles" | "direction" | "components";
+    "missing" | "contours" | "points" | "closed" | "handles" | "direction" | "components" | "pen";
   /** Said to somebody who has to go and fix it. */
   readonly says: string;
   /** Which contour it is about, where it is about one. */
@@ -125,6 +126,19 @@ function contourIncompatibility(
     }
   }
 
+  // A stroke's pen, where it is one no variable font can vary: a broad edge
+  // in one master and a rounder pen in the other, a pen changed at a point, a
+  // broad edge turned too far between two points. It interpolates — see
+  // `glyphCompatible`, which does not count it — and an instance is drawn as
+  // well as any; but a variable font is written with the default master's
+  // ink for it, and that was said only once it had been exported.
+  if (one.nib !== undefined && two.nib !== undefined) {
+    const problem = knownPenProblem([one, two]);
+    if (problem !== null) {
+      return at(`Contour ${String(index + 1)} will not vary: ${problem}.`, "pen");
+    }
+  }
+
   // Which way round they run. Two contours that agree in every other particular
   // and run opposite ways turn inside out on the way between, which is the
   // strangest-looking of all of these and the hardest to see the cause of.
@@ -196,9 +210,17 @@ export function incompatibilities(one: FontDocument, two: FontDocument): Incompa
   return out;
 }
 
-/** Whether one glyph can be interpolated between two masters. */
+/**
+ * Whether one glyph can be interpolated between two masters.
+ *
+ * A pen no variable font can vary is not a reason: between two masters the
+ * skeleton and the pen are worked out like any points, and an instance — a
+ * weight in between, written as a font of its own, or drawn here — is the ink
+ * of that pen. It is a variable font, which holds ink and not pens, that has
+ * nothing to put between them; that is said, and it does not stop this.
+ */
 export function glyphCompatible(name: GlyphName, one: Glyph | null, two: Glyph | null): boolean {
-  return glyphIncompatibilities(name, one, two).length === 0;
+  return glyphIncompatibilities(name, one, two).every((found) => found.kind === "pen");
 }
 
 const count = (n: number, thing: string): string => `${String(n)} ${thing}${n === 1 ? "" : "s"}`;
