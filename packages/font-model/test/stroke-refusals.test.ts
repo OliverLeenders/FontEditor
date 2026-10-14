@@ -69,15 +69,16 @@ describe("a stroke whose pen keeps it from varying", () => {
   });
 
   it("is a broad edge turning by different amounts in different masters, where it cannot be followed", () => {
-    const c = named("a drawn hook with retracted handles");
+    // One that is not followed yet: the pen pivoting as the line ends.
+    const c = named("a pen widening along a line");
     const n = c.curves.length + 1;
     const light = strokeOf(
       c.curves,
-      Array.from({ length: n }, (_, i) => broad(10 + i * 35, 50)),
+      Array.from({ length: n }, (_, i) => broad(10 + i * 20, 50 + i * 10)),
     );
     const bold = strokeOf(
       c.curves,
-      Array.from({ length: n }, (_, i) => broad(10 + i * 55, 80)),
+      Array.from({ length: n }, (_, i) => broad(10 + i * 45, 80 + i * 10)),
     );
     expect(plannedInk([light, bold], ids)).toBeNull();
     expect(whyNotOnePlan([light, bold])).toMatch(

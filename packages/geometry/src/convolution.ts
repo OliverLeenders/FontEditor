@@ -1122,6 +1122,16 @@ function refinedSides(
   return out;
 }
 
+/**
+ * A pivot over less of a stretch than this is an instant: the side goes
+ * straight across the pen's edge from the one corner to the other. Over so
+ * little the two corners are going across the edge at all but the same speed,
+ * and the place it pivots on — one speed over their difference — is anywhere,
+ * thousands of millions of units off; a line across is the pen at that
+ * instant, to well under a unit on any stretch a letter has.
+ */
+const PIVOT_INSTANT = 1e-4;
+
 /** How deep a piece is halved, at most: a piece a thousandth of the stretch. */
 const REFINE_DEPTH = 10;
 /** How many pieces a side may come to: as many as the most even pieces are tried with, twice. */
@@ -1592,8 +1602,17 @@ type TurningRun =
       /** The end of it that is not at a corner: the stretch begins or ends with the pen mid-pivot. */
       readonly open?: "start" | "end";
     }
-  /** No length: where a corner is at an instant, standing in for a run another master has. */
-  | { readonly kind: "point"; readonly k: number; readonly from: number; readonly to: number }
+  /**
+   * No length: where a corner is at an instant, standing in for a run another
+   * master has — or, given `here`, wherever the runs either side of it meet.
+   */
+  | {
+      readonly kind: "point";
+      readonly k: number;
+      readonly from: number;
+      readonly to: number;
+      readonly here?: Vec2;
+    }
   | {
       /** Along the pen's edge as it is at an instant, between corner `k` and the place it pivots on. */
       readonly kind: "over";
@@ -1606,6 +1625,91 @@ type TurningRun =
       /** All the edge: to the corner from corner `next`, and not from the pivot. */
       readonly whole?: boolean;
     };
+
+/**
+ * Every master's runs in one order that holds each master's own in its order,
+ * and each master's with a point of no length for every run of that order it
+ * has not got, standing where its own runs either side of it meet.
+ *
+ * Runs are matched by what they are: a corner's path, the pivot's (wherever it
+ * begins and ends), along the pen's edge to a corner or from one. The order is
+ * the shortest that holds them all, worked out a master at a time. `null`
+ * where a master has no runs at all.
+ */
+function mergedRuns(
+  each: readonly {
+    readonly runs: readonly TurningRun[];
+    readonly along: (run: TurningRun) => { at: (f: number) => Vec2 };
+  }[],
+): TurningRun[][] | null {
+  const word = (r: TurningRun): string =>
+    r.kind === "corner"
+      ? "c"
+      : r.kind === "edge"
+        ? "e"
+        : r.kind === "over"
+          ? `o${String(r.toCorner)}${String(r.whole === true)}`
+          : "";
+  const own = each.map((e) => e.runs.filter((r) => r.kind !== "point"));
+  if (own.some((runs) => runs.length === 0)) return null;
+
+  // The shortest order of words that holds two orders, each in its order.
+  const holding = (a: readonly string[], b: readonly string[]): string[] => {
+    const longest: number[][] = Array.from({ length: a.length + 1 }, () =>
+      new Array<number>(b.length + 1).fill(0),
+    );
+    for (let i = a.length - 1; i >= 0; i--) {
+      for (let j = b.length - 1; j >= 0; j--) {
+        longest[i]![j] =
+          a[i] === b[j]
+            ? longest[i + 1]![j + 1]! + 1
+            : Math.max(longest[i + 1]![j]!, longest[i]![j + 1]!);
+      }
+    }
+    const out: string[] = [];
+    let i = 0;
+    let j = 0;
+    while (i < a.length || j < b.length) {
+      if (i < a.length && j < b.length && a[i] === b[j]) {
+        out.push(a[i]!);
+        i += 1;
+        j += 1;
+      } else if (j >= b.length || (i < a.length && longest[i + 1]![j]! >= longest[i]![j + 1]!)) {
+        out.push(a[i]!);
+        i += 1;
+      } else {
+        out.push(b[j]!);
+        j += 1;
+      }
+    }
+    return out;
+  };
+  let order = own[0]!.map(word);
+  for (const runs of own.slice(1)) order = holding(order, runs.map(word));
+
+  return each.map((e, at) => {
+    const runs = own[at]!;
+    // Each of its own runs at the place in the order its word is next.
+    const placed: (TurningRun | null)[] = order.map(() => null);
+    let j = 0;
+    for (let r = 0; r < order.length && j < runs.length; r++) {
+      if (order[r] === word(runs[j]!)) {
+        placed[r] = runs[j]!;
+        j += 1;
+      }
+    }
+    // The rest, points where its own runs either side meet.
+    let last: Vec2 | null = null;
+    const firstAt = e.along(runs[0]!).at(0);
+    return placed.map((run): TurningRun => {
+      if (run !== null) {
+        last = e.along(run).at(1);
+        return run;
+      }
+      return { kind: "point", k: 0, from: 0, to: 0, here: last ?? firstAt };
+    });
+  });
+}
 
 /**
  * A master's runs matched, in order, to the runs of the master with most: a
@@ -1976,7 +2080,7 @@ function turningSides(
           ): { at: (f: number) => Vec2; speed: (f: number) => Vec2 } => {
             const span = run.to - run.from;
             if (run.kind === "point") {
-              const here = trace(run.k, run.from);
+              const here = run.here ?? trace(run.k, run.from);
               return { at: () => here, speed: () => ({ x: 0, y: 0 }) };
             }
             if (run.kind === "over") {
@@ -2005,7 +2109,7 @@ function turningSides(
             }
             const between = (f: number): Vec2 => {
               // No time between them: the pen's edge as it is at that instant.
-              if (Math.abs(span) < 1e-7) {
+              if (Math.abs(span) < PIVOT_INSTANT) {
                 const start = trace(run.k, run.from);
                 const end = trace(run.next, run.to);
                 return { x: start.x + (end.x - start.x) * f, y: start.y + (end.y - start.y) * f };
@@ -2079,9 +2183,18 @@ function turningSides(
         // the runs either side of it meet — so the master is drawn as it was,
         // and in between the run grows from nothing.
         const aligned = each.map((e) => alignedRuns(e!.runs, most, kindOf));
-        if (aligned.some((runs) => runs === null)) return null;
-        const made = aligned as TurningRun[][];
-        return agree(made) ? { each, made, most } : null;
+        if (aligned.every((runs) => runs !== null) && agree(aligned)) {
+          return { each, made: aligned, most };
+        }
+        // And where no master's runs hold all the others' in order — one
+        // begins with the pen part way through pivoting where another begins
+        // at a corner, one goes along the pen's edge where another does not —
+        // the runs of all of them in one order that holds each, and each
+        // master given the ones it has not got with no length, where its own
+        // either side of them meet.
+        const merged = mergedRuns(each.map((e) => e!));
+        if (merged === null) return null;
+        return { each, made: merged, most: merged[0]! };
       };
       const way = followed(true) ?? followed(false);
       if (way === null) return null;

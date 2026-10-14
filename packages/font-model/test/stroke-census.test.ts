@@ -51,7 +51,7 @@ const SIZES = [
  * - **kind**: every one. A pen of one kind in one master and of another in the
  *   next is declined outright.
  */
-const MOST: Record<"size" | "turn" | "kind", number> = { size: 27, turn: 90, kind: 940 };
+const MOST: Record<"size" | "turn" | "kind", number> = { size: 27, turn: 48, kind: 940 };
 
 const penOf = (kind: Kind, i: number, turn: number, wide: number): PenShape => {
   const angle = 10 + i * turn;
