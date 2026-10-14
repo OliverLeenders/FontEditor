@@ -1639,7 +1639,22 @@ export function penAt(c: Contour, i: number): Nib | null {
  * what it is, that the ink does not come to the same points.
  */
 export function whyNotOnePlan(strokes: readonly Contour[]): string {
-  return knownPenProblem(strokes) ?? "its ink does not come to the same points in every master";
+  const known = knownPenProblem(strokes);
+  if (known !== null) return known;
+  // A broad edge that turns along the stroke by one amount in one master and
+  // another in the next: the commonest that is left, and one with something
+  // to do about it.
+  const pens = strokes.map(pensOf);
+  const turns = (own: readonly PenShape[]): number[] =>
+    own.slice(1).map((pen, i) => pen.angle - own[i]!.angle);
+  const first = turns(pens[0] ?? []);
+  if (
+    pens.flat().every(isBroad) &&
+    pens.some((own) => turns(own).some((turn, i) => Math.abs(turn - (first[i] ?? turn)) > 1e-6))
+  ) {
+    return "its broad edge turns along the stroke by different amounts in different masters, in a way that cannot be followed yet; turned the same way in each, or by less between two points, it varies";
+  }
+  return "its ink does not come to the same points in every master";
 }
 
 /**

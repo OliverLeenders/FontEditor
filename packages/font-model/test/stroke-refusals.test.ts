@@ -68,6 +68,23 @@ describe("a stroke whose pen keeps it from varying", () => {
     );
   });
 
+  it("is a broad edge turning by different amounts in different masters, where it cannot be followed", () => {
+    const c = named("a drawn hook with retracted handles");
+    const n = c.curves.length + 1;
+    const light = strokeOf(
+      c.curves,
+      Array.from({ length: n }, (_, i) => broad(10 + i * 35, 50)),
+    );
+    const bold = strokeOf(
+      c.curves,
+      Array.from({ length: n }, (_, i) => broad(10 + i * 55, 80)),
+    );
+    expect(plannedInk([light, bold], ids)).toBeNull();
+    expect(whyNotOnePlan([light, bold])).toMatch(
+      /^its broad edge turns along the stroke by different amounts in different masters/,
+    );
+  });
+
   it("is said plainly where it is none of those", () => {
     // Masters whose paths have not the same number of curves: not the pen.
     const one = strokeOf(s, [oval(30), oval(40)]);
