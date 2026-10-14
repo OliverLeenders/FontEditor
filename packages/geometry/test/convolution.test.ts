@@ -190,6 +190,32 @@ describe("the line round a stroke's ink, in two masters", () => {
     },
   );
 
+  it("follows a hairpin narrower than the pen, its curves where its side swings", () => {
+    // The path turns half round in a few hundredths of its length, and in that
+    // sliver the inner side swings across the far half of the pen. No even
+    // number of curves follows it, and the stroke was the default master's
+    // ink at every weight; curves halved where they stray, in both masters at
+    // once, do.
+    const c = named("a round pen round a hairpin");
+    const masters: StrokeMaster[] = [1, 1.6].map((wide) => ({
+      curves: c.curves,
+      pens: [
+        { angle: 10, width: 50 * wide, thickness: 24 * wide, squareness: 0 },
+        { angle: 45, width: 110 * wide, thickness: 46 * wide, squareness: 0 },
+      ],
+      closed: false,
+    }));
+    const planned = plannedStrokes(masters);
+    expect(planned).not.toBeNull();
+    expect(shapeOf(planned![0]!)).toBe(shapeOf(planned![1]!));
+    for (const [at, m] of masters.entries()) {
+      const d = disagreement(curvesOf(planned![at]!), sweep(m.curves, m.pens, m.closed), 70);
+      expect(d.checked).toBeGreaterThan(1000);
+      expect(d.missing).toEqual([]);
+      expect(d.extra).toEqual([]);
+    }
+  });
+
   it("declines masters whose paths have not the same number of curves", () => {
     const one = master(named("a round pen round a sharp V"));
     expect(plannedStrokes([one, { ...one, curves: one.curves.slice(0, 1) }])).toBeNull();

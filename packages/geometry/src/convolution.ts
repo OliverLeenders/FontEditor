@@ -566,11 +566,18 @@ function ovalSides(
           return side.curves;
         }),
       );
-      if (drawn.some((d) => d.some((side) => side === null))) return null;
+      if (drawn.some((d) => d.some((side) => side === null))) {
+        chosen = null;
+        break;
+      }
       chosen = drawn;
       if (worst <= SIDE_TOLERANCE) break;
-      if (pieces === SIDE_COUNTS[SIDE_COUNTS.length - 1] && worst > SIDE_LIMIT) return null;
+      if (pieces === SIDE_COUNTS[SIDE_COUNTS.length - 1] && worst > SIDE_LIMIT) chosen = null;
     }
+    // Where no even number of curves will do, curves where they are needed:
+    // see `refinedSides`. Only then, so that a stroke drawn the even way is
+    // drawn as it always was.
+    chosen ??= refinedSides(masters, profiles, index, legs);
     if (chosen === null) return null;
     for (const [at, sides] of chosen.entries()) {
       for (const [l, leg] of legs.entries()) {
@@ -1050,6 +1057,124 @@ function corneredJoins(
     );
     return { pieces: curves.map((curve) => ({ curve, line: false })), turns };
   });
+}
+
+/**
+ * Both sides of one stretch, in every master, with curves as short as they
+ * need to be where they need to be and no shorter elsewhere.
+ *
+ * Even pieces fail where the side does almost all its going in a sliver of
+ * the path: round a hairpin narrower than the pen, the path turns half round in
+ * a few hundredths of its length, and in that sliver the side swings across
+ * the far half of the pen's outline. Forty-eight even pieces put one there;
+ * it wants dozens. So a piece is halved where it strays, and the halves again,
+ * until each is near enough.
+ *
+ * Halved in every master and on both sides at once, wherever any of them
+ * strays: the masters must come to the same pieces, and a piece one of them
+ * needs halved is halved for all. `null` where a piece has been halved so far
+ * that halving it again would not be a curve worth having, or the side cannot
+ * be followed at all.
+ */
+function refinedSides(
+  masters: readonly StrokeMaster[],
+  profiles: readonly (readonly PenProfile[])[],
+  index: number,
+  legs: readonly Leg[],
+): Cubic[][][] | null {
+  const sides = masters.flatMap((m, at) =>
+    legs.map((leg) => sideOf(m.curves[index]!, profiles[at]![index]!, leg)),
+  );
+  // Each piece as the parameter it runs over, halved where it strays.
+  const spans: [number, number][] = [];
+  const split = (s0: number, s1: number, depth: number): boolean => {
+    let worst = 0;
+    for (const side of sides) {
+      const piece = hermitePiece(side, s0, s1);
+      if (piece === null) return false;
+      worst = Math.max(worst, piece.strays);
+    }
+    if (worst <= SIDE_TOLERANCE || (depth >= REFINE_DEPTH && worst <= SIDE_LIMIT)) {
+      spans.push([s0, s1]);
+      return true;
+    }
+    if (depth >= REFINE_DEPTH) return false;
+    const middle = (s0 + s1) / 2;
+    return split(s0, middle, depth + 1) && split(middle, s1, depth + 1);
+  };
+  if (!split(0, 1, 0) || spans.length > REFINE_PIECES) return null;
+
+  const out: Cubic[][][] = [];
+  for (let at = 0; at < masters.length; at++) {
+    const each: Cubic[][] = [];
+    for (let l = 0; l < legs.length; l++) {
+      const side = sides[at * legs.length + l]!;
+      const curves: Cubic[] = [];
+      for (const [s0, s1] of spans) {
+        const piece = hermitePiece(side, s0, s1);
+        if (piece === null) return null;
+        curves.push(piece.curve);
+      }
+      each.push(curves);
+    }
+    out.push(each);
+  }
+  return out;
+}
+
+/** How deep a piece is halved, at most: a piece a thousandth of the stretch. */
+const REFINE_DEPTH = 10;
+/** How many pieces a side may come to: as many as the most even pieces are tried with, twice. */
+const REFINE_PIECES = 96;
+
+/** One side of a stretch as where it is and how fast it is going, at each place along the path. */
+type Side = {
+  readonly at: (s: number) => Vec2 | null;
+  readonly speed: (s: number) => Vec2 | null;
+};
+
+function sideOf(curve: Cubic, profile: PenProfile, leg: Leg): Side {
+  const at = (s: number): Vec2 | null => reach(curve, profile, leg, Math.min(1, Math.max(0, s)));
+  // How fast the side is going, by a step short enough for it to be straight over.
+  const step = 1e-5;
+  const speed = (s: number): Vec2 | null => {
+    const from = Math.max(0, s - step);
+    const to = Math.min(1, s + step);
+    const a = at(from);
+    const b = at(to);
+    if (a === null || b === null) return null;
+    return { x: (b.x - a.x) / (to - from), y: (b.y - a.y) / (to - from) };
+  };
+  return { at, speed };
+}
+
+/** One curve of a side, from where and how fast it is at each end, and how far it strays. */
+function hermitePiece(
+  side: Side,
+  s0: number,
+  s1: number,
+): { readonly curve: Cubic; readonly strays: number } | null {
+  const p0 = side.at(s0);
+  const p1 = side.at(s1);
+  const v0 = side.speed(s0);
+  const v1 = side.speed(s1);
+  if (p0 === null || p1 === null || v0 === null || v1 === null) return null;
+  const third = (s1 - s0) / 3;
+  const curve = cubic(
+    p0,
+    { x: p0.x + v0.x * third, y: p0.y + v0.y * third },
+    { x: p1.x - v1.x * third, y: p1.y - v1.y * third },
+    p1,
+  );
+  if (![curve.c1.x, curve.c1.y, curve.c2.x, curve.c2.y].every(Number.isFinite)) return null;
+  let strays = 0;
+  for (const u of [0.25, 0.5, 0.75]) {
+    const truly = side.at(s0 + (s1 - s0) * u);
+    if (truly === null) return null;
+    const drawn = evaluate(curve, u);
+    strays = Math.max(strays, Math.hypot(drawn.x - truly.x, drawn.y - truly.y));
+  }
+  return { curve, strays };
 }
 
 /** One side of a stretch in `pieces` curves, and how far the worst of them strays. */
