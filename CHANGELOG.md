@@ -21,6 +21,11 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
   where Chrome took five and Firefox three minutes. Fonts already in the browser are moved
   over the first time they are opened, without anything to do.
 
+- **Saving a large font to a folder.** Glyph files are written sixteen at a time where they
+  were written one after another, each waiting for the last. Chrome on Windows takes about a
+  tenth of a second for every file written to a disk, whatever is in it, so a font of four
+  thousand glyphs took minutes.
+
 ### Fixed
 
 - A component dragged lands on the font's grid, as a node does.
