@@ -162,6 +162,14 @@ Done so far, since 0.1.110:
 - The File menu in a browser with no way to be handed a folder says why the folder is not on
   it, and what to do instead.
 
+- Which strokes still do not vary is counted now, every night (`stroke-census.test.ts`): 940
+  strokes — every path the stroke tests draw, with four kinds of pen, turning from nought to
+  ninety degrees a point, with each kind of end — in two masters that differ in the pen's
+  size, in how much it turns, or in its kind. On 2026-10-14, after the hairpin narrower than
+  the pen was made to vary: 27 of 940 differing in size, all a broad edge turning sixty
+  degrees or more a point; 111 differing in turn, 107 of them a broad edge; and all 940
+  differing in kind, which is declined outright.
+
 Found on the way, and not yet looked at: the desktop window on Linux has no way to be handed
 a folder either, so a font cannot be saved to a folder there. Still to do for full storage: the desktop window's own question on closing does not yet ask about a
 save that failed, and nothing offers to make room (the copies under History are the largest
