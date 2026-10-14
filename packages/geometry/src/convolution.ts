@@ -1608,6 +1608,55 @@ type TurningRun =
     };
 
 /**
+ * A master's runs matched, in order, to the runs of the master with most: a
+ * run of the same kind where it has one, and where it has not, a point with no
+ * length where the runs either side of it meet. `null` where its runs are not
+ * the other's in order with some left out, or where the place they meet is
+ * not at one of the pen's corners.
+ */
+function alignedRuns(
+  runs: readonly TurningRun[],
+  most: readonly TurningRun[],
+  kindOf: (run: TurningRun) => string,
+): TurningRun[] | null {
+  /** The corner a run ends at, where it ends at one. */
+  const endsAt = (run: TurningRun): number | null =>
+    run.kind === "corner" || run.kind === "point"
+      ? run.k
+      : run.kind === "edge" && run.open !== "end"
+        ? run.next
+        : null;
+  /** The corner a run begins at, where it begins at one. */
+  const beginsAt = (run: TurningRun): number | null =>
+    run.kind === "corner" || run.kind === "point" || (run.kind === "edge" && run.open !== "start")
+      ? run.k
+      : null;
+
+  const out: TurningRun[] = [];
+  let j = 0;
+  for (const wanted of most) {
+    const own = runs[j];
+    if (own !== undefined && kindOf(own) === kindOf(wanted)) {
+      out.push(own);
+      j += 1;
+      continue;
+    }
+    const before = out[out.length - 1];
+    if (before === undefined) {
+      if (own === undefined) return null;
+      const k = beginsAt(own);
+      if (k === null) return null;
+      out.push({ kind: "point", k, from: own.from, to: own.from });
+    } else {
+      const k = endsAt(before);
+      if (k === null) return null;
+      out.push({ kind: "point", k, from: before.to, to: before.to });
+    }
+  }
+  return j === runs.length ? out : null;
+}
+
+/**
  * Both sides of every stretch for a pen of corners and straight edges that
  * turns along the path, whatever else it does.
  *
@@ -1991,7 +2040,7 @@ function turningSides(
           [...each[0]!.runs],
         );
         const atTheEnd = most[most.length - 1]!.from >= 0.5;
-        const made = each.map((e) => {
+        const padded = each.map((e) => {
           const runs = [...e!.runs];
           while (runs.length < most.length) {
             if (atTheEnd) {
@@ -2014,11 +2063,25 @@ function turningSides(
               : r.kind === "over"
                 ? `over ${String(r.toCorner)} ${String(r.whole === true)}`
                 : "";
-        for (let r = 0; r < most.length; r++) {
-          const said = made.map((runs) => kindOf(runs[r]!)).filter((kind) => kind !== "");
-          if (said.some((kind) => kind !== said[0])) return null;
-        }
-        return { each, made, most };
+        const agree = (made: readonly (readonly TurningRun[])[]): boolean => {
+          for (let r = 0; r < most.length; r++) {
+            const said = made.map((runs) => kindOf(runs[r]!)).filter((kind) => kind !== "");
+            if (said.some((kind) => kind !== said[0])) return false;
+          }
+          return true;
+        };
+        if (agree(padded)) return { each, made: padded, most };
+        // Where the runs a master has not got are not all at one end: the
+        // masters turn by different amounts, and a corner draws a little of
+        // the side in the middle of the stretch in one and none of it in
+        // another. Each master's runs are matched to the one with most, in
+        // order, and a run it has not got is a point with no length where
+        // the runs either side of it meet — so the master is drawn as it was,
+        // and in between the run grows from nothing.
+        const aligned = each.map((e) => alignedRuns(e!.runs, most, kindOf));
+        if (aligned.some((runs) => runs === null)) return null;
+        const made = aligned as TurningRun[][];
+        return agree(made) ? { each, made, most } : null;
       };
       const way = followed(true) ?? followed(false);
       if (way === null) return null;

@@ -46,11 +46,12 @@ const SIZES = [
  * - **size**: every one a broad edge turning sixty degrees or more from one
  *   point to the next.
  * - **turn**: all but four a broad edge whose masters turn by different
- *   amounts; the four a rectangle.
+ *   amounts; the four a rectangle. 111, until a master's runs were matched to
+ *   another's wherever the run it has not got falls, and not only at an end.
  * - **kind**: every one. A pen of one kind in one master and of another in the
  *   next is declined outright.
  */
-const MOST: Record<"size" | "turn" | "kind", number> = { size: 27, turn: 111, kind: 940 };
+const MOST: Record<"size" | "turn" | "kind", number> = { size: 27, turn: 90, kind: 940 };
 
 const penOf = (kind: Kind, i: number, turn: number, wide: number): PenShape => {
   const angle = 10 + i * turn;
