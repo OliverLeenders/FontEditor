@@ -223,7 +223,20 @@ jobs:
           Get-Content "${{ runner.temp }}\msedgedriver.cmd"
 
       - name: Build the test copy of the application, and drive it
-        run: pnpm --filter @typewright/editor test:desktop
+        run: |
+          # The screen as it is while the first session is being made.
+          $null = Start-Job -ScriptBlock {
+            param($out)
+            while (-not (Get-Process typewright -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 500 }
+            Start-Sleep -Seconds 30
+            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+            $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $shot = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
+            [System.Drawing.Graphics]::FromImage($shot).CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
+            $shot.Save($out)
+            Get-Process typewright, msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Name, Id, MainWindowTitle, Path | Out-File "$out.txt"
+          } -ArgumentList "${{ runner.temp }}\during.png"
+          pnpm --filter @typewright/editor test:desktop
         env:
           TW_NATIVE_DRIVER: ${{ runner.temp }}\msedgedriver.cmd
 
@@ -260,6 +273,8 @@ jobs:
           path: |
             screen.png
             ${{ runner.temp }}/msedgedriver.log
+            ${{ runner.temp }}/during.png
+            ${{ runner.temp }}/during.png.txt
 
   # A UFO that only this repository has ever read proves consistency, not
   # correctness: a misreading of the format shared by our writer and our reader
