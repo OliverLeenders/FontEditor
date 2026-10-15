@@ -80,13 +80,12 @@ jobs:
   # In each engine the editor is offered in, and headless. Chromium is the one
   # with a way to open a folder; Firefox keeps a font in the browser and is
   # supported as that. WebKit is Safari's engine, which is as near to Safari as
-  # can be had without a Mac: it is run to be seen, and does not yet stop a
-  # push, because whether its file system works where this runs is not known
-  # until it has — on Windows, Playwright's build of it cannot write a file.
+  # can be had without a Mac. It stops a push as the others do: it passed ten
+  # pushes running here on Linux before it was made to. On Windows,
+  # Playwright's build of it cannot write a file, so it is run here only.
   browser:
     name: In ${{ matrix.browser }}
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.browser == 'webkit' }}
     strategy:
       fail-fast: false
       matrix:

@@ -200,8 +200,8 @@ Done so far:
 
 - The whole suite runs on Windows in CI, and passes there.
 - The browser tests run in Chromium, Firefox and WebKit in CI, as a job each. Firefox stops a
-  push as Chromium does. WebKit on Linux keeps a font as the others do; it does not yet stop a
-  push, until it has been seen to pass a few times.
+  push as Chromium does, and WebKit on Linux too, since 2026-10-15, after passing ten pushes
+  in a row while it was only watched.
 - Saving to a folder and opening one are tested in a browser. What stands in for the picker
   hands the editor a folder of the browser's private file system, which is a real handle with
   the same things to ask of it, so everything after the picker is the editor's own code on
