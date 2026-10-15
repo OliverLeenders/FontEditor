@@ -228,12 +228,27 @@ jobs:
           & "$env:USERPROFILE\.cargo\bin\msedgedriver.exe" --version
           Get-ChildItem "$env:LOCALAPPDATA\dev.typewright.app.test" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
           Get-Content "$env:LOCALAPPDATA\dev.typewright.app.test\logs\*.log" -ErrorAction SilentlyContinue
-          $app = Start-Process apps\editor\src-tauri\target\desktop-test\debug\typewright.exe -PassThru
+          $app = Start-Process apps\editor\src-tauri\target\desktop-test\debug\typewright.exe -PassThru `
+            -RedirectStandardOutput app-out.txt -RedirectStandardError app-err.txt
           Start-Sleep -Seconds 15
-          Get-Process -Id $app.Id -ErrorAction SilentlyContinue | Select-Object Id, MainWindowTitle, HasExited
+          "still running: $(-not $app.HasExited)"
+          "window: $((Get-Process -Id $app.Id -ErrorAction SilentlyContinue).MainWindowTitle)"
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $shot = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
+          [System.Drawing.Graphics]::FromImage($shot).CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
+          $shot.Save("$PWD\screen.png")
           if (-not $app.HasExited) { Stop-Process -Id $app.Id }
           "exit code: $($app.ExitCode)"
+          "--- stdout"; Get-Content app-out.txt
+          "--- stderr"; Get-Content app-err.txt
           Get-Content "$env:LOCALAPPDATA\dev.typewright.app.test\logs\*.log" -ErrorAction SilentlyContinue
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: desktop-screen
+          path: screen.png
 
   # A UFO that only this repository has ever read proves consistency, not
   # correctness: a misreading of the format shared by our writer and our reader
