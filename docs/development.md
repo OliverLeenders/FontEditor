@@ -127,7 +127,7 @@ pnpm --filter @typewright/editor test:desktop
 
 This makes a debug build of the shell under the identifier `dev.typewright.app.test`, into
 `apps/editor/src-tauri/target/desktop-test`, so the fonts an installed copy or the debug build
-keeps are never the ones a test opens; each start is given an empty WebView2 profile besides.
+keeps are never the ones a test opens; msedgedriver gives each start an empty profile besides.
 Then it runs `apps/editor/desktop/*.test.ts` through tauri-driver. `--no-build` runs them on the
 last build. Two programs are needed, once:
 

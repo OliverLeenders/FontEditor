@@ -1,8 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, rm } from "node:fs/promises";
 import { connect } from "node:net";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,8 +16,10 @@ import { remote } from "webdriverio";
  * `dev.typewright.app.test`, and into a target folder of its own. The
  * identifier is where the desktop application keeps what its webview stores,
  * fonts included, so a test never opens the fonts of the copy somebody has
- * installed, nor the debug build they work in. And each start is given an
- * empty profile besides, which goes when the application does.
+ * installed, nor the debug build they work in. And msedgedriver gives each
+ * start a profile of its own besides, an empty folder under the temporary
+ * one — which is why WebView2 is not told of another: told one, it is not
+ * where the driver waits to hear from it, and on CI it never answered.
  *
  * On Windows tauri-driver hands the window to msedgedriver, which has to be the
  * version of the WebView2 that is installed: `msedgedriver-tool` fetches that
@@ -67,8 +68,6 @@ async function listening(port: number, within = 20_000): Promise<void> {
 
 export type Application = {
   browser: WebdriverIO.Browser;
-  /** The empty profile the webview was given. */
-  profile: string;
   /** Close the application and everything that was started for it. */
   close(): Promise<void>;
 };
@@ -78,13 +77,9 @@ export async function start(): Promise<Application> {
   if (!existsSync(APPLICATION)) {
     throw new Error(`no test build at ${APPLICATION}: run pnpm test:desktop, which makes it`);
   }
-  const profile = await mkdtemp(join(tmpdir(), "typewright-desktop-"));
   const driver: ChildProcess = spawn(cargoProgram("tauri-driver"), ["--port", String(PORT)], {
     // What the drivers say, on CI, where there is nobody to run them again.
     stdio: ["ignore", process.env["CI"] === undefined ? "ignore" : "inherit", "inherit"],
-    // Read by WebView2 in place of the folder the application names: a profile
-    // nothing has been kept in.
-    env: { ...process.env, WEBVIEW2_USER_DATA_FOLDER: profile },
   });
   try {
     await listening(PORT);
@@ -99,19 +94,9 @@ export async function start(): Promise<Application> {
     });
     return {
       browser,
-      profile,
       close: async () => {
         await browser.deleteSession().catch(() => undefined);
         driver.kill();
-        // The webview lets go of its profile a moment after its window goes.
-        for (let tries = 0; tries < 20; tries++) {
-          try {
-            await rm(profile, { recursive: true, force: true });
-            return;
-          } catch {
-            await new Promise((wake) => setTimeout(wake, 250));
-          }
-        }
       },
     };
   } catch (error) {
