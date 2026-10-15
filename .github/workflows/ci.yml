@@ -215,8 +215,14 @@ jobs:
           cd "$env:USERPROFILE\.cargo\bin"
           msedgedriver-tool
 
+      # msedgedriver makes each start's profile under the temporary folder and
+      # waits there to hear from WebView2. The runner's is named the short way,
+      # C:\Users\RUNNER~1\…, and the two did not meet; this one is named in full.
       - name: Build the test copy of the application, and drive it
         run: pnpm --filter @typewright/editor test:desktop
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
 
       # What there is to go on when the application would not start under the
       # driver: the two versions that must agree, the application's own log,
