@@ -8,6 +8,14 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Fixed
+
+- Closing the desktop window after a save that did not happen asks first — _Close and lose
+  the last changes?_ — and says why the save failed. Where the font has a folder, it offers
+  to save there and close, which keeps the changes. It used to close without a word.
+- The File menu of the desktop application on Linux says why saving to a folder is not on
+  it, and to export instead.
+
 ## 0.1.112
 
 ### Variable fonts

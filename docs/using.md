@@ -959,7 +959,9 @@ past it. The status bar then says _not saved, trying again_ and why — _this br
 is full_ — and the save is tried again by itself, every few seconds at first and then every
 minute, so making room is all there is to do: forget a font you no longer want from the list
 of fonts, or clear other sites' data in the browser. Nothing is lost while the window is open,
-and closing the tab on a save that has not happened is asked about first.
+and closing the tab on a save that has not happened is asked about first. The desktop window
+asks too — _Close and lose the last changes?_ — and where the font has a folder, offers to
+save it there before closing, which keeps the changes on disk.
 
 **What a font came in without.** Where a font file or a folder is opened, a master gone to
 or a copy put back, and something could not be read or kept, the status bar says so and how
@@ -968,7 +970,8 @@ many; rest the pointer on it for a line about each.
 **Browsers.** Typewright runs in Chrome and Edge and in Firefox. Saving to a folder on disk
 needs something only Chrome and Edge have, so in Firefox a font is kept in the browser and
 taken out by exporting it, as a UFO or as a font; the File menu there has no folder in it.
-Safari has not been tried.
+Safari has not been tried. The desktop application on Linux has no folder either, for the same
+reason, and its File menu says so.
 
 **Opening a large font** takes a second or two — an icon font of four thousand glyphs is
 four thousand glyphs to read and to draw — and for that time the window says so:

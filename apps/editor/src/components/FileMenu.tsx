@@ -257,13 +257,16 @@ export function FileMenu(): React.JSX.Element {
   // Where a browser has no way to be handed a folder, the two things that need
   // one are not on the menu. Said, since somebody who has read of them would
   // otherwise look for them, and since what to do instead is one word away.
-  // In a browser only: the desktop window is not something Chrome can be used
-  // instead of.
-  if (!folders && desktop() === null) {
+  // The desktop window has no folder to be handed where its webview has no
+  // picker either, which is on Linux, and Chrome is no answer to that.
+  if (!folders) {
     items.push({ kind: "separator" });
     items.push({
       kind: "aside",
-      text: "Saving to a folder needs Chrome or Edge. Here, take a font out with Export.",
+      text:
+        desktop() === null
+          ? "Saving to a folder needs Chrome or Edge. Here, take a font out with Export."
+          : "Saving to a folder is not in the desktop application on Linux yet. Take a font out with Export.",
     });
   }
 

@@ -175,10 +175,12 @@ Done so far, since 0.1.110:
   size, 9 differing in turn, every one a broad edge; kind still declined. Those left are said
   with what about the pen to change.
 
-Found on the way, and not yet looked at: the desktop window on Linux has no way to be handed
-a folder either, so a font cannot be saved to a folder there. Still to do for full storage: the desktop window's own question on closing does not yet ask about a
-save that failed, and nothing offers to make room (the copies under History are the largest
-thing kept).
+- The desktop window asks before closing on a save that did not happen, says why, and offers
+  the font's folder where it has one. The desktop application on Linux, which has no way to be
+  handed a folder, says so in its File menu as Firefox does; folders there are for later.
+
+Left, and decided: nothing offers to make room (the copies under History are the largest
+thing kept) — not yet.
 
 ### 0.3 — Tested where it runs
 

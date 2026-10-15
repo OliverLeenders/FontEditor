@@ -179,3 +179,66 @@ describe("closing the desktop window", () => {
     expect(sent).toEqual([]);
   });
 });
+
+describe("closing the desktop window when the last save failed", () => {
+  /** The working copy could not be written: what was to be saved is in the window only. */
+  function failed(store: Store): Store {
+    store.patch({ saveStatus: "failed", storageDetail: "this browser's storage is full" });
+    return store;
+  }
+
+  it("asks, says why, and says that closing loses the changes", async () => {
+    const sent = installDesktop();
+    render(<CloseWarning />, failed(freshStore()));
+    pressClose();
+
+    await waitFor(() => {
+      expect(dialog()).not.toBeNull();
+    });
+    expect(screen.getByText("Close and lose the last changes?")).toBeTruthy();
+    expect(dialog()?.textContent).toMatch(/could not be kept: this browser's storage is full\./);
+    expect(dialog()?.textContent).toMatch(/closing now loses them/);
+    expect(sent).toEqual([]);
+  });
+
+  it("offers no folder where there is none, and Cancel is where focus starts", async () => {
+    installDesktop();
+    render(<CloseWarning />, failed(freshStore()));
+    pressClose();
+    await waitFor(() => {
+      expect(dialog()).not.toBeNull();
+    });
+
+    expect(screen.queryByRole("button", { name: /^Save to/ })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+  });
+
+  it("offers the folder as the way to keep them, where there is one", async () => {
+    installDesktop();
+    render(<CloseWarning />, failed(behind()));
+    pressClose();
+    await waitFor(() => {
+      expect(dialog()).not.toBeNull();
+    });
+
+    // Asked about the changes, not about the folder being behind.
+    expect(screen.getByText("Close and lose the last changes?")).toBeTruthy();
+    const save = screen.getByRole("button", { name: "Save to Keep.ufo and close" });
+    expect(document.activeElement).toBe(save);
+  });
+
+  it("closes when told to close anyway", async () => {
+    const sent = installDesktop();
+    render(<CloseWarning />, failed(freshStore()));
+    pressClose();
+    await waitFor(() => {
+      expect(dialog()).not.toBeNull();
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Close anyway" }));
+
+    await waitFor(() => {
+      expect(sent).toEqual(["close_window"]);
+    });
+  });
+});

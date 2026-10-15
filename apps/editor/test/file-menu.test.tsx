@@ -218,6 +218,23 @@ describe("the font's folder in the bar", () => {
     );
   });
 
+  it("says so in the desktop window too, where it has no folder picker", () => {
+    delete (globalThis as { showDirectoryPicker?: unknown }).showDirectoryPicker;
+    (globalThis as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {
+      invoke: () => Promise.resolve(null),
+    };
+    try {
+      render(<FileMenu />);
+      openMenu();
+      // Not to use Chrome instead, which the desktop window is not a stand-in for.
+      expect(screen.getByRole("note").textContent).toBe(
+        "Saving to a folder is not in the desktop application on Linux yet. Take a font out with Export.",
+      );
+    } finally {
+      delete (globalThis as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__;
+    }
+  });
+
   it("says nothing of that where folders can be saved to", () => {
     render(<FileMenu />);
     openMenu();
