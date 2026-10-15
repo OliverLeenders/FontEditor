@@ -77,7 +77,12 @@ export async function start(): Promise<Application> {
   if (!existsSync(APPLICATION)) {
     throw new Error(`no test build at ${APPLICATION}: run pnpm test:desktop, which makes it`);
   }
-  const driver: ChildProcess = spawn(cargoProgram("tauri-driver"), ["--port", String(PORT)], {
+  // Another program in place of msedgedriver, where one is named: on CI, one
+  // that runs it with its log kept.
+  const native = process.env["TW_NATIVE_DRIVER"];
+  const options = ["--port", String(PORT)];
+  if (native !== undefined && native !== "") options.push("--native-driver", native);
+  const driver: ChildProcess = spawn(cargoProgram("tauri-driver"), options, {
     // What the drivers say, on CI, where there is nobody to run them again.
     stdio: ["ignore", process.env["CI"] === undefined ? "ignore" : "inherit", "inherit"],
   });
