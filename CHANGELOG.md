@@ -8,6 +8,8 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.1.112
+
 ### Variable fonts
 
 - More strokes drawn with a pen vary in a variable font, where they were written as the
