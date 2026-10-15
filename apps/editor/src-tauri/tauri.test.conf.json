@@ -1,6 +1,20 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "identifier": "dev.typewright.app.test",
+  "app": {
+    "windows": [
+      {
+        "title": "Typewright",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --remote-debugging-port=0"
+      }
+    ]
+  },
   "bundle": {
     "active": false
   }

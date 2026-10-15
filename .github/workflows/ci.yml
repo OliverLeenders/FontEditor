@@ -185,7 +185,9 @@ jobs:
   #
   # tauri-driver starts the application and hands its window to msedgedriver,
   # which must be the version of the WebView2 on the machine; msedgedriver-tool
-  # fetches that one.
+  # fetches that one. The test build gives its window --remote-debugging-port
+  # itself: the WebView2 on the runner keeps to the arguments the application
+  # gives and not the ones msedgedriver puts in the environment.
   desktop:
     name: The desktop application, driven
     runs-on: windows-latest
@@ -223,68 +225,15 @@ jobs:
           Get-Content "${{ runner.temp }}\msedgedriver.cmd"
 
       - name: Build the test copy of the application, and drive it
-        run: |
-          # The screen as it is while the first session is being made.
-          $null = Start-Job -ScriptBlock {
-            param($out)
-            while (-not (Get-Process typewright -ErrorAction SilentlyContinue)) { Start-Sleep -Milliseconds 500 }
-            Start-Sleep -Seconds 30
-            Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-            $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-            $shot = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
-            [System.Drawing.Graphics]::FromImage($shot).CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
-            $shot.Save($out)
-            & {
-              Get-Process typewright, msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Name, Id, MainWindowTitle, Path
-              "--- command lines of the webview"
-              Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" | ForEach-Object { $_.CommandLine } | Select-Object -First 3
-              "--- DevToolsActivePort files"
-              Get-ChildItem C:\Users, $env:TEMP, D:\a\_temp -Recurse -Filter DevToolsActivePort -ErrorAction SilentlyContinue | Select-Object FullName, LastWriteTime
-              "--- WebView2 policies"
-              Get-ChildItem HKLM:\SOFTWARE\Policies\Microsoft\Edge, HKCU:\SOFTWARE\Policies\Microsoft\Edge -Recurse -ErrorAction SilentlyContinue | Out-String
-              "--- WEBVIEW2 in the environment"
-              Get-ChildItem env: | Where-Object Name -like "WEBVIEW2*"
-            } *>&1 | Out-File "$out.txt" -Width 400
-          } -ArgumentList "${{ runner.temp }}\during.png"
-          pnpm --filter @typewright/editor test:desktop
+        run: pnpm --filter @typewright/editor test:desktop
         env:
           TW_NATIVE_DRIVER: ${{ runner.temp }}\msedgedriver.cmd
-
-      # What there is to go on when the application would not start under the
-      # driver: the two versions that must agree, the application's own log,
-      # and whether it starts at all with nothing driving it.
-      - name: What the machine had, if it failed
-        if: failure()
-        run: |
-          Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue | Select-Object pv
-          & "$env:USERPROFILE\.cargo\bin\msedgedriver.exe" --version
-          Get-ChildItem "$env:LOCALAPPDATA\dev.typewright.app.test" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
-          Get-Content "$env:LOCALAPPDATA\dev.typewright.app.test\logs\*.log" -ErrorAction SilentlyContinue
-          $app = Start-Process apps\editor\src-tauri\target\desktop-test\debug\typewright.exe -PassThru `
-            -RedirectStandardOutput app-out.txt -RedirectStandardError app-err.txt
-          Start-Sleep -Seconds 15
-          "still running: $(-not $app.HasExited)"
-          "window: $((Get-Process -Id $app.Id -ErrorAction SilentlyContinue).MainWindowTitle)"
-          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          $shot = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
-          [System.Drawing.Graphics]::FromImage($shot).CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
-          $shot.Save("$PWD\screen.png")
-          if (-not $app.HasExited) { Stop-Process -Id $app.Id }
-          "exit code: $($app.ExitCode)"
-          "--- stdout"; Get-Content app-out.txt
-          "--- stderr"; Get-Content app-err.txt
-          Get-Content "$env:LOCALAPPDATA\dev.typewright.app.test\logs\*.log" -ErrorAction SilentlyContinue
 
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: desktop-screen
-          path: |
-            screen.png
-            ${{ runner.temp }}/msedgedriver.log
-            ${{ runner.temp }}/during.png
-            ${{ runner.temp }}/during.png.txt
+          name: msedgedriver-log
+          path: ${{ runner.temp }}/msedgedriver.log
 
   # A UFO that only this repository has ever read proves consistency, not
   # correctness: a misreading of the format shared by our writer and our reader

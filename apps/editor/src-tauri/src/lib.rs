@@ -71,10 +71,19 @@ async fn open_window(app: tauri::AppHandle, font: Option<String>) -> Result<(), 
     None => "fonts".into(),
   };
   let label = format!("font-{}", OPENED.fetch_add(1, Ordering::SeqCst) + 1);
-  WebviewWindowBuilder::new(&app, label, WebviewUrl::App(format!("index.html?{search}").into()))
-    .title("Typewright")
-    .inner_size(1400.0, 900.0)
-    .min_inner_size(900.0, 600.0)
+  let mut builder =
+    WebviewWindowBuilder::new(&app, label, WebviewUrl::App(format!("index.html?{search}").into()))
+      .title("Typewright")
+      .inner_size(1400.0, 900.0)
+      .min_inner_size(900.0, 600.0);
+  // The browser arguments the first window was given, where it was given any:
+  // WebView2 makes every window of a profile with the same ones, and refuses a
+  // window asked for with others. The test build gives some, to be driven.
+  let first = app.config().app.windows.first();
+  if let Some(arguments) = first.and_then(|window| window.additional_browser_args.as_deref()) {
+    builder = builder.additional_browser_args(arguments);
+  }
+  builder
     .build()
     .map(|_| ())
     .map_err(|error| error.to_string())
