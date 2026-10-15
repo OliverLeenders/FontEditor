@@ -43,15 +43,18 @@ const SIZES = [
  * At most this many of the 940 fall back, as each kind of difference between
  * the two masters. Counted on 2026-10-14:
  *
- * - **size**: every one a broad edge turning sixty degrees or more from one
- *   point to the next.
- * - **turn**: all but four a broad edge whose masters turn by different
- *   amounts; the four a rectangle. 111, until a master's runs were matched to
- *   another's wherever the run it has not got falls, and not only at an end.
+ * - **size**: a broad edge turning sixty degrees or more from one point to
+ *   the next. 27, until a pen still pivoting where an open path begins or
+ *   ends was taken along its edge to a corner there.
+ * - **turn**: a broad edge whose masters turn by different amounts. 111,
+ *   until a master's runs were matched to another's wherever the run it has
+ *   not got falls; then 90, until a pivot over an instant was drawn as a line
+ *   across and runs no master holds all of were put in one order; then 48,
+ *   until the pivoting open ends above.
  * - **kind**: every one. A pen of one kind in one master and of another in the
  *   next is declined outright.
  */
-const MOST: Record<"size" | "turn" | "kind", number> = { size: 27, turn: 48, kind: 940 };
+const MOST: Record<"size" | "turn" | "kind", number> = { size: 6, turn: 9, kind: 940 };
 
 const penOf = (kind: Kind, i: number, turn: number, wide: number): PenShape => {
   const angle = 10 + i * turn;

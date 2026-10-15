@@ -106,17 +106,17 @@ describe("a pen of corners turning along a stroke", () => {
   });
 
   it(
-    "is drawn the other way where it pivots through the end of the path",
+    "is followed where it pivots through the end of the path",
     {
       timeout: 240_000,
     },
     () => {
       // Turning fast enough that the nib is still pivoting as the path ends:
-      // nothing to follow there, and the ink is made as it was before.
+      // the side is taken on along the pen's edge to a corner there.
       const j = named("a drawn J with a sharp corner");
       const pens = pensFor(j.curves.length + 1, "broad", -60);
       const stroke = strokeOf(j.curves, false, pens);
-      expect(plannedInk([stroke], ids)).toBeNull();
+      expect(plannedInk([stroke], ids)).not.toBeNull();
       const d = disagreement(loopsOf(inkRegions(stroke)), sweep(j.curves, pens, false), 70);
       expect(d.missing).toEqual([]);
       expect(d.extra).toEqual([]);

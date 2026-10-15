@@ -169,6 +169,11 @@ Done so far, since 0.1.110:
   the pen was made to vary: 27 of 940 differing in size, all a broad edge turning sixty
   degrees or more a point; 111 differing in turn, 107 of them a broad edge; and all 940
   differing in kind, which is declined outright.
+- A master's runs of a turning pen are matched to another's wherever the run it has not got
+  falls, a pivot over an instant is drawn as a line across, and a pen still pivoting at an
+  open end is taken along its edge to a corner there. On 2026-10-15: 6 of 940 differing in
+  size, 9 differing in turn, every one a broad edge; kind still declined. Those left are said
+  with what about the pen to change.
 
 Found on the way, and not yet looked at: the desktop window on Linux has no way to be handed
 a folder either, so a font cannot be saved to a folder there. Still to do for full storage: the desktop window's own question on closing does not yet ask about a

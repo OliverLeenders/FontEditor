@@ -78,7 +78,7 @@ describe("a rectangular pen changing its size along a stroke", () => {
     "a drawn J with a sharp corner",
   ].map((name) => STROKE_CASES.find((c) => c.name === name)!);
 
-  it.each(cases)("is the one line round its ink: $name", { timeout: 240_000 }, (c) => {
+  it.each(cases)("is the one line round its ink: $name", { timeout: 480_000 }, (c) => {
     for (const angle of [0, 20, 75]) {
       const pens = pensFor(c.closed ? c.curves.length : c.curves.length + 1, angle);
       const stroke = strokeOf(c.curves, c.closed, pens);

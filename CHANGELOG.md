@@ -8,6 +8,17 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Variable fonts
+
+- More strokes drawn with a pen vary in a variable font, where they were written as the
+  default master draws them at every weight:
+  - a hairpin narrower than the pen;
+  - a broad edge whose masters turn it by different amounts along the stroke;
+  - a pen with corners still turning where an open path begins or ends.
+- A stroke that still cannot vary is named when the masters are checked against each other,
+  and the export says why, with what about its pen to change.
+- A rectangular pen turning at an open end is drawn closer to the shape it sweeps.
+
 ## 0.1.111
 
 ### New

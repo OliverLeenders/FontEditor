@@ -1982,7 +1982,23 @@ function turningSides(
                 }
               }
             }
-            if (begin === null || atAnEnd.start) return null;
+            if (begin === null) return null;
+            // Where an open path begins, the pen stands there whole and the
+            // line goes round it from a corner to a corner. A side that begins
+            // part way along its edge is begun at a corner instead, and taken
+            // along the edge to where the pen pivots: the pen fills what that
+            // goes round, and the line round the end comes to a corner as it
+            // does wherever the pen is not pivoting.
+            if (atAnEnd.start) {
+              runs.push({
+                kind: "over",
+                k: (begin.next + begin.by) % n,
+                next: begin.next,
+                from: 0,
+                to: 0,
+                toCorner: false,
+              });
+            }
             runs.push({
               kind: "edge",
               k: (begin.next + begin.by) % n,
@@ -2065,8 +2081,24 @@ function turningSides(
               // Not in this stretch. Not yet, and the stretch ends with the pen
               // pivoting — or it began before the stretch did, which is two
               // corners drawing through a point of the path.
-              if (drawn(next, backOf(stop.by), stop.s) > 0 || atAnEnd.end) return null;
+              if (drawn(next, backOf(stop.by), stop.s) > 0) return null;
+              // Or the pen turns back before then, and the place it pivots on
+              // comes back to the corner that stopped: that corner draws again
+              // from there.
+              const back = turnsOf(k, stop.by).find(
+                (turn) => turn.starts && turn.s > stop.s + 1e-9,
+              );
+              if (back !== undefined) {
+                runs.push({ kind: "edge", k, next, from: stop.s, to: back.s, open: "end" });
+                from = back.s;
+                continue;
+              }
               runs.push({ kind: "edge", k, next, from: stop.s, to: 1, open: "end" });
+              // And where an open path ends, on along the pen's edge to a
+              // corner, as a side that begins pivoting is begun at one.
+              if (atAnEnd.end) {
+                runs.push({ kind: "over", k, next, from: 1, to: 1, toCorner: true });
+              }
               break;
             }
             runs.push({ kind: "edge", k, next, from: stop.s, to: begins });

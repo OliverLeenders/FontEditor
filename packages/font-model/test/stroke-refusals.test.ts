@@ -59,9 +59,16 @@ describe("a stroke whose pen keeps it from varying", () => {
   });
 
   it("is a broad edge turned too far between two points, and says how far and what to do", () => {
-    const c = named("a pen widening along a line");
-    const light = strokeOf(c.curves, [broad(10, 50), broad(100, 110)]);
-    const bold = strokeOf(c.curves, [broad(10, 80), broad(100, 176)]);
+    const c = named("a thin oval round a bend that folds on the inside");
+    const n = c.curves.length + 1;
+    const light = strokeOf(
+      c.curves,
+      Array.from({ length: n }, (_, i) => broad(10 + i * 90, 50)),
+    );
+    const bold = strokeOf(
+      c.curves,
+      Array.from({ length: n }, (_, i) => broad(10 + i * 90, 90)),
+    );
     expect(plannedInk([light, bold], ids)).toBeNull();
     expect(whyNotOnePlan([light, bold])).toBe(
       "its broad edge turns 90° between two of its points, further than its ends can be followed round; put a point between them",
@@ -69,16 +76,16 @@ describe("a stroke whose pen keeps it from varying", () => {
   });
 
   it("is a broad edge turning by different amounts in different masters, where it cannot be followed", () => {
-    // One that is not followed yet: the pen pivoting as the line ends.
-    const c = named("a pen widening along a line");
+    // One that is not followed yet: the pen pivoting round a bend that folds.
+    const c = named("a thin oval round a bend that folds on the inside");
     const n = c.curves.length + 1;
     const light = strokeOf(
       c.curves,
-      Array.from({ length: n }, (_, i) => broad(10 + i * 20, 50 + i * 10)),
+      Array.from({ length: n }, (_, i) => broad(10 - i * 20, 50 + i * 10)),
     );
     const bold = strokeOf(
       c.curves,
-      Array.from({ length: n }, (_, i) => broad(10 + i * 45, 80 + i * 10)),
+      Array.from({ length: n }, (_, i) => broad(10 + i * 40, 80 + i * 10)),
     );
     expect(plannedInk([light, bold], ids)).toBeNull();
     expect(whyNotOnePlan([light, bold])).toMatch(
