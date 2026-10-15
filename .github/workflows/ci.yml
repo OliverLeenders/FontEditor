@@ -234,7 +234,17 @@ jobs:
             $shot = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
             [System.Drawing.Graphics]::FromImage($shot).CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
             $shot.Save($out)
-            Get-Process typewright, msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Name, Id, MainWindowTitle, Path | Out-File "$out.txt"
+            & {
+              Get-Process typewright, msedgewebview2 -ErrorAction SilentlyContinue | Select-Object Name, Id, MainWindowTitle, Path
+              "--- command lines of the webview"
+              Get-CimInstance Win32_Process -Filter "Name = 'msedgewebview2.exe'" | ForEach-Object { $_.CommandLine } | Select-Object -First 3
+              "--- DevToolsActivePort files"
+              Get-ChildItem C:\Users, $env:TEMP, D:\a\_temp -Recurse -Filter DevToolsActivePort -ErrorAction SilentlyContinue | Select-Object FullName, LastWriteTime
+              "--- WebView2 policies"
+              Get-ChildItem HKLM:\SOFTWARE\Policies\Microsoft\Edge, HKCU:\SOFTWARE\Policies\Microsoft\Edge -Recurse -ErrorAction SilentlyContinue | Out-String
+              "--- WEBVIEW2 in the environment"
+              Get-ChildItem env: | Where-Object Name -like "WEBVIEW2*"
+            } *>&1 | Out-File "$out.txt" -Width 400
           } -ArgumentList "${{ runner.temp }}\during.png"
           pnpm --filter @typewright/editor test:desktop
         env:
