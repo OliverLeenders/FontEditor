@@ -4,5 +4,12 @@ packages:
 # pnpm blocks package install scripts by default. esbuild's postinstall links
 # its platform-specific native binary (@esbuild/win32-x64 and friends), which
 # Vitest needs in order to strip TypeScript. Without it, nothing runs.
+#
+# edgedriver and geckodriver come with WebdriverIO, which drives the desktop
+# application's tests, and would fetch browser drivers when installed. Those
+# tests use tauri-driver and an msedgedriver matched to the installed WebView2
+# instead, so neither is fetched.
 allowBuilds:
+  edgedriver: false
   esbuild: true
+  geckodriver: false

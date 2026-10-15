@@ -178,6 +178,46 @@ jobs:
       - name: Check the third-party notices are up to date
         run: node tools/notices/generate-notices.mjs --check
 
+  # The desktop application itself, driven: windows of its own, a close it holds
+  # until the page answers, and the ttfautohint beside it. On Windows, where the
+  # close button can be pressed from a test — it is a message to the window — and
+  # where the installer most people take is built for.
+  #
+  # tauri-driver starts the application and hands its window to msedgedriver,
+  # which must be the version of the WebView2 on the machine; msedgedriver-tool
+  # fetches that one.
+  desktop:
+    name: The desktop application, driven
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/editor/src-tauri/target/desktop-test
+          key: desktop-test-${{ hashFiles('apps/editor/src-tauri/Cargo.lock') }}
+          restore-keys: desktop-test-
+
+      - name: tauri-driver, and the msedgedriver for this WebView2
+        run: |
+          cargo install tauri-driver --locked
+          cargo install --git https://github.com/chippers/msedgedriver-tool
+          cd "$env:USERPROFILE\.cargo\bin"
+          msedgedriver-tool
+
+      - name: Build the test copy of the application, and drive it
+        run: pnpm --filter @typewright/editor test:desktop
+
   # A UFO that only this repository has ever read proves consistency, not
   # correctness: a misreading of the format shared by our writer and our reader
   # passes every test in the suite. fontTools is the reference implementation

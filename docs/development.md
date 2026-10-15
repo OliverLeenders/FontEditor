@@ -107,11 +107,42 @@ This builds the editor, serves the build on port 4317 under the content security
 desktop window has, and runs `apps/editor/browser/*.test.ts`. Each test begins with an empty
 profile. It needs the Chromium described below, and is a job of its own in CI.
 
-Opening and saving a folder is not covered: the browser's folder picker cannot be driven, and
-a stand-in for it would test the stand-in.
+Opening and saving a folder is tested with a stand-in for the browser's folder picker, which
+cannot be driven: it hands the editor a folder of the browser's private file system, a real
+handle, and everything after the picker is the editor's own. That test runs in the Chrome or
+Edge installed on the machine; see `apps/editor/browser/folder.test.ts`.
 
 The large font is Material Symbols Outlined, in `fixtures/fonts/material-symbols/` with its
 licence (Apache 2.0). It is read by the tests and is in nothing that is shipped.
+
+### The desktop application, driven
+
+What only the desktop application does — a window of its own for another font, closing a
+window with a folder behind, the hinted TrueType from the ttfautohint bundled beside it — is
+tested by driving the application itself, on Windows:
+
+```bash
+pnpm --filter @typewright/editor test:desktop
+```
+
+This makes a debug build of the shell under the identifier `dev.typewright.app.test`, into
+`apps/editor/src-tauri/target/desktop-test`, so the fonts an installed copy or the debug build
+keeps are never the ones a test opens; each start is given an empty WebView2 profile besides.
+Then it runs `apps/editor/desktop/*.test.ts` through tauri-driver. `--no-build` runs them on the
+last build. Two programs are needed, once:
+
+```bash
+cargo install tauri-driver --locked
+```
+
+```bash
+cargo install --git https://github.com/chippers/msedgedriver-tool
+```
+
+and then `msedgedriver-tool` run inside `~/.cargo/bin`, which fetches the msedgedriver of the
+WebView2 that is installed. Run it again when WebView2 updates and the tests say the versions
+differ. The close button is pressed as Windows presses it, by a message to the window, so
+those tests are for Windows only. It is a job of its own in CI.
 
 ### Real fonts
 

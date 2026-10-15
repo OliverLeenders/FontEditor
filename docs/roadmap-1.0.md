@@ -218,6 +218,14 @@ Done so far:
   one.
 - Each package's tests end by listing the ones that passed using more than half the time
   they are allowed, and CI marks each with a warning.
+- The desktop application is driven by a test, on Windows and in CI there
+  (`pnpm --filter @typewright/editor test:desktop`): a window of its own opened on the list of
+  fonts; the hinted TrueType made through its menu item, by the ttfautohint beside the
+  application; and the close button, pressed as Windows presses it — asking when the folder is
+  behind and staying open on Cancel, asking again the next time, closing straight away when
+  there is nothing behind, and closing on the second press when the page never answers. It is
+  a test build under an identifier of its own, so it never opens anybody's fonts. Still to
+  do: an update taken from one build to the next.
 - WebKit on Windows cannot be tested at all, and this is Playwright's build of it and not
   Safari: its file system has no access handles to give, and what is written to a file by
   stream never arrives. The editor says _not saving_ there, which is true. So WebKit is tried

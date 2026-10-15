@@ -12,8 +12,10 @@
     "test/**/*.ts",
     "test/**/*.tsx",
     "browser/**/*.ts",
+    "desktop/**/*.ts",
     "vite.config.ts",
     "vitest.config.ts",
-    "vitest.browser.config.ts"
+    "vitest.browser.config.ts",
+    "vitest.desktop.config.ts"
   ]
 }
