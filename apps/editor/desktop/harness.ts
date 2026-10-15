@@ -80,7 +80,8 @@ export async function start(): Promise<Application> {
   }
   const profile = await mkdtemp(join(tmpdir(), "typewright-desktop-"));
   const driver: ChildProcess = spawn(cargoProgram("tauri-driver"), ["--port", String(PORT)], {
-    stdio: ["ignore", "ignore", "inherit"],
+    // What the drivers say, on CI, where there is nobody to run them again.
+    stdio: ["ignore", process.env["CI"] === undefined ? "ignore" : "inherit", "inherit"],
     // Read by WebView2 in place of the folder the application names: a profile
     // nothing has been kept in.
     env: { ...process.env, WEBVIEW2_USER_DATA_FOLDER: profile },

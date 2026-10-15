@@ -218,6 +218,23 @@ jobs:
       - name: Build the test copy of the application, and drive it
         run: pnpm --filter @typewright/editor test:desktop
 
+      # What there is to go on when the application would not start under the
+      # driver: the two versions that must agree, the application's own log,
+      # and whether it starts at all with nothing driving it.
+      - name: What the machine had, if it failed
+        if: failure()
+        run: |
+          Get-ItemProperty "HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" -ErrorAction SilentlyContinue | Select-Object pv
+          & "$env:USERPROFILE\.cargo\bin\msedgedriver.exe" --version
+          Get-ChildItem "$env:LOCALAPPDATA\dev.typewright.app.test" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+          Get-Content "$env:LOCALAPPDATA\dev.typewright.app.test\logs\*.log" -ErrorAction SilentlyContinue
+          $app = Start-Process apps\editor\src-tauri\target\desktop-test\debug\typewright.exe -PassThru
+          Start-Sleep -Seconds 15
+          Get-Process -Id $app.Id -ErrorAction SilentlyContinue | Select-Object Id, MainWindowTitle, HasExited
+          if (-not $app.HasExited) { Stop-Process -Id $app.Id }
+          "exit code: $($app.ExitCode)"
+          Get-Content "$env:LOCALAPPDATA\dev.typewright.app.test\logs\*.log" -ErrorAction SilentlyContinue
+
   # A UFO that only this repository has ever read proves consistency, not
   # correctness: a misreading of the format shared by our writer and our reader
   # passes every test in the suite. fontTools is the reference implementation
