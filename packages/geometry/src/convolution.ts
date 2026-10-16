@@ -16,6 +16,7 @@ import {
   type PenProfile,
   type PenShape,
   type SegmentBlend,
+  THINNEST_OVAL,
   isBroad,
   isSquared,
   penExponent,
@@ -112,19 +113,57 @@ type Leg = { readonly index: number; readonly forward: boolean };
  * same pieces, for every master.
  *
  * `null` where there is no one plan: the masters' paths have not the same
- * number of curves, a pen has no width, the pen is a broad edge in one place
- * and an oval in another, a broad edge that turns in a way its ends cannot be
- * followed through (see `turningSides`), a pen that is held and then changed
- * at a point, or a side no number of curves comes near. Whoever asked then
- * draws each master's ink for itself.
+ * number of curves, a pen has no width, a broad edge that turns in a way its
+ * ends cannot be followed through (see `turningSides`), a pen that is held
+ * and then changed at a point, or a side no number of curves comes near.
+ * Whoever asked then draws each master's ink for itself.
+ *
+ * A broad edge in one place and a rounder pen in another — between masters,
+ * or along a stroke — is drawn wherever it is a broad edge as a pen of the
+ * other kind, as thin as one may be: one kind all along, and one plan, where
+ * a broad edge's own plan has corners and pivots a rounder pen's has not. As
+ * square as the other pen, so a broad edge beside a rectangle is a rectangle,
+ * which a broad edge is one of with no thickness. And as thin as the plan can
+ * be made with: the thinnest pen that is not a broad edge first, then thicker,
+ * a very flat oval's sides turning too fast at its ends to be fitted where the
+ * path bends tightly. Never so thick that its ink is further from the broad
+ * edge's than a side is let stray.
  *
  * `byCornersOnly`, a plan is wanted only where the pen's own corners and edges
  * draw the line, and `null` where its sides would be fitted to the pen's reach:
  * for whoever has a nearer way than that of making one master's ink.
  */
 export function plannedStrokes(
-  masters: readonly StrokeMaster[],
+  given: readonly StrokeMaster[],
   byCornersOnly = false,
+): PlannedPiece[][][] | null {
+  const kinds = new Set(given.flatMap((m) => m.pens.map(isBroad)));
+  const rounder = given.flatMap((m) => m.pens).find((pen) => !isBroad(pen));
+  if (kinds.size < 2 || rounder === undefined) return plannedOnce(given, byCornersOnly);
+  for (const thickness of LIFTED_THICKNESSES) {
+    const lifted = given.map((m) => ({
+      ...m,
+      pens: m.pens.map((pen) =>
+        isBroad(pen) ? { ...pen, thickness, squareness: squarenessOf(rounder) } : pen,
+      ),
+    }));
+    const planned = plannedOnce(lifted, byCornersOnly);
+    if (planned !== null) return planned;
+  }
+  return null;
+}
+
+/**
+ * How thick a broad edge is drawn beside a rounder pen, thinnest first. Its ink
+ * is half that from the broad edge's at most, so the last is as far as a side
+ * is let stray: see `SIDE_LIMIT`.
+ */
+const LIFTED_THICKNESSES = [THINNEST_OVAL, 1, 2 * SIDE_LIMIT];
+
+/** {@link plannedStrokes}, the pen of one kind all along. */
+function plannedOnce(
+  masters: readonly StrokeMaster[],
+  byCornersOnly: boolean,
 ): PlannedPiece[][][] | null {
   const first = masters[0];
   if (first === undefined) return null;

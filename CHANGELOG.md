@@ -8,6 +8,17 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Variable fonts
+
+- **A broad edge in one master and a rounder pen in another varies.** It was declined
+  outright, and every weight had the default master's ink. The broad edge is drawn as the
+  thinnest pen of the other kind — at most a unit from its own ink — so the masters share one
+  outline. Of 940 test strokes, 24 still do not vary: a broad edge beside an oval round a
+  hairpin or a bend tighter than the pen. Those are named, with what to do: give the broad
+  edge a little thickness.
+- The masters check no longer says a broad edge turned far between two points will not vary
+  where it does: it plans the stroke to be sure.
+
 ### Fixed
 
 - Closing the desktop window after a save that did not happen asks first — _Close and lose

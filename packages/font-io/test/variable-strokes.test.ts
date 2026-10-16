@@ -10,6 +10,7 @@ import {
   fontDocument,
   glyph,
   node,
+  updateGlyph,
   withNib,
 } from "@typewright/font-model";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -386,15 +387,36 @@ describe("a stroke in a variable font", () => {
     }
   });
 
-  it("is the default master's ink, and said not to vary, where the pens are too unlike", () => {
-    // An oval in one master and a broad edge in the other: no one plan.
+  it("varies where the pen is an oval in one master and a broad edge in the other", () => {
+    // The broad edge drawn as the thinnest oval: one plan for both.
     const unlike = [
       { name: "Regular", location: { wght: 400 }, document: master(60) },
       { name: "Black", location: { wght: 900 }, document: master(140, 0) },
     ];
     const { warnings, notVarying } = exportVariableFont(axes, unlike);
+    expect(notVarying).toEqual([]);
+    expect(warnings.some((w) => w.includes("do not vary"))).toBe(false);
+  });
 
-    expect(notVarying).toEqual(expect.arrayContaining(["s", "dollar"]));
+  it("is the default master's ink, and said not to vary, where the pen cannot", () => {
+    // A pen held and then changed at a point: no one plan, in either master.
+    const stepped = (document: FontDocument): FontDocument =>
+      updateGlyph(document, "s", (g) => ({
+        ...g,
+        contours: g.contours.map((c) => ({
+          ...c,
+          nodes: c.nodes.map((n, i) =>
+            i === 0 ? { ...n, blend: { angle: "step" as const, shape: "linear" as const } } : n,
+          ),
+        })),
+      }))!;
+    const unlike = [
+      { name: "Regular", location: { wght: 400 }, document: stepped(master(60)) },
+      { name: "Black", location: { wght: 900 }, document: stepped(master(140)) },
+    ];
+    const { warnings, notVarying } = exportVariableFont(axes, unlike);
+
+    expect(notVarying).toContain("s");
     expect(notVarying).not.toContain("n");
     expect(warnings).toContainEqual(
       // Which ones is `notVarying`, above: the warning names the first few.
@@ -402,9 +424,7 @@ describe("a stroke in a variable font", () => {
     );
     // And why, once for every glyph it is the reason for: what to change.
     expect(warnings).toContainEqual(
-      expect.stringMatching(
-        /because its pen is a broad edge in one place and a rounder pen in another.*: .*s/,
-      ),
+      expect.stringMatching(/because its pen is held and then changed at a point.*: .*s/),
     );
     expect(warnings.some((w) => w.includes("masters disagree"))).toBe(false);
   });

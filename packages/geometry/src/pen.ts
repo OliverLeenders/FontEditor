@@ -91,6 +91,9 @@ export function penExponent(pen: PenShape): number {
 /** Below this thickness a pen is drawn as the broad edge it cannot be told from. */
 const BROAD_BELOW = 0.5;
 
+/** The thinnest pen drawn as an oval: what a broad edge is drawn as beside rounder pens. */
+export const THINNEST_OVAL = BROAD_BELOW;
+
 /** Whether a pen is a broad edge, or near enough that its exact answer is the right one. */
 export function isBroad(pen: PenShape): boolean {
   return pen.thickness < BROAD_BELOW;

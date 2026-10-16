@@ -37,14 +37,41 @@ const named = (name: string) => STROKE_CASES.find((c) => c.name === name)!;
 const broad = (angle: number, width = 80): PenShape => ({ angle, width, thickness: 0 });
 const oval = (angle: number, width = 80): PenShape => ({ angle, width, thickness: 30 });
 
+/**
+ * A round pen round a hairpin, a broad edge in the light master and an oval in
+ * the bold: too tight a bend for any oval thin enough to stand in for the
+ * broad edge to be fitted round, so it does not vary.
+ */
+const SIZES = [
+  [50, 24],
+  [110, 46],
+  [70, 60],
+  [36, 20],
+  [90, 30],
+] as const;
+function hairpin(): [Contour, Contour] {
+  const c = named("a round pen round a hairpin");
+  const n = c.curves.length + 1;
+  const pens = (bold: boolean): PenShape[] =>
+    Array.from({ length: n }, (_, i) => {
+      const [width, thickness] = SIZES[i % SIZES.length]!;
+      return bold
+        ? { angle: 10, width: width * 1.6, thickness: thickness * 1.6 }
+        : { angle: 10, width, thickness: 0 };
+    });
+  return [strokeOf(c.curves, pens(false)), strokeOf(c.curves, pens(true))];
+}
+
 describe("a stroke whose pen keeps it from varying", () => {
   const s = named("an oval pen along an S").curves;
 
-  it("is a broad edge in one master and a rounder pen in another", () => {
-    const light = strokeOf(s, [broad(30), broad(40)]);
-    const bold = strokeOf(s, [oval(30, 120), oval(40, 120)]);
+  it("is a broad edge beside a rounder pen round a bend too tight for the two, and says what to do", () => {
+    const [light, bold] = hairpin();
     expect(plannedInk([light, bold], ids)).toBeNull();
-    expect(whyNotOnePlan([light, bold])).toMatch(/broad edge in one place and a rounder pen/);
+    expect(knownPenProblem([light, bold])).toBeNull();
+    expect(whyNotOnePlan([light, bold])).toBe(
+      "its pen is a broad edge in one place and a rounder pen in another, and round its tightest bend the two cannot be drawn alike; a broad edge given a little thickness varies",
+    );
   });
 
   it("is a pen held and then changed at a point", () => {
@@ -103,6 +130,14 @@ describe("a stroke whose pen keeps it from varying", () => {
     );
   });
 
+  it("is not a broad edge in one master and a rounder pen in another, as such", () => {
+    // Drawn, where it is a broad edge, as the thinnest oval: one plan.
+    const light = strokeOf(s, [broad(30), broad(40)]);
+    const bold = strokeOf(s, [oval(30, 120), oval(40, 120)]);
+    expect(plannedInk([light, bold], ids)).not.toBeNull();
+    expect(knownPenProblem([light, bold])).toBeNull();
+  });
+
   it("is nothing to say of a pen that varies", () => {
     const light = strokeOf(s, [oval(30), oval(40)]);
     const bold = strokeOf(s, [oval(30, 120), oval(40, 120)]);
@@ -113,14 +148,23 @@ describe("a stroke whose pen keeps it from varying", () => {
 
 describe("the check between two masters", () => {
   it("names a stroke whose pen keeps it from varying, and what to change", () => {
-    const s = named("an oval pen along an S").curves;
-    const light = glyph("s", { contours: [strokeOf(s, [broad(30), broad(40)])] });
-    const bold = glyph("s", { contours: [strokeOf(s, [oval(30, 120), oval(40, 120)])] });
+    const [one, two] = hairpin();
+    const light = glyph("s", { contours: [one] });
+    const bold = glyph("s", { contours: [two] });
 
     const found = glyphIncompatibilities("s", light, bold);
     expect(found).toHaveLength(1);
     expect(found[0]).toMatchObject({ kind: "pen", contour: 0 });
-    expect(found[0]?.says).toMatch(/^Contour 1 will not vary: its pen is a broad edge/);
+    expect(found[0]?.says).toMatch(
+      /^Contour 1 will not vary: its pen is a broad edge .* a broad edge given a little thickness varies\.$/,
+    );
+  });
+
+  it("says nothing of a broad edge beside a rounder pen where the two are drawn alike", () => {
+    const s = named("an oval pen along an S").curves;
+    const light = glyph("s", { contours: [strokeOf(s, [broad(30), broad(40)])] });
+    const bold = glyph("s", { contours: [strokeOf(s, [oval(30, 120), oval(40, 120)])] });
+    expect(glyphIncompatibilities("s", light, bold)).toEqual([]);
   });
 
   it("says nothing of a stroke that varies", () => {

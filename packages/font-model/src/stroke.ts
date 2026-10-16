@@ -1633,14 +1633,20 @@ export function penAt(c: Contour, i: number): Nib | null {
  *
  * Asked of a stroke {@link plannedInk} has said no to, and of the same stroke
  * as each master has it. The reasons are the ones a pen gives that there is
- * no plan for: a broad edge in one master and a rounder pen in another, a pen
- * held and then changed at a point, a broad edge turned so far between two of
- * its points that its ends cannot be followed round. Anything else is said as
- * what it is, that the ink does not come to the same points.
+ * no plan for: a pen held and then changed at a point, a broad edge turned so
+ * far between two of its points that its ends cannot be followed round, a
+ * broad edge beside a rounder pen round a bend too tight for the two to be
+ * drawn alike. Anything else is said as what it is, that the ink does not
+ * come to the same points.
  */
 export function whyNotOnePlan(strokes: readonly Contour[]): string {
   const known = knownPenProblem(strokes);
   if (known !== null) return known;
+  // A broad edge beside a rounder pen is drawn as the thinnest rounder pen the
+  // plan can be made with, and round a bend tight enough none can.
+  if (mixesPenKinds(strokes)) {
+    return "its pen is a broad edge in one place and a rounder pen in another, and round its tightest bend the two cannot be drawn alike; a broad edge given a little thickness varies";
+  }
   // A broad edge that turns along the stroke by one amount in one master and
   // another in the next: the commonest that is left, and one with something
   // to do about it.
@@ -1658,6 +1664,16 @@ export function whyNotOnePlan(strokes: readonly Contour[]): string {
 }
 
 /**
+ * Whether a stroke's pen is a broad edge in one place and a rounder pen in
+ * another, between masters or along it: one that varies where it can be
+ * planned, and is to be planned to know.
+ */
+export function mixesPenKinds(strokes: readonly Contour[]): boolean {
+  if (strokes.some((c) => c.nib === undefined)) return false;
+  return new Set(strokes.flatMap((c) => pensOf(c).map(isBroad))).size > 1;
+}
+
+/**
  * What about a stroke's pen is known to keep it from varying, without trying
  * to plan it: `null` where nothing is, which is not to say it will vary.
  *
@@ -1669,15 +1685,12 @@ export function knownPenProblem(strokes: readonly Contour[]): string | null {
   const pens = strokes.map(pensOf);
   const all = pens.flat();
   const broad = all.filter(isBroad).length;
-  if (broad > 0 && broad < all.length) {
-    return "its pen is a broad edge in one place and a rounder pen in another, and a pen cannot change kind between masters or along a stroke";
-  }
   if (
     strokes.some((c) => c.nodes.some((n) => n.blend?.angle === "step" || n.blend?.shape === "step"))
   ) {
     return "its pen is held and then changed at a point, which cannot vary";
   }
-  if (broad > 0) {
+  if (broad === all.length) {
     let most = 0;
     for (const [at, own] of pens.entries()) {
       const c = strokes[at]!;

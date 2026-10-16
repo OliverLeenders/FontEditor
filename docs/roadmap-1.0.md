@@ -174,6 +174,16 @@ Done so far, since 0.1.110:
   open end is taken along its edge to a corner there. On 2026-10-15: 6 of 940 differing in
   size, 9 differing in turn, every one a broad edge; kind still declined. Those left are said
   with what about the pen to change.
+- A broad edge in one master and a rounder pen in another is drawn, where it is a broad
+  edge, as the thinnest pen of the other kind the plan can be made with — half a unit thick,
+  then one, then two, so never more than a unit from the broad edge's own ink — and as square
+  as the other pen. Differing in kind: 24 of 940 on 2026-10-16, where it was every one.
+
+  Found while checking those: the census counts strokes that do not plan, not whether what
+  is planned is right. Measured against the pen swept along the path, plans already in place
+  for a rounder pen leave ink out where a pen much bigger than the bend is turned sixty
+  degrees or more a point — 64 of 676 masters' inks in the same-kind census strokes with
+  plain ends. Not this change's doing, and not yet looked at.
 
 - The desktop window asks before closing on a save that did not happen, says why, and offers
   the font's folder where it has one. The desktop application on Linux, which has no way to be

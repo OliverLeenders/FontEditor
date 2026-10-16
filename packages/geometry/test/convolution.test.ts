@@ -221,9 +221,36 @@ describe("the line round a stroke's ink, in two masters", () => {
     expect(plannedStrokes([one, { ...one, curves: one.curves.slice(0, 1) }])).toBeNull();
   });
 
-  it("declines an oval in one master and a broad edge in another", () => {
+  it("draws an oval in one master and a broad edge in another to one plan", () => {
+    // The broad edge drawn as the thinnest oval: the same pieces as the oval
+    // master's, and its ink within a unit of the broad edge's own.
     const one = master(named("an oval pen round a sharp V"));
     const other = master(named("a broad nib round a sharp V"));
-    expect(plannedStrokes([one, other])).toBeNull();
+    const planned = plannedStrokes([one, other]);
+    expect(planned).not.toBeNull();
+    expect(shapeOf(planned![0]!)).toBe(shapeOf(planned![1]!));
+    for (const [at, m] of [one, other].entries()) {
+      const d = disagreement(curvesOf(planned![at]!), sweep(m.curves, m.pens, m.closed), 70);
+      expect(d.checked).toBeGreaterThan(1000);
+      expect(d.missing).toEqual([]);
+      expect(d.extra).toEqual([]);
+    }
+  });
+
+  it("draws a broad edge beside a rectangle as a rectangle", () => {
+    // A rectangle with no thickness is a broad edge, so it is drawn by the
+    // corners as the rectangle is, and exactly.
+    const c = named("a broad nib round a sharp V");
+    const box: StrokeMaster = {
+      ...master(c),
+      pens: c.pens.map((pen) => ({ ...pen, thickness: 30, squareness: 1 })),
+    };
+    const planned = plannedStrokes([master(c), box]);
+    expect(planned).not.toBeNull();
+    for (const [at, m] of [master(c), box].entries()) {
+      const d = disagreement(curvesOf(planned![at]!), sweep(m.curves, m.pens, m.closed), 70);
+      expect(d.missing).toEqual([]);
+      expect(d.extra).toEqual([]);
+    }
   });
 });

@@ -51,10 +51,13 @@ const SIZES = [
  *   not got falls; then 90, until a pivot over an instant was drawn as a line
  *   across and runs no master holds all of were put in one order; then 48,
  *   until the pivoting open ends above.
- * - **kind**: every one. A pen of one kind in one master and of another in the
- *   next is declined outright.
+ * - **kind**: a broad edge beside an oval round a tight bend — a hairpin, a
+ *   bend tighter than the pen, a path crossing itself — where no oval thin
+ *   enough to stand in for the broad edge can be fitted. 940, every one
+ *   declined, until a broad edge beside a rounder pen was drawn as the
+ *   thinnest pen of the other kind the plan could be made with.
  */
-const MOST: Record<"size" | "turn" | "kind", number> = { size: 6, turn: 9, kind: 940 };
+const MOST: Record<"size" | "turn" | "kind", number> = { size: 6, turn: 9, kind: 24 };
 
 const penOf = (kind: Kind, i: number, turn: number, wide: number): PenShape => {
   const angle = 10 + i * turn;
