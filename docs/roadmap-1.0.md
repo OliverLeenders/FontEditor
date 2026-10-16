@@ -188,7 +188,20 @@ Done so far, since 0.1.110:
   is planned is right. Measured against the pen swept along the path, plans already in place
   for a rounder pen leave ink out where a pen much bigger than the bend is turned sixty
   degrees or more a point — 64 of 676 masters' inks in the same-kind census strokes with
-  plain ends. Not this change's doing, and not yet looked at.
+  plain ends. Not this change's doing.
+
+  Looked at on 2026-10-16. Two things, seen on a round pen round a small closed curve turned
+  ninety degrees a point. On the outside, the side is drawn where the pen reaches furthest
+  straight out from the path, which is the edge of the ink only for a pen that stays as it
+  is: one growing, shrinking or turning as it goes reaches past that, the outline falling a
+  few units short in long runs. On the inside, where the side folds back over itself, a patch
+  is left out where the line crosses itself. The edge drawn where the pen's own change and the
+  path's going cancel — the right answer — mended the outside of that stroke (64 points of a
+  grid left out to 16), but measured over every census stroke it did no better than straight
+  out: the pen's change had to be measured over a fiftieth of the segment to be smooth enough
+  to fit, which is not near enough, and very thin ovals could not be fitted with it at all.
+  Not kept. What it wants is the pen's change worked out exactly, from the blend, rather than
+  measured across two points.
 
 - The desktop window asks before closing on a save that did not happen, says why, and offers
   the font's folder where it has one. The desktop application on Linux, which has no way to be
