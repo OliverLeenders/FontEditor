@@ -254,3 +254,168 @@ describe("the line round a stroke's ink, in two masters", () => {
     }
   });
 });
+
+describe("a pen held and then changed at a point, in two masters", () => {
+  // The stroke is two that meet at the point, each with its pen standing whole
+  // there: the one arriving holding its pen, the one leaving with the next.
+  const SIZES = [
+    [50, 24],
+    [110, 46],
+    [70, 60],
+    [36, 20],
+  ] as const;
+  const pensFor = (count: number, wide: number, kind: "oval" | "box"): PenShape[] =>
+    Array.from({ length: count }, (_, i) => {
+      const [width, thickness] = SIZES[i % SIZES.length]!;
+      return {
+        angle: 10 + i * 30,
+        width: width * wide,
+        thickness: thickness * wide,
+        squareness: kind === "box" ? 1 : 0,
+      };
+    });
+  const cases = [
+    ["an oval pen turning and swelling round a corner", "oval", { angle: "step", shape: "linear" }],
+    ["a drawn J with a sharp corner", "oval", { angle: "linear", shape: "step" }],
+    ["a zigzag with a broad nib", "box", { angle: "step", shape: "step" }],
+    ["an oval pen round a closed square", "oval", { angle: "step", shape: "step" }],
+  ] as const;
+
+  // Minutes of sweeping, a minute or two a case: asked for, and run every night.
+  it.skipIf(process.env["STROKE_DIAGNOSE"] === undefined).each(cases)(
+    "is its ink, the same in both: %s, %s",
+    { timeout: 240_000 },
+    (name, kind, step) => {
+      const c = named(name);
+      const n = c.closed ? c.curves.length : c.curves.length + 1;
+      // A step on the first segment, and on every other one after.
+      const blends = c.curves.map((_, i) => (i % 2 === 0 ? step : undefined));
+      const masters: StrokeMaster[] = [1, 1.6].map((wide) => ({
+        curves: c.curves,
+        pens: pensFor(n, wide, kind),
+        closed: c.closed,
+        blends,
+      }));
+      const planned = plannedStrokes(masters);
+      expect(planned).not.toBeNull();
+      expect(shapeOf(planned![0]!)).toBe(shapeOf(planned![1]!));
+      for (const [at, m] of masters.entries()) {
+        const d = disagreement(
+          curvesOf(planned![at]!),
+          sweep(m.curves, m.pens, m.closed, m.blends),
+          70,
+        );
+        expect(d.checked).toBeGreaterThan(1000);
+        expect(d.missing).toEqual([]);
+        expect(d.extra).toEqual([]);
+      }
+    },
+  );
+
+  it("declines masters that change their pens at different points", () => {
+    const c = named("a drawn J with a sharp corner");
+    const n = c.curves.length + 1;
+    const step = { angle: "step", shape: "linear" } as const;
+    const one: StrokeMaster = {
+      curves: c.curves,
+      pens: pensFor(n, 1, "oval"),
+      closed: false,
+      blends: [step],
+    };
+    const other: StrokeMaster = { ...one, blends: [undefined, step] };
+    expect(plannedStrokes([one, other])).toBeNull();
+  });
+});
+
+/**
+ * The plans themselves, quickly: that one is made, and is the same in every
+ * master. Whether each fills as its pen does is asked of them by the sweeps
+ * above and every night; this is what runs on every push.
+ */
+describe("one plan for every master, made quickly", () => {
+  const SIZES = [
+    [50, 24],
+    [110, 46],
+    [70, 60],
+    [36, 20],
+    [90, 30],
+  ] as const;
+  const broadPens = (count: number, turn: number, wide: number): PenShape[] =>
+    Array.from({ length: count }, (_, i) => ({
+      angle: 10 + i * turn,
+      width: SIZES[i % SIZES.length]![0] * wide,
+      thickness: 0,
+    }));
+  const planOf = (masters: StrokeMaster[]): string[] => {
+    const planned = plannedStrokes(masters);
+    expect(planned).not.toBeNull();
+    return planned!.map(shapeOf);
+  };
+
+  it("is made for a broad edge whose masters turn it by different amounts", () => {
+    const c = named("a drawn J with a sharp corner");
+    const n = c.curves.length + 1;
+    const [one, two] = planOf(
+      [12, 32].map((turn, at) => ({
+        curves: c.curves,
+        pens: broadPens(n, turn, at === 0 ? 1 : 1.6),
+        closed: false,
+      })),
+    );
+    expect(one).toBe(two);
+  });
+
+  it("is made for a broad edge still pivoting where an open path ends", () => {
+    const c = named("a drawn J with a sharp corner");
+    const n = c.curves.length + 1;
+    const [one, two] = planOf(
+      [1, 1.6].map((wide) => ({ curves: c.curves, pens: broadPens(n, -60, wide), closed: false })),
+    );
+    expect(one).toBe(two);
+  });
+
+  it("is made for a broad edge beside an oval, and beside a rectangle", () => {
+    const c = named("a drawn J with a sharp corner");
+    const n = c.curves.length + 1;
+    for (const squareness of [0, 1]) {
+      const rounder = broadPens(n, 12, 1.6).map((pen) => ({ ...pen, thickness: 40, squareness }));
+      const [one, two] = planOf([
+        { curves: c.curves, pens: broadPens(n, 12, 1), closed: false },
+        { curves: c.curves, pens: rounder, closed: false },
+      ]);
+      expect(one).toBe(two);
+    }
+  });
+
+  it("is made a part at a time where the pen is changed at a point", () => {
+    const c = named("a drawn J with a sharp corner");
+    const n = c.curves.length + 1;
+    const step = { angle: "step", shape: "step" } as const;
+    // Changed at the second point and the fourth: three parts, a loop each.
+    const blends = [step, undefined, step, undefined];
+    const masters: StrokeMaster[] = [1, 1.6].map((wide) => ({
+      curves: c.curves,
+      pens: broadPens(n, 12, wide).map((pen) => ({ ...pen, thickness: 30 * wide })),
+      closed: false,
+      blends,
+    }));
+    const [one, two] = planOf(masters);
+    expect(one).toBe(two);
+    expect(one!.split(" ")).toHaveLength(3);
+  });
+
+  it("is begun at a point the pen changes at, on a closed path", () => {
+    const c = named("an oval pen round a closed square");
+    const step = { angle: "step", shape: "linear" } as const;
+    const masters: StrokeMaster[] = [1, 1.6].map((wide) => ({
+      curves: c.curves,
+      pens: c.pens.map((pen) => ({ ...pen, width: pen.width * wide })),
+      closed: true,
+      blends: [undefined, step, undefined, step],
+    }));
+    const [one, two] = planOf(masters);
+    expect(one).toBe(two);
+    // Two parts, each open from one point of change to the other.
+    expect(one!.split(" ")).toHaveLength(2);
+  });
+});

@@ -210,7 +210,10 @@ describe("closing the desktop window when the last save failed", () => {
     });
 
     expect(screen.queryByRole("button", { name: /^Save to/ })).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+    // Focus is moved once the dialog is drawn.
+    await waitFor(() => {
+      expect(document.activeElement).toBe(screen.getByRole("button", { name: "Cancel" }));
+    });
   });
 
   it("offers the folder as the way to keep them, where there is one", async () => {
@@ -224,7 +227,9 @@ describe("closing the desktop window when the last save failed", () => {
     // Asked about the changes, not about the folder being behind.
     expect(screen.getByText("Close and lose the last changes?")).toBeTruthy();
     const save = screen.getByRole("button", { name: "Save to Keep.ufo and close" });
-    expect(document.activeElement).toBe(save);
+    await waitFor(() => {
+      expect(document.activeElement).toBe(save);
+    });
   });
 
   it("closes when told to close anyway", async () => {

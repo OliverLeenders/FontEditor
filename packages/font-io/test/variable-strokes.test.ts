@@ -399,7 +399,8 @@ describe("a stroke in a variable font", () => {
   });
 
   it("is the default master's ink, and said not to vary, where the pen cannot", () => {
-    // A pen held and then changed at a point: no one plan, in either master.
+    // A pen held and then changed at a point, in the Regular, and nowhere in
+    // the Black: the two are not the same strokes, and there is no one plan.
     const stepped = (document: FontDocument): FontDocument =>
       updateGlyph(document, "s", (g) => ({
         ...g,
@@ -412,7 +413,7 @@ describe("a stroke in a variable font", () => {
       }))!;
     const unlike = [
       { name: "Regular", location: { wght: 400 }, document: stepped(master(60)) },
-      { name: "Black", location: { wght: 900 }, document: stepped(master(140)) },
+      { name: "Black", location: { wght: 900 }, document: master(140) },
     ];
     const { warnings, notVarying } = exportVariableFont(axes, unlike);
 
@@ -424,7 +425,9 @@ describe("a stroke in a variable font", () => {
     );
     // And why, once for every glyph it is the reason for: what to change.
     expect(warnings).toContainEqual(
-      expect.stringMatching(/because its pen is held and then changed at a point.*: .*s/),
+      expect.stringMatching(
+        /because its pen is held and then changed at one point in one master and at another.*: .*s/,
+      ),
     );
     expect(warnings.some((w) => w.includes("masters disagree"))).toBe(false);
   });

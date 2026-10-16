@@ -137,6 +137,130 @@ export function plannedStrokes(
   given: readonly StrokeMaster[],
   byCornersOnly = false,
 ): PlannedPiece[][][] | null {
+  // A pen held and then changed at a point is two strokes that meet there,
+  // each with its pen standing whole at the point: the one arriving with the
+  // pen it held, the one leaving with the pen it changed to. Planned a part at
+  // a time, and laid together, their loops fill as the ink does.
+  const parts = steppedParts(given);
+  if (parts === false) return null;
+  if (parts !== null) {
+    const each = parts.map((part) => plannedKinds(part, byCornersOnly));
+    if (each.some((planned) => planned === null)) return null;
+    return given.map((_, at) => each.flatMap((planned) => planned![at]!));
+  }
+  return plannedKinds(given, byCornersOnly);
+}
+
+/**
+ * Each master's stroke cut where its pen is changed at a point, the parts in
+ * order along it, each part as every master has it: `null` where nothing is,
+ * and `false` where the masters change their pens at different points.
+ *
+ * The part arriving at the point ends with the pen it held, the channels the
+ * segment steps kept as they were and the others come to the next point's. A
+ * closed path is begun at a point a pen changes at, and is open from there
+ * round to it again. An open path's last segment may step too: the path ends
+ * there, and with the pen it held, so it is not cut.
+ */
+function steppedParts(masters: readonly StrokeMaster[]): StrokeMaster[][] | null | false {
+  const stepsOf = (m: StrokeMaster): number[] => {
+    const count = m.curves.length;
+    const points: number[] = [];
+    for (let i = 0; i < count; i++) {
+      const blend = m.blends?.[i];
+      if (blend?.angle !== "step" && blend?.shape !== "step") continue;
+      const point = i + 1;
+      if (!m.closed && point === count) continue;
+      points.push(point % count);
+    }
+    return points.sort((a, b) => a - b);
+  };
+  const first = masters[0];
+  if (first === undefined) return null;
+  const steps = stepsOf(first);
+  if (masters.some((m) => stepsOf(m).join() !== steps.join())) return false;
+  if (steps.length === 0) return null;
+
+  const cut = masters.map((m) => {
+    const count = m.curves.length;
+    const pen = (i: number): PenShape => m.pens[m.closed ? i % count : i]!;
+    // The pen at a point as the segment before it leaves it.
+    const arriving = (point: number): PenShape => {
+      const i = (point - 1 + count) % count;
+      const blend = m.blends?.[i];
+      const held = pen(i);
+      const next = pen(i + 1);
+      const shape = blend?.shape === "step" ? held : next;
+      return {
+        ...next,
+        angle: blend?.angle === "step" ? held.angle : next.angle,
+        width: shape.width,
+        thickness: shape.thickness,
+        squareness: squarenessOf(shape),
+      };
+    };
+    const unstepped = (blend: SegmentBlend | undefined): SegmentBlend | undefined =>
+      blend === undefined
+        ? undefined
+        : {
+            angle: blend.angle === "step" ? "linear" : blend.angle,
+            shape: blend.shape === "step" ? "linear" : blend.shape,
+          };
+    // Where each part begins and ends, by point.
+    const bounds: [number, number][] = [];
+    if (m.closed) {
+      for (let k = 0; k < steps.length; k++) {
+        const from = steps[k]!;
+        const to = steps[(k + 1) % steps.length]!;
+        bounds.push([from, to > from ? to : to + count]);
+      }
+    } else {
+      const ends = [0, ...steps, count];
+      for (let k = 0; k + 1 < ends.length; k++) bounds.push([ends[k]!, ends[k + 1]!]);
+    }
+    return bounds.map(([from, to], k): StrokeMaster => {
+      const indices = Array.from({ length: to - from }, (_, j) => (from + j) % count);
+      const pens = [...indices.map(pen), arriving(to % count)];
+      const firstPart = !m.closed && k === 0;
+      const lastPart = !m.closed && k === bounds.length - 1;
+      // The ends of the path are cut as they were; the ends between parts are
+      // the pen standing whole at the point.
+      const start = firstPart ? m.cuts?.start : undefined;
+      const end = lastPart ? m.cuts?.end : undefined;
+      const shifted = (c: PlannedCut): PlannedCut => {
+        if (c.from === undefined) return c;
+        const { from: along, ...rest } = c;
+        // A cut made of more than this part is made of all of it.
+        return along - from > 0 ? { ...rest, from: along - from } : rest;
+      };
+      return {
+        curves: indices.map((i) => m.curves[i]!),
+        pens: lastPart ? [...indices.map(pen), pen(to)] : pens,
+        closed: false,
+        // The segment that comes to the point the pen changes at holds what it
+        // stepped, its pen at the point being what it held: nothing left to step.
+        blends: indices.map((i, j) =>
+          !lastPart && j === indices.length - 1 ? unstepped(m.blends?.[i]) : m.blends?.[i],
+        ),
+        ...(start === undefined && end === undefined
+          ? {}
+          : {
+              cuts: {
+                ...(start === undefined ? {} : { start }),
+                ...(end === undefined ? {} : { end: shifted(end) }),
+              },
+            }),
+      };
+    });
+  });
+  return cut[0]!.map((_, part) => cut.map((parts) => parts[part]!));
+}
+
+/** {@link plannedStrokes}, the pen changed nowhere at a point. */
+function plannedKinds(
+  given: readonly StrokeMaster[],
+  byCornersOnly: boolean,
+): PlannedPiece[][][] | null {
   const kinds = new Set(given.flatMap((m) => m.pens.map(isBroad)));
   const rounder = given.flatMap((m) => m.pens).find((pen) => !isBroad(pen));
   if (kinds.size < 2 || rounder === undefined) return plannedOnce(given, byCornersOnly);
@@ -174,7 +298,6 @@ function plannedOnce(
     if (m.curves.length !== count || m.closed !== first.closed) return null;
     if (m.pens.length < (m.closed ? count : count + 1)) return null;
     if (m.pens.some((pen) => !(pen.width > 0))) return null;
-    if (m.blends?.some((b) => b?.angle === "step" || b?.shape === "step") === true) return null;
     for (const curve of m.curves) {
       if (endTangent(curve, 0) === null) return null;
     }

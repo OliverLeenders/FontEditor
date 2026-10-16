@@ -74,15 +74,32 @@ describe("a stroke whose pen keeps it from varying", () => {
     );
   });
 
-  it("is a pen held and then changed at a point", () => {
-    const held = strokeOf(s, [oval(30), oval(70)]);
-    const stepped = {
-      ...held,
-      nodes: held.nodes.map((n, i) =>
-        i === 0 ? { ...n, blend: { angle: "step" as const, shape: "linear" as const } } : n,
-      ),
+  describe("a pen held and then changed at a point", () => {
+    const j = named("a drawn J with a sharp corner").curves;
+    /** The J, its pen held along the segment after point `at` and changed at the next. */
+    const stepped = (at: number, wide: number): Contour => {
+      const held = strokeOf(j, [oval(30, 80 * wide), oval(70, 100 * wide), oval(50, 90 * wide)]);
+      return {
+        ...held,
+        nodes: held.nodes.map((n, i) =>
+          i === at ? { ...n, blend: { angle: "step" as const, shape: "linear" as const } } : n,
+        ),
+      };
     };
-    expect(whyNotOnePlan([stepped, stepped])).toMatch(/held and then changed at a point/);
+
+    it("varies, where every master changes it at the same point", () => {
+      const both = [stepped(1, 1), stepped(1, 1.6)];
+      expect(plannedInk(both, ids)).not.toBeNull();
+      expect(knownPenProblem(both)).toBeNull();
+    });
+
+    it("does not, changed at one point in one master and another in the next, and says so", () => {
+      const both = [stepped(0, 1), stepped(1, 1.6)];
+      expect(plannedInk(both, ids)).toBeNull();
+      expect(whyNotOnePlan(both)).toBe(
+        "its pen is held and then changed at one point in one master and at another in the next; changed at the same points in each, it varies",
+      );
+    });
   });
 
   it("is a broad edge turned too far between two points, and says how far and what to do", () => {

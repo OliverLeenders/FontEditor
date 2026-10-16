@@ -179,6 +179,11 @@ Done so far, since 0.1.110:
   then one, then two, so never more than a unit from the broad edge's own ink — and as square
   as the other pen. Differing in kind: 24 of 940 on 2026-10-16, where it was every one.
 
+- A pen held and then changed at a point is two strokes that meet there, each with its pen
+  standing whole at the point, and is planned as that, a part at a time. Checked against the
+  pen swept the slow way, steps of the angle, of the shape and of both, open and closed, every
+  night. Masters that change their pen at different points do not vary, and are said to.
+
   Found while checking those: the census counts strokes that do not plan, not whether what
   is planned is right. Measured against the pen swept along the path, plans already in place
   for a rounder pen leave ink out where a pen much bigger than the bend is turned sixty

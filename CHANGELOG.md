@@ -16,6 +16,9 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
   outline. Of 940 test strokes, 24 still do not vary: a broad edge beside an oval round a
   hairpin or a bend tighter than the pen. Those are named, with what to do: give the broad
   edge a little thickness.
+- **A pen held and then changed at a point varies** (a _Step_ blend), where every master
+  changes it at the same points. Masters that change it at different points are named, with
+  that as the reason.
 - The masters check no longer says a broad edge turned far between two points will not vary
   where it does: it plans the stroke to be sure.
 

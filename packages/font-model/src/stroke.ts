@@ -1633,8 +1633,9 @@ export function penAt(c: Contour, i: number): Nib | null {
  *
  * Asked of a stroke {@link plannedInk} has said no to, and of the same stroke
  * as each master has it. The reasons are the ones a pen gives that there is
- * no plan for: a pen held and then changed at a point, a broad edge turned so
- * far between two of its points that its ends cannot be followed round, a
+ * no plan for: a pen changed at one point in one master and at another in the
+ * next, a broad edge turned so far between two of its points that its ends
+ * cannot be followed round, a
  * broad edge beside a rounder pen round a bend too tight for the two to be
  * drawn alike. Anything else is said as what it is, that the ink does not
  * come to the same points.
@@ -1685,10 +1686,11 @@ export function knownPenProblem(strokes: readonly Contour[]): string | null {
   const pens = strokes.map(pensOf);
   const all = pens.flat();
   const broad = all.filter(isBroad).length;
-  if (
-    strokes.some((c) => c.nodes.some((n) => n.blend?.angle === "step" || n.blend?.shape === "step"))
-  ) {
-    return "its pen is held and then changed at a point, which cannot vary";
+  // A pen held and then changed at a point is two strokes meeting there, and
+  // varies where every master changes it at the same points.
+  const changes = strokes.map((c) => changedAt(c).join());
+  if (changes.some((each) => each !== changes[0])) {
+    return "its pen is held and then changed at one point in one master and at another in the next; changed at the same points in each, it varies";
   }
   if (broad === all.length) {
     let most = 0;
@@ -1705,6 +1707,22 @@ export function knownPenProblem(strokes: readonly Contour[]): string | null {
     }
   }
   return null;
+}
+
+/**
+ * The points a stroke's pen is changed at, having been held along the segment
+ * before: not the end of an open path, which the stroke has ended at.
+ */
+function changedAt(c: Contour): number[] {
+  const count = segmentCount(c);
+  const points: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const blend = c.nodes[i]?.blend;
+    if (blend?.angle !== "step" && blend?.shape !== "step") continue;
+    if (!c.closed && i + 1 === count) continue;
+    points.push((i + 1) % count);
+  }
+  return points.sort((a, b) => a - b);
 }
 
 /**
