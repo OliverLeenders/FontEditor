@@ -200,8 +200,12 @@ Done so far, since 0.1.110:
   grid left out to 16), but measured over every census stroke it did no better than straight
   out: the pen's change had to be measured over a fiftieth of the segment to be smooth enough
   to fit, which is not near enough, and very thin ovals could not be fitted with it at all.
-  Not kept. What it wants is the pen's change worked out exactly, from the blend, rather than
-  measured across two points.
+  Not kept. Tried again with the pen's change made smooth along the curve and measured over a
+  hair: no better — fewer outlines short on the outside, but a broad edge beside a rounder
+  pen left out twice the ink it had. The edge drawn that way goes wrong wherever the pen grows
+  faster than the path moves, inside a tight bend and for the thinnest ovals, where it swings
+  to points that are not on the ink at all. Mending this is drawing a side differently where
+  the pen covers its own path, which is work of its own; not kept either.
 
 - The desktop window asks before closing on a save that did not happen, says why, and offers
   the font's folder where it has one. The desktop application on Linux, which has no way to be
