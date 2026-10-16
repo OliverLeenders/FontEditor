@@ -126,3 +126,79 @@ describe("a font written to a disk slow to take each file", () => {
     );
   });
 });
+
+/**
+ * A disk that refuses some writes: each file named in `refused` that many
+ * times, and then takes it. What Chrome says when the file it is writing over
+ * is held by something else as it lands.
+ */
+function refusing(inner: DiskFolder, refused: Map<string, number>, at = ""): DiskFolder {
+  return {
+    kind: "directory",
+    name: inner.name,
+    entries: () => inner.entries(),
+    getFileHandle: async (name, options) => {
+      const file = await inner.getFileHandle(name, options);
+      const path = `${at}${name}`;
+      return {
+        kind: "file",
+        name: file.name,
+        getFile: () => file.getFile(),
+        createWritable: async () => {
+          const writable = await file.createWritable();
+          return {
+            write: (data) => writable.write(data),
+            close: async () => {
+              const left = refused.get(path) ?? 0;
+              if (left > 0) {
+                refused.set(path, left - 1);
+                throw new DOMException(
+                  "An operation that depends on state cached in an interface object was made but the state had changed since it was read from disk.",
+                  "InvalidStateError",
+                );
+              }
+              await writable.close();
+            },
+          };
+        },
+      };
+    },
+    getDirectoryHandle: async (name, options) =>
+      refusing(await inner.getDirectoryHandle(name, options), refused, `${at}${name}/`),
+    removeEntry: (name, options) => inner.removeEntry(name, options),
+  };
+}
+
+describe("a font written to a disk that refuses a file now and then", () => {
+  it("is written whole, the refused files tried again", async () => {
+    const folder = new FakeFolder("Held.ufo");
+    const entries = ufoFiles(font(40));
+    const glifs = entries.filter((e) => e.path.endsWith(".glif")).map((e) => e.path);
+    // Three glyphs refused once, one twice, and a file that is not a glyph once.
+    const refused = new Map<string, number>([
+      [glifs[0]!, 1],
+      [glifs[7]!, 2],
+      [glifs[20]!, 1],
+      ["fontinfo.plist", 1],
+    ]);
+
+    const report = await writeFolder(refusing(folder, refused), entries);
+
+    expect(report.written).toBe(entries.length);
+    expect([...refused.values()].every((left) => left === 0)).toBe(true);
+    const written = folder.all();
+    for (const entry of entries) expect(written.has(entry.path), entry.path).toBe(true);
+  });
+
+  it("names the file, where it is refused every time", async () => {
+    const folder = new FakeFolder("Stuck.ufo");
+    const entries = ufoFiles(font(10));
+    const stuck = entries.find((e) => e.path.endsWith(".glif"))!.path;
+
+    await expect(writeFolder(refusing(folder, new Map([[stuck, 99]])), entries)).rejects.toThrow(
+      new RegExp(
+        `^${stuck.replace(/[.]/g, "\\.")} could not be written: An operation that depends on state cached`,
+      ),
+    );
+  });
+});

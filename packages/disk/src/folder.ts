@@ -328,6 +328,12 @@ class Folders {
     return { folder: await this.made(parts), name };
   }
 
+  /** Look up the folders on the way to a path again, next time they are asked for. */
+  forget(path: string): void {
+    const parts = path.split("/").slice(0, -1);
+    for (let k = parts.length; k > 0; k--) this.found.delete(parts.slice(0, k).join("/"));
+  }
+
   /** A file as it is now, or `null` where it is not there or will not say. */
   async file(path: string): Promise<{ readonly lastModified: number } | null> {
     try {
@@ -382,14 +388,55 @@ async function fileAt(
   }
 }
 
-/** Write one file, making the directories on the way to it. */
+/**
+ * Write one file, making the directories on the way to it.
+ *
+ * Tried again where the disk says no, a moment later and with the folder looked
+ * up afresh. A save of four thousand glyphs to a folder on Windows was seen to
+ * fail part way with Chrome's "an operation that depends on state cached in an
+ * interface object", after sixteen files at a time were written. What refused
+ * it is not known yet — something holding a file that has just landed, the
+ * virus scanner or an indexer, is the likeliest — and a write that is refused
+ * once is worth trying again rather than failing a save of thousands for. Said
+ * with the file's name where it is refused every time, so there is something
+ * to go on.
+ */
 async function writeFile(folders: Folders, path: string, data: Uint8Array): Promise<void> {
-  const { folder: at, name } = await folders.of(path);
-  const handle = await at.getFileHandle(name, { create: true });
-  const writable = await handle.createWritable();
-  await writable.write(data);
-  await writable.close();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const { folder: at, name } = await folders.of(path);
+      const handle = await at.getFileHandle(name, { create: true });
+      const writable = await handle.createWritable();
+      await writable.write(data);
+      await writable.close();
+      return;
+    } catch (error) {
+      // Only a refusal that may pass: a folder that has gone, or that may not
+      // be written to at all, says so again however often it is asked.
+      if (attempt >= WRITE_ATTEMPTS || !mayPass(error)) {
+        const why = error instanceof Error ? error.message : String(error);
+        throw new Error(`${path} could not be written: ${why}`, { cause: error });
+      }
+      folders.forget(path);
+      await new Promise((wake) => setTimeout(wake, RETRY_AFTER * attempt));
+    }
+  }
 }
+
+/**
+ * Whether a write was refused in a way that may not happen next time: the file
+ * held by something else as it was written over, which Chrome says as a state
+ * that changed, or as a file that may not be changed just now.
+ */
+function mayPass(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null)?.name;
+  return name === "InvalidStateError" || name === "NoModificationAllowedError";
+}
+
+/** How many times a file is tried before the save is said to have failed. */
+const WRITE_ATTEMPTS = 4;
+/** How long to wait before trying a file again, in milliseconds, more each time. */
+const RETRY_AFTER = 150;
 
 /** The text of a file, or `null` if it is not there. */
 export async function textAt(folder: DiskFolder, path: string): Promise<string | null> {

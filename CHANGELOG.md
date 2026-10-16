@@ -24,6 +24,9 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ### Fixed
 
+- A save to a folder that the disk refuses a file of now and then — seen on Windows as _an
+  operation that depends on state cached in an interface object_ — tries that file again
+  rather than failing, and where a file is refused every time, says which.
 - Closing the desktop window after a save that did not happen asks first — _Close and lose
   the last changes?_ — and says why the save failed. Where the font has a folder, it offers
   to save there and close, which keeps the changes. It used to close without a word.
