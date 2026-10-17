@@ -290,6 +290,20 @@ Done so far:
 
 **Exit:** a week of fuzzing on CI finds nothing new.
 
+Done so far:
+
+- Every reader of a file from outside is held to one rule, tried on every push and twenty
+  thousand times a night with a new seed (`test/fuzz.test.ts` in `stuffit` and `font-io`):
+  whatever it is handed, an answer or an error that says why, within two seconds, and never a
+  `TypeError` or `RangeError` from inside the reader. Each is fed good files spoiled — bytes
+  changed, pieces cut out or repeated, counts made the largest they can be, the end cut off
+  — and bytes or text at random. What the first runs found: the StuffIt archive reader and the
+  resource fork reader read offsets past their file's end (both now checked, a number at a
+  time, and say what was missing); WOFF did the same, and passed on the platform's wordless
+  error for a table that would not inflate; and a binary font damaged inside an outline gave
+  points that were not numbers, which took two seconds to import and sat in the font after.
+  Under investigation: a spoiled font that took forty-seven seconds to import.
+
 ### 0.5 — A correct font, by other people's measure
 
 - Font Bakery and the OpenType Sanitizer in CI on every proof font and every corpus font.

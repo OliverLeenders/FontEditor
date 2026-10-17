@@ -19,6 +19,7 @@
 
 import { arsenic } from "./arsenic.js";
 import { method13 } from "./method13.js";
+import { numbersOf } from "./numbers.js";
 
 const MAGIC = "StuffIt (c)1997-";
 const ENTRY_ID = 0xa5a5a5a5;
@@ -86,15 +87,15 @@ function macTime(seconds: number): number {
  */
 export function readArchive(bytes: Uint8Array): Archive {
   if (!looksLikeStuffIt(bytes)) throw new Error("not a StuffIt archive");
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const n = numbersOf(bytes, "the archive");
 
   const version = bytes[82];
   if (version !== 5) {
     throw new Error(`StuffIt archive version ${String(version)} is not supported, only 5`);
   }
 
-  const count = view.getUint16(92);
-  let at = view.getUint32(94);
+  const count = n.u16(92, "its header");
+  let at = n.u32(94, "its header");
   let left = count;
 
   const entries: Entry[] = [];
@@ -104,18 +105,18 @@ export function readArchive(bytes: Uint8Array): Archive {
 
   while (left > 0) {
     if (at + 48 > bytes.length) throw new Error("the archive ends inside an entry header");
-    if (view.getUint32(at) !== ENTRY_ID) throw new Error(`no entry header at ${String(at)}`);
+    if (n.u32(at, "an entry") !== ENTRY_ID) throw new Error(`no entry header at ${String(at)}`);
 
-    const entryVersion = bytes[at + 4]!;
-    const headerEnd = at + view.getUint16(at + 6);
-    const flags = bytes[at + 9]!;
-    const created = view.getUint32(at + 10);
-    const modified = view.getUint32(at + 14);
-    const folderOffset = view.getUint32(at + 26);
-    const nameLength = view.getUint16(at + 30);
-    const dataLength = view.getUint32(at + 34);
-    const dataPacked = view.getUint32(at + 38);
-    const dataCrc = view.getUint16(at + 42);
+    const entryVersion = n.u8(at + 4, "an entry");
+    const headerEnd = at + n.u16(at + 6, "an entry");
+    const flags = n.u8(at + 9, "an entry");
+    const created = n.u32(at + 10, "an entry");
+    const modified = n.u32(at + 14, "an entry");
+    const folderOffset = n.u32(at + 26, "an entry");
+    const nameLength = n.u16(at + 30, "an entry");
+    const dataLength = n.u32(at + 34, "an entry");
+    const dataPacked = n.u32(at + 38, "an entry");
+    const dataCrc = n.u16(at + 42, "an entry");
 
     const folder = (flags & FLAG_FOLDER) !== 0;
     let p = at + 46;
@@ -123,7 +124,7 @@ export function readArchive(bytes: Uint8Array): Archive {
     let children = 0;
 
     if (folder) {
-      children = view.getUint16(p);
+      children = n.u16(p, "an entry");
       p += 2;
       // A folder is followed by a second entry that says 0xffffffff where a
       // length belongs. What it is for is not known; it holds no data and no
@@ -135,8 +136,8 @@ export function readArchive(bytes: Uint8Array): Archive {
         continue;
       }
     } else {
-      dataMethod = bytes[p]!;
-      p += 2 + bytes[p + 1]!; // the password check, if the entry is encrypted
+      dataMethod = n.u8(p, "an entry");
+      p += 2 + n.u8(p + 1, "an entry"); // the password check, if the entry is encrypted
     }
 
     const name = latin1(bytes, p, nameLength);
@@ -144,13 +145,13 @@ export function readArchive(bytes: Uint8Array): Archive {
 
     let comment = "";
     if (p < headerEnd) {
-      const commentLength = view.getUint16(p);
+      const commentLength = n.u16(p, "an entry");
       p += 4;
       comment = latin1(bytes, p, commentLength);
       p += commentLength;
     }
 
-    const second = view.getUint16(p);
+    const second = n.u16(p, "an entry");
     p += 4;
     const fileType = latin1(bytes, p, 4);
     const creator = latin1(bytes, p + 4, 4);
@@ -161,14 +162,14 @@ export function readArchive(bytes: Uint8Array): Archive {
     let resource: Fork | null = null;
     if ((second & 0x01) !== 0) {
       resource = {
-        length: view.getUint32(p),
-        packed: view.getUint32(p + 4),
-        crc: view.getUint16(p + 8),
-        method: bytes[p + 12]!,
+        length: n.u32(p, "an entry"),
+        packed: n.u32(p + 4, "an entry"),
+        crc: n.u16(p + 8, "an entry"),
+        method: n.u8(p + 12, "an entry"),
         offset: 0,
         encrypted: (flags & FLAG_ENCRYPTED) !== 0,
       };
-      p += 14 + bytes[p + 13]!;
+      p += 14 + n.u8(p + 13, "an entry");
     }
 
     const forkStart = p;

@@ -71,6 +71,32 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @typewright/geometry exec vitest run test/accuracy
 
+  # Every reader of a file from outside, handed a great many spoiled and random
+  # files: an answer or an error that says why, every time. A new seed each
+  # night, said at the top of the log, so a failure can be run again with it:
+  # FUZZ_SEED=<seed> pnpm --filter <package> exec vitest run test/fuzz.test.ts
+  fuzz:
+    name: Files from anywhere
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      FUZZ_RUNS: "20000"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: The seed
+        run: echo "FUZZ_SEED=$(date +%s)" | tee -a "$GITHUB_ENV"
+      - name: The containers old Macintosh fonts come in
+        run: pnpm --filter @typewright/stuffit exec vitest run test/fuzz.test.ts --testTimeout=3600000
+      - name: Fonts, UFOs, designspaces, feature source and SVG
+        if: ${{ !cancelled() }}
+        run: pnpm --filter @typewright/font-io exec vitest run test/fuzz.test.ts --testTimeout=3600000
+
   # How much of each package's source its own tests run, as a table in this
   # job's summary, and held against the floor each package was given: see
   # tools/coverage.

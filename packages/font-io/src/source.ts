@@ -39,7 +39,29 @@ export type SourceGlyph = {
   readonly advance: number;
   readonly commands: readonly PathCommand[];
   readonly components: readonly SourceComponent[];
+  /**
+   * Its outline could not be read, and it has none here: the file could not be
+   * followed, or gave points that are not numbers or are nowhere near the em.
+   */
+  readonly damaged?: true;
 };
+
+/**
+ * How far from the origin a point of an outline may be before it is taken to
+ * be the file going wrong rather than a drawing: a thousand ems and more of the
+ * largest em a font may have.
+ */
+const FURTHEST = 16384 * 64;
+
+/** Whether every number of an outline is one a drawing could hold. */
+function sound(command: PathCommand): boolean {
+  for (const value of Object.values(command)) {
+    if (typeof value === "number" && !(Number.isFinite(value) && Math.abs(value) <= FURTHEST)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /** The three numbers `hhea` says a line is made of. */
 export type SourceHhea = {
@@ -159,11 +181,20 @@ function readGlyphs(font: OtFont): SourceGlyph[] {
     const composite = g.isComposite === true && (g.components?.length ?? 0) > 0;
 
     let commands: PathCommand[] = [];
+    let damaged = false;
     if (!composite) {
       try {
         commands = g.path.commands.map(toCommand).filter((c): c is PathCommand => c !== null);
       } catch {
         commands = [];
+        damaged = true;
+      }
+      // A file damaged in the right place gives an outline of points that are
+      // not numbers, which nothing downstream can draw or work out — and can
+      // spend seconds trying. Taken as no outline, and said.
+      if (!commands.every(sound)) {
+        commands = [];
+        damaged = true;
       }
     }
 
@@ -193,6 +224,7 @@ function readGlyphs(font: OtFont): SourceGlyph[] {
       advance: g.advanceWidth ?? 0,
       commands,
       components,
+      ...(damaged ? { damaged: true as const } : {}),
     });
   }
   return glyphs;

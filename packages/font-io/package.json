@@ -25,6 +25,7 @@
     "woff2-encoder": "^2.0.0"
   },
   "devDependencies": {
+    "fast-check": "^4.9.0",
     "harfbuzzjs": "^1.6.1"
   }
 }

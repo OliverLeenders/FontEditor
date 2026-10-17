@@ -29,6 +29,8 @@ export type ResourceFork = {
   readonly resources: readonly Resource[];
 };
 
+import { numbersOf } from "./numbers.js";
+
 function latin1(bytes: Uint8Array, at: number, length: number): string {
   let out = "";
   for (let i = 0; i < length; i++) out += String.fromCharCode(bytes[at + i] ?? 0);
@@ -38,17 +40,17 @@ function latin1(bytes: Uint8Array, at: number, length: number): string {
 /** Read every resource in a fork, in the order the map lists them. */
 export function readResourceFork(bytes: Uint8Array): ResourceFork {
   if (bytes.length < 16) throw new Error("a resource fork needs at least its header");
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const n = numbersOf(bytes, "the resource fork");
 
-  const dataAt = view.getUint32(0);
-  const mapAt = view.getUint32(4);
+  const dataAt = n.u32(0, "its header");
+  const mapAt = n.u32(4, "its header");
   if (mapAt + 28 > bytes.length) throw new Error("the resource map is past the end of the fork");
 
-  const typeListAt = mapAt + view.getUint16(mapAt + 24);
-  const nameListAt = mapAt + view.getUint16(mapAt + 26);
+  const typeListAt = mapAt + n.u16(mapAt + 24, "its map");
+  const nameListAt = mapAt + n.u16(mapAt + 26, "its map");
   // The counts are all "one less than", which is the format saying that a list
   // of nothing is not worth being able to express.
-  const typeCount = view.getUint16(typeListAt) + 1;
+  const typeCount = n.u16(typeListAt, "its list of types") + 1;
 
   const resources: Resource[] = [];
   for (let i = 0; i < typeCount; i++) {
@@ -56,15 +58,15 @@ export function readResourceFork(bytes: Uint8Array): ResourceFork {
     if (typeAt + 8 > bytes.length) throw new Error("the type list runs past the end of the fork");
 
     const type = latin1(bytes, typeAt, 4);
-    const count = view.getUint16(typeAt + 4) + 1;
-    const refListAt = typeListAt + view.getUint16(typeAt + 6);
+    const count = n.u16(typeAt + 4, "its list of types") + 1;
+    const refListAt = typeListAt + n.u16(typeAt + 6, "its list of types");
 
     for (let k = 0; k < count; k++) {
       const refAt = refListAt + k * 12;
       if (refAt + 12 > bytes.length) throw new Error("a resource list runs past the end");
 
-      const id = view.getInt16(refAt);
-      const nameAt = view.getInt16(refAt + 2);
+      const id = n.i16(refAt, "a list of resources");
+      const nameAt = n.i16(refAt + 2, "a list of resources");
       const attributes = bytes[refAt + 4]!;
       const offset = (bytes[refAt + 5]! << 16) | (bytes[refAt + 6]! << 8) | bytes[refAt + 7]!;
 
@@ -76,7 +78,7 @@ export function readResourceFork(bytes: Uint8Array): ResourceFork {
 
       const start = dataAt + offset;
       if (start + 4 > bytes.length) throw new Error(`resource ${type} ${String(id)} is not there`);
-      const length = view.getUint32(start);
+      const length = n.u32(start, `resource ${type} ${String(id)}`);
       if (start + 4 + length > bytes.length) {
         throw new Error(`resource ${type} ${String(id)} runs past the end of the fork`);
       }

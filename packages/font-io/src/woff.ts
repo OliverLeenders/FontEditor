@@ -111,9 +111,13 @@ export function isWoff(bytes: Uint8Array): boolean {
  * both ways, is taken as it is.
  */
 export async function fromWoff(woff: Uint8Array): Promise<Uint8Array> {
+  if (!isWoff(woff)) throw new Error("this is not a WOFF file, or it is cut short");
   const view = new DataView(woff.buffer, woff.byteOffset, woff.byteLength);
   const flavour = view.getUint32(4);
   const count = view.getUint16(12);
+  if (HEADER + count * RECORD > woff.length) {
+    throw new Error("this WOFF's list of tables runs past its end");
+  }
 
   const tables: { tag: string; data: Uint8Array }[] = [];
   for (let i = 0; i < count; i++) {
@@ -122,19 +126,34 @@ export async function fromWoff(woff: Uint8Array): Promise<Uint8Array> {
     const offset = view.getUint32(at + 4);
     const compressed = view.getUint32(at + 8);
     const original = view.getUint32(at + 12);
+    if (offset + compressed > woff.length) {
+      throw new Error(`the ${tag} table of this WOFF runs past its end`);
+    }
     const stored = woff.subarray(offset, offset + compressed);
     const data = compressed === original ? stored : await inflate(stored);
     if (data === null) throw new Error(`the ${tag} table of this WOFF could not be unpacked`);
+    if (data.length !== original) {
+      throw new Error(`the ${tag} table of this WOFF is not the length it says it is`);
+    }
     tables.push({ tag, data });
   }
   return sfntOf(flavour, tables);
 }
 
+/**
+ * zlib undone, by the platform: `null` where there is nothing to do it with,
+ * or where what is there is not zlib — a damaged table, which the platform
+ * says only as an error with no words in it.
+ */
 async function inflate(data: Uint8Array): Promise<Uint8Array | null> {
   const Stream = (globalThis as { DecompressionStream?: typeof DecompressionStream })
     .DecompressionStream;
   if (Stream === undefined) return null;
-  return await collect(new Stream("deflate"), data);
+  try {
+    return await collect(new Stream("deflate"), data);
+  } catch {
+    return null;
+  }
 }
 
 /**

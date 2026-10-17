@@ -8,6 +8,14 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Fixed
+
+- **Damaged files.** A StuffIt archive, a Macintosh suitcase or a WOFF that is cut short or
+  damaged says so — _the archive ends before an entry_, _the WOFF's table runs past its end_
+  — where it failed with an error from inside the reader. A font whose outline is damaged
+  comes in with that glyph empty and a warning naming it, where it could take seconds and
+  come in with points that were not numbers.
+
 ## 0.2.0
 
 The first milestone on the way to 1.0, _Finish what is started_: Firefox, strokes that vary in

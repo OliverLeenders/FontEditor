@@ -169,6 +169,9 @@ importers:
         specifier: ^2.0.0
         version: 2.0.0
     devDependencies:
+      fast-check:
+        specifier: ^4.9.0
+        version: 4.9.0
       harfbuzzjs:
         specifier: ^1.6.1
         version: 1.6.1
@@ -232,7 +235,11 @@ importers:
         specifier: workspace:*
         version: link:../geometry
 
-  packages/stuffit: {}
+  packages/stuffit:
+    devDependencies:
+      fast-check:
+        specifier: ^4.9.0
+        version: 4.9.0
 
   packages/tools:
     dependencies:
@@ -1932,10 +1939,6 @@ packages:
     resolution: {integrity: sha512-dkrQXeHSaoamnItlYbmzG0wFYrM0ZwDxCIg0A7aKjTyyhh9svRzCNFEzV+Vm05/yehjCzjDZ31KXfGEjYSztDQ==}
     engines: {node: '>=20.18.1'}
 
-  undici@8.10.2:
-    resolution: {integrity: sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==}
-    engines: {node: '>=22.19.0'}
-
   undici@8.12.1:
     resolution: {integrity: sha512-usz3OVQBeh1LxNn0DzU0voLXMgn5CU/WUdpBsY6Ti5afNao+vTkmn4H/NxoXolc10cOqe2+YIG0Hspq2rsl64w==}
     engines: {node: '>=22.19.0'}
@@ -3260,7 +3263,7 @@ snapshots:
       saxes: 6.0.0
       symbol-tree: 3.2.4
       tough-cookie: 6.0.2
-      undici: 8.10.2
+      undici: 8.12.1
       w3c-xmlserializer: 5.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
@@ -3745,8 +3748,6 @@ snapshots:
   undici-types@6.21.0: {}
 
   undici@7.30.0: {}
-
-  undici@8.10.2: {}
 
   undici@8.12.1: {}
 

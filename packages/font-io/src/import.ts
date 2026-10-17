@@ -160,6 +160,13 @@ export function documentFrom(source: SourceFont, ids: IdFactory): ImportResult {
   source.glyphs.forEach((g, index) => {
     const name = names[index]!;
     const components: Component[] = [];
+    if (g.damaged === true) {
+      warnings.push({
+        glyph: name,
+        message:
+          "Its outline could not be read — the file is damaged there — and it comes in without one.",
+      });
+    }
 
     for (const reference of g.components) {
       const base = names[reference.glyphIndex];

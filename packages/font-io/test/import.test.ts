@@ -122,6 +122,19 @@ describe("documentFrom", () => {
     expect(document.glyphOrder).toEqual(["uni0041", "u01F600", "glyph2"]);
   });
 
+  it("brings a glyph whose outline could not be read in empty, and says so", () => {
+    // A file damaged inside an outline gives points that are not numbers: the
+    // reader takes it as no outline, and the import says which glyph.
+    const { document, warnings } = documentFrom(
+      { ...base, glyphs: [plain("A"), { ...plain("B"), damaged: true as const }] },
+      counterIds(),
+    );
+    expect(document.glyphs["B"]?.contours).toEqual([]);
+    expect(warnings).toEqual([
+      expect.objectContaining({ glyph: "B", message: expect.stringMatching(/could not be read/) }),
+    ]);
+  });
+
   it("renames duplicates rather than letting one glyph replace another", () => {
     const { document, warnings } = documentFrom(
       { ...base, glyphs: [plain("A"), plain("A"), plain("A")] },
