@@ -8,6 +8,13 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.2.0
+
+The first milestone on the way to 1.0, _Finish what is started_: Firefox, strokes that vary in
+a variable font, storage that is full or fails, and the desktop window asking before it closes on
+work not saved. Everything from 0.1.110 to here is part of it; see
+[the roadmap](docs/roadmap-1.0.md) for what each was and what is left as a limit.
+
 ### Variable fonts
 
 - A stroke whose pen grows, shrinks or turns fast is drawn closer to its ink in a variable
