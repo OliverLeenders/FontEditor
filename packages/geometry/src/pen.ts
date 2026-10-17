@@ -290,6 +290,12 @@ const DISTANCE_STEPS = 48;
  * The fraction of a curve's length reached at parameter `t`, from a table of
  * chords. Close enough for a pen's blend, which nobody measures to the unit, and
  * the same curve always gives the same answer.
+ *
+ * Between two chords' ends it goes as the curve itself goes there, at the speed
+ * it has at each end, and not straight from one to the other: the pen changes
+ * smoothly along the path rather than in a kink at every chord, and how fast it
+ * is changing — which is where the edge of its ink is — has an answer at every
+ * point.
  */
 function distanceAlong(curve: Cubic): (t: number) => number {
   const table = new Float64Array(DISTANCE_STEPS + 1);
@@ -301,12 +307,45 @@ function distanceAlong(curve: Cubic): (t: number) => number {
   }
   const total = table[DISTANCE_STEPS]!;
   if (!(total > 0)) return (t) => t;
+  const h = 1 / DISTANCE_STEPS;
+  // The curve's speed at each chord's end, held to what keeps the distance
+  // going forward between them: no more than three times either chord's own.
+  const secant = (k: number): number => (table[k + 1]! - table[k]!) / h;
+  const speeds = new Float64Array(DISTANCE_STEPS + 1);
+  for (let k = 0; k <= DISTANCE_STEPS; k++) {
+    const most =
+      3 * Math.min(k > 0 ? secant(k - 1) : Infinity, k < DISTANCE_STEPS ? secant(k) : Infinity);
+    speeds[k] = Math.min(most, speedAt(curve, k * h));
+  }
   return (t) => {
     const x = Math.min(1, Math.max(0, t)) * DISTANCE_STEPS;
     const k = Math.min(DISTANCE_STEPS - 1, Math.floor(x));
     const f = x - k;
-    return (table[k]! + (table[k + 1]! - table[k]!) * f) / total;
+    const f2 = f * f;
+    const f3 = f2 * f;
+    const d =
+      (2 * f3 - 3 * f2 + 1) * table[k]! +
+      (f3 - 2 * f2 + f) * h * speeds[k]! +
+      (-2 * f3 + 3 * f2) * table[k + 1]! +
+      (f3 - f2) * h * speeds[k + 1]!;
+    return d / total;
   };
+}
+
+/** How fast a curve is going at `t`, per unit of `t`. */
+function speedAt(curve: Cubic, t: number): number {
+  const u = 1 - t;
+  const x =
+    3 *
+    (u * u * (curve.c1.x - curve.a.x) +
+      2 * u * t * (curve.c2.x - curve.c1.x) +
+      t * t * (curve.b.x - curve.c2.x));
+  const y =
+    3 *
+    (u * u * (curve.c1.y - curve.a.y) +
+      2 * u * t * (curve.c2.y - curve.c1.y) +
+      t * t * (curve.b.y - curve.c2.y));
+  return Math.hypot(x, y);
 }
 
 /**

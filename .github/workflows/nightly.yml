@@ -52,6 +52,25 @@ jobs:
         if: ${{ !cancelled() }}
         run: pnpm --filter @typewright/font-model test
 
+  # Whether what is planned for a variable font is the ink, every stroke of the
+  # census in two masters: how many leave ink out, held to what it was. See
+  # packages/geometry/test/accuracy. In shards side by side, an hour and more.
+  accuracy:
+    name: The ink planned for a variable font
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      STROKE_ACCURACY: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @typewright/geometry exec vitest run test/accuracy
+
   # How much of each package's source its own tests run, as a table in this
   # job's summary, and held against the floor each package was given: see
   # tools/coverage.

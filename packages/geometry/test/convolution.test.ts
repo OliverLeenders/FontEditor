@@ -419,3 +419,30 @@ describe("one plan for every master, made quickly", () => {
     expect(one!.split(" ")).toHaveLength(2);
   });
 });
+
+describe("a pen that grows along a stroke", () => {
+  // Swelling fast along a line: the edge of its ink is past where it reaches
+  // straight out from the path, and a strip is laid along each side out to it.
+  const c = named("a pen widening along a line");
+  const masters: StrokeMaster[] = [1, 1.6].map((wide) => ({
+    curves: c.curves,
+    pens: [
+      { angle: 30, width: 20 * wide, thickness: 16 * wide, squareness: 0 },
+      { angle: 30, width: 160 * wide, thickness: 120 * wide, squareness: 0 },
+    ],
+    closed: false,
+  }));
+
+  it("is the ink, out to its edge, in both masters alike", () => {
+    const planned = plannedStrokes(masters);
+    expect(planned).not.toBeNull();
+    // The line round the ink, and the strips beside its two sides.
+    expect(planned![0]!.length).toBeGreaterThan(1);
+    expect(shapeOf(planned![0]!)).toBe(shapeOf(planned![1]!));
+    for (const [at, m] of masters.entries()) {
+      const d = disagreement(curvesOf(planned![at]!), sweep(m.curves, m.pens, m.closed), 70);
+      expect(d.missing).toEqual([]);
+      expect(d.extra).toEqual([]);
+    }
+  });
+});

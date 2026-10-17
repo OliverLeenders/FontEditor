@@ -618,8 +618,301 @@ function plannedOnce(
       }
     }
   }
+
+  // Where the pen changes as it goes, the strips between each side and the
+  // edge of the ink: see `edgeStrips`. Not beside the sides of a cut end,
+  // which a strip could reach past the cut's line from.
+  if (!broad && !box && turned === null && !sized) {
+    const near = (end: "start" | "end"): number => {
+      let most = -1;
+      for (const m of masters) {
+        const cut = cutAt(m, end);
+        if (cut === undefined) continue;
+        most = Math.max(most, Math.max(0, cut.legs ?? 0), parted[end] ?? 0);
+      }
+      return most;
+    };
+    const fromStart = near("start");
+    const fromEnd = near("end");
+    const legs = there
+      .filter((leg) => leg.index > fromStart && leg.index < count - 1 - fromEnd)
+      .flatMap((leg) => [leg, { ...leg, forward: false }]);
+    const strips = edgeStrips(masters, profiles, legs, Math.sign(loopArea(out[0]![0]!)));
+    for (const [at, own] of strips.entries()) out[at]!.push(...own);
+  }
   return out;
 }
+
+/**
+ * Strips laid along the outside of each side, out to the edge of the ink,
+ * where the pen grows, shrinks or turns as it goes.
+ *
+ * A side is where the pen reaches furthest straight out from the path, which
+ * is the edge of the ink for a pen that stays as it is. One that changes
+ * reaches past that: its ink's edge is where the pen reaches furthest in the
+ * direction its own growing and the path's going cancel in, and the side falls
+ * short of it by as much as the pen changes fast. Moving the side out there
+ * makes it turn back on itself wherever the pen grows faster than the path
+ * goes, and the line round the ink then cancels ink it goes round twice.
+ *
+ * So the side stays, and strips are laid beside it, from the side out to the
+ * edge and back. Each point of either is a point of the pen at that moment,
+ * and the pen is convex, so a strip between them is ink. A side is taken a
+ * stretch at a time, the same stretches in every master, and a strip is laid
+ * on a stretch only where it can be: where the edge goes along it without
+ * jumping — the edge comes and goes where the pen covers its own path, and
+ * jumps where the side folds — where a few curves follow both, and where the
+ * strip goes round the way the line round the ink does, so that it only ever
+ * adds to the ink it is over. In every master or in none.
+ */
+function edgeStrips(
+  masters: readonly StrokeMaster[],
+  profiles: readonly (readonly PenProfile[])[],
+  legs: readonly Leg[],
+  /** Which way round the line round the ink goes: a strip goes the same way. */
+  winding: number,
+): PlannedPiece[][][] {
+  const out: PlannedPiece[][][] = masters.map(() => []);
+  for (const leg of legs) {
+    const each = masters.map((m, at) => ({
+      curve: m.curves[leg.index]!,
+      profile: profiles[at]![leg.index]!,
+    }));
+    if (each.every(({ profile }) => profile.constant !== null)) continue;
+    for (let k = 0; k < STRIP_STRETCHES; k++) {
+      const s0 = k / STRIP_STRETCHES;
+      const s1 = (k + 1) / STRIP_STRETCHES;
+      const strip = stripOn(each, leg, s0, s1, winding);
+      if (strip === null) continue;
+      for (const [at, own] of strip.entries()) out[at]!.push(own);
+    }
+  }
+  return out;
+}
+
+/** One stretch's strip in every master, or `null` where it cannot be laid in all of them. */
+function stripOn(
+  each: readonly { readonly curve: Cubic; readonly profile: PenProfile }[],
+  leg: Leg,
+  s0: number,
+  s1: number,
+  winding: number,
+): PlannedPiece[][] | null {
+  // How far out the edge is, and whether it goes along without jumping.
+  let furthest = 0;
+  for (const { curve, profile } of each) {
+    // Jumping is the edge moving further between two looks than the side does,
+    // by more than a little: both go along with the path.
+    let last: { readonly side: Vec2; readonly edge: Vec2 } | null = null;
+    for (let k = 0; k <= STRIP_SAMPLES; k++) {
+      const s = s0 + ((s1 - s0) * k) / STRIP_SAMPLES;
+      const a = reach(curve, profile, leg, s);
+      const b = edgeReach(curve, profile, leg, s);
+      if (a === null || b === null) return null;
+      furthest = Math.max(furthest, Math.hypot(b.x - a.x, b.y - a.y));
+      if (last !== null) {
+        const edgeMoved = Math.hypot(b.x - last.edge.x, b.y - last.edge.y);
+        const sideMoved = Math.hypot(a.x - last.side.x, a.y - last.side.y);
+        if (edgeMoved > sideMoved + STRIP_JUMP) return null;
+      }
+      last = { side: a, edge: b };
+    }
+  }
+  if (furthest < STRIP_FROM) return null;
+
+  const sideOfStretch = (
+    find: (curve: Cubic, profile: PenProfile, leg: Leg, s: number) => Vec2 | null,
+    curve: Cubic,
+    profile: PenProfile,
+  ): Side => ({
+    at: (u) => find(curve, profile, leg, Math.min(1, Math.max(0, u))),
+    speed: (u) => {
+      const lo = Math.max(0, u - 1e-5);
+      const hi = Math.min(1, u + 1e-5);
+      const a = find(curve, profile, leg, lo);
+      const b = find(curve, profile, leg, hi);
+      if (a === null || b === null) return null;
+      return { x: (b.x - a.x) / (hi - lo), y: (b.y - a.y) / (hi - lo) };
+    },
+  });
+  // Both of its long edges in as few curves as come near them in every master.
+  for (const pieces of STRIP_COUNTS) {
+    let worst = 0;
+    const made: PlannedPiece[][] = [];
+    for (const { curve, profile } of each) {
+      const edges = [edgeReach, reach].map((find) => {
+        const side = sideOfStretch(find, curve, profile);
+        const curves: Cubic[] = [];
+        for (let k = 0; k < pieces; k++) {
+          const piece = hermitePiece(
+            side,
+            s0 + ((s1 - s0) * k) / pieces,
+            s0 + ((s1 - s0) * (k + 1)) / pieces,
+          );
+          if (piece === null) return null;
+          worst = Math.max(worst, piece.strays);
+          curves.push(piece.curve);
+        }
+        return curves;
+      });
+      const [edge, side] = edges;
+      if (edge == null || side == null) return null;
+      const across = (from: Vec2, to: Vec2): PlannedPiece => ({
+        curve: cubic(from, lerp(from, to, 1 / 3), lerp(from, to, 2 / 3), to),
+        line: true,
+      });
+      // Out along the edge, across to the side, back along the side, and across.
+      made.push([
+        ...edge.map((c) => ({ curve: c, line: false })),
+        across(edge[edge.length - 1]!.b, side[side.length - 1]!.b),
+        ...[...side].reverse().map((c) => ({ curve: cubic(c.b, c.c2, c.c1, c.a), line: false })),
+        across(side[0]!.a, edge[0]!.a),
+      ]);
+    }
+    if (worst > SIDE_LIMIT) continue;
+    // Laid only where it goes round the same way as the line round the ink in
+    // every master, all of it: a strip going the other way, or crossing
+    // itself, would take away the ink it is over.
+    return made.every((strip) => sameWayRound(strip, winding)) ? made : null;
+  }
+  return null;
+}
+
+/** How many stretches a side is taken in, for its strips. */
+const STRIP_STRETCHES = 8;
+/** The numbers of curves a strip's edge is tried with, fewest first. */
+const STRIP_COUNTS = [1, 2, 3, 4];
+
+/** The area a loop goes round, positive anticlockwise, from points along it. */
+function loopArea(loop: readonly PlannedPiece[]): number {
+  let area = 0;
+  for (const { curve } of loop) {
+    let last = curve.a;
+    for (let k = 1; k <= 8; k++) {
+      const p = evaluate(curve, k / 8);
+      area += last.x * p.y - p.x * last.y;
+      last = p;
+    }
+  }
+  return area / 2;
+}
+
+/**
+ * Whether a strip goes round the way `winding` says, and not crossing itself:
+ * its area as signed is nearly all of its area as it would be were none of it
+ * going the other way.
+ */
+function sameWayRound(strip: readonly PlannedPiece[], winding: number): boolean {
+  const signed = loopArea(strip);
+  if (Math.sign(signed) !== winding && Math.abs(signed) > 1e-6) return false;
+  // Each of the strip's two long edges against the other, a slice at a time.
+  const pts: Vec2[] = [];
+  for (const { curve } of strip) {
+    for (let k = 0; k < 8; k++) pts.push(evaluate(curve, k / 8));
+  }
+  let unsigned = 0;
+  const n = pts.length;
+  const half = Math.floor(n / 2);
+  for (let i = 0; i < half; i++) {
+    const a = pts[i]!;
+    const b = pts[i + 1]!;
+    const c = pts[n - 1 - i]!;
+    const d = pts[(n - 2 - i + n) % n]!;
+    // The slice a, b, d, c, as two triangles.
+    const t1 = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+    const t2 = (c.x - b.x) * (d.y - b.y) - (d.x - b.x) * (c.y - b.y);
+    unsigned += Math.abs(t1) / 2 + Math.abs(t2) / 2;
+  }
+  return Math.abs(signed) >= STRIP_ONE_WAY * unsigned;
+}
+
+/** How many places along a side the edge is looked for, to see whether a strip is wanted. */
+const STRIP_SAMPLES = 16;
+/** How far, at most, the edge may be from the side before a strip is laid there. */
+const STRIP_FROM = 0.5;
+/** How much further than the side the edge may move between two looks at it and still be one edge. */
+const STRIP_JUMP = 3;
+/** How much of a strip's area has to go round the one way. */
+const STRIP_ONE_WAY = 0.9;
+
+/** The point a third of the way, or any share of the way, from one point to another. */
+const lerp = (a: Vec2, b: Vec2, f: number): Vec2 => ({
+  x: a.x + (b.x - a.x) * f,
+  y: a.y + (b.y - a.y) * f,
+});
+
+/**
+ * Where the ink's edge is to the right of a leg at `s`, for a pen that changes:
+ * where the pen reaches furthest in the direction its growing and the path's
+ * going cancel in, nearest straight out. Straight out where there is no such
+ * direction, the pen covering its own path there.
+ */
+function edgeReach(curve: Cubic, profile: PenProfile, leg: Leg, s: number): Vec2 | null {
+  const t = leg.forward ? s : 1 - s;
+  const along = heading(curve, leg, s);
+  if (along === null) return null;
+  const at = evaluate(curve, t);
+  const pen = profile.at(t);
+  const base = Math.atan2(-along.x, along.y);
+  const support = (turn: number): Vec2 =>
+    penSupport(pen, { x: Math.cos(base + turn), y: Math.sin(base + turn) });
+  if (profile.constant !== null) {
+    const by = support(0);
+    return { x: at.x + by.x, y: at.y + by.y };
+  }
+  const lo = Math.max(0, s - EDGE_STEP);
+  const hi = Math.min(1, s + EDGE_STEP);
+  const tOf = (u: number): number => (leg.forward ? u : 1 - u);
+  const span = hi - lo;
+  const p0 = evaluate(curve, tOf(lo));
+  const p1 = evaluate(curve, tOf(hi));
+  const fast = Math.hypot(p1.x - p0.x, p1.y - p0.y) / span;
+  const before = profile.at(tOf(lo));
+  const after = profile.at(tOf(hi));
+  const reachOf = (p: PenShape, n: Vec2): number => {
+    const q = penSupport(p, n);
+    return q.x * n.x + q.y * n.y;
+  };
+  // Nothing where the path's going along the direction and the pen's growing
+  // in it cancel: the edge. Straight out the path's going along it is none.
+  const off = (turn: number): number => {
+    const n = { x: Math.cos(base + turn), y: Math.sin(base + turn) };
+    return fast * Math.sin(turn) + (reachOf(after, n) - reachOf(before, n)) / span;
+  };
+  const at0 = off(0);
+  let found: number | null = at0 === 0 ? 0 : null;
+  for (let k = 1; found === null && k <= EDGE_SEARCH; k++) {
+    for (const way of [1, -1]) {
+      const a = (way * (k - 1) * EDGE_LIMIT) / EDGE_SEARCH;
+      const b = (way * k * EDGE_LIMIT) / EDGE_SEARCH;
+      let fa = off(a);
+      const fb = off(b);
+      if (fa * fb > 0) continue;
+      let x = a;
+      let y = b;
+      for (let i = 0; i < 30; i++) {
+        const mid = (x + y) / 2;
+        const fm = off(mid);
+        if (fa * fm <= 0) y = mid;
+        else {
+          x = mid;
+          fa = fm;
+        }
+      }
+      found = (x + y) / 2;
+      break;
+    }
+  }
+  const by = support(found ?? 0);
+  return { x: at.x + by.x, y: at.y + by.y };
+}
+
+/** How far either way along a leg the pen's change is measured over. */
+const EDGE_STEP = 1e-4;
+/** How far from straight out the edge is looked for, in radians. */
+const EDGE_LIMIT = (85 * Math.PI) / 180;
+/** In how many steps either way it is looked for. */
+const EDGE_SEARCH = 17;
 
 /**
  * A pen's own outline, standing at a place, as a loop the way round that ink

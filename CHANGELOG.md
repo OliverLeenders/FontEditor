@@ -8,6 +8,13 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Variable fonts
+
+- A stroke whose pen grows, shrinks or turns fast is drawn closer to its ink in a variable
+  font: where the outline fell a few units short on the outside of the stroke, it now reaches
+  the edge in most places. What is still short is measured every night, so it cannot get
+  worse unnoticed.
+
 ## 0.1.113
 
 ### Variable fonts

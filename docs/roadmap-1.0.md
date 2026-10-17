@@ -207,6 +207,17 @@ Done so far, since 0.1.110:
   to points that are not on the ink at all. Mending this is drawing a side differently where
   the pen covers its own path, which is work of its own; not kept either.
 
+  What was kept: the side stays where it is, and strips are laid along the outside of it out
+  to the edge, a stretch at a time, wherever the pen changes — each strip between two points
+  of one pen, so ink, and laid only where it goes round the way the line does, so it only
+  adds. And the pen changed smoothly along each curve rather than in a kink at every chord of
+  the table it is measured along. Masters leaving ink out, of the 1,340 planned in the census:
+  141 before, 127 after, and the ink left out of same-kind strokes down by a quarter. Held
+  there every night (`packages/geometry/test/accuracy`). What is left is where the edge jumps
+  — the pen covering its own path — and the inside of a fold, where the line still goes round
+  some ink the wrong way. A limit of 0.2, written down as such; laying the pen whole along a
+  fold is the next thing to try.
+
 - The desktop window asks before closing on a save that did not happen, says why, and offers
   the font's folder where it has one. The desktop application on Linux, which has no way to be
   handed a folder, says so in its File menu as Firefox does; folders there are for later.
