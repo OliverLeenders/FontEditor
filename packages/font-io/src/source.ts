@@ -5,6 +5,7 @@ import { opentype } from "./opentype.js";
 import type { Affine } from "@typewright/geometry";
 
 import type { PathCommand } from "./commands.js";
+import { damagedTopDict, glyphCountsClaimed } from "./glyph-count.js";
 import { GPOS, GSUB, readGdef, readLayout } from "./layout-read.js";
 import type { LayoutTables } from "./layout-source.js";
 import { type SourceKerning, kerningFromGpos, kerningFromKernTable } from "./readkern.js";
@@ -240,6 +241,19 @@ function readGlyphs(font: OtFont): SourceGlyph[] {
  * round trip. Components are phase 3; this is where they will be recovered.
  */
 export function parseFont(bytes: ArrayBuffer): SourceFont {
+  // A count of glyphs no file this size could hold is damage, and so is a CFF
+  // table that does not say plainly where its parts are; parsing either is
+  // minutes of building glyphs out of nothing. Said before that begins.
+  const whole = new Uint8Array(bytes);
+  for (const claimed of glyphCountsClaimed(whole)) {
+    if (claimed > bytes.byteLength) {
+      throw new FontParseError(
+        `Could not read this font: it says it has ${String(claimed)} glyphs, more than a file of ${String(bytes.byteLength)} bytes can hold. It is damaged.`,
+      );
+    }
+  }
+  const damaged = damagedTopDict(whole);
+  if (damaged !== null) throw new FontParseError(`Could not read this font: ${damaged}.`);
   let font: OtFont;
   try {
     font = opentype.parse(bytes);

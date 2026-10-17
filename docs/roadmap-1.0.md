@@ -302,7 +302,12 @@ Done so far:
   time, and say what was missing); WOFF did the same, and passed on the platform's wordless
   error for a table that would not inflate; and a binary font damaged inside an outline gave
   points that were not numbers, which took two seconds to import and sat in the font after.
-  Under investigation: a spoiled font that took forty-seven seconds to import.
+  And then a font of five thousand bytes that took a minute and more to open, one byte of its
+  CFF top dictionary changed: the charset's operator became a number, the outlines' operator
+  was given three places to be, and the parser built twenty thousand glyphs out of whichever
+  it took. A font's counts of its glyphs are read before it is parsed now, and one larger than
+  the file is refused, as is a top dictionary giving any of its places more than one number
+  (`font-io/src/glyph-count.ts`).
 
 ### 0.5 — A correct font, by other people's measure
 

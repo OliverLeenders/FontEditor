@@ -49,7 +49,13 @@ export const RUNS = Number(process.env["FUZZ_RUNS"] ?? 300);
 export const SEED = process.env["FUZZ_SEED"] === undefined ? 1 : Number(process.env["FUZZ_SEED"]);
 
 /** The options every property here is checked with. */
-export const CHECK = { numRuns: RUNS, seed: SEED } as const;
+export const CHECK = {
+  numRuns: RUNS,
+  seed: SEED,
+  // The first failure as it was found, not made smaller: a reader that takes a
+  // minute over one file takes a minute over every smaller one tried.
+  endOnFailure: process.env["FUZZ_NO_SHRINK"] !== undefined,
+} as const;
 
 /**
  * A file that was good, spoiled: some of its bytes changed, a piece cut out or

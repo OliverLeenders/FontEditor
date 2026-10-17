@@ -14,7 +14,8 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
   damaged says so — _the archive ends before an entry_, _the WOFF's table runs past its end_
   — where it failed with an error from inside the reader. A font whose outline is damaged
   comes in with that glyph empty and a warning naming it, where it could take seconds and
-  come in with points that were not numbers.
+  come in with points that were not numbers. And a font file damaged so that it seems to hold
+  far more glyphs than it could is refused at once, where it could take minutes to open.
 
 ## 0.2.0
 
