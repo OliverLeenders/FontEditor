@@ -8,6 +8,8 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.2.5
+
 ### Changed
 
 - **The inspector has tabs.** Eleven sections stacked in one panel had become a list to scroll
