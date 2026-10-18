@@ -8,6 +8,8 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.2.4
+
 ### Fixed
 
 - **Saving a serif as a style** asks for the style's name, where it took one without asking.
