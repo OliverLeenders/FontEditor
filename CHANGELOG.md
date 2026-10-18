@@ -8,11 +8,18 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.2.2
+
+### Changed
+
+- The pen under the pointer is a solid line of its own colour — dark blue in light mode — where
+  it was dashed.
+
 ## 0.2.1
 
 ### Added
 
-- **The pen under the pointer.** Moving over a stroke with the select tool shows its pen, outlined in blue,
+- **The pen under the pointer.** Moving over a stroke with the select tool shows its pen, dashed,
   standing at the nearest place on the path: how wide, how thick and how turned it is there,
   between the points where it was set.
 
