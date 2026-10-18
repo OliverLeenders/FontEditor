@@ -88,6 +88,8 @@ export function drawScene(ctx: Canvas2D, s: Scene): void {
     // — and the ring is wider than a node, so it reads as a halo rather than a
     // thing in its own right.
     drawSnapGuides(ctx, s);
+    // Under the points, which are what is grabbed; over the ink it describes.
+    drawStrokePen(ctx, s);
     drawTunniControls(ctx, s);
     drawHandles(ctx, s);
     drawCornerSizes(ctx, s);
@@ -919,6 +921,36 @@ export function drawKnifeStroke(ctx: Canvas2D, s: Scene): void {
   ctx.beginPath();
   ctx.moveTo(a.x, a.y);
   ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * The pen of the stroke under the pointer, where the pointer is along it:
+ * dashed, as what is shown and not drawn — a reading of the stroke, like the
+ * pen's rubber band, never part of the outline.
+ */
+export function drawStrokePen(ctx: Canvas2D, s: Scene): void {
+  const outline = s.strokePen;
+  if (outline === null || outline.length === 0) return;
+  ctx.save();
+  ctx.beginPath();
+  const start = toScreen(s.view, outline[0]!.a);
+  ctx.moveTo(start.x, start.y);
+  for (const piece of outline) {
+    const c1 = toScreen(s.view, piece.c1);
+    const c2 = toScreen(s.view, piece.c2);
+    const b = toScreen(s.view, piece.b);
+    ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, b.x, b.y);
+  }
+  // Over the ink it sits on, so on a halo, as the marks are.
+  const width = Math.max(1, s.metrics.outlineWidth);
+  ctx.strokeStyle = s.palette.halo;
+  ctx.lineWidth = width + 2;
+  ctx.stroke();
+  ctx.setLineDash([4, 3]);
+  ctx.strokeStyle = s.palette.outline;
+  ctx.lineWidth = width;
   ctx.stroke();
   ctx.restore();
 }

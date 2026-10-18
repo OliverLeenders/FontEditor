@@ -778,12 +778,22 @@ function serifEnd(
   const facing = cut.normal.x * cut.onward.x + cut.normal.y * cut.onward.y;
   const lean = (-(cut.onward.x * along.x + cut.onward.y * along.y) / facing) * rise;
   const top = measured ?? { from: foot.from + lean, to: foot.to + lean };
+  // How the edges go where they leave the serif's top, read a little below it.
+  const below = measured === null ? null : crossing(loops, above(rise - rise * LEAN_SPAN));
   const pieces = serifOutline(serif, {
     through: cut.through,
     normal: cut.normal,
     foot,
     top,
     rise,
+    ...(below === null || measured === null
+      ? {}
+      : {
+          lean: {
+            from: (measured.from - below.from) / (rise * LEAN_SPAN),
+            to: (measured.to - below.to) / (rise * LEAN_SPAN),
+          },
+        }),
   });
   if (pieces === null) return null;
   return {
@@ -791,6 +801,9 @@ function serifEnd(
     pieces,
   };
 }
+
+/** How far below a serif's top, as a share of how high it rises, the way the stroke's edges go is read. */
+const LEAN_SPAN = 0.05;
 
 /**
  * Where a cut's line crosses some ink: the first and the last of it, measured
@@ -1618,6 +1631,25 @@ const OVAL_FROM = 0.5;
 /** Whether a pen is drawn as an oval, or as the broad edge it is too thin to differ from. */
 export function isOval(nib: Nib): boolean {
   return (nib.thickness ?? 0) >= OVAL_FROM;
+}
+
+/**
+ * The pen a stroke is drawn with at a place along its path: on segment `i`,
+ * `t` of the way along it, as the pens at its points and the way each segment
+ * blends between them have it there. `null` for a contour that is not a
+ * stroke, or a segment it does not have.
+ */
+export function penAlong(c: Contour, i: number, t: number): PenShape | null {
+  if (c.nib === undefined) return null;
+  const curves = curvesOf(c);
+  if (i < 0 || i >= curves.length) return null;
+  const profiles = penProfiles(
+    curves,
+    pensOf(c),
+    c.closed,
+    c.nodes.map((n) => n.blend),
+  );
+  return profiles[i]?.at(Math.min(1, Math.max(0, t))) ?? null;
 }
 
 /** The pen at a point of a stroke: the point's own, or the contour's. */

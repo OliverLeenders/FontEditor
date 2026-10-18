@@ -324,6 +324,8 @@ export { cutGlyph } from "./knife.js";
 
 export type { StrokeCrossing } from "./crossings.js";
 export type { SerifHandle, SerifHandles, StrokeCut, StrokeCutHandle } from "./stroke.js";
+export type { PenUnder } from "./pen-under.js";
+export { penUnder } from "./pen-under.js";
 export { byContour, samePoint, strokeCrossings } from "./crossings.js";
 
 export type { Measurement, PlacedGlyph, Section, SectionSpan } from "./measure.js";
@@ -349,6 +351,7 @@ export {
   inkRegions,
   isDerived,
   isOval,
+  penAlong,
   samePen,
   withInk,
   withNib,

@@ -8,8 +8,23 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Added
+
+- **The pen under the pointer.** Moving over a stroke with the select tool shows its pen, dashed,
+  standing at the nearest place on the path: how wide, how thick and how turned it is there,
+  between the points where it was set.
+
 ### Fixed
 
+- **Strokes whose pen turns fast.** A long pen turned well away from the path over a short
+  stretch — the start of an arch, set upright and turned forty degrees in a few dozen units —
+  was drawn with a notch and a lump, and short of its ink: its edge was taken straight out
+  from the path, where a pen that changes reaches out ahead of it and behind. Its edge is now
+  where the pen's growing and the path's going cancel, and where the pen's tip sweeps out an
+  edge of its own, the stroke is drawn with the pen itself.
+- **Serifs on a stroke that flares.** A bracket left the stroke along the straight line from
+  the foot to the serif's top, a degree or so off the stroke's own edge where it widens towards
+  the end. It now leaves the way the edge goes.
 - **Damaged files.** A StuffIt archive, a Macintosh suitcase or a WOFF that is cut short or
   damaged says so — _the archive ends before an entry_, _the WOFF's table runs past its end_
   — where it failed with an error from inside the reader. A font whose outline is damaged

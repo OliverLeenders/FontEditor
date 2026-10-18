@@ -205,6 +205,12 @@ export function withSerifNumber(serif: EndSerif, key: SerifNumber, value: number
  * `top` where a line `rise` further up the stroke does, each as two distances
  * along the line from `through` — along it a quarter turn anticlockwise of
  * `normal`.
+ *
+ * `lean` is how each edge is going where it leaves the serif's top: how far
+ * along the line it moves for each unit further up the stroke. The two edges
+ * are taken to be straight between foot and top, but a stroke that flares
+ * towards its end is not, and a bracket is to leave the stroke the way the
+ * stroke's edge goes there. Without it, the way the straight edge goes.
  */
 export type SerifSeat = {
   readonly through: Vec2;
@@ -212,6 +218,7 @@ export type SerifSeat = {
   readonly foot: { readonly from: number; readonly to: number };
   readonly top: { readonly from: number; readonly to: number };
   readonly rise: number;
+  readonly lean?: { readonly from: number; readonly to: number };
 };
 
 /**
@@ -287,6 +294,12 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
     flipped ? [-c.to, -c.from] : [c.from, c.to];
   const [footLeft, footRight] = span(seat.foot);
   const [topLeft, topRight] = span(seat.top);
+  const [leanLeft, leanRight] = span(
+    seat.lean ?? {
+      from: (seat.top.from - seat.foot.from) / seat.rise,
+      to: (seat.top.to - seat.foot.to) / seat.rise,
+    },
+  );
 
   const tip = s.height * (1 - s.slope);
   const width = footRight - footLeft + s.left + s.right;
@@ -303,7 +316,13 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
    * One side, from the end of the foot up to the top of the serif on the
    * stroke's edge: six pieces. `out` is which way is outward, as a sign.
    */
-  const side = (reach: number, foot: number, top: number, out: 1 | -1): SerifPiece[] => {
+  const side = (
+    reach: number,
+    foot: number,
+    top: number,
+    lean: number,
+    out: 1 | -1,
+  ): SerifPiece[] => {
     const edge = (h: number): Vec2 => at(foot + ((top - foot) * h) / seat.rise, h);
     const hasReach = reach > 1e-9;
     const meets = edge(s.height);
@@ -346,18 +365,38 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
     const run = s.bracket * Math.max(0, topLength - topRounded);
     const bracketFrom = towards(meets, tipTop, run);
     const bracketTo = edge(Math.min(seat.rise, s.height + run));
+    // Into the stroke the way its edge goes there, as far as a round corner
+    // would reach along the straight edge: tangent to the stroke, which leans
+    // further than the straight edge where it flares.
+    const bracket = rounding(bracketFrom, meets, bracketTo);
+    const reachIn = Math.hypot(meets.x - bracketTo.x, meets.y - bracketTo.y) * ROUND;
+    const down = { x: -(v.x * lean + up.x), y: -(v.y * lean + up.y) };
+    const downLength = Math.hypot(down.x, down.y);
+    const into =
+      downLength > 1e-12 && reachIn > 1e-12
+        ? {
+            ...bracket,
+            curve: {
+              ...bracket.curve,
+              c2: {
+                x: bracketTo.x + (down.x / downLength) * reachIn,
+                y: bracketTo.y + (down.y / downLength) * reachIn,
+              },
+            },
+          }
+        : bracket;
     return [
       rounding(footEnd, corner, tipFrom),
       line(tipFrom, tipTo),
       rounding(tipTo, tipTop, topFrom),
       line(topFrom, bracketFrom),
-      rounding(bracketFrom, meets, bracketTo),
+      into,
       line(bracketTo, edge(seat.rise)),
     ];
   };
 
-  const right = side(s.right, footRight, topRight, 1);
-  const left = side(s.left, footLeft, topLeft, -1);
+  const right = side(s.right, footRight, topRight, leanRight, 1);
+  const left = side(s.left, footLeft, topLeft, leanLeft, -1);
   const footFrom = left[0]!.curve.a;
   const footTo = right[0]!.curve.a;
   const lift = (cup * 4) / 3;

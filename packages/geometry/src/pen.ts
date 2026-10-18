@@ -660,6 +660,31 @@ function penCap(curve: Cubic, atEnd: boolean, pen: PenShape, tolerance: number):
   return [...arc, line(arc[arc.length - 1]!.b, arc[0]!.a)];
 }
 
+/**
+ * A pen's own outline standing at a point, as a closed loop: an oval, a box
+ * with its corners rounded, a rectangle. A broad edge, which has no inside, is
+ * the one straight line it is. `null` for a pen of no size.
+ */
+export function penOutlineAt(
+  pen: PenShape,
+  at: Vec2,
+  tolerance: number = OFFSET_TOLERANCE,
+): Cubic[] | null {
+  if (!(pen.width > 0)) return null;
+  if (isBroad(pen)) {
+    const angle = (pen.angle * Math.PI) / 180;
+    const half = { x: (Math.cos(angle) * pen.width) / 2, y: (Math.sin(angle) * pen.width) / 2 };
+    return [line({ x: at.x - half.x, y: at.y - half.y }, { x: at.x + half.x, y: at.y + half.y })];
+  }
+  const arc = penArc(pen, at, { x: 1, y: 0 }, 2 * Math.PI, tolerance);
+  if (arc.length === 0) return null;
+  const first = arc[0]!.a;
+  const last = arc[arc.length - 1]!;
+  // Closed on itself exactly.
+  arc[arc.length - 1] = cubic(last.a, last.c1, last.c2, first);
+  return arc;
+}
+
 /** How many points a varying curve's sides are sampled at, before fitting. */
 const SAMPLES = 48;
 
@@ -725,6 +750,7 @@ function varyingBands(
     readonly left: Vec2;
     readonly right: Vec2;
     readonly side: number;
+    readonly tangled: boolean;
   };
 
   const samples: Sample[] = [];
@@ -735,7 +761,6 @@ function varyingBands(
     if (along === null || normal === null) continue;
     const pen = penOn(t);
     const at = evaluate(curve, t);
-    const reach = penSupport(pen, normal);
     const angle = (pen.angle * Math.PI) / 180;
     // Which side of the path the nib's own direction points: the sign that flips at
     // a broad pen's pinch.
@@ -744,9 +769,10 @@ function varyingBands(
       t,
       at,
       along,
-      left: { x: at.x + reach.x, y: at.y + reach.y },
-      right: { x: at.x - reach.x, y: at.y - reach.y },
+      left: inkEdge(curve, penOn, t, 1)?.at ?? at,
+      right: inkEdge(curve, penOn, t, -1)?.at ?? at,
       side,
+      tangled: tangled(curve, penOn, t),
     });
   }
   if (samples.length < 2) return { bands: [], sweeps: [] };
@@ -777,8 +803,8 @@ function varyingBands(
   // sides, fitted; where one does, the pen swept from one position to the next.
   // A run with no fold anywhere is kept whole, so the runs can still be chained
   // through their pinches into one outline.
-  const whole: { left: Cubic[]; right: Cubic[] }[] = [];
-  const pieces: Cubic[][] = [];
+  const whole: { left: Cubic[]; right: Cubic[]; from: Vec2; to: Vec2 }[] = [];
+  const pieces: Cubic[][] = edgeSlices(curve, penOn, samples, tolerance);
   const sweeps: Cubic[][][] = [];
   let broken = false;
   for (const run of runs) {
@@ -790,7 +816,7 @@ function varyingBands(
     if (!folding.some(Boolean)) {
       const fitted = fittedSides(curve, penOn, run, tolerance);
       if (fitted === null) broken = true;
-      else whole.push(fitted);
+      else whole.push({ ...fitted, from: run[0]!.at, to: run[run.length - 1]!.at });
       continue;
     }
     broken = true;
@@ -809,7 +835,9 @@ function varyingBands(
         if (chain.length > 0) sweeps.push(chain);
       } else {
         const fitted = fittedSides(curve, penOn, stretch.samples, tolerance);
-        if (fitted !== null) pieces.push(band(fitted.left, fitted.right));
+        const first = stretch.samples[0]!.at;
+        const last = stretch.samples[stretch.samples.length - 1]!.at;
+        if (fitted !== null) pieces.push(band(fitted.left, fitted.right, first, last));
       }
     }
   }
@@ -825,26 +853,223 @@ function varyingBands(
   if (!broken && whole.length > 0) {
     const upper = whole.flatMap((s, i) => (i % 2 === 0 ? s.left : s.right));
     const lower = whole.flatMap((s, i) => (i % 2 === 0 ? s.right : s.left));
-    return { bands: [band(upper, lower)], sweeps };
+    return {
+      bands: [band(upper, lower, whole[0]!.from, whole[whole.length - 1]!.to), ...pieces],
+      sweeps,
+    };
   }
   // A run too short to fit, or one with a fold, leaves the chain broken, and each
   // run is loops of its own.
-  return { bands: [...whole.map((s) => band(s.left, s.right)), ...pieces], sweeps };
+  return {
+    bands: [...whole.map((s) => band(s.left, s.right, s.from, s.to)), ...pieces],
+    sweeps,
+  };
 }
 
-/** A band closed straight across its two ends. */
-function band(upper: readonly Cubic[], lower: readonly Cubic[]): Cubic[] {
+/**
+ * A band closed across its two ends: straight across, or by way of the path's
+ * own point where the two sides are not straight across from each other there.
+ *
+ * A pen that changes has its edges where its growing and the path's going
+ * cancel, which need not be straight out from the path either side; the line
+ * between two such points misses the path's point, and what a neighbour or an
+ * end closes along — the pen's reach straight out, through the point — is then
+ * not the same line. Closed through the point, every piece meeting there meets
+ * along lines out from it, and the pen's own edge between them is filled by a
+ * slice of the pen (see {@link edgeSlices}).
+ */
+function band(upper: readonly Cubic[], lower: readonly Cubic[], from?: Vec2, to?: Vec2): Cubic[] {
+  const across = (a: Vec2, b: Vec2, by?: Vec2): Cubic[] =>
+    by === undefined || onTheLine(a, b, by) ? [line(a, b)] : [line(a, by), line(by, b)];
   return [
     ...upper,
-    line(upper[upper.length - 1]!.b, lower[lower.length - 1]!.b),
+    ...across(upper[upper.length - 1]!.b, lower[lower.length - 1]!.b, to),
     ...[...lower].reverse().map(reversed),
-    line(lower[0]!.a, upper[0]!.a),
+    ...across(lower[0]!.a, upper[0]!.a, from),
   ];
 }
+
+/** Whether a point is on the straight line between two others, to a hair. */
+function onTheLine(a: Vec2, b: Vec2, p: Vec2): boolean {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const length = Math.hypot(dx, dy);
+  if (length < 1e-9) return Math.hypot(p.x - a.x, p.y - a.y) < 1e-6;
+  return Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / length < 1e-6;
+}
+
+/**
+ * The slices of the pen at either end of a curve that its edges, where the
+ * pen changes, leave out: from straight out, where whatever meets the curve
+ * there closes, round the pen's own edge to where the curve's side begins.
+ * Each is a piece of the pen standing there, so ink; and its edge is the edge
+ * of the ink, the pen's own outline between the two.
+ *
+ * Only where the end is not swept: a stretch whose edge is tangled (see
+ * `tangled`) stands the whole pen at its ends.
+ */
+function edgeSlices(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  samples: readonly { readonly t: number; readonly tangled: boolean }[],
+  tolerance: number,
+): Cubic[][] {
+  const slices: Cubic[][] = [];
+  for (const end of [samples[0], samples[samples.length - 1]]) {
+    if (end === undefined || end.tangled || (end.t !== 0 && end.t !== 1)) continue;
+    const t = end.t;
+    const pen = penOn(t);
+    if (isBroad(pen) || !(pen.width > 0)) continue;
+    const normal = leftNormal(curve, t);
+    if (normal === null) continue;
+    const at = evaluate(curve, t);
+    for (const side of [1, -1] as const) {
+      const edge = inkEdge(curve, penOn, t, side);
+      if (edge === null || edge.turn === 0) continue;
+      const out = { x: normal.x * side, y: normal.y * side };
+      const arc = penArc(pen, at, out, edge.turn, tolerance);
+      if (arc.length === 0) continue;
+      slices.push([line(at, arc[0]!.a), ...arc, line(arc[arc.length - 1]!.b, at)]);
+    }
+  }
+  return slices;
+}
+
+/**
+ * Where the edge of the ink is on one side of a curve at `t`: the point of the
+ * pen furthest out in the direction where the pen's growing and the path's
+ * going cancel, nearest straight out — and how far that direction is turned
+ * from straight out, in radians. `side` is `1` for the left.
+ *
+ * For a pen that stays as it is, that is straight out, the pen's reach across
+ * the path. A pen that grows, shrinks or turns as it goes reaches out a little
+ * ahead of the path or behind it as well: a pen growing as it moves pushes its
+ * edge out ahead of where it stands, and the edge is the furthest point of the
+ * pen leaning that way. Taken straight out, the side runs inside the ink and,
+ * where the pen changes fast for how far it goes, back on itself — and was
+ * swept there as a fold, a row of pen shapes for an edge.
+ *
+ * Straight out where no direction cancels within reason, the pen covering its
+ * own path there; and always for a broad edge, whose sides are its two ends,
+ * and whose turning is followed by its pivots instead. Within `EDGE_SNAP` of
+ * straight out at either end of the curve, straight out: a slice of the pen too
+ * thin to see is a sliver to the union. Not where only the edge's direction
+ * is wanted, `snap` false: a step that snapped at one end and not the other
+ * would be no direction at all.
+ *
+ * Between the edge at a curve's end and straight out there, the pen standing
+ * at the end is the edge: see {@link edgeSlices}.
+ */
+function inkEdge(
+  curve: Cubic,
+  penOn: (t: number) => PenShape,
+  t: number,
+  side: 1 | -1,
+  snap = true,
+): { at: Vec2; turn: number } | null {
+  const normal = leftNormal(curve, t);
+  if (normal === null) return null;
+  const out = { x: normal.x * side, y: normal.y * side };
+  const at = evaluate(curve, t);
+  const pen = penOn(t);
+  const straight = (): { at: Vec2; turn: number } => {
+    const reach = penSupport(pen, out);
+    return { at: { x: at.x + reach.x, y: at.y + reach.y }, turn: 0 };
+  };
+  if (isBroad(pen)) return straight();
+  const lo = Math.max(0, t - EDGE_STEP);
+  const hi = Math.min(1, t + EDGE_STEP);
+  const before = penOn(lo);
+  const after = penOn(hi);
+  if (samePenShape(before, after) && samePenShape(before, pen)) return straight();
+  const span = hi - lo;
+  const velocity = derivative(curve, t);
+  const reachOf = (p: PenShape, n: Vec2): number => {
+    const q = penSupport(p, n);
+    return q.x * n.x + q.y * n.y;
+  };
+  const turned = (turn: number): Vec2 => {
+    const cos = Math.cos(turn);
+    const sin = Math.sin(turn);
+    return { x: out.x * cos - out.y * sin, y: out.x * sin + out.y * cos };
+  };
+  // Nothing where the path's going along the direction and the pen's growing
+  // in it cancel: the edge.
+  const off = (turn: number): number => {
+    const n = turned(turn);
+    return velocity.x * n.x + velocity.y * n.y + (reachOf(after, n) - reachOf(before, n)) / span;
+  };
+  let found: number | null = off(0) === 0 ? 0 : null;
+  for (let k = 1; found === null && k <= EDGE_SEARCH; k++) {
+    for (const way of [1, -1]) {
+      const a = (way * (k - 1) * EDGE_LIMIT) / EDGE_SEARCH;
+      const b = (way * k * EDGE_LIMIT) / EDGE_SEARCH;
+      const fa = off(a);
+      const fb = off(b);
+      if (fa * fb > 0) continue;
+      found = rootBetween(off, a, fa, b, fb);
+      break;
+    }
+  }
+  if (found === null || found === 0) return straight();
+  const reach = penSupport(pen, turned(found));
+  const edge = { x: at.x + reach.x, y: at.y + reach.y };
+  if (snap && (t === 0 || t === 1)) {
+    const plain = straight().at;
+    if (Math.hypot(edge.x - plain.x, edge.y - plain.y) <= EDGE_SNAP) return straight();
+  }
+  return { at: edge, turn: found };
+}
+
+/**
+ * Where a function that changes sign between two places is nothing: by false
+ * position, the end that stays put weighed down each time it does (the
+ * Illinois way), to well under a millionth of a turn.
+ */
+function rootBetween(
+  f: (x: number) => number,
+  a0: number,
+  fa0: number,
+  b0: number,
+  fb0: number,
+): number {
+  let a = a0;
+  let b = b0;
+  let fa = fa0;
+  let fb = fb0;
+  if (fa === 0) return a;
+  if (fb === 0) return b;
+  for (let i = 0; i < 60 && Math.abs(b - a) > 1e-9; i++) {
+    const x = (a * fb - b * fa) / (fb - fa);
+    const fx = f(x);
+    if (fx === 0) return x;
+    if (fx * fb < 0) {
+      a = b;
+      fa = fb;
+    } else {
+      fa /= 2;
+    }
+    b = x;
+    fb = fx;
+  }
+  return Math.abs(fa) < Math.abs(fb) ? a : b;
+}
+
+/** How far either way along a curve the pen's change is measured over. */
+const EDGE_STEP = 1e-4;
+/** How far from straight out the edge is looked for, in radians. */
+const EDGE_LIMIT = (85 * Math.PI) / 180;
+/** In how many steps either way it is looked for. */
+const EDGE_SEARCH = 17;
+/** How far from straight out, in units, an edge at either end of a curve may be and be taken as straight out. */
+const EDGE_SNAP = 0.02;
 
 /** A sample of the pen along a curve: where it is, and how far it reaches either side. */
 type SideSample = {
   readonly t: number;
+  readonly at: Vec2;
+  /** Whether the edge has more to it here than a place either side: see `tangled`. */
+  readonly tangled: boolean;
   readonly along: Vec2;
   readonly left: Vec2;
   readonly right: Vec2;
@@ -895,7 +1120,7 @@ function unfoldedSide(
   let right = false;
   for (let k = 0; k < samples.length; k++) {
     const here = samples[k]!;
-    if (isBroad(penOn(here.t)) || pivoting(curve, penOn, here.t)) return 0;
+    if (here.tangled || isBroad(penOn(here.t)) || pivoting(curve, penOn, here.t)) return 0;
     const next = samples[k + 1];
     if (next === undefined) continue;
     left ||= runsBack(here.left, next.left, next.along);
@@ -1002,7 +1227,7 @@ function foldingSteps(
   penOn: (t: number) => PenShape,
 ): boolean[] {
   const back = runsBack;
-  const pivots = samples.map((s) => pivoting(curve, penOn, s.t));
+  const pivots = samples.map((s) => s.tangled || pivoting(curve, penOn, s.t));
   const out: boolean[] = [];
   for (let k = 0; k + 1 < samples.length; k++) {
     const here = samples[k]!;
@@ -1057,6 +1282,70 @@ function pivoting(curve: Cubic, penOn: (t: number) => PenShape, t: number): bool
   const s = -cross(velocity, h) / d;
   return Math.abs(s) <= 1 + PIVOT_MARGIN;
 }
+
+/**
+ * Whether a pen that changes has more to the edge of its ink at `t` than one
+ * place either side of the path: whether the pen changes so fast, for how fast
+ * it is carried along, that some part of it — the tip of a long pen turning —
+ * sweeps out an edge of its own, behind the path or ahead of it.
+ *
+ * The edge is where the pen's growing in a direction and the path's going in
+ * it cancel (see `inkEdge`). Carried along by a pen that stays as it is, they
+ * cancel straight out either side and nowhere else; a pen that changes moves
+ * those two a little, and so long as nothing of it moves faster than the path
+ * they are still the only two. More than two, or none — a pen growing faster
+ * than it goes, covering where it was — and the sides are not the edge of the
+ * ink, and the stretch is swept like a fold, where nothing is left out.
+ */
+function tangled(curve: Cubic, penOn: (t: number) => PenShape, t: number): boolean {
+  const pen = penOn(t);
+  if (isBroad(pen)) return false;
+  const lo = Math.max(0, t - EDGE_STEP);
+  const hi = Math.min(1, t + EDGE_STEP);
+  const before = penOn(lo);
+  const after = penOn(hi);
+  if (samePenShape(before, after)) return false;
+  const span = hi - lo;
+  const velocity = derivative(curve, t);
+  // Nothing of the pen moving at half the path's speed, the two places are
+  // all there is: where the path's going is at least half its speed, the pen's
+  // growing cannot cancel it, and where it is less, the going turns faster
+  // than the growing can follow, and crosses nothing once only. So a pen that
+  // changes slowly for how far it goes is not looked round at all.
+  const size = Math.max(pen.width, pen.thickness) / 2;
+  const moving =
+    (Math.abs(after.width - before.width) / 2 +
+      Math.abs(after.thickness - before.thickness) / 2 +
+      size * ((Math.abs(shortTurn(before.angle, after.angle)) * Math.PI) / 180) +
+      size * Math.abs(squarenessOf(after) - squarenessOf(before))) /
+    span;
+  if (moving < TANGLE_SLOW * Math.hypot(velocity.x, velocity.y)) return false;
+  const reachOf = (p: PenShape, n: Vec2): number => {
+    const q = penSupport(p, n);
+    return q.x * n.x + q.y * n.y;
+  };
+  let changes = 0;
+  let first = 0;
+  let previous = 0;
+  for (let k = 0; k < TANGLE_LOOKS; k++) {
+    const a = (2 * Math.PI * k) / TANGLE_LOOKS;
+    const n = { x: Math.cos(a), y: Math.sin(a) };
+    const sign = Math.sign(
+      velocity.x * n.x + velocity.y * n.y + (reachOf(after, n) - reachOf(before, n)) / span,
+    );
+    if (k === 0) first = sign;
+    else if (sign !== 0 && previous !== 0 && sign !== previous) changes++;
+    if (sign !== 0) previous = sign;
+  }
+  if (first !== 0 && previous !== 0 && first !== previous) changes++;
+  return changes !== 2;
+}
+
+/** How fast, for the path's speed, the pen may change and certainly not be tangled. */
+const TANGLE_SLOW = 0.5;
+
+/** In how many directions round the pen `tangled` looks. */
+const TANGLE_LOOKS = 96;
 
 /** How far beyond its ends a nib's pivot still counts, as a share of half the nib. */
 const PIVOT_MARGIN = 0.05;
@@ -1325,6 +1614,7 @@ function pinchSample(
   readonly left: Vec2;
   readonly right: Vec2;
   readonly side: number;
+  readonly tangled: boolean;
 } {
   const pen = penOn(t);
   const at = evaluate(curve, t);
@@ -1341,6 +1631,7 @@ function pinchSample(
     left: { x: at.x + half.x, y: at.y + half.y },
     right: { x: at.x - half.x, y: at.y - half.y },
     side,
+    tangled: false,
   };
 }
 
@@ -1362,13 +1653,7 @@ function edgeDirection(
 ): Vec2 | undefined {
   const step = 1e-4;
   const near = Math.min(1, Math.max(0, t + step * inward));
-  const edgeAt = (u: number): Vec2 | null => {
-    const normal = leftNormal(curve, u);
-    if (normal === null) return null;
-    const reach = penSupport(penOn(u), { x: normal.x * side, y: normal.y * side });
-    const at = evaluate(curve, u);
-    return { x: at.x + reach.x, y: at.y + reach.y };
-  };
+  const edgeAt = (u: number): Vec2 | null => inkEdge(curve, penOn, u, side, false)?.at ?? null;
   const a = edgeAt(Math.min(t, near));
   const b = edgeAt(Math.max(t, near));
   if (a === null || b === null) return undefined;

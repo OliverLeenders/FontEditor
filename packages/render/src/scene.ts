@@ -292,6 +292,12 @@ export type Scene = {
    */
   readonly penPreview: Cubic | null;
   /**
+   * The pen of the stroke under the pointer, standing where the pointer is
+   * along its path: its outline, in glyph units. `null` when the pointer is
+   * over no stroke.
+   */
+  readonly strokePen: readonly Cubic[] | null;
+  /**
    * Glyphs shown either side of the one being edited, dimmed and untouchable.
    *
    * Spacing is meaningless in isolation — a sidebearing is only right relative
@@ -392,6 +398,7 @@ export type SceneInit = {
   readonly transformBox?: BoxFrame | null;
   readonly filled?: readonly Contour[];
   readonly penPreview?: Cubic | null;
+  readonly strokePen?: readonly Cubic[] | null;
   readonly neighbours?: readonly NeighbourGlyph[];
   readonly componentOutlines?: readonly Contour[];
   readonly shapePreview?: Contour | null;
@@ -430,6 +437,7 @@ export function scene(init: SceneInit): Scene {
     transformBox: init.transformBox ?? null,
     filled: init.filled ?? init.glyph.contours,
     penPreview: init.penPreview ?? null,
+    strokePen: init.strokePen ?? null,
     neighbours: init.neighbours ?? [],
     componentOutlines: init.componentOutlines ?? [],
     shapePreview: init.shapePreview ?? null,

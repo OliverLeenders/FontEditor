@@ -15,6 +15,7 @@ import {
   glyphBounds,
   glyphsForString,
   metricLines,
+  penUnder,
   randomIds,
   resolveGlyphComponents,
 } from "@typewright/font-model";
@@ -298,6 +299,7 @@ export function sceneFor(
     // other tool is in the middle of making something rather than moving it.
     transformBox: editor.activeTool === "select" ? selectionBox(editor) : null,
     penPreview: penPreview(editor),
+    strokePen: strokePenFor(state, glyph),
     shapePreview: shapePreview(editor, outlineIds),
     knifeStroke: knifeStroke(editor),
     measurement: measurementFor(state),
@@ -316,6 +318,25 @@ export function sceneFor(
     },
   });
 }
+
+/**
+ * The pen of the stroke the pointer is over, where it is along the stroke.
+ *
+ * Under the select tool, while nothing is being dragged: moving over the
+ * letter, not making or moving something in it. Near is a few pixels, as a
+ * segment is hovered.
+ */
+function strokePenFor(state: StoreState, glyph: Glyph): Scene["strokePen"] {
+  const editor = state.session.editor;
+  if (state.previewing || editor.activeTool !== "select") return null;
+  if (editor.cursor === null || editor.gesture !== null) return null;
+  return (
+    penUnder(glyph.contours, editor.cursor, STROKE_PEN_NEAR / editor.view.scale)?.outline ?? null
+  );
+}
+
+/** How near the path of a stroke, in pixels, the pointer is over it, however thin its ink. */
+const STROKE_PEN_NEAR = 6;
 
 /** What some of a glyph's components draw, resolved for one frame. */
 function resolvedComponents(

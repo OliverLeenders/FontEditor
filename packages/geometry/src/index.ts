@@ -147,6 +147,7 @@ export {
   penPathStroke,
   penPathStrokeParts,
   penExponent,
+  penOutlineAt,
   penProfiles,
   penSupport,
   isSquared,
