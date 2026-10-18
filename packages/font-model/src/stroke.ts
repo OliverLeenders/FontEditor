@@ -786,6 +786,7 @@ function serifEnd(
     foot,
     top,
     rise,
+    runs: -(cut.onward.x * along.x + cut.onward.y * along.y) / facing,
     ...(below === null || measured === null
       ? {}
       : {
@@ -988,8 +989,10 @@ export function strokeCutHandle(c: Contour, which: "start" | "end"): StrokeCutHa
  * the side that reaches further, and are there where they have something to
  * say. `slope` is the middle of the serif's top, which comes down as the tip
  * thins. `bracket` is where the bracket leaves the stroke's edge, which goes
- * up the stroke as the bracket grows. `round` is where the round of the tip
- * leaves the serif's top, which comes in from the tip's corner. `cup` hangs a
+ * up the stroke as the bracket grows. `roundLeft` and `roundRight` are where
+ * the round of each tip leaves the serif's top, which comes in from the tip's
+ * corner — or, on a side that reaches nowhere, hang under the stroke's own
+ * corner and come in under it as it is rounded. `cup` hangs a
  * little under the foot and goes up with the hollow — a quarter of the way
  * across the stroke, not under its middle, where the stroke's own last point
  * is and the handle would go up through it.
@@ -1001,7 +1004,8 @@ export type SerifHandles = {
   readonly cup: Vec2;
   readonly slope?: Vec2;
   readonly bracket?: Vec2;
-  readonly round?: Vec2;
+  readonly roundLeft?: Vec2;
+  readonly roundRight?: Vec2;
 };
 
 /** A part of a serif that is dragged on the canvas: the number it sets. */
@@ -1015,7 +1019,8 @@ export const SERIF_HANDLES: readonly SerifHandle[] = [
   "cup",
   "slope",
   "bracket",
-  "round",
+  "roundLeft",
+  "roundRight",
 ];
 
 /** How far under the foot the cup's handle hangs, in units. */
@@ -1115,24 +1120,71 @@ export function serifHandles(c: Contour, which: "start" | "end"): SerifHandles |
   };
   const side = handledSide(serif, frame);
   const tip = serif.height * (1 - serif.slope);
-  if (side === null) {
-    // Reaching neither way, what is rounded is the stroke's own corners. The
-    // handle hangs under the right one, as the cup's does under the foot, and
-    // comes in under the stroke as the round grows.
-    if (!(tip > 1e-6)) return always;
-    const rounded = Math.min((serif.round * tip) / 2, (frame.footRight - frame.footLeft) / 2);
-    return { ...always, round: at(frame.footRight - rounded, -CUP_HANDLE_BELOW) };
+  // Out on the tip, the handles go along with its shear.
+  const sheared = serif.shear * frame.lean;
+  // Each side's round: on its tip where it reaches, which comes in from the
+  // tip's corner; where it reaches nowhere, under the stroke's own corner, as
+  // the cup's hangs under the foot, coming in under the stroke as it grows. A
+  // tip that comes to a point has no corner to round.
+  const rounds: { roundLeft?: Vec2; roundRight?: Vec2 } = {};
+  if (tip > 1e-6) {
+    for (const each of sidesOf(serif, frame)) {
+      const rounded = Math.min((each.round * tip) / 2, each.most(tip));
+      rounds[each.key] =
+        each.reach > 0
+          ? at(each.edge + each.out * (each.reach - rounded) + sheared * tip, tip)
+          : at(each.edge - each.out * rounded, -CUP_HANDLE_BELOW);
+    }
   }
+  if (side === null) return { ...always, ...rounds };
 
-  const rounded = Math.min((serif.round * tip) / 2, side.reach);
+  const rounded = Math.min((roundOf(serif, side.out) * tip) / 2, side.reach);
   const run = serif.bracket * Math.max(0, side.reach - rounded);
+  const slopeUp = (tip + serif.height) / 2;
   return {
     ...always,
-    slope: at(side.edge + (side.out * side.reach) / 2, (tip + serif.height) / 2),
+    slope: at(side.edge + (side.out * side.reach) / 2 + (sheared * tip) / 2, slopeUp),
     bracket: at(side.edge + frame.lean * (serif.height + run), serif.height + run),
-    // A tip that comes to a point has no corner to round.
-    ...(tip > 1e-6 ? { round: at(side.edge + side.out * (side.reach - rounded), tip) } : {}),
+    ...rounds,
   };
+}
+
+/** The round of a serif's tip on one side: `1` for the right, `-1` the left. */
+function roundOf(serif: Serif, out: 1 | -1): number {
+  return out === 1 ? serif.roundRight : serif.roundLeft;
+}
+
+/**
+ * A serif's two sides as their rounds want them: the number, which way is
+ * out, where the stroke's edge is, how far the side reaches, its round, and
+ * how far in the round may come for a tip so thick — along the reach, or half
+ * across the stroke where it reaches nowhere.
+ */
+function sidesOf(
+  serif: Serif,
+  frame: SerifFrame,
+): {
+  readonly key: "roundLeft" | "roundRight";
+  readonly out: 1 | -1;
+  readonly edge: number;
+  readonly reach: number;
+  readonly round: number;
+  readonly most: (tip: number) => number;
+}[] {
+  const across = (frame.footRight - frame.footLeft) / 2;
+  return (
+    [
+      ["roundLeft", -1, frame.footLeft, serif.left, serif.roundLeft],
+      ["roundRight", 1, frame.footRight, serif.right, serif.roundRight],
+    ] as const
+  ).map(([key, out, edge, reach, round]) => ({
+    key,
+    out,
+    edge,
+    reach,
+    round,
+    most: (tip: number) => Math.min(tip / 2, reach > 0 ? reach : across),
+  }));
 }
 
 /**
@@ -1189,25 +1241,25 @@ export function serifDragged(
       break;
     case "bracket": {
       if (side === null) return null;
-      const rounded = Math.min((sound.round * tip) / 2, side.reach);
+      const rounded = Math.min((roundOf(sound, side.out) * tip) / 2, side.reach);
       const room = side.reach - rounded;
       if (!(room > 1e-9)) return null;
       value = share((up - sound.height) / room);
       break;
     }
-    case "round": {
+    case "roundLeft":
+    case "roundRight": {
       if (!(tip > 1e-6)) return null;
-      // In from the tip's corner along the top; or, reaching neither way, in
-      // from the stroke's right edge under the foot.
-      const most =
-        side === null
-          ? Math.min(tip / 2, (frame.footRight - frame.footLeft) / 2)
-          : Math.min(tip / 2, side.reach);
+      // In from the tip's corner along the top; or, reaching nowhere, in from
+      // the stroke's edge under the foot.
+      const each = sidesOf(sound, frame).find((one) => one.key === handle)!;
+      const most = each.most(tip);
       if (!(most > 1e-9)) return null;
-      const inward =
-        side === null
-          ? frame.footRight - along
-          : side.out * (side.edge + side.out * side.reach - along);
+      const corner =
+        each.reach > 0
+          ? each.edge + each.out * each.reach + sound.shear * frame.lean * tip
+          : each.edge;
+      const inward = each.out * (corner - along);
       value = share((Math.min(most, Math.max(0, inward)) * 2) / tip);
       break;
     }

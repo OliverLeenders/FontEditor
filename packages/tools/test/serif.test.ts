@@ -200,7 +200,8 @@ describe("a serif's handles on the canvas", () => {
     const pointed = drag(state, "slope", { x: 0, y: -40 });
     expect(footOf(pointed)!.serif!.slope).toBe(1);
     // A tip that comes to a point has no corner to round, and no handle for it.
-    expect(serifHandles(stemOf(pointed), "end")!.round).toBeUndefined();
+    expect(serifHandles(stemOf(pointed), "end")!.roundRight).toBeUndefined();
+    expect(serifHandles(stemOf(pointed), "end")!.roundLeft).toBeUndefined();
   });
 
   it("grow the bracket by its handle taken up the stroke's edge", () => {
@@ -211,10 +212,16 @@ describe("a serif's handles on the canvas", () => {
     expect(footOf(drag(half, "bracket", { x: 0, y: -500 }))!.serif!.bracket).toBe(0);
   });
 
+  it("round each tip by its own handle, the other left as it was", () => {
+    const state = serifed(twoStems());
+    const left = drag(state, "roundLeft", { x: 7.5, y: 6 });
+    expect(footOf(left)!.serif!).toMatchObject({ roundLeft: 0.5, roundRight: 0 });
+  });
+
   it("round the tip by its corner brought in along the top", () => {
     const state = serifed(twoStems());
-    expect(footOf(drag(state, "round", { x: -7.5, y: 6 }))!.serif!.round).toBe(0.5);
-    expect(footOf(drag(state, "round", { x: -200, y: 0 }))!.serif!.round).toBe(1);
+    expect(footOf(drag(state, "roundRight", { x: -7.5, y: 6 }))!.serif!.roundRight).toBe(0.5);
+    expect(footOf(drag(state, "roundRight", { x: -200, y: 0 }))!.serif!.roundRight).toBe(1);
   });
 
   it("are on the side that reaches further, and the plain four and the round where neither does", () => {
@@ -231,7 +238,8 @@ describe("a serif's handles on the canvas", () => {
       "height",
       "left",
       "right",
-      "round",
+      "roundLeft",
+      "roundRight",
     ]);
   });
 
@@ -240,13 +248,13 @@ describe("a serif's handles on the canvas", () => {
     const none = setEndSerifNumber(setEndSerifNumber(state, "left", 0).state, "right", 0).state;
     const handles = serifHandles(stemOf(none), "end")!;
     // Under the stroke's right edge, clear of the tip's handle on the line.
-    expect(handles.round!.y).toBeCloseTo(-16, 9);
-    expect(handles.round!.x).toBeCloseTo(handles.right.x, 9);
+    expect(handles.roundRight!.y).toBeCloseTo(-16, 9);
+    expect(handles.roundRight!.x).toBeCloseTo(handles.right.x, 9);
     // Thirty high: a round of the whole tip is fifteen in.
-    expect(footOf(drag(none, "round", { x: -7.5, y: 9 }))!.serif!.round).toBe(0.5);
-    const whole = drag(none, "round", { x: -90, y: 0 });
-    expect(footOf(whole)!.serif!.round).toBe(1);
-    expect(serifHandles(stemOf(whole), "end")!.round!.x).toBeCloseTo(handles.right.x - 15, 9);
+    expect(footOf(drag(none, "roundRight", { x: -7.5, y: 9 }))!.serif!.roundRight).toBe(0.5);
+    const whole = drag(none, "roundRight", { x: -90, y: 0 });
+    expect(footOf(whole)!.serif!.roundRight).toBe(1);
+    expect(serifHandles(stemOf(whole), "end")!.roundRight!.x).toBeCloseTo(handles.right.x - 15, 9);
   });
 
   it("change nothing where the handle is put back where it was", () => {

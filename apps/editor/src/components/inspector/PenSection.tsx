@@ -5,6 +5,7 @@ import {
   type EndChoice,
   type EndShape,
   addSerifStyle,
+  changeSerifStyle,
   begin,
   changePen,
   commit,
@@ -45,6 +46,7 @@ import {
   SerifReachLeftIcon,
   SerifReachRightIcon,
   SerifRoundIcon,
+  SerifShearIcon,
   SerifSlopeIcon,
 } from "../icons.js";
 import { Section } from "./Section.js";
@@ -424,10 +426,28 @@ const SERIF_ROWS: readonly (readonly {
       percent: true,
     },
     {
-      key: "round",
-      name: "Serif round tips",
+      key: "shear",
+      name: "Serif shear",
       title:
-        "Round tips, in per cent: how much of each tip is rounded off — 0 square, 100 half a circle",
+        "Shear, in per cent: on a slanting cut, how the tips stand — 0 square to the cut, the serif turned with it; 100 the way the stroke runs, the serif sheared",
+      icon: SerifShearIcon,
+      percent: true,
+    },
+  ],
+  [
+    {
+      key: "roundLeft",
+      name: "Serif round left",
+      title:
+        "Round left, in per cent: how much of the left tip is rounded off — 0 square, 100 half a circle. Where the serif reaches nowhere on the left, the stroke's own corner",
+      icon: SerifRoundIcon,
+      percent: true,
+    },
+    {
+      key: "roundRight",
+      name: "Serif round right",
+      title:
+        "Round right, in per cent: how much of the right tip is rounded off — 0 square, 100 half a circle. Where the serif reaches nowhere on the right, the stroke's own corner",
       icon: SerifRoundIcon,
       percent: true,
     },
@@ -473,6 +493,20 @@ function SerifFields(): React.JSX.Element | null {
     store.applyTool(result(store.editor, [commit]));
   };
 
+  // The numbers set on this end made the style's, so that every end with the
+  // style has them — but for the numbers those ends have set of their own —
+  // and this end follows the style again. One step to undo.
+  const updateStyle = (): void => {
+    const name = serif.style;
+    if (name === undefined) return;
+    store.applyTool(result(store.editor, [begin("Update serif style")]));
+    store.applyTool(
+      result(changeSerifStyle(store.editor, name, { name, ...serifNumbers(serif) }).state),
+    );
+    store.applyTool(result(setEndSerifStyle(store.editor, name).state));
+    store.applyTool(result(store.editor, [commit]));
+  };
+
   return (
     <Field label="Serif" group>
       <div className={styles.styleRow}>
@@ -506,15 +540,26 @@ function SerifFields(): React.JSX.Element | null {
             <SaveIcon />
           </button>
         ) : own.length > 0 ? (
-          <button
-            type="button"
-            className={styles.rowAction}
-            aria-label="Follow style"
-            title="Follow style: take back the numbers set on this end, and follow the style again"
-            onClick={() => store.applyTool(setEndSerifStyle(store.editor, serif.style ?? null))}
-          >
-            <LinkIcon />
-          </button>
+          <>
+            <button
+              type="button"
+              className={styles.rowAction}
+              aria-label="Update style"
+              title="Update style: make the numbers set on this end the style's, for every end that follows it"
+              onClick={updateStyle}
+            >
+              <SaveIcon />
+            </button>
+            <button
+              type="button"
+              className={styles.rowAction}
+              aria-label="Follow style"
+              title="Follow style: take back the numbers set on this end, and follow the style again"
+              onClick={() => store.applyTool(setEndSerifStyle(store.editor, serif.style ?? null))}
+            >
+              <LinkIcon />
+            </button>
+          </>
         ) : null}
       </div>
       <button

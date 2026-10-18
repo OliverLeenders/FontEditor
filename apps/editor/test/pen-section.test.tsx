@@ -403,4 +403,26 @@ describe("a serif on a cut end", () => {
     expect(serifOf(store)).toMatchObject({ height: 30, style: "Serif" });
     expect(serifOf(store).own).toBeUndefined();
   });
+  it("makes the numbers set on an end its style's, and follows the style again", () => {
+    const store = withSerif();
+    fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    // Nothing set on the end: nothing to give the style.
+    expect(screen.queryByRole("button", { name: "Update style" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Numbers" }));
+    const height = screen.getByLabelText("Serif height");
+    fireEvent.change(height, { target: { value: "44" } });
+    fireEvent.blur(height);
+    fireEvent.click(screen.getByRole("button", { name: "Update style" }));
+
+    expect(store.editor.document.serifs[0]).toMatchObject({ name: "Serif", height: 44 });
+    expect(serifOf(store)).toMatchObject({ height: 44, style: "Serif" });
+    expect(serifOf(store).own).toBeUndefined();
+    expect(screen.queryByRole("button", { name: "Update style" })).toBeNull();
+
+    // One step back is the style as it was, and the end's own number again.
+    store.undo();
+    expect(store.editor.document.serifs[0]).toMatchObject({ height: 30 });
+    expect(serifOf(store)).toMatchObject({ height: 44, own: ["height"] });
+  });
 });

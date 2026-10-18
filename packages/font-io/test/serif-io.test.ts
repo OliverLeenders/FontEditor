@@ -40,7 +40,9 @@ const FOOT: SerifStyle = {
   bracket: 0.6,
   slope: 0,
   cup: 4,
-  round: 0,
+  roundLeft: 0,
+  roundRight: 0,
+  shear: 0,
 };
 const { name: _name, ...FOOT_NUMBERS } = FOOT;
 const OWN: EndSerif = { ...FOOT_NUMBERS, right: 12, style: "Foot", own: ["right"] };

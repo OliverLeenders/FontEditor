@@ -47,6 +47,7 @@ import {
   SerifReachLeftIcon,
   SerifReachRightIcon,
   SerifRoundIcon,
+  SerifShearIcon,
   SerifSlopeIcon,
 } from "./icons.js";
 import { Stepper } from "./Stepper.js";
@@ -1012,9 +1013,25 @@ const SERIF_STYLE_ROWS: readonly (readonly {
       percent: true,
     },
     {
-      key: "round",
-      label: "Round tips %",
-      hint: "Round tips, in per cent: how much of each tip is rounded off — 0 square, 100 half a circle",
+      key: "shear",
+      label: "Shear %",
+      hint: "Shear, in per cent: on a slanting cut, how the tips stand — 0 square to the cut, 100 the way the stroke runs",
+      icon: SerifShearIcon,
+      percent: true,
+    },
+  ],
+  [
+    {
+      key: "roundLeft",
+      label: "Round left %",
+      hint: "Round left, in per cent: how much of the left tip is rounded off — 0 square, 100 half a circle; where it reaches nowhere, the stroke's corner",
+      icon: SerifRoundIcon,
+      percent: true,
+    },
+    {
+      key: "roundRight",
+      label: "Round right %",
+      hint: "Round right, in per cent: how much of the right tip is rounded off — 0 square, 100 half a circle; where it reaches nowhere, the stroke's corner",
       icon: SerifRoundIcon,
       percent: true,
     },

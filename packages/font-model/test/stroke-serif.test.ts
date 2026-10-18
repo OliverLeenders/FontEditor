@@ -165,13 +165,29 @@ describe("a serif's shape", () => {
     ["cupped", { ...SLAB, cup: 12 }],
     ["cupped deeper than it is high", { ...SLAB, cup: 400 }],
     ["cupped and sloped to a point", { ...SLAB, cup: 30, slope: 1 }],
-    ["rounded", { ...SLAB, round: 1 }],
-    ["rounded, one side reaching nowhere", { ...SLAB, right: 0, round: 1 }],
-    ["rounded, one side reaching less than its round", { ...SLAB, right: 6, round: 1 }],
-    ["rounded, reaching neither way", { ...SLAB, left: 0, right: 0, round: 0.7 }],
+    ["rounded", { ...SLAB, roundLeft: 1, roundRight: 1 }],
+    ["rounded, one side reaching nowhere", { ...SLAB, right: 0, roundLeft: 1, roundRight: 1 }],
+    [
+      "rounded, one side reaching less than its round",
+      { ...SLAB, right: 6, roundLeft: 1, roundRight: 1 },
+    ],
+    [
+      "rounded, reaching neither way",
+      { ...SLAB, left: 0, right: 0, roundLeft: 0.7, roundRight: 0.7 },
+    ],
     [
       "everything at once",
-      { left: 70, right: 40, height: 36, bracket: 0.6, slope: 0.4, cup: 8, round: 0.8 },
+      {
+        left: 70,
+        right: 40,
+        height: 36,
+        bracket: 0.6,
+        slope: 0.4,
+        cup: 8,
+        roundLeft: 0.8,
+        roundRight: 0.8,
+        shear: 0,
+      },
     ],
     ["wider on the left", { ...SLAB, left: 120, right: 10, bracket: 0.5 }],
   ];
@@ -216,7 +232,7 @@ describe("a serif's shape", () => {
     // A stem from 160 to 240 on the line, its serif forty high and to the left
     // only: the right corner is the stem's, and is rounded by twenty.
     const sharp = inkOf(stem(BOX, footed({ ...SLAB, right: 0 })), ids);
-    const round = stem(BOX, footed({ ...SLAB, right: 0, round: 1 }));
+    const round = stem(BOX, footed({ ...SLAB, right: 0, roundLeft: 1, roundRight: 1 }));
     const ink = inkOf(round, ids);
     expect(inked(sharp, 238, 2)).toBe(true);
     expect(inked(ink, 238, 2)).toBe(false);
@@ -231,13 +247,19 @@ describe("a serif's shape", () => {
   });
 
   it("rounds that corner as a tip there would be: less as the serif slopes, not at a point", () => {
-    const pointed = inkOf(stem(BOX, footed({ ...SLAB, right: 0, round: 1, slope: 1 })), ids);
+    const pointed = inkOf(
+      stem(BOX, footed({ ...SLAB, right: 0, roundLeft: 1, roundRight: 1, slope: 1 })),
+      ids,
+    );
     expect(inked(pointed, 238, 2)).toBe(true);
-    // Half the slope, half the tip, half the round: ten where it was twenty.
-    const half = inkOf(stem(BOX, footed({ ...SLAB, right: 0, round: 1, slope: 0.5 })), ids);
+    // Half the slope, half the tip, half the roundLeft: ten where it was twenty., roundRight: ten where it was twenty.
+    const half = inkOf(
+      stem(BOX, footed({ ...SLAB, right: 0, roundLeft: 1, roundRight: 1, slope: 0.5 })),
+      ids,
+    );
     expect(inked(half, 238, 2)).toBe(false);
     expect(inked(half, 232, 2)).toBe(true);
-    const whole = inkOf(stem(BOX, footed({ ...SLAB, right: 0, round: 1 })), ids);
+    const whole = inkOf(stem(BOX, footed({ ...SLAB, right: 0, roundLeft: 1, roundRight: 1 })), ids);
     expect(inked(whole, 232, 2)).toBe(false);
   });
 
@@ -286,7 +308,11 @@ describe("a serif on a last stroke shorter than it is high", () => {
 
   it("is the same ink joined, in regions and to one plan", { timeout: 60_000 }, () => {
     for (const drop of [12, 40, 70]) {
-      for (const serif of [FOOT, { ...FOOT, bracket: 0.7, cup: 6, round: 0.5 }, SLAB]) {
+      for (const serif of [
+        FOOT,
+        { ...FOOT, bracket: 0.7, cup: 6, roundLeft: 0.5, roundRight: 0.5 },
+        SLAB,
+      ]) {
         const stroke = hook(drop, serif);
         const joined = inkOf(stroke, ids);
         expect(differences(joined, inkRegions(stroke))).toEqual([]);
@@ -317,7 +343,9 @@ describe("a serif on the head of a stem", () => {
         bracket: 0.16,
         slope: 0.31,
         cup: 5,
-        round: 1,
+        roundLeft: 1,
+        roundRight: 1,
+        shear: 0,
       };
       const stroke = withNib(
         contour(
@@ -424,7 +452,9 @@ describe("a serif's numbers", () => {
       bracket: 1,
       slope: 0,
       cup: 0,
-      round: 0,
+      roundLeft: 0,
+      roundRight: 0,
+      shear: 0,
       style: "Foot",
       own: ["right"],
     });
@@ -450,5 +480,69 @@ describe("a serif's numbers", () => {
     expect(styles.map((s) => s.name)).toEqual(["Foot", "Head"]);
     expect(styles[0]!.left).toBe(60);
     expect(styles[1]!.height).toBe(20);
+  });
+});
+
+describe("a serif on a cut that slants across the stroke", () => {
+  // An upright stem cut at fourteen degrees: the line the serif stands on
+  // rises to the right, and faces down and a little to the left.
+  const turn = (14 * Math.PI) / 180;
+  const normal = { x: Math.sin(turn), y: -Math.cos(turn) };
+  const along = { x: -normal.y, y: normal.x };
+  // The stem runs straight up, which along the slanting line is this far
+  // along for each unit up from it.
+  const onward = { x: 0, y: -1 };
+  const facing = normal.x * onward.x + normal.y * onward.y;
+  const runs = -(onward.x * along.x + onward.y * along.y) / facing;
+  const seat = {
+    through: at(0, 0),
+    normal,
+    foot: { from: -40, to: 40 },
+    top: { from: -40 + runs * 50, to: 40 + runs * 50 },
+    rise: 50,
+    runs,
+  };
+  const tipSide = (shear: number) => {
+    const pieces = serifOutline({ ...SLAB, shear }, seat)!;
+    // The right tip's side, from the foot up: the second piece of the right.
+    const side = pieces.find(
+      (p) => p.line && p.curve.a.x > 60 && Math.abs(p.curve.b.y - p.curve.a.y) > 10,
+    )!;
+    return Math.atan2(side.curve.b.x - side.curve.a.x, side.curve.b.y - side.curve.a.y);
+  };
+
+  it("has its tips square to the cut, turned with it, unsheared", () => {
+    expect(Math.abs(tipSide(0)) * (180 / Math.PI)).toBeCloseTo(14, 3);
+  });
+
+  it("has its tips upright, as the stem runs, sheared all the way", () => {
+    expect(Math.abs(tipSide(1)) * (180 / Math.PI)).toBeLessThan(1e-6);
+  });
+
+  it("is sheared half way at half", () => {
+    const half = Math.abs(tipSide(0.5)) * (180 / Math.PI);
+    expect(half).toBeGreaterThan(1);
+    expect(half).toBeLessThan(13);
+  });
+
+  it("reads one round, written before the two sides were apart, as both", () => {
+    const end = readStrokeEnd({
+      cut: 0,
+      serif: {
+        ...SLAB,
+        roundLeft: undefined,
+        roundRight: undefined,
+        round: 0.6,
+        style: "Foot",
+        own: ["round"],
+      },
+    })!;
+    expect(end.serif).toMatchObject({ roundLeft: 0.6, roundRight: 0.6 });
+    expect(end.serif!.own).toEqual(["roundLeft", "roundRight"]);
+  });
+
+  it("reads an old serif, written before there was a shear, as unsheared", () => {
+    const { shear: _, ...old } = SLAB;
+    expect(readSerifStyles([{ name: "Old", ...old }])[0]!.shear).toBe(0);
   });
 });

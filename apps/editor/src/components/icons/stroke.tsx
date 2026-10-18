@@ -131,6 +131,16 @@ export const SerifCupIcon: IconComponent = () => (
   </Glyph>
 );
 
+/**
+ * A serif's shear: a foot on a slanting cut whose tips stand upright, the
+ * serif sheared along the cut rather than turned with it.
+ */
+export const SerifShearIcon: IconComponent = () => (
+  <Glyph>
+    <path d="M9 3v10.67L3 15v6l18-4v-6l-6 1.33V3" />
+  </Glyph>
+);
+
 /** The round of a serif's tips. */
 export const SerifRoundIcon: IconComponent = () => (
   <Glyph>

@@ -8,6 +8,19 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Added
+
+- **Serif shear.** On a cut that slants across the stroke, a serif's tips stood square to the
+  cut, the serif turned with it. Shear stands them the way the stroke runs instead — upright on
+  an upright stem — the serif sheared rather than turned; between, part of the way.
+- **Round left and round right.** A serif's tips are rounded each on its own, where both were
+  one number: a head on a slanting cut can round off its sharp corner and leave the blunt one.
+  On a side that reaches nowhere it is the stroke's own corner that is rounded. A serif written
+  before keeps its one round on both sides.
+- **Update style.** A serif that follows one of the font's styles, with numbers set on it,
+  gives those numbers to the style: every end with the style takes them, but for numbers those
+  ends have set of their own. One step to undo.
+
 ## 0.2.2
 
 ### Changed

@@ -9,7 +9,7 @@ import { type Cubic, type Vec2, lineAsCubic, reverseLoop } from "@typewright/geo
  * stroke's own edges where the line crosses them, so a stem made heavier
  * carries its serif out with it and nothing is taken off or put back by hand.
  *
- * Seven numbers, and every serif there is a name for is some of them: a slab is
+ * Nine numbers, and every serif there is a name for is some of them: a slab is
  * a reach and a height, a bracketed serif the same with a bracket, a wedge one
  * with a slope, a flag one with a reach on one side only.
  *
@@ -22,11 +22,16 @@ import { type Cubic, type Vec2, lineAsCubic, reverseLoop } from "@typewright/geo
  * - `slope`, from nought to one, is how much thinner the serif is at its tip
  *   than at the stroke: nought a slab, one a wedge that comes to a point.
  * - `cup` is how far the middle of the serif's foot is hollowed, in units.
- * - `round`, from nought to one, is how much of the tip is rounded off: none,
- *   or the whole of it to a half circle. On a side that reaches nowhere it is
- *   the stroke's own corner that is rounded, by as much as a tip there would
- *   be: less the more the serif slopes, and not at all where it comes to a
- *   point.
+ * - `roundLeft` and `roundRight`, from nought to one, are how much of the tip
+ *   on each side is rounded off: none, or the whole of it to a half circle. On
+ *   a side that reaches nowhere it is the stroke's own corner that is rounded,
+ *   by as much as a tip there would be: less the more the serif slopes, and not
+ *   at all where it comes to a point. A side each, as the reach is: a head on a
+ *   slanting cut has a sharp corner on one side and a blunt one on the other.
+ * - `shear`, from nought to one, is which way the sides of its tips stand on a
+ *   cut that slants across the stroke: nought square to the cut, the serif
+ *   turned with it; one the way the stroke runs, upright on an upright stem,
+ *   the serif sheared rather than turned.
  */
 export type Serif = {
   readonly left: number;
@@ -35,7 +40,9 @@ export type Serif = {
   readonly bracket: number;
   readonly slope: number;
   readonly cup: number;
-  readonly round: number;
+  readonly roundLeft: number;
+  readonly roundRight: number;
+  readonly shear: number;
 };
 
 /** The numbers of a serif, by name. */
@@ -46,13 +53,21 @@ export const SERIF_NUMBERS = [
   "bracket",
   "slope",
   "cup",
-  "round",
+  "roundLeft",
+  "roundRight",
+  "shear",
 ] as const;
 
 export type SerifNumber = (typeof SERIF_NUMBERS)[number];
 
 /** Which of a serif's numbers are a share of something, from nought to one, and not units. */
-export const SERIF_SHARES: readonly SerifNumber[] = ["bracket", "slope", "round"];
+export const SERIF_SHARES: readonly SerifNumber[] = [
+  "bracket",
+  "slope",
+  "roundLeft",
+  "roundRight",
+  "shear",
+];
 
 /**
  * A serif the font has a name for.
@@ -84,15 +99,17 @@ export const DEFAULT_SERIF: Serif = {
   bracket: 0,
   slope: 0,
   cup: 0,
-  round: 0,
+  roundLeft: 0,
+  roundRight: 0,
+  shear: 0,
 };
 
 /** Serifs to start a style from, by what they are called. */
 export const SERIF_PRESETS: readonly SerifStyle[] = [
-  { name: "Slab", left: 60, right: 60, height: 40, bracket: 0, slope: 0, cup: 0, round: 0 },
-  { name: "Bracketed", left: 60, right: 60, height: 24, bracket: 0.7, slope: 0, cup: 4, round: 0 },
-  { name: "Wedge", left: 70, right: 0, height: 60, bracket: 0, slope: 1, cup: 0, round: 0 },
-  { name: "Hairline", left: 70, right: 70, height: 10, bracket: 0, slope: 0, cup: 0, round: 0 },
+  { ...DEFAULT_SERIF, name: "Slab", left: 60, right: 60, height: 40 },
+  { ...DEFAULT_SERIF, name: "Bracketed", left: 60, right: 60, height: 24, bracket: 0.7, cup: 4 },
+  { ...DEFAULT_SERIF, name: "Wedge", left: 70, right: 0, height: 60, slope: 1 },
+  { ...DEFAULT_SERIF, name: "Hairline", left: 70, right: 70, height: 10 },
 ];
 
 /** A serif's numbers made sound: no reach or height below nothing, each share within its range. */
@@ -106,7 +123,9 @@ export function soundSerif(serif: Serif): Serif {
     bracket: share(serif.bracket),
     slope: share(serif.slope),
     cup: length(serif.cup),
-    round: share(serif.round),
+    roundLeft: share(serif.roundLeft),
+    roundRight: share(serif.roundRight),
+    shear: share(serif.shear),
   };
 }
 
@@ -124,7 +143,9 @@ export function serifNumbers(serif: Serif): Serif {
     bracket: serif.bracket,
     slope: serif.slope,
     cup: serif.cup,
-    round: serif.round,
+    roundLeft: serif.roundLeft,
+    roundRight: serif.roundRight,
+    shear: serif.shear,
   };
 }
 
@@ -136,6 +157,8 @@ export function readSerif(raw: unknown): Serif | undefined {
     const value = from[key];
     return typeof value === "number" && Number.isFinite(value) ? value : DEFAULT_SERIF[key];
   };
+  const old = from["round"];
+  const both = typeof old === "number" && Number.isFinite(old) ? old : 0;
   return soundSerif({
     left: said("left"),
     right: said("right"),
@@ -143,7 +166,10 @@ export function readSerif(raw: unknown): Serif | undefined {
     bracket: said("bracket"),
     slope: said("slope"),
     cup: said("cup"),
-    round: said("round"),
+    // Written before the two sides were apart: one round for both.
+    roundLeft: from["roundLeft"] === undefined ? both : said("roundLeft"),
+    roundRight: from["roundRight"] === undefined ? both : said("roundRight"),
+    shear: said("shear"),
   });
 }
 
@@ -153,9 +179,13 @@ export function readEndSerif(raw: unknown): EndSerif | undefined {
   if (numbers === undefined) return undefined;
   const from = raw as Record<string, unknown>;
   const style = typeof from["style"] === "string" && from["style"] !== "" ? from["style"] : null;
-  const own = Array.isArray(from["own"])
-    ? SERIF_NUMBERS.filter((key) => (from["own"] as unknown[]).includes(key))
-    : [];
+  // An end's own round, written before the two sides were apart, is both.
+  const said = Array.isArray(from["own"])
+    ? (from["own"] as unknown[]).flatMap((key) =>
+        key === "round" ? ["roundLeft", "roundRight"] : [key],
+      )
+    : null;
+  const own = said !== null ? SERIF_NUMBERS.filter((key) => said.includes(key)) : [];
   return {
     ...numbers,
     ...(style === null ? {} : { style }),
@@ -219,6 +249,11 @@ export type SerifSeat = {
   readonly top: { readonly from: number; readonly to: number };
   readonly rise: number;
   readonly lean?: { readonly from: number; readonly to: number };
+  /**
+   * Which way the stroke runs back up from the line: how far along the line
+   * it goes for each unit up. What a sheared serif's tips stand along.
+   */
+  readonly runs?: number;
 };
 
 /**
@@ -228,11 +263,11 @@ export type SerifSeat = {
 export function serifRise(serif: Serif): number {
   const s = soundSerif(serif);
   const tip = s.height * (1 - s.slope);
-  const run = (reach: number): number => {
-    const rounded = Math.min((s.round * tip) / 2, reach);
+  const run = (reach: number, round: number): number => {
+    const rounded = Math.min((round * tip) / 2, reach);
     return s.bracket * Math.max(0, reach - rounded);
   };
-  return s.height + Math.max(run(s.left), run(s.right));
+  return s.height + Math.max(run(s.left, s.roundLeft), run(s.right, s.roundRight));
 }
 
 /**
@@ -303,6 +338,9 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
 
   const tip = s.height * (1 - s.slope);
   const width = footRight - footLeft + s.left + s.right;
+  // How far along the line the top of a tip moves, sheared the way the stroke
+  // runs, for each unit up: as the page has left and right.
+  const shearing = s.shear * (flipped ? -(seat.runs ?? 0) : (seat.runs ?? 0));
   // A foot hollowed deeper than a thin tip is thick would come through the
   // top of the serif on its way up: no deeper than the top rises there.
   let cup = Math.min(s.cup, s.height * CUP_MOST);
@@ -321,6 +359,7 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
     foot: number,
     top: number,
     lean: number,
+    round: number,
     out: 1 | -1,
   ): SerifPiece[] => {
     const edge = (h: number): Vec2 => at(foot + ((top - foot) * h) / seat.rise, h);
@@ -329,14 +368,14 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
     const corner = hasReach ? at(foot + out * reach, 0) : edge(0);
     // A side that reaches nowhere has no tip: its corner is the stroke's own,
     // and goes straight up the stroke's edge to the top of the serif.
-    const tipTop = hasReach ? at(foot + out * reach, tip) : meets;
+    const tipTop = hasReach ? at(foot + out * reach + shearing * tip, tip) : meets;
     // The round of the corner on the line the serif stands on comes in under
     // the stroke where the side reaches less than its radius — and where it
     // reaches nowhere, is the stroke's own corner rounded, by as much as a tip
     // there would be and no further in than the stroke's middle: a tip drawn
     // in to the stroke keeps the round it had. The round at the top of the tip
     // has only the reach to come in along.
-    const wanted = (s.round * tip) / 2;
+    const wanted = (round * tip) / 2;
     const footRounded = Math.min(wanted, reach + (footRight - footLeft) / 2);
     const rounded = Math.min(wanted, reach);
     const towards = (from: Vec2, to: Vec2, by: number): Vec2 => {
@@ -395,8 +434,8 @@ export function serifOutline(serif: Serif, seat: SerifSeat): SerifPiece[] | null
     ];
   };
 
-  const right = side(s.right, footRight, topRight, leanRight, 1);
-  const left = side(s.left, footLeft, topLeft, leanLeft, -1);
+  const right = side(s.right, footRight, topRight, leanRight, s.roundRight, 1);
+  const left = side(s.left, footLeft, topLeft, leanLeft, s.roundLeft, -1);
   const footFrom = left[0]!.curve.a;
   const footTo = right[0]!.curve.a;
   const lift = (cup * 4) / 3;
