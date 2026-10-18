@@ -8,6 +8,12 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Fixed
+
+- **Saving a serif as a style** asks for the style's name, where it took one without asking.
+  And a serif whose style the font does not have — a stroke pasted from another font — is taken
+  for numbers of its own, to be saved as a style; its buttons did nothing.
+
 ## 0.2.3
 
 ### Changed

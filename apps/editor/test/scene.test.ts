@@ -198,7 +198,9 @@ describe("sceneFor", () => {
     const name = store.editor.currentGlyph;
     store.setEditor({
       ...store.editor,
-      document: updateGlyph(store.editor.document, name, (g) => ({ ...g, contours: [stem] })),
+      document:
+        updateGlyph(store.editor.document, name, (g) => ({ ...g, contours: [stem] })) ??
+        store.editor.document,
       cursor: { x: 110, y: 200 },
     });
     expect(sceneFor(store.getState(), SIZE).strokePen).toBeNull();

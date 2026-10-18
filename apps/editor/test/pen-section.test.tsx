@@ -387,6 +387,7 @@ describe("a serif on a cut end", () => {
   it("is made a style of the font by the button beside it, and followed again by the same", () => {
     const store = withSerif();
     fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save style" }));
     expect(store.editor.document.serifs.map((style) => style.name)).toEqual(["Serif"]);
     expect(serifOf(store).style).toBe("Serif");
     // Following its style, with nothing of its own: nothing to take back.
@@ -403,9 +404,42 @@ describe("a serif on a cut end", () => {
     expect(serifOf(store)).toMatchObject({ height: 30, style: "Serif" });
     expect(serifOf(store).own).toBeUndefined();
   });
+  it("asks for the style's name, and saves nothing where that is let go", () => {
+    const store = withSerif();
+    fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    const name = screen.getByLabelText<HTMLInputElement>("Serif style name");
+    expect(name.value).toBe("Serif");
+    fireEvent.keyDown(name, { key: "Escape" });
+    expect(store.editor.document.serifs).toEqual([]);
+    expect(screen.queryByLabelText("Serif style name")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    const again = screen.getByLabelText("Serif style name");
+    fireEvent.change(again, { target: { value: "Foot" } });
+    fireEvent.keyDown(again, { key: "Enter" });
+    expect(store.editor.document.serifs.map((style) => style.name)).toEqual(["Foot"]);
+    expect(serifOf(store).style).toBe("Foot");
+  });
+
+  it("takes a style the font does not have for numbers of the end's own, to save under its name", () => {
+    const store = withSerif();
+    // As a stroke pasted from another font comes, with that font's style.
+    fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save style" }));
+    act(() => {
+      store.setEditor({ ...store.editor, document: { ...store.editor.document, serifs: [] } });
+    });
+    expect(serifOf(store).style).toBe("Serif");
+    expect(screen.getByLabelText<HTMLSelectElement>("Serif style").value).toBe("");
+    expect(screen.queryByRole("button", { name: "Update style" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    expect(screen.getByLabelText<HTMLInputElement>("Serif style name").value).toBe("Serif");
+  });
+
   it("makes the numbers set on an end its style's, and follows the style again", () => {
     const store = withSerif();
     fireEvent.click(screen.getByRole("button", { name: "Save as style" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save style" }));
     // Nothing set on the end: nothing to give the style.
     expect(screen.queryByRole("button", { name: "Update style" })).toBeNull();
 

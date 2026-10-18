@@ -1,5 +1,6 @@
 import { type EndSerif, type SerifNumber, serifNumbers } from "@typewright/font-model";
 import type { PenBlend } from "@typewright/geometry";
+import { useState } from "react";
 import {
   type BlendChannel,
   type EndChoice,
@@ -31,6 +32,7 @@ import styles from "../Inspector.module.css";
 import {
   type IconComponent,
   BrushIcon,
+  CheckIcon,
   ChevronRightIcon,
   CloseNibIcon,
   CloseSerifIcon,
@@ -48,6 +50,7 @@ import {
   SerifRoundIcon,
   SerifShearIcon,
   SerifSlopeIcon,
+  XIcon,
 } from "../icons.js";
 import { Section } from "./Section.js";
 import { Field, Named, SteppedNumber } from "./fields.js";
@@ -476,16 +479,23 @@ function SerifFields(): React.JSX.Element | null {
   const mixed = useStoreValue((s) => selectedEndSerifsDiffer(s.session.editor));
   const fontStyles = useStoreValue((s) => s.session.editor.document.serifs);
   const unfolded = useStoreValue((s) => s.inspector.sections[SERIF_NUMBERS_FOLD]) === true;
+  // The name a style is about to be saved under, while it is asked for.
+  const [naming, setNaming] = useState<string | null>(null);
   if (found === null) return null;
   const serif: EndSerif = found;
   const own = serif.own ?? [];
+  // A style the font does not have — a stroke pasted from another font, a
+  // style since taken out — is no style here: the numbers are the end's own,
+  // and saving them makes the style, under its name to begin with.
+  const styled = serif.style !== undefined && fontStyles.some((one) => one.name === serif.style);
 
-  const saveAsStyle = (): void => {
+  const saveAsStyle = (asked: string): void => {
+    const name = asked.trim();
+    setNaming(null);
+    if (name === "") return;
     store.applyTool(result(store.editor, [begin("New serif style")]));
     const before = new Set(store.editor.document.serifs.map((style) => style.name));
-    store.applyTool(
-      result(addSerifStyle(store.editor, { name: "Serif", ...serifNumbers(serif) }).state),
-    );
+    store.applyTool(result(addSerifStyle(store.editor, { name, ...serifNumbers(serif) }).state));
     const made = store.editor.document.serifs.find((style) => !before.has(style.name));
     if (made !== undefined) {
       store.applyTool(result(setEndSerifStyle(store.editor, made.name).state));
@@ -509,59 +519,101 @@ function SerifFields(): React.JSX.Element | null {
 
   return (
     <Field label="Serif" group>
-      <div className={styles.styleRow}>
-        <select
-          className={styles.input}
-          aria-label="Serif style"
-          title="One of the font's serif styles, which are changed in Font info, or numbers of this end's own"
-          value={mixed ? "\u0000mixed" : (serif.style ?? "")}
-          onChange={(event) =>
-            store.applyTool(
-              setEndSerifStyle(store.editor, event.target.value === "" ? null : event.target.value),
-            )
-          }
-        >
-          {mixed && <option value={"\u0000mixed"}>—</option>}
-          <option value="">Own numbers</option>
-          {fontStyles.map((style) => (
-            <option key={style.name} value={style.name}>
-              {style.name}
-            </option>
-          ))}
-        </select>
-        {serif.style === undefined ? (
+      {naming !== null ? (
+        <div className={styles.styleRow}>
+          <input
+            className={styles.input}
+            aria-label="Serif style name"
+            title="The name the font's new serif style is saved under"
+            value={naming}
+            // Asked for because the button was pressed: the name is what is
+            // wanted next.
+            autoFocus
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => setNaming(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") saveAsStyle(naming);
+              if (event.key === "Escape") setNaming(null);
+              event.stopPropagation();
+            }}
+          />
           <button
             type="button"
             className={styles.rowAction}
-            aria-label="Save as style"
-            title="Save as style: make these numbers a serif style of the font, and give it to this end"
-            onClick={saveAsStyle}
+            aria-label="Save style"
+            title="Save style: make these numbers a serif style of the font under this name"
+            onClick={() => saveAsStyle(naming)}
           >
-            <SaveIcon />
+            <CheckIcon />
           </button>
-        ) : own.length > 0 ? (
-          <>
+          <button
+            type="button"
+            className={styles.rowAction}
+            aria-label="Cancel"
+            title="Cancel: save no style"
+            onClick={() => setNaming(null)}
+          >
+            <XIcon />
+          </button>
+        </div>
+      ) : (
+        <div className={styles.styleRow}>
+          <select
+            className={styles.input}
+            aria-label="Serif style"
+            title="One of the font's serif styles, which are changed in Font info, or numbers of this end's own"
+            value={mixed ? "\u0000mixed" : styled ? serif.style : ""}
+            onChange={(event) =>
+              store.applyTool(
+                setEndSerifStyle(
+                  store.editor,
+                  event.target.value === "" ? null : event.target.value,
+                ),
+              )
+            }
+          >
+            {mixed && <option value={"\u0000mixed"}>—</option>}
+            <option value="">Own numbers</option>
+            {fontStyles.map((style) => (
+              <option key={style.name} value={style.name}>
+                {style.name}
+              </option>
+            ))}
+          </select>
+          {!styled ? (
             <button
               type="button"
               className={styles.rowAction}
-              aria-label="Update style"
-              title="Update style: make the numbers set on this end the style's, for every end that follows it"
-              onClick={updateStyle}
+              aria-label="Save as style"
+              title="Save as style: make these numbers a serif style of the font, under a name you give it, and give it to this end"
+              onClick={() => setNaming(serif.style ?? "Serif")}
             >
               <SaveIcon />
             </button>
-            <button
-              type="button"
-              className={styles.rowAction}
-              aria-label="Follow style"
-              title="Follow style: take back the numbers set on this end, and follow the style again"
-              onClick={() => store.applyTool(setEndSerifStyle(store.editor, serif.style ?? null))}
-            >
-              <LinkIcon />
-            </button>
-          </>
-        ) : null}
-      </div>
+          ) : own.length > 0 ? (
+            <>
+              <button
+                type="button"
+                className={styles.rowAction}
+                aria-label="Update style"
+                title="Update style: make the numbers set on this end the style's, for every end that follows it"
+                onClick={updateStyle}
+              >
+                <SaveIcon />
+              </button>
+              <button
+                type="button"
+                className={styles.rowAction}
+                aria-label="Follow style"
+                title="Follow style: take back the numbers set on this end, and follow the style again"
+                onClick={() => store.applyTool(setEndSerifStyle(store.editor, serif.style ?? null))}
+              >
+                <LinkIcon />
+              </button>
+            </>
+          ) : null}
+        </div>
+      )}
       <button
         type="button"
         className={styles.fold}
