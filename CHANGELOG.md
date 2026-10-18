@@ -12,7 +12,7 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ### Added
 
-- **The pen under the pointer.** Moving over a stroke with the select tool shows its pen, dashed,
+- **The pen under the pointer.** Moving over a stroke with the select tool shows its pen, outlined in blue,
   standing at the nearest place on the path: how wide, how thick and how turned it is there,
   between the points where it was set.
 

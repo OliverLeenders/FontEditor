@@ -63,6 +63,8 @@ export type RenderPalette = {
   readonly marqueeFill: string;
   readonly marqueeStroke: string;
   readonly preview: string;
+  /** The pen of the stroke under the pointer: a mark, darker than the ink it stands on. */
+  readonly strokePen: string;
   /** Border around a glyph browser cell. */
   readonly cellRule: string;
   /** The glyph name and code point beneath a cell. */
@@ -158,6 +160,7 @@ export const LIGHT_PALETTE: RenderPalette = {
   marqueeFill: "rgba(44,109,175,0.08)",
   marqueeStroke: "#2C6DAF",
   preview: "#7C8896",
+  strokePen: "#1D4F86",
   cellRule: "#E3E9EF",
   cellLabel: "#6B7783",
   cellSample: "rgba(107,119,131,0.42)",
@@ -204,6 +207,7 @@ export const DARK_PALETTE: RenderPalette = {
   marqueeFill: "rgba(116,174,226,0.10)",
   marqueeStroke: "#74AEE2",
   preview: "#74828F",
+  strokePen: "#9CC8F0",
   cellRule: "#232F3C",
   cellLabel: "#8B98A5",
   cellSample: "rgba(139,152,165,0.45)",

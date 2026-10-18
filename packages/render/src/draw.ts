@@ -926,9 +926,9 @@ export function drawKnifeStroke(ctx: Canvas2D, s: Scene): void {
 }
 
 /**
- * The pen of the stroke under the pointer, where the pointer is along it:
- * dashed, as what is shown and not drawn — a reading of the stroke, like the
- * pen's rubber band, never part of the outline.
+ * The pen of the stroke under the pointer, where the pointer is along it: a
+ * line of its own colour, a reading of the stroke and never part of the
+ * outline.
  */
 export function drawStrokePen(ctx: Canvas2D, s: Scene): void {
   const outline = s.strokePen;
@@ -948,8 +948,7 @@ export function drawStrokePen(ctx: Canvas2D, s: Scene): void {
   ctx.strokeStyle = s.palette.halo;
   ctx.lineWidth = width + 2;
   ctx.stroke();
-  ctx.setLineDash([4, 3]);
-  ctx.strokeStyle = s.palette.outline;
+  ctx.strokeStyle = s.palette.strokePen;
   ctx.lineWidth = width;
   ctx.stroke();
   ctx.restore();
