@@ -8,6 +8,13 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.2.3
+
+### Changed
+
+- **The pen under the pointer** shows while Ctrl is held, and not otherwise: always there, it
+  covered the ink it describes.
+
 ### Added
 
 - **Serif shear.** On a cut that slants across the stroke, a serif's tips stood square to the

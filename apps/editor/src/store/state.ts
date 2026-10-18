@@ -113,6 +113,8 @@ export type StoreState = {
   readonly stripText: string;
   /** Space held: draw the shape without any controls. */
   readonly previewing: boolean;
+  /** Ctrl held: show the pen of the stroke under the pointer. */
+  readonly showingPen: boolean;
   readonly inspector: InspectorPlacement;
   /** How a split window is divided: side by side or stacked, and where. */
   readonly split: Preferences["split"];
@@ -386,6 +388,7 @@ export function initialState(preferences: Preferences): StoreState {
     proofLeading: preferences.proofLeading,
     cellScale: preferences.cellScale,
     previewing: false,
+    showingPen: false,
     inspector: preferences.inspector,
     split: preferences.split,
     theme: preferences.theme,

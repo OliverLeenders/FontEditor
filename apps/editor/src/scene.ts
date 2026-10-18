@@ -322,13 +322,14 @@ export function sceneFor(
 /**
  * The pen of the stroke the pointer is over, where it is along the stroke.
  *
- * Under the select tool, while nothing is being dragged: moving over the
- * letter, not making or moving something in it. Near is a few pixels, as a
- * segment is hovered.
+ * While Ctrl is held, under the select tool, and while nothing is being
+ * dragged: looking over the letter, not making or moving something in it.
+ * Asked for rather than always there, as it covers the ink it describes. Near
+ * is a few pixels, as a segment is hovered.
  */
 function strokePenFor(state: StoreState, glyph: Glyph): Scene["strokePen"] {
   const editor = state.session.editor;
-  if (state.previewing || editor.activeTool !== "select") return null;
+  if (!state.showingPen || state.previewing || editor.activeTool !== "select") return null;
   if (editor.cursor === null || editor.gesture !== null) return null;
   return (
     penUnder(glyph.contours, editor.cursor, STROKE_PEN_NEAR / editor.view.scale)?.outline ?? null

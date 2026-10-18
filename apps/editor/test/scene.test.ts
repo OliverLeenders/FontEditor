@@ -184,6 +184,30 @@ describe("sceneFor", () => {
     expect(scene.glyph.advance).toBe(0);
   });
 
+  it("shows the pen of the stroke under the pointer only while Ctrl is held", async () => {
+    const { contour, counterIds, node } = await import("@typewright/font-model");
+    const ids = counterIds("pen-shown");
+    const stem = {
+      ...contour(
+        ids.contour(),
+        [node(ids.node(), { x: 100, y: 0 }), node(ids.node(), { x: 100, y: 400 })],
+        false,
+      ),
+      nib: { angle: 0, width: 60, thickness: 20 },
+    };
+    const name = store.editor.currentGlyph;
+    store.setEditor({
+      ...store.editor,
+      document: updateGlyph(store.editor.document, name, (g) => ({ ...g, contours: [stem] })),
+      cursor: { x: 110, y: 200 },
+    });
+    expect(sceneFor(store.getState(), SIZE).strokePen).toBeNull();
+    store.setShowingPen(true);
+    expect(sceneFor(store.getState(), SIZE).strokePen?.length).toBeGreaterThan(0);
+    store.setShowingPen(false);
+    expect(sceneFor(store.getState(), SIZE).strokePen).toBeNull();
+  });
+
   it("hides every control while space is held", () => {
     store.setPreviewing(true);
     expect(sceneFor(store.getState(), SIZE).options.showControls).toBe(false);

@@ -222,6 +222,8 @@ export function App(): React.JSX.Element {
         return;
       }
 
+      // Ctrl held shows the pen of the stroke under the pointer; let go, it goes.
+      if (event.key === "Control") store.setShowingPen(true);
       if (event.code === "Space" && !typing && !onControl) {
         event.preventDefault();
         store.setPreviewing(true);
@@ -263,10 +265,14 @@ export function App(): React.JSX.Element {
     };
     const onKeyUp = (event: KeyboardEvent): void => {
       if (event.code === "Space") store.setPreviewing(false);
+      if (event.key === "Control") store.setShowingPen(false);
     };
     // A key let go of in another window is never heard here: Space held while
     // switching away left the preview on until Space was pressed again.
-    const onBlur = (): void => store.setPreviewing(false);
+    const onBlur = (): void => {
+      store.setPreviewing(false);
+      store.setShowingPen(false);
+    };
     /**
      * On the way out: settle the working copy, and speak up about the folder.
      *

@@ -69,6 +69,7 @@ export const SHORTCUTS: readonly ShortcutGroup[] = [
       },
       { keys: "Page Up · Page Down", what: "The glyph before and after this one" },
       { keys: "Space held", what: "Show the drawing alone, without controls" },
+      { keys: "Ctrl held", what: "Show the pen of the stroke under the pointer, where it is" },
       { keys: "Ctrl-0", what: "Fit the glyph in the window" },
       { keys: "Ctrl-wheel", what: "Zoom at the pointer" },
       { keys: "Wheel · middle-drag", what: "Pan" },

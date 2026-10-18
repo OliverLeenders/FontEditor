@@ -523,6 +523,10 @@ export class EditorStore {
     if (previewing !== this.state.previewing) this.patch({ previewing });
   }
 
+  setShowingPen(showingPen: boolean): void {
+    if (showingPen !== this.state.showingPen) this.patch({ showingPen });
+  }
+
   // ---- opening a font ----------------------------------------------------
 
   /** Start a new, empty font, discarding whatever is open. */
