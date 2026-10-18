@@ -118,8 +118,17 @@ function advance(page: Page): Locator {
   return page.getByRole("textbox", { name: "Advance", exact: true });
 }
 
+/** The inspector's Glyph tab, where the advance is. */
+async function glyphTab(page: Page): Promise<void> {
+  await page
+    .getByRole("tablist", { name: "What the inspector shows" })
+    .getByRole("tab", { name: "Glyph" })
+    .click();
+}
+
 async function setAdvance(page: Page, value: number): Promise<void> {
   await workspace(page, "Glyph");
+  await glyphTab(page);
   await advance(page).fill(String(value));
   await advance(page).press("Enter");
   await expect.poll(() => advance(page).inputValue()).toBe(String(value));
@@ -174,6 +183,7 @@ describe.runIf(here)("a font and a folder, in a browser", () => {
       await page.reload();
       await resume(page).click();
       await workspace(page, "Glyph");
+      await glyphTab(page);
       await advance(page).waitFor();
 
       // No folder to choose: the item is Save, and writes where it wrote.
@@ -216,6 +226,7 @@ describe.runIf(here)("a font and a folder, in a browser", () => {
       await page.getByText(/ glyphs from /).waitFor();
 
       await workspace(page, "Glyph");
+      await glyphTab(page);
       await expect.poll(() => advance(page).inputValue()).toBe("512");
 
       expect(p.problems, "what the pages threw or said was an error").toEqual([]);

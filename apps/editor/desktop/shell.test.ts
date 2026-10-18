@@ -146,6 +146,10 @@ async function behind(browser: WebdriverIO.Browser): Promise<void> {
     .waitForExist({ timeout: 30_000 });
 
   await workspace(browser, "Glyph");
+  // The advance is on the inspector's Glyph tab.
+  await browser
+    .$(`[aria-label="What the inspector shows"] [role="tab"][aria-label="Glyph"]`)
+    .click();
   const advance = browser.$(`input[aria-label="Advance"]`);
   await advance.waitForClickable();
   await advance.setValue("777");

@@ -163,7 +163,7 @@ describe("a large font, in a browser", () => {
         // Said on the status line, so still said from another workspace: the
         // Export menu is only in the font view, and took its word with it.
         await workspace(page, "Glyph");
-        await page.getByRole("textbox", { name: "Advance", exact: true }).waitFor();
+        await page.getByRole("tablist", { name: "What the inspector shows" }).waitFor();
         expect(await said.isVisible(), "still said, away from the menu").toBe(true);
 
         const download = await arrived;
