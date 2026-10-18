@@ -8,6 +8,8 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+## 0.2.1
+
 ### Added
 
 - **The pen under the pointer.** Moving over a stroke with the select tool shows its pen, dashed,
