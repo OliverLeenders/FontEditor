@@ -1,43 +1,19 @@
 /*
- * Sized for reading rather than for fitting.
- *
- * This panel used to be as narrow as its widest field allowed, which made every
- * label a size nobody would choose for text they had to read all day — and left
- * the Lucide drawings below the size this repository already says they need.
- * Wider by two rem, and everything in it up a step.
+ * A column at one edge of the drawing, as tall as it: in the flow, squared off
+ * against the edge it sits at, and flat beside the drawing, which is sunk under
+ * it. The width comes from the placement, so it is set inline rather than here.
  */
 .panel {
-  position: absolute;
-  width: 14.5rem;
-  background: var(--surface);
-  border: 1px solid var(--rule-strong);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  user-select: none;
-  /* Over the drawing and the inset round its edge: floating, it is the one
-     thing here that casts a shadow. */
-  z-index: 3;
-}
-
-/*
- * Docked, it is a column of the window rather than a thing lying on top of one:
- * in the flow, full height, and squared off against the edge it sits at. The
- * width comes from the placement, so it is set inline rather than here.
- */
-.panel[data-dock] {
   position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  border-radius: 0;
+  background: var(--surface);
+  border: 1px solid var(--rule-frame);
   border-top: 0;
   border-bottom: 0;
-  /* The resizer's side of it, framed as the bars are. */
-  border-color: var(--rule-frame);
-  /* Docked, it lies flat beside the drawing, which is sunk under it; only
-     the floating panel casts a shadow. */
-  box-shadow: none;
+  user-select: none;
 }
 .panel[data-dock="right"] {
   border-right: 0;
@@ -75,25 +51,46 @@
   gap: 0.4rem;
   padding: 0.3rem 0.3rem 0.3rem 0.6rem;
   border-bottom: 1px solid var(--rule);
-  cursor: grab;
-  touch-action: none;
-}
-.grip:active {
-  cursor: grabbing;
 }
 
-/* The mark that says the header is a handle. Faint, because it is an
-   affordance rather than a control: it does nothing when pressed that the
-   header around it does not already do. */
-.gripMark {
-  display: inline-flex;
-  flex: none;
-  margin-left: -0.15rem;
+/*
+ * The tabs: what the inspector is showing, one at a time. Icons, as the
+ * sections they open have always had, each named on hover; the one showing
+ * underlined in the accent, as a tab is.
+ */
+.tabs {
+  display: flex;
+  gap: 0.15rem;
+  padding: 0.25rem 0.45rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+.tab {
+  flex: 1;
+  height: var(--tool);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: none;
+  cursor: pointer;
   color: var(--ink-3);
 }
-.gripMark svg {
-  width: var(--icon-small);
-  height: var(--icon-small);
+.tab svg {
+  width: var(--icon);
+  height: var(--icon);
+}
+.tab:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .title {
@@ -155,22 +152,11 @@
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.65rem 0.7rem 0.75rem;
-  /* The panel floats and is dragged about, so it cannot rely on the window
-     being tall enough for everything it holds. Scrolling the contents keeps the
-     last field reachable on a short window; dragging the panel off the top to
-     reach it is not a way to use a tool. The drawing below the panel is the
-     measure where it is known — a stacked split gives the drawing a fraction of
-     the window, and the panel would otherwise hang over the pane beneath. */
-  max-height: min(calc(100vh - 7rem), max(8rem, calc(var(--inspector-room, 100vh) - 3.5rem)));
-  overflow-y: auto;
-}
-
-/* Docked, the column is already as tall as the window, so the body takes what
-   the header leaves rather than measuring the window for itself. */
-.panel[data-dock] .body {
+  /* The column is as tall as the drawing; the tab takes what the header and
+     the tabs leave, and scrolls within it. */
   flex: 1;
   min-height: 0;
-  max-height: none;
+  overflow-y: auto;
 }
 
 /*

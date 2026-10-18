@@ -51,6 +51,14 @@ function advance(page: Page): Locator {
   return page.getByRole("textbox", { name: "Advance", exact: true });
 }
 
+/** The inspector's Glyph tab, where the advance is. Remembered once chosen. */
+async function glyphTab(page: Page): Promise<void> {
+  await page
+    .getByRole("tablist", { name: "What the inspector shows" })
+    .getByRole("tab", { name: "Glyph" })
+    .click();
+}
+
 async function setAdvance(page: Page, value: number): Promise<void> {
   await advance(page).fill(String(value));
   await advance(page).press("Enter");
@@ -61,6 +69,7 @@ async function setAdvance(page: Page, value: number): Promise<void> {
 async function drawing(page: Page): Promise<void> {
   await enter(page);
   await workspace(page, "Glyph");
+  await glyphTab(page);
   await advance(page).waitFor();
 }
 
@@ -88,6 +97,7 @@ async function drawMaster(page: Page, name: string): Promise<void> {
   });
   await expect.poll(() => mastersMenu(page).textContent()).toBe(`Masters · ${name}`);
   await workspace(page, "Glyph");
+  await glyphTab(page);
   await advance(page).waitFor();
 }
 

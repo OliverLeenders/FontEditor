@@ -1,9 +1,21 @@
 import { renameCurrentGlyph, renameRefusal } from "@typewright/tools";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useEditorStore, useStoreValue } from "../useStore.js";
 import styles from "./Inspector.module.css";
-import { GripVerticalIcon, PanelLeftIcon, PanelRightIcon, ScalingIcon, XIcon } from "./icons.js";
+import type { InspectorTab } from "../preferences.js";
+import {
+  type IconComponent,
+  AnchorIcon,
+  ImageIcon,
+  LayersIcon,
+  PanelLeftIcon,
+  PanelRightIcon,
+  PointIcon,
+  ScalingIcon,
+  TypeIcon,
+  XIcon,
+} from "./icons.js";
 import { TransformPanel } from "./TransformPanel.js";
 import { AnchorsSection } from "./inspector/AnchorsSection.js";
 import { ComponentsSection } from "./inspector/ComponentsSection.js";
@@ -21,40 +33,27 @@ import { TracingSection } from "./inspector/TracingSection.js";
  * The inspector: the glyph, and whatever of it is selected, as numbers.
  *
  * This file is the frame — where the panel sits, what its header does, and
- * which sections it is made of. Each section owns its own selectors and its own
+ * which tabs it is made of. Each section owns its own selectors and its own
  * commands and lives beside this one in `inspector/`, because they have nothing
- * to say to each other: the panel is a stack of unrelated things about one
- * glyph, and the only thing they share is the edge they line up against.
+ * to say to each other.
  *
- * It sits over the drawing or beside it, and that is a choice made here rather
- * than in the layout. Floating, it can land on top of what you are editing
- * until you move it; docked, it takes a column and the drawing gets the rest.
- * Dragging the header to a window edge docks it, dragging away undocks it, and
- * the button in the header reaches the same two states without the throw.
+ * A column at one edge of the drawing, with a tab for each thing it is about:
+ * what is selected, the glyph, its layers, its anchors and guides, the picture
+ * it is traced from. One at a time, so what is shown is what is being worked
+ * on and not eleven sections of everything. It used to float over the drawing,
+ * and grew until it covered what was being drawn: a column covers nothing.
+ * Selecting something shows the Selection tab, which is where anybody looks
+ * for what they have just picked up.
  */
 export function Inspector(): React.JSX.Element | null {
   const store = useEditorStore();
   const open = useStoreValue((s) => s.inspector.open);
-  const x = useStoreValue((s) => s.inspector.x);
-  const y = useStoreValue((s) => s.inspector.y);
   const dock = useStoreValue((s) => s.inspector.dock);
   const width = useStoreValue((s) => s.inspector.width);
-  // The size of the drawing the panel floats over: the window less its bars in
-  // a window of one, and much less in a stacked split.
-  const roomWidth = useStoreValue((s) => s.viewport.width);
-  const room = useStoreValue((s) => s.viewport.height);
-  // Where it is drawn: where it was put, as far as the drawing allows — enough
-  // of it across to grab, and its header and the least of its body down. The
-  // remembered place is left alone, so a pane made larger again puts the panel
-  // back where it was.
-  const shownX = roomWidth > 1 ? Math.max(0, Math.min(x, roomWidth - 80)) : x;
-  const shownY = room > 1 ? Math.max(0, Math.min(y, room - 168)) : y;
+  const tab = useStoreValue((s) => s.inspector.tab);
   const glyphName = useStoreValue((s) => s.session.editor.currentGlyph);
   const glyphNames = useStoreValue((s) => s.session.editor.document.glyphOrder);
-  // Every control in the transform section acts on the points selected, and is
-  // dead without them — so with none, the section has nothing in it.
-  // What the selection is, which decides which sections come first: the ones
-  // about it, where the eye is, rather than below the glyph's own.
+  // What the selection is, which decides what the Selection tab leads with.
   const focus = useStoreValue((s): Focus => {
     const e = s.session.editor;
     if (e.selectedComponent !== null) return "component";
@@ -62,9 +61,20 @@ export function Inspector(): React.JSX.Element | null {
     if (e.selectedGuide !== null) return "guide";
     return e.selection.some((item) => item.part === "point") ? "points" : "none";
   });
+  // Every control in the transform section acts on the points selected, and is
+  // dead without them — so with none, the section has nothing in it.
   const selectedPoints = useStoreValue(
     (s) => s.session.editor.selection.filter((item) => item.part === "point").length,
   );
+
+  // Something picked up is what is being worked on: its tab comes forward. Only
+  // when the selection becomes something, so a tab chosen by hand while it
+  // stays the same is left alone.
+  const was = useRef(focus);
+  useEffect(() => {
+    if (focus !== was.current && focus !== "none") store.showInspectorTab("selection");
+    was.current = focus;
+  }, [focus, store]);
 
   // The field is only a draft until it is committed, so it holds its own text.
   // Reset when the open glyph changes, or it would show the last glyph's name.
@@ -78,7 +88,6 @@ export function Inspector(): React.JSX.Element | null {
   // be marked invalid the moment it was opened.
   const wrong = draftName !== glyphName && refusal !== null && refusal !== "missing";
 
-  const drag = useRef<{ dx: number; dy: number } | null>(null);
   const resizing = useRef(false);
 
   if (!open) return null;
@@ -98,69 +107,30 @@ export function Inspector(): React.JSX.Element | null {
     store.applyTool(renameCurrentGlyph(store.editor, draftName));
   };
 
+  const transform = (
+    <Section
+      name="transform"
+      title="Transform"
+      icon={ScalingIcon}
+      relevant={false}
+      empty={selectedPoints === 0}
+      // Shorter than the others say it: beside this title the longer
+      // words ran to a second line.
+      emptyNote="no selection"
+      note={selectedPoints === 0 ? undefined : `${String(selectedPoints)} selected`}
+    >
+      <TransformPanel />
+    </Section>
+  );
+
   return (
     <aside
       className={styles.panel}
-      data-dock={dock === "float" ? undefined : dock}
-      style={
-        dock === "float"
-          ? {
-              left: `${shownX}px`,
-              top: `${shownY}px`,
-              // How much of the drawing lies below the panel's top, for its
-              // body to scroll within. Unset until the canvas has been measured.
-              ...(room > 1 ? { "--inspector-room": `${room - shownY}px` } : {}),
-            }
-          : { width: `${width}px`, flex: `0 0 ${width}px` }
-      }
+      data-dock={dock}
+      style={{ width: `${width}px`, flex: `0 0 ${width}px` }}
       aria-label="Glyph inspector"
     >
-      <header
-        className={styles.grip}
-        onPointerDown={(event) => {
-          event.currentTarget.setPointerCapture(event.pointerId);
-          // A docked panel is not where the pointer went down relative to its
-          // own left edge, so dragging one out starts from under the cursor
-          // rather than from a position it does not have.
-          // Floating, it is placed within the workspace it lies over, which in
-          // a split window does not start at the window's corner.
-          const origin = event.currentTarget
-            .closest("aside")
-            ?.parentElement?.getBoundingClientRect() ?? { left: 0, top: 0 };
-          drag.current =
-            dock === "float"
-              ? { dx: event.clientX - shownX, dy: event.clientY - shownY }
-              : { dx: width / 2 + origin.left, dy: 8 + origin.top };
-        }}
-        onPointerMove={(event) => {
-          const from = drag.current;
-          if (from === null) return;
-
-          // Dragging to an edge docks, dragging away from one undocks. The
-          // panel goes where it is put, which is the gesture anybody would try
-          // first — the button in the header is for the people who would not.
-          const edge = edgeAt(event.clientX, event.currentTarget);
-          if (edge !== null) {
-            store.dockInspector(edge);
-            return;
-          }
-          if (dock !== "float") store.dockInspector("float");
-          store.moveInspector(
-            Math.max(0, event.clientX - from.dx),
-            Math.max(0, event.clientY - from.dy),
-          );
-        }}
-        onPointerUp={(event) => {
-          event.currentTarget.releasePointerCapture(event.pointerId);
-          drag.current = null;
-        }}
-      >
-        {/* The panel is dragged by its header, and nothing said so. Lucide's
-            grip, which is the mark every draggable thing in every application
-            carries. */}
-        <span className={styles.gripMark} aria-hidden="true">
-          <GripVerticalIcon />
-        </span>
+      <header className={styles.grip}>
         {/* The name is a reference — components place a glyph by it and kerning
             names it on both sides of a pair — so renaming is an edit rather
             than relabelling, and it belongs with the other fields that edit
@@ -183,7 +153,6 @@ export function Inspector(): React.JSX.Element | null {
           }
           data-invalid={wrong ? "true" : undefined}
           readOnly={refusal === "reserved"}
-          onPointerDown={(event) => event.stopPropagation()}
           onChange={(event) => setDraftName(event.target.value)}
           onBlur={commitName}
           onKeyDown={(event) => {
@@ -195,16 +164,12 @@ export function Inspector(): React.JSX.Element | null {
             event.stopPropagation();
           }}
         />
-        {/* The same two states the drag reaches, for a pointer that would
-            rather press something than throw the panel at a wall. */}
         <button
           type="button"
           className={styles.dock}
-          title={dock === "float" ? "Dock to the right" : "Float over the drawing"}
-          aria-label={dock === "float" ? "Dock the inspector" : "Float the inspector"}
-          aria-pressed={dock !== "float"}
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={() => store.dockInspector(dock === "float" ? "right" : "float")}
+          title={dock === "right" ? "Move to the left edge" : "Move to the right edge"}
+          aria-label={dock === "right" ? "Move the inspector left" : "Move the inspector right"}
+          onClick={() => store.dockInspector(dock === "right" ? "left" : "right")}
         >
           {dock === "left" ? <PanelLeftIcon /> : <PanelRightIcon />}
         </button>
@@ -219,31 +184,48 @@ export function Inspector(): React.JSX.Element | null {
         </button>
       </header>
 
-      {dock === "float" ? null : (
-        // Dragged rather than typed, because the width somebody wants is the
-        // one where their letter still fits beside it.
-        <div
-          className={styles.resizer}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="Inspector width"
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
-            resizing.current = true;
-          }}
-          onPointerMove={(event) => {
-            if (!resizing.current) return;
-            const pane = paneEdges(event.currentTarget);
-            store.resizeInspector(
-              dock === "right" ? pane.right - event.clientX : event.clientX - pane.left,
-            );
-          }}
-          onPointerUp={(event) => {
-            event.currentTarget.releasePointerCapture(event.pointerId);
-            resizing.current = false;
-          }}
-        />
-      )}
+      {/* Dragged rather than typed, because the width somebody wants is the
+          one where their letter still fits beside it. */}
+      <div
+        className={styles.resizer}
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Inspector width"
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          resizing.current = true;
+        }}
+        onPointerMove={(event) => {
+          if (!resizing.current) return;
+          const pane = paneEdges(event.currentTarget);
+          store.resizeInspector(
+            dock === "right" ? pane.right - event.clientX : event.clientX - pane.left,
+          );
+        }}
+        onPointerUp={(event) => {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+          resizing.current = false;
+        }}
+      />
+
+      <div className={styles.tabs} role="tablist" aria-label="What the inspector shows">
+        {TABS.map(({ key, title, icon: Icon }) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            id={`inspector-tab-${key}`}
+            className={styles.tab}
+            aria-selected={tab === key}
+            aria-controls="inspector-tab-body"
+            aria-label={title}
+            title={title}
+            onClick={() => store.showInspectorTab(key)}
+          >
+            <Icon />
+          </button>
+        ))}
+      </div>
 
       {/* Every glyph in the font, offered to the fields that name one: a
           component's base, and where a glyph takes its spacing from. Here
@@ -256,63 +238,48 @@ export function Inspector(): React.JSX.Element | null {
         ))}
       </datalist>
 
-      <div className={styles.body}>
-        {ordered(focus).map((key) => (
-          <Fragment key={key}>
-            {key === "glyph" ? <GlyphSection /> : null}
-            {key === "pixels" ? <PixelsSection /> : null}
-            {key === "layers" ? <LayersSection /> : null}
-            {key === "components" ? <ComponentsSection /> : null}
-            {key === "anchors" ? <AnchorsSection /> : null}
-            {key === "tracing" ? <TracingSection /> : null}
-            {key === "guides" ? <GuidesSection /> : null}
-            {key === "point" ? <PointSection /> : null}
-            {key === "curve" ? <CurveSection /> : null}
-            {key === "pen" ? <PenSection /> : null}
-            {key === "transform" ? (
-              <Section
-                name="transform"
-                title="Transform"
-                icon={ScalingIcon}
-                relevant={false}
-                empty={selectedPoints === 0}
-                // Shorter than the others say it: beside this title the longer
-                // words ran to a second line.
-                emptyNote="no selection"
-                note={selectedPoints === 0 ? undefined : `${String(selectedPoints)} selected`}
-              >
-                <TransformPanel />
-              </Section>
-            ) : null}
-          </Fragment>
-        ))}
+      <div
+        className={styles.body}
+        id="inspector-tab-body"
+        role="tabpanel"
+        aria-labelledby={`inspector-tab-${tab}`}
+      >
+        {tab === "selection" ? (
+          <>
+            {focus === "component" ? <ComponentsSection /> : null}
+            {focus === "anchor" ? <AnchorsSection /> : null}
+            {focus === "guide" ? <GuidesSection /> : null}
+            <PointSection />
+            <CurveSection />
+            <PenSection />
+            {transform}
+          </>
+        ) : null}
+        {tab === "glyph" ? (
+          <>
+            <GlyphSection />
+            <ComponentsSection />
+            <PixelsSection />
+          </>
+        ) : null}
+        {tab === "layers" ? <LayersSection /> : null}
+        {tab === "marks" ? (
+          <>
+            <AnchorsSection />
+            <GuidesSection />
+          </>
+        ) : null}
+        {tab === "tracing" ? <TracingSection /> : null}
       </div>
     </aside>
   );
 }
 
 /**
- * How near a window edge counts as being at it, in pixels.
- *
- * Wide enough to hit while moving a panel about, narrow enough that dragging
- * the panel to a corner of the drawing does not dock it by surprise.
- */
-const EDGE = 48;
-
-/** Which side of its pane a drag is at, if it is at one. */
-function edgeAt(clientX: number, inside: Element): "left" | "right" | null {
-  const pane = paneEdges(inside);
-  if (clientX <= pane.left + EDGE) return "left";
-  if (clientX >= pane.right - EDGE) return "right";
-  return null;
-}
-
-/**
  * The left and right edges of the pane the inspector is in.
  *
  * The window's, in a window of one. In a split window the drawing may be the
- * right-hand pane, and docking to the window's left edge would put the panel in
- * the other pane's workspace.
+ * right-hand pane, and the inspector's width is measured from that pane's edge.
  */
 function paneEdges(inside: Element): { left: number; right: number } {
   const pane = inside.closest("[data-pane]");
@@ -320,44 +287,12 @@ function paneEdges(inside: Element): { left: number; right: number } {
 }
 
 type Focus = "points" | "component" | "anchor" | "guide" | "none";
-type SectionKey =
-  | "glyph"
-  | "layers"
-  | "components"
-  | "anchors"
-  | "tracing"
-  | "guides"
-  | "point"
-  | "curve"
-  | "pen"
-  | "pixels"
-  | "transform";
 
-/** The glyph's own sections first, as they have always been, then the selection's. */
-const USUAL: readonly SectionKey[] = [
-  "glyph",
-  "pixels",
-  "layers",
-  "components",
-  "anchors",
-  "tracing",
-  "guides",
-  "point",
-  "curve",
-  "pen",
-  "transform",
+/** The tabs, in order, each with the mark its section has wherever else it appears. */
+const TABS: readonly { key: InspectorTab; title: string; icon: IconComponent }[] = [
+  { key: "selection", title: "Selection", icon: PointIcon },
+  { key: "glyph", title: "Glyph", icon: TypeIcon },
+  { key: "layers", title: "Layers", icon: LayersIcon },
+  { key: "marks", title: "Anchors and guides", icon: AnchorIcon },
+  { key: "tracing", title: "Tracing", icon: ImageIcon },
 ];
-
-/** The sections about each kind of selection, brought to the top while it is selected. */
-const LEADING: Readonly<Record<Focus, readonly SectionKey[]>> = {
-  points: ["point", "curve", "pen", "transform"],
-  component: ["components"],
-  anchor: ["anchors"],
-  guide: ["guides"],
-  none: [],
-};
-
-function ordered(focus: Focus): SectionKey[] {
-  const first = LEADING[focus];
-  return [...first, ...USUAL.filter((key) => !first.includes(key))];
-}

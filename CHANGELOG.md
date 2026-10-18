@@ -8,6 +8,14 @@ be what it is, phase by phase, is in the [roadmap](docs/roadmap.md).
 
 ## Unreleased
 
+### Changed
+
+- **The inspector has tabs.** Eleven sections stacked in one panel had become a list to scroll
+  through. It is now a column at the edge of the drawing with a tab for each thing it is about:
+  Selection, Glyph, Layers, Anchors and guides, Tracing. Selecting something brings the
+  Selection tab forward. It no longer floats over the drawing; the button in its header moves
+  it to the other edge, and I still hides it.
+
 ## 0.2.4
 
 ### Fixed

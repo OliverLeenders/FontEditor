@@ -88,6 +88,7 @@ import {
 import type { PaneIndex } from "../layout.js";
 import {
   type InspectorDock,
+  type InspectorTab,
   type PaneViews,
   type ThemeChoice,
   type ViewSettings,
@@ -110,9 +111,8 @@ import {
 import { type FontHost, type ImportReport, importFont, newFont, showDocument } from "./fonts.js";
 import {
   dockInspector,
-  moveInspector,
-  reclampInspector,
   resizeInspector,
+  showInspectorTab,
   toggleInspector,
   toggleInspectorSection,
 } from "./inspector.js";
@@ -183,6 +183,7 @@ export { DEFAULT_PREFERENCES } from "../preferences.js";
 export type {
   InspectorDock,
   InspectorPlacement,
+  InspectorTab,
   PaneViews,
   Preferences,
   ThemeChoice,
@@ -1406,20 +1407,16 @@ export class EditorStore {
 
   // ---- where the inspector is -------------------------------------------
 
-  moveInspector(x: number, y: number): void {
-    moveInspector(this.host, x, y);
-  }
-
-  reclampInspector(): void {
-    reclampInspector(this.host);
-  }
-
   resizeInspector(width: number): void {
     resizeInspector(this.host, width);
   }
 
   dockInspector(dock: InspectorDock): void {
     dockInspector(this.host, dock);
+  }
+
+  showInspectorTab(tab: InspectorTab): void {
+    showInspectorTab(this.host, tab);
   }
 
   toggleInspectorSection(name: string, open: boolean): void {

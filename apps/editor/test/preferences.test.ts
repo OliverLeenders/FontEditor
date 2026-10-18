@@ -170,10 +170,18 @@ describe("reading preferences", () => {
     expect(loadPreferences().theme).toBe("light");
   });
 
-  it("adopts an inspector position left by the version before this one", () => {
+  it("adopts an inspector left by the version before this one", () => {
     localStorage.setItem("fonteditor.inspector", JSON.stringify({ x: 120, y: 90, open: false }));
     const read = loadPreferences();
-    expect(read.inspector).toEqual({ ...DEFAULT_PLACEMENT, x: 120, y: 90, open: false });
+    expect(read.inspector).toEqual({ ...DEFAULT_PLACEMENT, open: false });
+  });
+
+  it("makes an inspector left floating a column at the right", () => {
+    localStorage.setItem(
+      "typewright.preferences",
+      JSON.stringify({ inspector: { dock: "float", width: 300, tab: "layers" } }),
+    );
+    expect(loadPreferences().inspector).toMatchObject({ dock: "right", width: 300, tab: "layers" });
   });
 });
 
@@ -257,9 +265,10 @@ describe("preferences and the store", () => {
     expect(store.getState().views[1].outlineWidth).toBe(4);
   });
 
-  it("keeps the inspector where it was put", () => {
+  it("keeps the inspector where it was put, and the tab it was showing", () => {
     const first = new EditorStore();
-    first.moveInspector(200, 150);
+    first.dockInspector("left");
+    first.showInspectorTab("layers");
     const placed = first.getState().inspector;
 
     expect(new EditorStore().getState().inspector).toEqual(placed);

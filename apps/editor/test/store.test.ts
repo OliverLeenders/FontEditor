@@ -206,18 +206,6 @@ describe("EditorStore", () => {
       expect(store.getState().views[1].showCurvature).toBe(true);
       expect(store.getState().views[0].showCurvature).toBe(false);
     });
-
-    it("keeps the inspector on screen when the window is small", () => {
-      store.moveInspector(5000, 5000);
-      expect(store.getState().inspector.x).toBeLessThanOrEqual(1200);
-      expect(store.getState().inspector.y).toBeLessThanOrEqual(800);
-    });
-
-    it("never puts the inspector at a negative position", () => {
-      store.moveInspector(-500, -500);
-      expect(store.getState().inspector.x).toBe(0);
-      expect(store.getState().inspector.y).toBe(0);
-    });
   });
 
   describe("stepping through the font", () => {

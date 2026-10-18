@@ -159,22 +159,20 @@ describe("the status bar", () => {
 describe("the inspector", () => {
   const order = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
 
-  it("leads with the point's sections while points are selected", () => {
+  it("shows the point's sections while points are selected, and not the glyph's", () => {
     render(<Inspector />, withSelection());
     const titles = order();
-    const point = titles.findIndex((t) => t.startsWith("Point"));
-    const glyph = titles.findIndex((t) => t.startsWith("Glyph"));
-    expect(point).toBeGreaterThanOrEqual(0);
-    expect(point).toBeLessThan(glyph);
+    expect(titles.some((t) => t.startsWith("Point"))).toBe(true);
+    expect(titles.some((t) => t.startsWith("Glyph"))).toBe(false);
   });
 
-  it("keeps the glyph's own first with nothing selected", () => {
+  it("leads with the glyph's own on its tab", () => {
     const store = withSelection();
     act(() => {
       store.setEditor({ ...store.editor, selection: [] });
+      store.showInspectorTab("glyph");
     });
     render(<Inspector />, store);
-    const titles = order();
-    expect(titles[0]).toMatch(/^Glyph/);
+    expect(order()[0]).toMatch(/^Glyph/);
   });
 });

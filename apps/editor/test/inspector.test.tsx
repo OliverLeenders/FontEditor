@@ -32,6 +32,11 @@ afterEach(() => {
   cleanup();
 });
 
+/** Show one of the inspector's tabs, as a click on it does. */
+function showTab(name: string): void {
+  fireEvent.click(screen.getByRole("tab", { name }));
+}
+
 /** The store, with something on the current glyph worth inspecting. */
 function withFurniture() {
   const store = freshStore();
@@ -53,6 +58,7 @@ describe("anchors in the inspector", () => {
   it("lists them, with where they are", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     expect(screen.getByLabelText<HTMLInputElement>("X of the anchor top").value).toBe("100");
     expect(screen.getByLabelText<HTMLInputElement>("Y of the anchor top").value).toBe("500");
@@ -61,6 +67,7 @@ describe("anchors in the inspector", () => {
   it("renames one, which is what a panel is for", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.change(screen.getByLabelText(/Name of the anchor/), {
       target: { value: "_top" },
@@ -73,6 +80,7 @@ describe("anchors in the inspector", () => {
   it("moves one to an exact place", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.change(screen.getByLabelText("Y of the anchor top"), { target: { value: "640" } });
 
@@ -83,6 +91,7 @@ describe("anchors in the inspector", () => {
   it("takes one away", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.click(screen.getByLabelText("Remove the anchor top"));
 
@@ -94,6 +103,7 @@ describe("guides in the inspector", () => {
   it("shows the glyph's own, and says which scope it is in", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     expect(screen.getByLabelText<HTMLInputElement>("X of the guide stem").value).toBe("60");
     expect(screen.getByLabelText<HTMLInputElement>("Angle of the guide stem").value).toBe("90");
@@ -103,6 +113,7 @@ describe("guides in the inspector", () => {
   it("hands one to the whole font, and takes it back", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.click(screen.getByRole("button", { name: "glyph" }));
 
@@ -118,6 +129,7 @@ describe("guides in the inspector", () => {
   it("turns one to an angle typed in, brought into range", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.change(screen.getByLabelText("Angle of the guide stem"), {
       target: { value: "-12" },
@@ -131,6 +143,7 @@ describe("guides in the inspector", () => {
   it("names one", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.change(screen.getByLabelText(/Name of the guide/), {
       target: { value: "overshoot" },
@@ -144,6 +157,7 @@ describe("guides in the inspector", () => {
   it("takes one away", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.click(screen.getByLabelText("Remove the guide stem"));
 
@@ -154,6 +168,7 @@ describe("guides in the inspector", () => {
 describe("what the inspector says when there is nothing to say", () => {
   it("points at the canvas rather than showing an empty list", () => {
     render(<Inspector />);
+    showTab("Anchors and guides");
     // Empty, so the section is folded and says so: opening it is what somebody
     // looking for where anchors come from would do, and the answer is there
     // when they do.
@@ -175,6 +190,7 @@ describe("folding the inspector", () => {
   it("opens a section that has something in it and folds one that does not", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     // Both have one thing in them, so both are open without anyone saying so.
     expect(screen.getByLabelText("X of the anchor top")).toBeTruthy();
@@ -186,6 +202,7 @@ describe("folding the inspector", () => {
   it("remembers the fold rather than the state", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.click(screen.getByRole("button", { name: /^Anchors/ }));
 
@@ -196,6 +213,7 @@ describe("folding the inspector", () => {
   it("unfolds one that would have stayed shut", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     fireEvent.click(screen.getByRole("button", { name: /^Guides/ }));
     fireEvent.click(screen.getByRole("button", { name: /^Guides/ }));
@@ -225,6 +243,7 @@ describe("a section with nothing in it", () => {
   it("opens when it is asked to, so what is in it can still be reached", () => {
     const store = freshStore();
     render(<Inspector />, store);
+    showTab("Layers");
 
     fireEvent.click(screen.getByRole("button", { name: /^Layers/ }));
 
@@ -237,6 +256,7 @@ describe("a section with nothing in it", () => {
   it("folds again when what filled it goes away, and the choice comes back", () => {
     const store = withFurniture();
     render(<Inspector />, store);
+    showTab("Anchors and guides");
 
     // Held open by a choice, with a guide in it.
     fireEvent.click(screen.getByRole("button", { name: /^Guides/ }));
@@ -260,29 +280,51 @@ describe("a section with nothing in it", () => {
   });
 });
 
+describe("the inspector's tabs", () => {
+  it("shows one at a time, the selection's to begin with", () => {
+    const store = freshStore();
+    render(<Inspector />, store);
+    expect(screen.getByRole("tab", { name: "Selection" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /^Point/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Layers/ })).toBeNull();
+
+    showTab("Layers");
+    expect(store.getState().inspector.tab).toBe("layers");
+    expect(screen.getByRole("button", { name: /^Layers/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Point/ })).toBeNull();
+  });
+
+  it("comes to the selection when something is picked up, and leaves a tab chosen alone till then", () => {
+    const store = withFurniture();
+    render(<Inspector />, store);
+    showTab("Anchors and guides");
+    expect(store.getState().inspector.tab).toBe("marks");
+
+    act(() => {
+      store.setEditor({ ...store.editor, selectedAnchor: "test-a" });
+    });
+    expect(store.getState().inspector.tab).toBe("selection");
+    // The anchor picked up leads the Selection tab.
+    expect(screen.getByLabelText("X of the anchor top")).toBeTruthy();
+
+    showTab("Glyph");
+    expect(store.getState().inspector.tab).toBe("glyph");
+  });
+});
+
 describe("docking the inspector", () => {
   it("takes a side, and comes back from it", () => {
     const store = freshStore();
     render(<Inspector />, store);
 
-    fireEvent.click(screen.getByLabelText("Dock the inspector"));
     expect(store.getState().inspector.dock).toBe("right");
+    fireEvent.click(screen.getByLabelText("Move the inspector left"));
+    expect(store.getState().inspector.dock).toBe("left");
 
-    fireEvent.click(screen.getByLabelText("Float the inspector"));
-    expect(store.getState().inspector.dock).toBe("float");
-  });
-
-  it("keeps where it floated, so undocking puts it back", () => {
-    const store = freshStore();
-    act(() => {
-      store.moveInspector(300, 200);
-    });
-    render(<Inspector />, store);
-
-    fireEvent.click(screen.getByLabelText("Dock the inspector"));
-
-    expect(store.getState().inspector.x).toBe(300);
-    expect(store.getState().inspector.y).toBe(200);
+    fireEvent.click(screen.getByLabelText("Move the inspector right"));
+    expect(store.getState().inspector.dock).toBe("right");
   });
 
   it("will not be made narrower than it can show a field in", () => {
@@ -353,6 +395,7 @@ describe("turning a component over", () => {
 describe("the glyph at the sizes it is used at", () => {
   it("is folded until asked for, and then offers three sizes with one close up", () => {
     render(<Inspector />);
+    showTab("Glyph");
     const heading = screen.getByRole("button", { name: /^Pixels/ });
     expect(screen.queryByRole("group", { name: "Size shown close up" })).toBeNull();
 

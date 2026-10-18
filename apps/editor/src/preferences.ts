@@ -46,23 +46,35 @@ import {
 export type ThemeChoice = "system" | "light" | "dark";
 
 /**
- * Where the inspector sits: over the drawing, or in a column beside it.
+ * Which edge of the drawing the inspector is a column at.
  *
- * Floating is right for a panel you consult; docked is right for one you work
- * out of all day, which is what this turned out to be. Both, because which of
- * the two a person wants depends on how wide their screen is and on whether the
- * letter they are drawing is a `l` or a `W`.
+ * It used to float over the drawing as well. With a tab for each thing it is
+ * about, it is a panel worked out of all day, and a panel over the drawing
+ * covers what is being worked on: so it is a column, at one edge or the other.
  */
-export type InspectorDock = "float" | "left" | "right";
+export type InspectorDock = "left" | "right";
+
+/**
+ * The inspector's tabs, one shown at a time: what is selected, the glyph, its
+ * layers, its anchors and guides, and the picture it is traced from.
+ */
+export type InspectorTab = "selection" | "glyph" | "layers" | "marks" | "tracing";
+
+export const INSPECTOR_TABS: readonly InspectorTab[] = [
+  "selection",
+  "glyph",
+  "layers",
+  "marks",
+  "tracing",
+];
 
 export type InspectorPlacement = {
-  /** Where it floats. Kept while docked, so undocking puts it back. */
-  readonly x: number;
-  readonly y: number;
   readonly open: boolean;
   readonly dock: InspectorDock;
-  /** How wide the column is when docked. Ignored while floating. */
+  /** How wide the column is. */
   readonly width: number;
+  /** The tab showing. */
+  readonly tab: InspectorTab;
   /**
    * Which sections have been folded or unfolded by hand, by name.
    *
@@ -259,11 +271,10 @@ export const MIN_DOCK_WIDTH = 200;
 export const MAX_DOCK_WIDTH = 460;
 
 export const DEFAULT_PLACEMENT: InspectorPlacement = {
-  x: 24,
-  y: 24,
   open: true,
-  dock: "float",
+  dock: "right",
   width: DOCK_WIDTH,
+  tab: "selection",
   sections: {},
 };
 
@@ -285,23 +296,6 @@ export const DEFAULT_PREFERENCES: Preferences = {
   inspector: DEFAULT_PLACEMENT,
   split: DEFAULT_SPLIT,
 };
-
-/**
- * Keep enough of the panel on screen to grab it again.
- *
- * A floating panel that can be dragged fully off the edge is a floating panel
- * you cannot get back — and the position is remembered, so it would still be
- * gone after a reload.
- */
-export function clampInspector(x: number, y: number): { x: number; y: number } {
-  const grip = 80;
-  const maxX = Math.max(0, window.innerWidth - grip);
-  const maxY = Math.max(0, window.innerHeight - 28);
-  return {
-    x: Math.min(Math.max(0, x), maxX),
-    y: Math.min(Math.max(0, y), maxY),
-  };
-}
 
 /**
  * Read the preferences, field by field.
@@ -352,10 +346,10 @@ export function loadPreferences(): Preferences {
     proofTextSettings: textSettingsOf(raw["proofTextSettings"]),
     proofBlocks: proofBlocksOf(raw["proofBlocks"]),
     inspector: {
-      x: number(inspector["x"], DEFAULT_PLACEMENT.x, {}),
-      y: number(inspector["y"], DEFAULT_PLACEMENT.y, {}),
       open: boolean(inspector["open"], DEFAULT_PLACEMENT.open),
+      // A panel left floating by an older version is a column at the right.
       dock: isDock(inspector["dock"]) ? inspector["dock"] : DEFAULT_PLACEMENT.dock,
+      tab: isTab(inspector["tab"]) ? inspector["tab"] : DEFAULT_PLACEMENT.tab,
       width: number(inspector["width"], DEFAULT_PLACEMENT.width, {
         min: MIN_DOCK_WIDTH,
         max: MAX_DOCK_WIDTH,
@@ -374,8 +368,10 @@ export function loadPreferences(): Preferences {
   };
 }
 
-const isDock = (value: unknown): value is InspectorDock =>
-  value === "float" || value === "left" || value === "right";
+const isDock = (value: unknown): value is InspectorDock => value === "left" || value === "right";
+
+const isTab = (value: unknown): value is InspectorTab =>
+  INSPECTOR_TABS.includes(value as InspectorTab);
 
 const isControlSize = (value: unknown): value is ControlSize =>
   CONTROL_SIZES.includes(value as ControlSize);

@@ -296,7 +296,6 @@ export function App(): React.JSX.Element {
         event.preventDefault();
       }
     };
-    const onResize = (): void => store.reclampInspector();
     // Whatever was begun and left, and failed with nobody waiting for it. Not
     // prevented: the console still has it, with where it came from.
     const onUnhandled = (event: PromiseRejectionEvent): void => {
@@ -317,7 +316,6 @@ export function App(): React.JSX.Element {
     window.addEventListener("keyup", onKeyUp);
     window.addEventListener("blur", onBlur);
     window.addEventListener("beforeunload", onUnload);
-    window.addEventListener("resize", onResize);
     return () => {
       window.removeEventListener("error", onError);
       window.removeEventListener("unhandledrejection", onUnhandled);
@@ -325,7 +323,6 @@ export function App(): React.JSX.Element {
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("beforeunload", onUnload);
-      window.removeEventListener("resize", onResize);
     };
   }, [store]);
 
@@ -509,10 +506,7 @@ export function App(): React.JSX.Element {
         return (
           <>
             <Toolbar />
-            <div
-              className={`${styles.stage} ${styles.editing}`}
-              data-dock={dock === "float" ? undefined : dock}
-            >
+            <div className={`${styles.stage} ${styles.editing}`} data-dock={dock}>
               {/* The canvas in a box of its own, so a docked inspector sits
                   beside it rather than over it and the drawing gets the rest. */}
               <div className={styles.drawing}>
