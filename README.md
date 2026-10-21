@@ -2,6 +2,8 @@
 
 <img src="brand/mark.svg" alt="" width="88" align="right">
 
+*If my work has been of use for you, feel free to [buy me a coffee](https://buymeacoffee.com/oliverleenders)
+
 A font editor that runs in a browser and ships as a desktop application. It draws,
 spaces, interpolates and exports a whole family — masters, instances, static fonts and
 variable fonts — and it offers **Tunni lines** as an additional way to control cubic
